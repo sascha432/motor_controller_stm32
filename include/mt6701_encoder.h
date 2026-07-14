@@ -24,38 +24,42 @@ struct MT6701Config {
 
     static constexpr uint8_t MT6701_ADDR = 0x06;
 
-    bool init() {
+    MT6701Config(I2CHelper &i2c) : i2c(i2c) 
+    {
+    }
+
+    /**
+     * @brief check if the encoder is detected on the I2C bus
+     * 
+     * @return true if the encoder is detected
+     * @return false if the encoder is not detected
+     */
+    bool init() 
+    {
         return i2c.sendBytes(MT6701_ADDR, nullptr, 0);
-        // Wire.beginTransmission(MT6701_ADDR);
-        // return (Wire.endTransmission() == 0);
     }
 
-    uint8_t readRegister(uint8_t reg) const {
-        i2c.sendByte(MT6701_ADDR, reg, false);
-        return i2c.readByte(MT6701_ADDR);
-        // Wire.beginTransmission(MT6701_ADDR);
-        // Wire.write(reg);
-        // Wire.endTransmission(false);
-        // Wire.requestFrom(MT6701_ADDR, (uint8_t)1);
-        // return Wire.available() ? Wire.read() : 0xFF;
-    }
-
-    bool writeRegister(uint8_t reg, uint8_t value) const {
-        uint8_t buf[2] = { reg, value };
-        return i2c.sendBytes(MT6701_ADDR, buf, sizeof(buf), true);
-        // Wire.beginTransmission(MT6701_ADDR);
-        // Wire.write(reg);
-        // Wire.write(value);
-        // return (Wire.endTransmission() == 0);
-    }    
-
-    uint16_t getPPR() const {
+    /**
+     * @brief read PPR from encoder
+     * 
+     * @return uint16_t pulses per revolution
+     */
+    uint16_t getPPR() const 
+    {
         uint8_t high = readRegister(REG_ABZ_RES_HIGH);
         uint8_t low  = readRegister(REG_ABZ_RES_LOW);
         return (((uint16_t)high << 8) | (low)) + 1;
     }    
 
-    bool setPPR(uint16_t ppr) const {
+    /**
+     * @brief set PPR of the encoder
+     * 
+     * @param ppr set pulses per revolution
+     * @return true if the PPR was set successfully
+     * @return false if an error occurred
+     */
+    bool setPPR(uint16_t ppr) const 
+    {
         uint16_t res_value = ppr - 1;
         uint8_t high = (res_value >> 8);
         uint8_t low  = (res_value) & 0xff;
@@ -72,8 +76,14 @@ struct MT6701Config {
         return (getPPR() == ppr);
     }
 
-    // requires 4.5V supply voltage for programming
-    bool writeEEPROM() {
+    /**
+     * @brief store settings in EEPROM, requires 4.5V supply voltage for programming
+     * 
+     * @return true if the settings were stored successfully
+     * @return false if an error occurred
+     */
+    bool writeEEPROM() 
+    {
         // Programming unlock + commit
         if (!writeRegister(REG_PROG_KEY, CMD_UNLOCK)) {
             return false;
@@ -86,6 +96,22 @@ struct MT6701Config {
         return true;
     }
 
+private:
+    uint8_t readRegister(uint8_t reg) const 
+    {
+        if (!i2c.sendByte(MT6701_ADDR, reg, false)) {
+            return 0xff;
+        }
+        return i2c.readByte(MT6701_ADDR);
+    }
+
+    bool writeRegister(uint8_t reg, uint8_t value) const 
+    {
+        uint8_t buf[2] = { reg, value };
+        return i2c.sendBytes(MT6701_ADDR, buf, sizeof(buf), true);
+    }    
+
+    I2CHelper &i2c;
 };
 
 /**
@@ -98,7 +124,13 @@ struct MT6701Config {
 template<uint8_t GPIO_PIN, uint32_t GPIO_PORT_ADDR, bool ACTIVE_LOW_I2C>
 struct MT6701Encoder {
 
-    void setI2CEnablePin(bool state) {
+    /**
+     * @brief select encoder mode
+     * 
+     * @param state true to enable I2C mode, false to enable A/B mode
+     */
+    void setI2CEnablePin(bool state) 
+    {
         (ACTIVE_LOW_I2C ? !state : state) ?
             (((GPIO_TypeDef *)GPIO_PORT_ADDR)->BSRR = (1 << digitalPinToBit(GPIO_PIN))) : 
             (((GPIO_TypeDef *)GPIO_PORT_ADDR)->BRR  = (1 << digitalPinToBit(GPIO_PIN)))
@@ -107,7 +139,11 @@ struct MT6701Encoder {
         delayMicroseconds(10);
     }
 
-    void init() {
+    /**
+     * @brief initialize the encoder in A/B mode
+     */
+    void init() 
+    {
         // Enable GPIOx clock
         RCC->APB2ENR |= RCC_APB2ENR_IOPxEN(GPIO_PORT_ADDR); 
 
@@ -124,8 +160,11 @@ struct MT6701Encoder {
      * 
      * To store the settings in the EEPROM, the MT6701 requires a 4.5V supply voltage
      * 
+     * @param i2c I2C helper instance
+     * @param ppr set pulses per revolution
+     * @param writeEEPROM whether to write the settings to EEPROM
      */
-    void programPPR(uint16_t ppr) 
+    void programPPR(I2CHelper &i2c, uint16_t ppr, bool writeEEPROM = false) 
     {
         setI2CEnablePin(!ACTIVE_LOW_I2C);
 
@@ -133,11 +172,13 @@ struct MT6701Encoder {
         i2c.deinitI2C1();
         i2c.initI2C1();
 
-        MT6701Config config;
+        MT6701Config config(i2c);
         Serial.print("MT6701 ");
         if (config.init()) {
             config.setPPR(ppr);
-            // config.writeEEPROM(); // writes disabled
+            if (writeEEPROM) {
+                config.writeEEPROM();
+            }
             Serial.print("PPR: ");
             Serial.println(config.getPPR());
         }

@@ -52,7 +52,7 @@ void setup()
     // === motor encoder ===
     motorEncoder.init();
     if (0) {
-        motorEncoder.programPPR(PidController::kPPR);
+        motorEncoder.programPPR(i2c, PidController::kPPR);
     }
 
     // === buttons ===
@@ -183,7 +183,7 @@ void loop()
                 delay(2000);
             }
             pid.disable();
-            motorEncoder.programPPR(PidController::kPPR);
+            motorEncoder.programPPR(i2c, PidController::kPPR);
             // re-init pid after programming
             pid.initQDECpins();
             pid.enable();

@@ -55,27 +55,10 @@ struct I2CHelper {
         initCommon();
     }   
 
-    void initCommon()
-    {
-        // Reset I2C
-        I2C1->CR1 = I2C_CR1_SWRST;
-        I2C1->CR1 = 0;
-
-        // APB1 = 36 MHz
-        I2C1->CR2 = 36;
-
-        // 100 kHz Standard Mode
-        I2C1->CCR = 180;
-
-        // Maximum rise time
-        I2C1->TRISE = 37;
-
-        // Enable I2C
-        I2C1->CR1 = I2C_CR1_PE;
-
-        delay(10);
-    }
-
+    /**
+     * @brief disable I2C1 and reset PB6, PB7, PB8, PB9 to floating input
+     * 
+     */
     void deinitI2C1()
     {
         // Disable I2C peripheral
@@ -102,18 +85,16 @@ struct I2CHelper {
         delay(10);
     }
 
-    static inline bool I2C_Error() 
-    {
-        I2C1->CR1 |= I2C_CR1_STOP;
-        I2C1->SR1 &= ~I2C_SR1_AF;
-        return false;
-    }
-
-    inline bool isTimeout(uint32_t &counter) {
-        delayMicroseconds(1);
-        return --counter == 0;
-    }
-
+    /**
+     * @brief send data to i2c bus
+     * 
+     * @param address I2C address of the device
+     * @param data Pointer to the data buffer
+     * @param length Number of bytes to send
+     * @param stop Whether to send a STOP condition after transmission
+     * @return true if the transmission was successful
+     * @return false if an error occurred
+     */
     bool sendBytes(uint8_t address, const uint8_t *data, uint16_t length, bool stop = true)
     {
         // START
@@ -158,7 +139,6 @@ struct I2CHelper {
                         return I2C_Error();
                     }
                 }
-
                 I2C1->DR = *data++;
             }
 
@@ -168,7 +148,6 @@ struct I2CHelper {
                     return I2C_Error();
                 }
             }
-
         }
 
         if (stop) {
@@ -177,6 +156,15 @@ struct I2CHelper {
         return true;
     }
 
+    /**
+     * @brief read data from i2c bus
+     * 
+     * @param address I2C address of the device
+     * @param data Pointer to the data buffer
+     * @param length Number of bytes to read
+     * @return true if the read was successful
+     * @return false if an error occurred
+     */
     bool readBytes(uint8_t address, uint8_t *data, uint16_t length)
     {
         if (length == 0) {
@@ -225,7 +213,6 @@ struct I2CHelper {
 
             *data = I2C1->DR;
             I2C1->CR1 |= I2C_CR1_ACK;
-
             return true;
         }
 
@@ -251,16 +238,30 @@ struct I2CHelper {
         }
 
         I2C1->CR1 |= I2C_CR1_ACK;
-
         return true;
     }    
 
+    /**
+     * @brief send a single byte to i2c bus
+     * 
+     * @param address I2C address of the device
+     * @param data Byte to send
+     * @param stop Whether to send a STOP condition after transmission
+     * @return true if the transmission was successful
+     * @return false if an error occurred
+     */
     inline bool sendByte(uint8_t address, uint8_t data, bool stop = true)
     {
         return sendBytes(address, &data, sizeof(data), stop);
     }
 
-    int readByte(uint8_t address)
+    /**
+     * @brief read a single byte from i2c bus
+     * 
+     * @param address I2C address of the device
+     * @return int16_t The read byte, or -1 if an error occurred
+     */
+    int16_t readByte(uint8_t address)
     {
         uint8_t data;
         if (readBytes(address, &data, sizeof(data))) {
@@ -268,6 +269,39 @@ struct I2CHelper {
         }
         return -1;
     }
-};
 
-extern I2CHelper i2c;
+private:
+    void initCommon()
+    {
+        // Reset I2C
+        I2C1->CR1 = I2C_CR1_SWRST;
+        I2C1->CR1 = 0;
+
+        // APB1 = 36 MHz
+        I2C1->CR2 = 36;
+
+        // 100 kHz Standard Mode
+        I2C1->CCR = 180;
+
+        // Maximum rise time
+        I2C1->TRISE = 37;
+
+        // Enable I2C
+        I2C1->CR1 = I2C_CR1_PE;
+
+        delay(10);
+    }
+
+    inline bool I2C_Error() 
+    {
+        I2C1->CR1 |= I2C_CR1_STOP;
+        I2C1->SR1 &= ~I2C_SR1_AF;
+        return false;
+    }
+
+    inline bool isTimeout(uint32_t &counter) 
+    {
+        delayMicroseconds(1);
+        return --counter == 0;
+    }
+};
