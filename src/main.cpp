@@ -39,6 +39,12 @@ static void pid_timer_isr() {
     pid.isr();
 }
 
+extern "C" int _write(int file, char *ptr, int len)
+{
+    Serial.write((uint8_t*)ptr, len);
+    return len;
+}
+
 void setup()
 {
     Serial.begin(115200);
@@ -115,9 +121,7 @@ void loop()
     }
     #if 0
     if (backButton.isReleased()) {
-        Serial.print(millis());
-        Serial.print(' ');
-        Serial.println("BACK BTN RELEASED");
+        DEBUG_PRINTF("BACK BTN RELEASED");
     }
     #endif
     #if 0
@@ -136,6 +140,7 @@ void loop()
     #if 1
     if (backButton.isPressed()) {
         static uint32_t num = 0;
+        DEBUG_PRINTF("BACK BTN PRESSED %u", num);
         switch(num++ % 3) {
             case 0:
                 leds.onLED1();
@@ -167,10 +172,7 @@ void loop()
             digitalWrite(PA5, LOW);
             delay(100);
             NVIC_SystemReset();
-            while(1) {
-                Serial.println("ERROR");
-                delay(1000);
-            }
+            for(;;) {}
             break;
         case 'c':
             pid.printDebug(Serial);
@@ -178,7 +180,7 @@ void loop()
         case 'm':
             // motor must be off and pid controller disabled to program the encoder
             if (pid.running) {
-                Serial.println("MOTOR OFF...");
+                DEBUG_PRINTF("MOTOR OFF...");
                 motorOff();
                 delay(2000);
             }

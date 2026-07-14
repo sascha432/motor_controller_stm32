@@ -6,6 +6,12 @@
 
 #include <Arduino.h>
 
+#if 1
+#define DEBUG_PRINTF(msg, ...)      { printf("%08lu ", millis()); printf(msg "\n", ##__VA_ARGS__); }
+#else
+#define DEBUG_PRINT(...)            ;
+#endif
+
 #define ENC1_A PB6                  // MT6701 A pin
 #define ENC1_B PB7                  // MT6701 B pin
 #define ENC2_A PA6                  // rotary encoder A pin

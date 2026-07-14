@@ -175,17 +175,16 @@ struct MT6701Encoder {
         i2c.initI2C1();
 
         MT6701Config config(i2c);
-        Serial.print("MT6701 ");
         if (config.init()) {
-            config.setPPR(ppr);
-            if (writeEEPROM) {
-                config.writeEEPROM();
+            auto result = config.setPPR(ppr);
+            if (result && writeEEPROM) {
+                result = config.writeEEPROM();
+                DEBUG_PRINTF("MT6701 write EEPROM result: %u", result);
             }
-            Serial.print("PPR: ");
-            Serial.println(config.getPPR());
+            DEBUG_PRINTF("MT6701 PPR: %u", config.getPPR());
         }
         else {
-            Serial.println("ERROR not detected");
+            DEBUG_PRINTF("MT6701 not detected at address 0x%02x", MT6701Config::MT6701_ADDR);
         }
 
         setI2CEnablePin(ACTIVE_LOW_I2C);
