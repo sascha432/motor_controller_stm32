@@ -67,11 +67,12 @@ struct MT6701Config {
         if (!writeRegister(REG_ABZ_RES_HIGH, high)) {
             return false;
         }
-        delay(10);
+        delayMicroseconds(10000);
+
         if (!writeRegister(REG_ABZ_RES_LOW, low)) {
             return false;
         }
-        delay(10);
+        delayMicroseconds(10000);
 
         return (getPPR() == ppr);
     }
@@ -88,11 +89,12 @@ struct MT6701Config {
         if (!writeRegister(REG_PROG_KEY, CMD_UNLOCK)) {
             return false;
         }
-        delay(10);
+        delayMicroseconds(10000);
+
         if (!writeRegister(REG_PROG_CMD, CMD_COMMIT)) {
             return false;
         }
-        delay(1000);  // EEPROM write time
+        delayMicroseconds(800000);  // EEPROM write time
         return true;
     }
 

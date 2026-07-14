@@ -32,7 +32,7 @@ struct I2CHelper {
         GPIOB->CRH &= ~((0xF << 0) | (0xF << 4));
         GPIOB->CRH |=  ((0xF << 0) | (0xF << 4));
 
-        initCommon();
+        initI2C1Common();
     }
 
     /**
@@ -52,7 +52,7 @@ struct I2CHelper {
         GPIOB->CRL &= ~((0xF << (6 * 4)) | (0xF << (7 * 4)));
         GPIOB->CRL |=  ((0xF << (6 * 4)) | (0xF << (7 * 4)));
 
-        initCommon();
+        initI2C1Common();
     }   
 
     /**
@@ -82,11 +82,11 @@ struct I2CHelper {
         // Optional: disable peripheral clock if no longer needed
         RCC->APB1ENR &= ~RCC_APB1ENR_I2C1EN;
 
-        delay(10);
+        delayMicroseconds(10);
     }
 
     /**
-     * @brief send data to i2c bus
+     * @brief send data to I2C bus
      * 
      * @param address I2C address of the device
      * @param data Pointer to the data buffer
@@ -103,7 +103,7 @@ struct I2CHelper {
         uint32_t timeout = kTimeoutMicros;
         while (!(I2C1->SR1 & I2C_SR1_SB)) {
             if (isTimeout(timeout)) {
-                return I2C_Error();
+                return I2CError();
             }
         }
 
@@ -113,11 +113,10 @@ struct I2CHelper {
         timeout = kTimeoutMicros;
         while (!(I2C1->SR1 & I2C_SR1_ADDR)) {
             if (I2C1->SR1 & I2C_SR1_AF) {
-                return I2C_Error();
+                return I2CError();
             }
-
             if (isTimeout(timeout)) {
-                return I2C_Error();
+                return I2CError();
             }
         }
 
@@ -126,17 +125,14 @@ struct I2CHelper {
         (void)I2C1->SR2;
 
         if (length) {
-
             while (length--) {
                 timeout = kTimeoutMicros;
-
                 while (!(I2C1->SR1 & I2C_SR1_TXE)) {
                     if (I2C1->SR1 & I2C_SR1_AF) {
-                        return I2C_Error();
+                        return I2CError();
                     }
-
                     if (isTimeout(timeout)) {
-                        return I2C_Error();
+                        return I2CError();
                     }
                 }
                 I2C1->DR = *data++;
@@ -145,7 +141,7 @@ struct I2CHelper {
             timeout = kTimeoutMicros;
             while (!(I2C1->SR1 & I2C_SR1_BTF)) {
                 if (isTimeout(timeout)) {
-                    return I2C_Error();
+                    return I2CError();
                 }
             }
         }
@@ -157,7 +153,7 @@ struct I2CHelper {
     }
 
     /**
-     * @brief read data from i2c bus
+     * @brief read data from I2C bus
      * 
      * @param address I2C address of the device
      * @param data Pointer to the data buffer
@@ -177,7 +173,7 @@ struct I2CHelper {
         uint32_t timeout = kTimeoutMicros;
         while (!(I2C1->SR1 & I2C_SR1_SB)) {
             if (isTimeout(timeout)) {
-                return I2C_Error();
+                return I2CError();
             }
         }
 
@@ -187,54 +183,38 @@ struct I2CHelper {
         timeout = kTimeoutMicros;
         while (!(I2C1->SR1 & I2C_SR1_ADDR)) {
             if (I2C1->SR1 & I2C_SR1_AF) {
-                return I2C_Error();
+                return I2CError();
             }
-
             if (isTimeout(timeout)) {
-                return I2C_Error();
+                return I2CError();
             }
         }
 
-        // Single byte
-        if (length == 1) {
-            I2C1->CR1 &= ~I2C_CR1_ACK;
-
-            (void)I2C1->SR1;
-            (void)I2C1->SR2;
-
-            I2C1->CR1 |= I2C_CR1_STOP;
-
-            timeout = kTimeoutMicros;
-            while (!(I2C1->SR1 & I2C_SR1_RXNE)) {
-                if (isTimeout(timeout)) {
-                    return false;
-                }
-            }
-
-            *data = I2C1->DR;
-            I2C1->CR1 |= I2C_CR1_ACK;
-            return true;
-        }
-
-        // Multiple bytes
+        // Clear ADDR
         (void)I2C1->SR1;
         (void)I2C1->SR2;
 
-        while (length--) {
-            timeout = kTimeoutMicros;
-
-            while (!(I2C1->SR1 & I2C_SR1_RXNE)) {
-                if (isTimeout(timeout)) {
-                    return I2C_Error();
-                }
-            }
-
-            if (length == 0) {
+        if (length != 0) {
+            // Single byte requires STOP first
+            if (length == 1) {
                 I2C1->CR1 &= ~I2C_CR1_ACK;
                 I2C1->CR1 |= I2C_CR1_STOP;
             }
-
-            *data++ = I2C1->DR;
+            // Read bytes
+            while (length--) {
+                timeout = kTimeoutMicros;
+                while (!(I2C1->SR1 & I2C_SR1_RXNE)) {
+                    if (isTimeout(timeout)) {
+                        return I2CError();
+                    }
+                }
+                *data++ = I2C1->DR;
+            }
+            // Clear ACK after sending the last byte, if not cleared before
+            if (I2C1->CR1 & I2C_CR1_ACK) {
+                I2C1->CR1 &= ~I2C_CR1_ACK;
+                I2C1->CR1 |= I2C_CR1_STOP;
+            }
         }
 
         I2C1->CR1 |= I2C_CR1_ACK;
@@ -271,7 +251,7 @@ struct I2CHelper {
     }
 
 private:
-    void initCommon()
+    void initI2C1Common()
     {
         // Reset I2C
         I2C1->CR1 = I2C_CR1_SWRST;
@@ -289,10 +269,10 @@ private:
         // Enable I2C
         I2C1->CR1 = I2C_CR1_PE;
 
-        delay(10);
+        delayMicroseconds(10);
     }
 
-    inline bool I2C_Error() 
+    inline bool I2CError() 
     {
         I2C1->CR1 |= I2C_CR1_STOP;
         I2C1->SR1 &= ~I2C_SR1_AF;
