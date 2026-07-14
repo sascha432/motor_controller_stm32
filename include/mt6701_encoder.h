@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <Wire.h>
+#include "i2c.h"
 
 /**
  * @brief MT6701 magnetic encoder I2C configuration
@@ -25,24 +25,28 @@ struct MT6701Config {
     static constexpr uint8_t MT6701_ADDR = 0x06;
 
     bool init() {
-        Wire.beginTransmission(MT6701_ADDR);
-        return (Wire.endTransmission() == 0);
+        return i2c.sendBytes(MT6701_ADDR, nullptr, 0);
+        // Wire.beginTransmission(MT6701_ADDR);
+        // return (Wire.endTransmission() == 0);
     }
 
     uint8_t readRegister(uint8_t reg) const {
-        Wire.beginTransmission(MT6701_ADDR);
-        Wire.write(reg);
-        Wire.endTransmission(false);
-
-        Wire.requestFrom(MT6701_ADDR, (uint8_t)1);
-        return Wire.available() ? Wire.read() : 0xFF;
+        i2c.sendByte(MT6701_ADDR, reg, false);
+        return i2c.readByte(MT6701_ADDR);
+        // Wire.beginTransmission(MT6701_ADDR);
+        // Wire.write(reg);
+        // Wire.endTransmission(false);
+        // Wire.requestFrom(MT6701_ADDR, (uint8_t)1);
+        // return Wire.available() ? Wire.read() : 0xFF;
     }
 
     bool writeRegister(uint8_t reg, uint8_t value) const {
-        Wire.beginTransmission(MT6701_ADDR);
-        Wire.write(reg);
-        Wire.write(value);
-        return (Wire.endTransmission() == 0);
+        uint8_t buf[2] = { reg, value };
+        return i2c.sendBytes(MT6701_ADDR, buf, sizeof(buf), true);
+        // Wire.beginTransmission(MT6701_ADDR);
+        // Wire.write(reg);
+        // Wire.write(value);
+        // return (Wire.endTransmission() == 0);
     }    
 
     uint16_t getPPR() const {
@@ -123,10 +127,11 @@ struct MT6701Encoder {
      */
     void programPPR(uint16_t ppr) 
     {
-        setI2CEnablePin(true);
+        setI2CEnablePin(!ACTIVE_LOW_I2C);
 
-        // === I2C1 ===
-        Wire.begin(); // Default: PB6=SCL, PB7=SDA
+        // switch I2C1 pins for MT6701
+        i2c.deinitI2C1();
+        i2c.initI2C1();
 
         MT6701Config config;
         Serial.print("MT6701 ");
@@ -139,14 +144,10 @@ struct MT6701Encoder {
         else {
             Serial.println("ERROR not detected");
         }
-        
-        setI2CEnablePin(false);
-        Wire.end();
 
-        // remap I2C and restart bus for EEPROM
-        // // Uncomment for remapped I2C1
-        // Wire.setSCL(PB8); 
-        // Wire.setSDA(PB9); 
-        // Wire.begin();
+        setI2CEnablePin(ACTIVE_LOW_I2C);
+        // remap I2C1 for EEPROM
+        i2c.deinitI2C1();
+        i2c.initI2C1Remapped();
     }
 };

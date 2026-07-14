@@ -2,6 +2,7 @@
   Author: sascha_lammers@gmx.de
 */
 
+#include "i2c.h"
 #include "controls.h"
 #include "mt6701_encoder.h"
 #include "pid_controller.h"
@@ -13,6 +14,7 @@ static int debugSpeed = 500;
 static uint32_t debugStep = -1;
 static uint32_t lastCurrent = 0;
 
+I2CHelper i2c;
 Button<TOGGLE_PIN, GPIOB_BASE, false> startButton;
 Button<BACK_PIN, GPIOA_BASE, false> backButton;
 RotaryEncoder<PA6, PA7, GPIOA_BASE> knob;
@@ -22,7 +24,7 @@ ADC adc;
 LEDs leds;
 
 static void button_isr() {
-    // group by GOIO port
+    // group by GPIO port
     uint32_t idrb = ((GPIO_TypeDef *)GPIOB_BASE)->IDR;
     startButton.isr(idrb);
     uint32_t idra = ((GPIO_TypeDef *)GPIOA_BASE)->IDR;
@@ -40,6 +42,9 @@ static void pid_timer_isr() {
 void setup()
 {
     Serial.begin(115200);
+
+    // === I2C ===
+    i2c.initI2C1Remapped();
 
     // === LEDs ===
     leds.init();
