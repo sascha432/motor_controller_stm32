@@ -31,11 +31,12 @@ void tft_driver_gpio_init(void)
     RCC->APB1ENR |= RCC_APB1ENR_TIM2EN;
 
     AFIO->MAPR &= ~AFIO_MAPR_TIM2_REMAP;
-    AFIO->MAPR |= AFIO_MAPR_TIM2_REMAP_0 | AFIO_MAPR_TIM2_REMAP_1;
+    // TIM2 partial remap 2 routes CH4 to PB11.
+    AFIO->MAPR |= AFIO_MAPR_TIM2_REMAP_1;
 
-    // TFT_PIN_LED/PB11 = Alternate Function Open Drain, 50 MHz (CRH)
+    // TFT_PIN_LED/PB11 = Alternate Function Push-Pull, 50 MHz (CRH)
     GPIOB->CRH &= ~(0xF << ((11 - 8) * 4));
-    GPIOB->CRH |=  (0xD << ((11 - 8) * 4));
+    GPIOB->CRH |=  (0xB << ((11 - 8) * 4));
 
     TIM2->CR1 = 0;
     TIM2->PSC = 71;      /* 72MHz / (71+1) = 1MHz timer clock */

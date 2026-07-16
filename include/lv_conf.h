@@ -11,7 +11,7 @@
 
 /* Memory */
 #define LV_MEM_CUSTOM 0
-#define LV_MEM_SIZE (4U * 1024U)
+#define LV_MEM_SIZE (8U * 1024U)
 
 /* Timing */
 #define LV_TICK_CUSTOM 1
@@ -31,7 +31,7 @@
 #define LV_USE_ASSERT_OBJ 0
 
 /* Theme/layout */
-#define LV_USE_THEME_DEFAULT 1
+#define LV_USE_THEME_DEFAULT 0
 #define LV_USE_THEME_BASIC 0
 #define LV_USE_THEME_MONO 0
 #define LV_USE_FLEX 0
@@ -84,10 +84,14 @@
 #define LV_USE_SJPG 0
 #define LV_USE_QRCODE 0
 
-/* Fonts: one tiny default font only */
-#define LV_FONT_MONTSERRAT_12 0
-#define LV_FONT_MONTSERRAT_14 0
-#define LV_FONT_UNSCII_8 1
-#define LV_FONT_DEFAULT &lv_font_unscii_8
+/* Fonts */
+#define LV_FONT_MONTSERRAT_12 1
+#define LV_FONT_MONTSERRAT_14 1
+#define LV_FONT_MONTSERRAT_18 1
+#define LV_FONT_MONTSERRAT_24 0
+#define LV_FONT_UNSCII_8 0
+
+//#define LV_FONT_DEFAULT &lv_font_unscii_8
+#define LV_FONT_DEFAULT &lv_font_montserrat_12
 
 #endif
