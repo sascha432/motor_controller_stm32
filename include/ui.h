@@ -16,23 +16,31 @@
 #define VERSION_MINOR 0
 #define VERSION_PATCH 0
 
-#define UI_MIN_RPM 10
-#define UI_MAX_RPM 15000
+// === UI constants ===
+struct UIConstants {
 
-#define UI_MIN_INPUT_CURRENT 0.1f
-#define UI_MAX_INPUT_CURRENT 40.0f
-#define UI_MIN_MOTOR_CURRENT 0.5f
-#define UI_MAX_MOTOR_CURRENT 82.5f
+    static constexpr float kMinInputCurrent = 0.1f;
+    static constexpr float kMaxInputCurrent = 40.0f;
+    static constexpr float kMinMotorCurrent = 0.5f;
+    static constexpr float kMaxMotorCurrent = 82.5f;
+    static constexpr uint16_t kMinRPM = 10;
+    static constexpr uint16_t kMaxRPM = 15000;
+    static constexpr uint8_t kMinTFTBrightness = 5;
+    static constexpr uint8_t kMaxTFTBrightness = 100;   
+    static constexpr uint8_t kMinLEDBrightness = 0; 
+    static constexpr uint8_t kMaxLEDBrightness = 100;
+    static constexpr uint32_t kWelcomeScreenTimeout = 2000; // milliseconds
 
-#define UI_WELCOME_SCREEN_TIMEOUT 2000
+};
 
 // === Base Screen class ===
-
 struct Screen
 {
     // Screen Type identifier
     enum class Type {
         WELCOME,
+        START,
+        EEPROM_SAVED,
         MAIN_MENU,
         CONTROL_MODE,
         LED_BRIGHTNESS,
