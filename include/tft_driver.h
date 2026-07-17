@@ -68,7 +68,7 @@ extern "C" {
 
 /* Function prototypes */
 void tft_backlight_pwm_set_raw(uint16_t value);
-void tft_backlight_pwm_set(uint32_t value);
+void tft_backlight_pwm_set(uint8_t value);
 void tft_driver_gpio_init(void);
 
 void tft_driver_init(void);
