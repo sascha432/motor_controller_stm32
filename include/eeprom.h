@@ -5,6 +5,7 @@
 #pragma once
 
 #include <stdint.h>
+#include "ui.h"
 
 struct EEPROM 
 {

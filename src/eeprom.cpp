@@ -13,6 +13,7 @@ void EEPROM::read(Data &data)
 {
     // Read EEPROM data from hardware
     // For example, read from I2C or SPI EEPROM
+    data = Data();
 }
 
 void EEPROM::write(const Data &data) 
