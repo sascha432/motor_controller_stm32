@@ -1,7 +1,10 @@
 /**
   Author: sascha_lammers@gmx.de
+
+  Menu implementation for the UI
 */
 
+#include <Arduino.h>
 #include <stdio.h>
 #include "menu.h"
 #include "ui.h"
@@ -9,6 +12,8 @@
 
 ScreenFlow screenFlow;
 EEPROM eeprom;
+
+#define sizeof_array(arr) (sizeof(arr) / sizeof(arr[0]))
 
 static const char *kMainMenuItems[] = {
     "Speed",                    // 0
@@ -22,23 +27,30 @@ static const char *kMainMenuItems[] = {
     "Save & Exit",              // 8
 };
 
-static const char *kControlModeItems[] = {
-    "PWM / Open Loop",          // 0
-    "PID / Closed Loop"         // 1
-};
-
 static const char *kAdvancedMenuItems[] = {
     "TFT Brightness",           // 0
     "MOSFET Temperature",       // 1
     "Motor Temperature",        // 2
     "Motor RPM Settings",       // 3
     "Motor Direction",          // 4
-    "Main Menu"                 // 5
+    "Back"                      // 5
 };
 
 static const char *kMotorRPMSettingsItems[] = {
-    "Min RPM",                  // 0
-    "Max RPM"                   // 1
+    "Minimum RPM",              // 0
+    "Maximum RPM",              // 1
+    "Back"                      // 2
+};
+
+static const char *kCurrentLimitItems[] = {
+    "Input Current Limit",      // 0
+    "Motor Current Limit",      // 1
+    "Back"                      // 2
+};
+
+static const char *kControlModeItems[] = {
+    "PWM / Open Loop",          // 0
+    "PID / Closed Loop"         // 1
 };
 
 static const char *kMotorDirectionItems[] = {
@@ -46,68 +58,76 @@ static const char *kMotorDirectionItems[] = {
     "Reverse"                   // 1
 };
 
-static const char *kCurrentLimitItems[] = {
-    "Input Current Limit",      // 0
-    "Motor Current Limit"       // 1
+static const char *kRestoreDefaultsMenuItems[] = {
+    "Restore",                  // 0
+    "Cancel"                    // 1
 };
 
-// static const char *kYesNoMenuItems[] = {
-//     "Yes",                      // 0
-//     "No"                        // 1
-// };
-
 // TODO remove globals later
-void setRotaryMultiplier(uint16_t multiplier);
 void setRotaryValue(int32_t value);
 int32_t getRotaryValue();
 void led_pwm_set(uint8_t value);
+void applyEEPROMSettings();
 
-// custom format for float
+// custom format for current and conversion from uint16_t to float
 static const char *current_slider_format_callback(uint32_t value, char *buf, size_t bufSize) 
 {
-    snprintf(buf, bufSize, "%.2f A", EEPROM::kUint16ToCurrent(value));
+    snprintf(buf, bufSize, "%.1f A", EEPROM::kUint16ToCurrent(value));
     return buf;
 }
 
+/**
+ * @brief Get ScreenFlow class instance
+ * 
+ * @return ScreenFlow& 
+ */
 ScreenFlow &Menu::getScreenFlow()
 {
     return screenFlow;
 }
 
+/**
+ * @brief Get EEPROM class instance
+ * 
+ * @return EEPROM& 
+ */
 EEPROM &Menu::getEEPROM()
 {
     return eeprom;
 }
 
+/**
+ * @brief Restore previous menu screen and selected item
+ * 
+ */
 void Menu::restorePreviousMenu()
 {
     screenFlow.back(); // restore previous screen
-    setRotaryMultiplier(1); // set rotary multiplier back to 1 for normal operation
-    setRotaryValue(screenFlow->getValue()); // restore previous menu position
+    setSteps(0);
+    setRotaryValue(getValue()); // restore previous menu position
 }
 
+/**
+ * @brief Handle main button press based on the current screen and selected item
+ * 
+ */
 void Menu::handleButtonPress()
 {
     // Handle button press based on the current screen
     switch(screenFlow->getId()) {
         // === main menu ===
         case Screen::Type::MAIN_MENU:
-            switch(screenFlow->getValue()) {
+            switch(getValue()) {
+                case 0: // Speed
+                    //TODO
+                    break;
                 case 1: // Control Mode
                     screenFlow.next(new MenuScreen(
                         Screen::Type::CONTROL_MODE, 
                         kControlModeItems, 
-                        sizeof(kControlModeItems) / sizeof(kControlModeItems[0])
+                        sizeof_array(kControlModeItems)
                     ));
-                    setRotaryValue(0);
-                    break;
-                case 3: // Current Limits
-                    screenFlow.next(new MenuScreen(
-                        Screen::Type::CURRENT_LIMITS, 
-                        kCurrentLimitItems, 
-                        sizeof(kCurrentLimitItems) / sizeof(kCurrentLimitItems[0])
-                    ));
-                    setRotaryValue(0);
+                    setValue(0);
                     break;
                 case 2: // LED Brightness
                     screenFlow.next(new SliderScreen(
@@ -117,30 +137,77 @@ void Menu::handleButtonPress()
                         UIConstants::kMaxLEDBrightness, 
                         "%"
                     ));
-                    setRotaryValue(eeprom.getLEDBrightness());
+                    setValue(eeprom.getLEDBrightness());
+                    break;
+                case 3: // Current Limits
+                    screenFlow.next(new MenuScreen(
+                        Screen::Type::CURRENT_LIMITS, 
+                        kCurrentLimitItems, 
+                        sizeof_array(kCurrentLimitItems)
+                    ));
+                    setValue(0);
+                    break;
+                case 4: // Stall Time
+                    screenFlow.next(new SliderScreen(
+                        Screen::Type::MOTOR_STALL_TIMEOUT, 
+                        "Motor Stall Timeout", 
+                        UIConstants::kMinMotorStallTimeout,
+                        UIConstants::kMaxMotorStallTimeout,
+                        "ms"
+                    ));
+                    setSteps(UIConstants::kMotorStallTimeoutStep);
+                    setValue(eeprom.getMotorStallTimeout());
+                    break;
+                case 5: // Motor Brake
+                    screenFlow.next(new SliderScreen(
+                        Screen::Type::MOTOR_BRAKE, 
+                        "Motor Brake", 
+                        0, 
+                        100, 
+                        "%"
+                    ));
+                    setValue(eeprom.getMotorBrake());
                     break;
                 case 6: // Advanced
                     screenFlow.next(new MenuScreen(
                         Screen::Type::ADVANCED_MENU, 
                         kAdvancedMenuItems, 
-                        sizeof(kAdvancedMenuItems) / sizeof(kAdvancedMenuItems[0])
+                        sizeof_array(kAdvancedMenuItems)
                     ));
-                    setRotaryValue(0);
+                    setValue(0);
+                    break;
+                case 7: // Restore Defaults
+                    screenFlow.setScreen(new MenuScreen(
+                        Screen::Type::RESTORE_DEFAULTS_CONFIRMATION, 
+                        kRestoreDefaultsMenuItems, 
+                        sizeof_array(kRestoreDefaultsMenuItems)
+                    ));
+                    setValue(1);
                     break;
                 case 8:
                     eeprom.write(eeprom.getData());
-                    //TODO return to start screen
+                    screenFlow.setScreen(new InfoScreen(Screen::Type::EEPROM_SAVED, "Saved"));
+                    lv_timer_handler();
+                    //TODO change to start screen
+                    delay(UIConstants::kDefaultInfoScreenTimeout);
+                    showWelcomeScreen();
+                    loadMainMenu();
                     break;
             }
             break;
+        // === motor stall timeout menu ===
+        case Screen::Type::MOTOR_STALL_TIMEOUT:
+            eeprom.setMotorStallTimeout(getValue());
+            restorePreviousMenu();
+            break;
         // === control mode menu ===
         case Screen::Type::CONTROL_MODE:
-            eeprom.setControlMode(screenFlow->getValue());
+            eeprom.setControlMode(getValue());
             restorePreviousMenu();
             break;
         // === current limits menu ===
         case Screen::Type::CURRENT_LIMITS:
-            switch(screenFlow->getValue()) {
+            switch(getValue()) {
                 case 0: // Input Current Limit
                     screenFlow.next(new SliderScreen(
                         Screen::Type::INPUT_CURRENT_LIMIT, 
@@ -150,8 +217,8 @@ void Menu::handleButtonPress()
                         "A", 
                         current_slider_format_callback
                     ));
-                    setRotaryMultiplier(512);
-                    setRotaryValue(eeprom.getInputCurrentLimit());
+                    setSteps(eeprom.kCurrentToUint16(UIConstants::kInputCurrentStep));
+                    setValue(eeprom.getInputCurrentLimit());
                     break;
                 case 1: // Motor Current Limit
                     screenFlow.next(new SliderScreen(
@@ -162,30 +229,38 @@ void Menu::handleButtonPress()
                         "A", 
                         current_slider_format_callback
                     ));
-                    setRotaryMultiplier(512);
-                    setRotaryValue(eeprom.getMotorCurrentLimit());
+                    setSteps(eeprom.kCurrentToUint16(UIConstants::kMotorCurrentStep));
+                    setValue(eeprom.getMotorCurrentLimit());
+                    break;
+                case 2: // Back
+                    restorePreviousMenu();
                     break;
             }
             break;
         // === input current limits menu ===
         case Screen::Type::INPUT_CURRENT_LIMIT:
-            eeprom.setInputCurrentLimit(screenFlow->getValue());
+            eeprom.setInputCurrentLimit(getValue());
             restorePreviousMenu();
             break;
         // === motor current limits menu ===
         case Screen::Type::MOTOR_CURRENT_LIMIT:
-            eeprom.setMotorCurrentLimit(screenFlow->getValue());
+            eeprom.setMotorCurrentLimit(getValue());
             restorePreviousMenu();
             break;
         // === LED brightness menu ===
         case Screen::Type::LED_BRIGHTNESS:
-            eeprom.setLEDBrightness(screenFlow->getValue());    // TODO redundant, already set in live update
+            eeprom.setLEDBrightness(getValue());                // TODO redundant, already set in live update
             led_pwm_set(eeprom.getLEDBrightness());             // TODO redundant, already set in live update
+            restorePreviousMenu();
+            break;
+        // === motor brake menu ===
+        case Screen::Type::MOTOR_BRAKE:
+            eeprom.setMotorBrake(getValue());
             restorePreviousMenu();
             break;
         // === advanced menu ===
         case Screen::Type::ADVANCED_MENU:
-            switch(screenFlow->getValue()) {
+            switch(getValue()) {
                 case 0: // TFT Brightness
                     screenFlow.next(new SliderScreen(
                         Screen::Type::TFT_BRIGHTNESS, "TFT Brightness", 
@@ -193,43 +268,68 @@ void Menu::handleButtonPress()
                         UIConstants::kMaxTFTBrightness, 
                         "%"
                     ));
-                    setRotaryValue(eeprom.getTFTBrightness());
+                    setValue(eeprom.getTFTBrightness());
+                    break;
+                case 1: // MOSFET Temperature
+                    screenFlow.next(new SliderScreen(
+                        Screen::Type::MOSFET_TEMPERATURE_LIMIT, 
+                        "MOSFET Temperature Limit", 
+                        UIConstants::kMinMosfetTemperature,
+                        UIConstants::kMaxMosfetTemperature,
+                        "°C"
+                    ));
+                    setValue(eeprom.getMosfetTemperatureLimit());
+                    break;
+                case 2: // Motor Temperature
+                    screenFlow.next(new SliderScreen(
+                        Screen::Type::MOTOR_TEMPERATURE_LIMIT, 
+                        "Motor Temperature Limit", 
+                        UIConstants::kMinMotorTemperature,
+                        UIConstants::kMaxMotorTemperature,
+                        "°C"
+                    ));
+                    setValue(eeprom.getMotorTemperatureLimit());
                     break;
                 case 3: // Motor RPM Settings
                     screenFlow.next(new MenuScreen(
                         Screen::Type::MOTOR_RPM_SETTINGS, 
                         kMotorRPMSettingsItems, 
-                        sizeof(kMotorRPMSettingsItems) / sizeof(kMotorRPMSettingsItems[0])
+                        sizeof_array(kMotorRPMSettingsItems)
                     ));
-                    setRotaryValue(0);
+                    setValue(0);
                     break;
                 case 4: // Motor Direction
                     screenFlow.next(new MenuScreen(
                         Screen::Type::MOTOR_DIRECTION, 
                         kMotorDirectionItems, 
-                        sizeof(kMotorDirectionItems) / sizeof(kMotorDirectionItems[0])
+                        sizeof_array(kMotorDirectionItems)
                     ));
-                    setRotaryValue(0);
+                    setValue(0);
                     break;
-                case 5: // Main Menu
+                case 5: // Back
                     restorePreviousMenu();
                     break;
             }
             break;
         // === TFT brightness menu ===
         case Screen::Type::TFT_BRIGHTNESS:
-            eeprom.setTFTBrightness(screenFlow->getValue());    // TODO redundant, already set in live update
+            eeprom.setTFTBrightness(getValue());    // TODO redundant, already set in live update
             tft_backlight_pwm_set(eeprom.getTFTBrightness());   // TODO redundant, already set in live update
             restorePreviousMenu();
             break;
-        // === motor direction menu ===
-        case Screen::Type::MOTOR_DIRECTION:
-            eeprom.setMotorDirection(screenFlow->getValue());
+        // === MOSFET temperature limit menu ===
+        case Screen::Type::MOSFET_TEMPERATURE_LIMIT:
+            eeprom.setMosfetTemperatureLimit(getValue());
+            restorePreviousMenu();
+            break;
+        // === motor temperature limit menu ===
+        case Screen::Type::MOTOR_TEMPERATURE_LIMIT:
+            eeprom.setMotorTemperatureLimit(getValue());
             restorePreviousMenu();
             break;
         // === motor RPM settings menu ===
         case Screen::Type::MOTOR_RPM_SETTINGS:
-            switch(screenFlow->getValue()) {
+            switch(getValue()) {
                 case 0: // Min RPM
                     screenFlow.next(new SliderScreen(
                         Screen::Type::MIN_RPM, 
@@ -238,7 +338,7 @@ void Menu::handleButtonPress()
                         UIConstants::kMaxRPM, 
                         "RPM"
                     ));
-                    setRotaryValue(eeprom.getMinRPM());
+                    setValue(eeprom.getMinRPM());
                     break;
                 case 1: // Max RPM
                     screenFlow.next(new SliderScreen(
@@ -248,36 +348,151 @@ void Menu::handleButtonPress()
                         UIConstants::kMaxRPM, 
                         "RPM"
                     ));
-                    setRotaryValue(eeprom.getMaxRPM());
+                    setValue(eeprom.getMaxRPM());
+                    break;
+                case 2: // Back
+                    restorePreviousMenu();
                     break;
             }
             break;
+        // === motor direction menu ===
+        case Screen::Type::MOTOR_DIRECTION:
+            eeprom.setMotorDirection(getValue());
+            restorePreviousMenu();
+            break;
+        // === min RPM menu ===
+        case Screen::Type::MIN_RPM:
+            eeprom.setMinRPM(getValue());
+            restorePreviousMenu();
+            break;
+        // === max RPM menu ===
+        case Screen::Type::MAX_RPM:
+            eeprom.setMaxRPM(getValue());
+            restorePreviousMenu();
+            break;
+        // === restore defaults confirmation menu ===
+        case Screen::Type::RESTORE_DEFAULTS_CONFIRMATION:
+            switch(getValue()) {
+                case 0: // Restore
+                    eeprom.resetDefaults();
+                    eeprom.write(eeprom.getData());
+                    applyEEPROMSettings();
+                    screenFlow.setScreen(new InfoScreen(Screen::Type::EEPROM_RESTORED, "Restored"));
+                    lv_timer_handler();
+                    delay(UIConstants::kDefaultInfoScreenTimeout);
+                    break;
+            }
+            restorePreviousMenu();
+            break;
         default:
+            Serial.print("Unhandled main menu id: ");
+            Serial.println(static_cast<int>(screenFlow->getId()));
             break;
     }
 }
 
+/**
+ * @brief Show welcome screen for a few seconds
+ * 
+ */
+void Menu::showWelcomeScreen()
+{
+    // Show welcome screen for a few seconds
+    screenFlow.init();
+    screenFlow.setScreen(new WelcomeScreen());
+    lv_timer_handler();
+    tft_backlight_pwm_set(eeprom.getTFTBrightness());
+    delay(UIConstants::kWelcomeScreenTimeout);
+}
+
+/**
+ * @brief Load main menu screen
+ * 
+ */
 void Menu::loadMainMenu()
 {
     screenFlow.setScreen(new MenuScreen(
         Screen::Type::MAIN_MENU, 
         kMainMenuItems, 
-        sizeof(kMainMenuItems) / sizeof(kMainMenuItems[0])
+        sizeof_array(kMainMenuItems)
     ));
-    setRotaryValue(0);
+    setSteps(0);
+    setValue(0);
+    // setRotaryValue(0);
 }
 
-void Menu::updateRotaryValue(int32_t value)
+/**
+ * @brief Call to update menu position from rotary encoder
+ * 
+ * @param value 
+ */
+int32_t Menu::updateRotaryValue(int32_t value)
 {
-    screenFlow->setValue(value);
+    setRotaryValue(value);
+    screenFlow->setValue(
+        // add steps as multiplier to the Screen value independent of the rotary encoder acceleration
+        (steps > 1) ? (screenFlow->getValue() + static_cast<int32_t>(value - screenFlow->getValue()) * steps) : value                                                               
+    );
     switch(screenFlow->getId()) {
         case Screen::Type::TFT_BRIGHTNESS:
-            eeprom.setTFTBrightness(screenFlow->getValue());
+            eeprom.setTFTBrightness(getValue());
             tft_backlight_pwm_set(eeprom.getTFTBrightness());
             break;
         case Screen::Type::LED_BRIGHTNESS:
-            eeprom.setLEDBrightness(screenFlow->getValue());
+            eeprom.setLEDBrightness(getValue());
             led_pwm_set(eeprom.getLEDBrightness());
             break;
     }
+    return getValue();
+}
+
+/**
+ * @brief Update rotary encoder value and set screen value
+ * 
+ * @param value 
+ */
+void Menu::setValue(int32_t value)
+{
+    setRotaryValue(value);
+    screenFlow->setValue(value);
+}
+
+/**
+ * @brief Get screen value
+ * 
+ * @return int32_t 
+ */
+int32_t Menu::getValue() const
+{
+    return screenFlow->getValue();
+}
+
+/**
+ * @brief Set menu steps for slider screen
+ * 
+ * @param steps 
+ */
+void Menu::setSteps(int32_t steps)
+{
+    this->steps = steps;
+}
+
+/**
+ * @brief Set rotary encoder value
+ * 
+ * @param value 
+ */
+void Menu::setRotaryValue(int32_t value)
+{
+    ::setRotaryValue(value);
+}
+
+/**
+ * @brief Get rotary encoder value
+ * 
+ * @return int32_t 
+ */
+int32_t Menu::getRotaryValue() const
+{
+    return ::getRotaryValue();
 }

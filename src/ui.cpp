@@ -1,5 +1,7 @@
 /**
   Author: sascha_lammers@gmx.de
+
+  UI implementation using LVGL library
 */
 
 #include "ui.h"
@@ -36,7 +38,7 @@ void Screen::load()
     else {
         screen = lv_obj_create(nullptr);
     }
-    style_screen(screen);
+    _style_screen(screen);
 }
 
 Screen::Type Screen::getId() const 
@@ -53,7 +55,7 @@ uint32_t Screen::getValue() const
     return 0;
 }
 
-void Screen::fatal_error(const char *msg) 
+void Screen::_fatal_error(const char *msg) 
 {
     uint32_t num = 0;
     while (true) {
@@ -68,7 +70,7 @@ void Screen::fatal_error(const char *msg)
     }
 }
 
-void Screen::style_screen(lv_obj_t *screen)
+void Screen::_style_screen(lv_obj_t *screen)
 {
     lv_obj_set_style_bg_color(screen, lv_color_black(), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, LV_PART_MAIN);
@@ -78,13 +80,27 @@ void Screen::style_screen(lv_obj_t *screen)
 
 // === Welcome Screen ===
 
-void WelcomeScreen::load()
+WelcomeScreen::WelcomeScreen() : 
+    InfoScreen(Type::WELCOME, Screen::kWelcomeScreenLabelFont)
+{
+    char buf[32];
+    snprintf(buf, sizeof(buf)- 1, "Version %u.%u.%u", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
+    message = strdup(buf);
+    Serial.print("WelcomeScreen: ");
+    Serial.println(message);
+}
+
+// === Info Screen ===
+
+void InfoScreen::load()
 {
     Screen::load();
     lv_obj_t *label = lv_label_create(screen);
-    lv_label_set_text_fmt(label, "Version %u.%u.%u", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
+    Serial.print("InfoScreen: ");
+    Serial.println(message);
+    lv_label_set_text(label, message);
     lv_obj_set_style_text_color(label, lv_color_white(), LV_PART_MAIN);
-    lv_obj_set_style_text_font(label, kWelcomeScreenLabelFont, LV_PART_MAIN);
+    lv_obj_set_style_text_font(label, font, LV_PART_MAIN);
     lv_obj_center(label);
     lv_scr_load(screen);
 }
@@ -150,8 +166,13 @@ void MenuScreen::_refreshMenuScreen()
 
 void MenuScreen::setValue(uint32_t index)
 {
-    // allows negative values to wrap around the menu items
-    selected = (((int32_t)index % count) + count) % count;
+    #if 0
+        // allows negative values to wrap around the menu items
+        selected = (((int32_t)index % count) + count) % count;
+    #else
+        // no wrapping
+        selected =  std::clamp<int32_t>(index, 0, count - 1);
+    #endif
     _refreshMenuScreen();
 }
 

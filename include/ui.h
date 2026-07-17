@@ -4,9 +4,10 @@
 
 #pragma once
 
+#include <stdint.h>
+#include <stdlib.h>
 #include "lvgl.h"
 #include "tft_driver.h"
-#include <stdint.h>
 
 // set to 1 to create previous screens using Screen::load() instead of lv_scr_load(screen->screen)
 // more CPU vs memory usage tradeoff
@@ -19,18 +20,38 @@
 // === UI constants ===
 struct UIConstants {
 
-    static constexpr float kMinInputCurrent = 0.1f;
-    static constexpr float kMaxInputCurrent = 40.0f;
-    static constexpr float kMinMotorCurrent = 0.5f;
-    static constexpr float kMaxMotorCurrent = 82.5f;
-    static constexpr uint16_t kMinRPM = 10;
-    static constexpr uint16_t kMaxRPM = 15000;
-    static constexpr uint8_t kMinTFTBrightness = 5;
-    static constexpr uint8_t kMaxTFTBrightness = 100;   
-    static constexpr uint8_t kMinLEDBrightness = 0; 
-    static constexpr uint8_t kMaxLEDBrightness = 100;
-    static constexpr uint32_t kWelcomeScreenTimeout = 2000; // milliseconds
+    static constexpr float kMinInputCurrent = 0.1f;                     // min. input current in A
+    static constexpr float kMaxInputCurrent = 40.0f;                    // max. input current in A
+    static constexpr float kInputCurrentStep = 0.1f;                    // input current step in A (make sure min/max is divisible by this value)
+    static constexpr float kMinMotorCurrent = 0.5f;                     // min. peak motor current in A
+    static constexpr float kMaxMotorCurrent = 82.5f;                    // max. peak motor current in A
+    static constexpr float kMotorCurrentStep = 0.5f;                    // motor current step in A (make sure min/max is divisible by this value)
+    static constexpr uint16_t kMinRPM = 10;                             // Min. Motor RPM
+    static constexpr uint16_t kMaxRPM = 15000;                          // Max. Motor RPM
+    static constexpr uint8_t kMinTFTBrightness = 5;                     // Min. TFT Brightness
+    static constexpr uint8_t kMaxTFTBrightness = 100;                   // Max. TFT Brightness
+    static constexpr uint8_t kMinLEDBrightness = 0;                     // Min. LED Brightness
+    static constexpr uint8_t kMaxLEDBrightness = 100;                   // Max. LED Brightness
+    static constexpr uint32_t kWelcomeScreenTimeout = 2000;             // WelcomeScreen timeout in milliseconds
+    static constexpr uint32_t kMinMotorStallTimeout = 100;              // Motor stall time in milliseconds
+    static constexpr uint32_t kMaxMotorStallTimeout = 10000;            // Motor stall time in milliseconds
+    static constexpr int32_t kMotorStallTimeoutStep = 100;              // Motor stall time step in milliseconds
+    static constexpr uint8_t kDefaultMotorBrake = 50;                   // Default motor brake in percentage (0-100)
+    static constexpr uint8_t kMinMosfetTemperature = 50;                // Min. MOSFET temperature in °C
+    static constexpr uint8_t kMaxMosfetTemperature = 175;               // Max. MOSFET temperature in °C
+    static constexpr uint8_t kMinMotorTemperature = 30;                 // Min. Motor temperature in °C
+    static constexpr uint8_t kMaxMotorTemperature = 105;                // Max. Motor temperature in °C
 
+    static constexpr uint8_t kDefaultTFTBrightness = 80;                // Default TFT Brightness
+    static constexpr uint8_t kDefaultLEDBrightness = 50;                // Default LED Brightness
+    static constexpr float kDefaultInputCurrent = 10.0f;                // Default input current in A
+    static constexpr float kDefaultMotorCurrent = 40.0f;                // Default peak motor current in A
+    static constexpr uint16_t kDefaultMinRPM = 1000;                    // Default min. motor RPM
+    static constexpr uint16_t kDefaultMaxRPM = 5000;                    // Default max. motor RPM
+    static constexpr uint8_t kDefaultMosfetTemperatureLimit = 85;       // Default MOSFET temperature limit in °C
+    static constexpr uint8_t kDefaultMotorTemperatureLimit = 50;        // Default motor temperature limit in °C
+
+    static constexpr uint32_t kDefaultInfoScreenTimeout = 2000;         // Default InfoScreen timeout in milliseconds
 };
 
 // === Base Screen class ===
@@ -54,11 +75,19 @@ struct Screen
         MIN_RPM,
         MAX_RPM,
         CONTROL_MODE_PWM,
-        CONTROL_MODE_PID
+        CONTROL_MODE_PID,
+        MOTOR_STALL_TIMEOUT,
+        MOTOR_BRAKE,
+        MOSFET_TEMPERATURE_LIMIT,
+        MOTOR_TEMPERATURE_LIMIT,
+        RESTORE_DEFAULTS_CONFIRMATION,
+        EEPROM_RESTORED
     };
 
     // Screen style constants
     static constexpr const lv_font_t *kWelcomeScreenLabelFont = &lv_font_montserrat_18;
+    
+    static constexpr const lv_font_t *kInfoScreenLabelFont = &lv_font_montserrat_18;
 
     static constexpr const lv_font_t *kMenuScreenLabelFont = &lv_font_montserrat_14;
     static constexpr lv_coord_t kMenuScreenVisibleItems = 5;
@@ -72,15 +101,15 @@ struct Screen
     static constexpr uint8_t kMenuScreenCornerRadius = 4;
 
     static constexpr const lv_font_t *kSliderScreenLabelFont = &lv_font_montserrat_12;
-    static constexpr const lv_font_t *kSliderScreenValueFont = &lv_font_montserrat_12;
+    static constexpr const lv_font_t *kSliderScreenValueFont = &lv_font_montserrat_18;
     static constexpr lv_coord_t kSliderScreenContainerX = 16;
     static constexpr lv_coord_t kSliderScreenContainerY = 20;
     static constexpr lv_coord_t kSliderScreenContainerWidth = TFT_DIM_WIDTH - 24;
     static constexpr lv_coord_t kSliderScreenTitleBottomGap = 35;
-    static constexpr lv_coord_t kSliderScreenSliderHeight = 12;
+    static constexpr lv_coord_t kSliderScreenSliderHeight = 24;
     static constexpr lv_coord_t kSliderScreenSliderBorder = 2;
     static constexpr lv_coord_t kSliderScreenSliderRadius = 6;
-    static constexpr lv_coord_t kSliderScreenKnobSize = 18;
+    static constexpr lv_coord_t kSliderScreenKnobSize = 30;
     static constexpr lv_coord_t kSliderScreenValueTopGap = 40;
 
     Screen(Type id);
@@ -92,8 +121,8 @@ struct Screen
 
     virtual void load();
 
-    void style_screen(lv_obj_t *screen);
-    void fatal_error(const char *msg);
+    void _style_screen(lv_obj_t *screen);
+    void _fatal_error(const char *msg);
 
 protected:
     lv_obj_t *screen;
@@ -104,14 +133,39 @@ protected:
     static lv_obj_t *emptyScreen;
 };
 
-// === Welcome Screen ===
+// === Info Screen ===
 
-struct WelcomeScreen : public Screen
+struct InfoScreen : public Screen
 {
-    WelcomeScreen() : Screen(Type::WELCOME) 
+    InfoScreen(Type id, const char *message, const lv_font_t *font = Screen::kInfoScreenLabelFont) : 
+        Screen(id),
+        message(strdup(message)),
+        font(font)
     {}
 
+    InfoScreen(Type id, const lv_font_t *font = Screen::kInfoScreenLabelFont) : 
+        Screen(id),
+        message(nullptr),
+        font(font)
+    {}
+
+    virtual ~InfoScreen() 
+    {
+        free(message);
+    }
+
     virtual void load() override;
+
+protected:
+    char *message;
+    const lv_font_t *font;
+};
+
+// === Welcome Screen ===
+
+struct WelcomeScreen : public InfoScreen
+{
+    WelcomeScreen();
 };
 
 // === Menu Screen ===
@@ -164,7 +218,7 @@ struct SliderScreen : public Screen
     virtual void load() override;
     virtual void setValue(uint32_t value) override;
     virtual uint32_t getValue() const override;
-
+    
 protected:
     void _refreshVisuals();
 
