@@ -12,13 +12,13 @@ struct EEPROM
     static constexpr uint32_t kMagic = 0xDEADBEEF;
     static constexpr uint32_t kVersion = 1;
 
-    // 127A max.
+    // ~130A max.
     static constexpr uint16_t kCurrentToUint16(float current) {
-        return static_cast<uint16_t>(current * 512.0f);
+        return static_cast<uint16_t>(current * 500.0f);
     }
 
     static constexpr float kUint16ToCurrent(uint16_t value) {
-        return static_cast<float>(value) / 512.0f;
+        return static_cast<float>(value) / 500.0f;
     }
 
     static constexpr uint8_t kControlModePWM = 0;
@@ -36,20 +36,28 @@ struct EEPROM
         uint16_t motor_current_limit;
         uint16_t min_rpm;
         uint16_t max_rpm;
+        uint16_t motor_stall_timeout;
         uint8_t motor_direction;
+        uint8_t motor_brake;
         uint8_t control_mode;
+        uint8_t mosfet_temperature_limit;
+        uint8_t motor_temperature_limit;
 
         Data() : 
             magic(kMagic), 
             version(kVersion), 
-            tft_brightness(80), 
-            led_brightness(50), 
-            input_current_limit(kCurrentToUint16(10.0f)), 
-            motor_current_limit(kCurrentToUint16(40.0f)), 
-            min_rpm(1000),
-            max_rpm(5000),
-            motor_direction(kMotorDirectionForward), 
-            control_mode(kControlModePID)
+            tft_brightness(UIConstants::kDefaultTFTBrightness), 
+            led_brightness(UIConstants::kDefaultLEDBrightness), 
+            input_current_limit(kCurrentToUint16(UIConstants::kDefaultInputCurrent)), 
+            motor_current_limit(kCurrentToUint16(UIConstants::kDefaultMotorCurrent)), 
+            min_rpm(UIConstants::kDefaultMinRPM),
+            max_rpm(UIConstants::kDefaultMaxRPM),
+            motor_stall_timeout(UIConstants::kMinMotorStallTimeout),
+            motor_direction(kMotorDirectionForward),
+            motor_brake(UIConstants::kDefaultMotorBrake),
+            control_mode(kControlModePID),
+            mosfet_temperature_limit(UIConstants::kDefaultMosfetTemperatureLimit),
+            motor_temperature_limit(UIConstants::kDefaultMotorTemperatureLimit)
         {}
     };
 
@@ -60,6 +68,11 @@ struct EEPROM
     Data &getData()
     {
         return data;
+    }
+
+    void resetDefaults()
+    {
+        data = Data();
     }
 
     uint8_t getTFTBrightness() const
@@ -122,6 +135,16 @@ struct EEPROM
         data.max_rpm = value;
     }
 
+    uint16_t getMotorStallTimeout() const
+    {
+        return data.motor_stall_timeout;
+    }
+
+    void setMotorStallTimeout(uint16_t value) 
+    {
+        data.motor_stall_timeout = value;
+    }
+
     uint8_t getMotorDirection() const
     {
         return data.motor_direction;
@@ -132,6 +155,16 @@ struct EEPROM
         data.motor_direction = value;
     }
 
+    uint8_t getMotorBrake() const
+    {
+        return data.motor_brake;
+    }
+
+    void setMotorBrake(uint8_t value) 
+    {
+        data.motor_brake = value;
+    }
+
     uint8_t getControlMode() const
     {
         return data.control_mode;
@@ -140,6 +173,26 @@ struct EEPROM
     void setControlMode(uint8_t value) 
     {
         data.control_mode = value;
+    }
+
+    uint8_t getMosfetTemperatureLimit() const
+    {
+        return data.mosfet_temperature_limit;
+    }
+
+    void setMosfetTemperatureLimit(uint8_t value) 
+    {
+        data.mosfet_temperature_limit = value;
+    }
+
+    uint8_t getMotorTemperatureLimit() const
+    {
+        return data.motor_temperature_limit;
+    }
+
+    void setMotorTemperatureLimit(uint8_t value) 
+    {
+        data.motor_temperature_limit = value;
     }
 
 protected:

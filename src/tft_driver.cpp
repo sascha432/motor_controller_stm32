@@ -73,5 +73,5 @@ void tft_backlight_pwm_set_raw(uint16_t value)
  */
 void tft_backlight_pwm_set(uint8_t value) 
 {
-    tft_backlight_pwm_set_raw(value);
+    tft_backlight_pwm_set_raw(value * 10U);
 }
