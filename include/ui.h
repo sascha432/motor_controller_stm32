@@ -16,6 +16,16 @@
 #define VERSION_MINOR 0
 #define VERSION_PATCH 0
 
+#define UI_MIN_RPM 10
+#define UI_MAX_RPM 15000
+
+#define UI_MIN_INPUT_CURRENT 0.1f
+#define UI_MAX_INPUT_CURRENT 40.0f
+#define UI_MIN_MOTOR_CURRENT 0.5f
+#define UI_MAX_MOTOR_CURRENT 82.5f
+
+#define UI_WELCOME_SCREEN_TIMEOUT 2000
+
 // === Base Screen class ===
 
 struct Screen
@@ -25,7 +35,18 @@ struct Screen
         WELCOME,
         MAIN_MENU,
         CONTROL_MODE,
-        LED_BRIGHTNESS
+        LED_BRIGHTNESS,
+        ADVANCED_MENU,
+        MOTOR_RPM_SETTINGS,
+        MOTOR_DIRECTION,
+        TFT_BRIGHTNESS,
+        CURRENT_LIMITS,
+        INPUT_CURRENT_LIMIT,
+        MOTOR_CURRENT_LIMIT,
+        MIN_RPM,
+        MAX_RPM,
+        CONTROL_MODE_PWM,
+        CONTROL_MODE_PID
     };
 
     // Screen style constants
@@ -35,8 +56,11 @@ struct Screen
     static constexpr lv_coord_t kMenuScreenVisibleItems = 5;
     static constexpr lv_coord_t kMenuScreenStartX = 10;
     static constexpr lv_coord_t kMenuScreenStartY = 9;
+    static constexpr lv_coord_t kMenuScreenItemStartX = 8;
+    static constexpr lv_coord_t kMenuScreenItemStartY = 2;
     static constexpr lv_coord_t kMenuScreenItemHeight = 20;
     static constexpr lv_coord_t kMenuScreenItemWidth = TFT_DIM_WIDTH - (2 * kMenuScreenStartX);
+    static constexpr uint32_t kMenuScreenItemScrollSpeed = 10;
     static constexpr uint8_t kMenuScreenCornerRadius = 4;
 
     static constexpr const lv_font_t *kSliderScreenLabelFont = &lv_font_montserrat_12;
@@ -44,12 +68,12 @@ struct Screen
     static constexpr lv_coord_t kSliderScreenContainerX = 16;
     static constexpr lv_coord_t kSliderScreenContainerY = 20;
     static constexpr lv_coord_t kSliderScreenContainerWidth = TFT_DIM_WIDTH - 24;
-    static constexpr lv_coord_t kSliderScreenTitleBottomGap = 14;
+    static constexpr lv_coord_t kSliderScreenTitleBottomGap = 35;
     static constexpr lv_coord_t kSliderScreenSliderHeight = 12;
     static constexpr lv_coord_t kSliderScreenSliderBorder = 2;
     static constexpr lv_coord_t kSliderScreenSliderRadius = 6;
     static constexpr lv_coord_t kSliderScreenKnobSize = 18;
-    static constexpr lv_coord_t kSliderScreenValueTopGap = 18;
+    static constexpr lv_coord_t kSliderScreenValueTopGap = 40;
 
     Screen(Type id);
     virtual ~Screen();
@@ -63,11 +87,12 @@ struct Screen
     void style_screen(lv_obj_t *screen);
     void fatal_error(const char *msg);
 
-// protected:
+protected:
     lv_obj_t *screen;
     Screen *prevScreen;
     Type id;
 
+    friend struct ScreenFlow;
     static lv_obj_t *emptyScreen;
 };
 
@@ -91,14 +116,14 @@ struct MenuScreen : public Screen
     virtual void setValue(uint32_t index) override;
     virtual uint32_t getValue() const override;
 
-protected:
-    void refreshMenuScreen();
-    
 private:
     uint8_t _first_visible_start_index(uint8_t selected_index);
-    void style_menu_row(lv_obj_t *row, bool selected);
-    void style_menu_label(lv_obj_t *label, bool selected);
-    lv_obj_t *create_menu_label(lv_obj_t *parent, const char *text, bool selected);
+    void _style_menu_row(lv_obj_t *row, bool selected);
+    void _style_menu_label(lv_obj_t *label, bool selected);
+    lv_obj_t *_style_create_menu_label(lv_obj_t *parent, const char *text, bool selected);
+
+protected:
+    void _refreshMenuScreen();
 
 protected:
     lv_obj_t *rows[kMenuScreenVisibleItems];
@@ -112,7 +137,9 @@ protected:
 
 struct SliderScreen : public Screen
 {
-    SliderScreen(Type id, const char *label, uint32_t minValue, uint32_t maxValue, const char *unit) : 
+    typedef const char *(*FormatCallbackType)(uint32_t value, char *buf, size_t bufSize);
+
+    SliderScreen(Type id, const char *label, uint32_t minValue, uint32_t maxValue, const char *unit, FormatCallbackType callback = nullptr) : 
         Screen(id),
         value(minValue),
         minValue(minValue),
@@ -121,7 +148,8 @@ struct SliderScreen : public Screen
         unit(unit),
         sliderFill(nullptr),
         sliderKnob(nullptr),
-        valueLabel(nullptr)
+        valueLabel(nullptr),
+        formatCallback(callback)
     {
     }
 
@@ -129,8 +157,8 @@ struct SliderScreen : public Screen
     virtual void setValue(uint32_t value) override;
     virtual uint32_t getValue() const override;
 
-private:
-    void refreshVisuals();
+protected:
+    void _refreshVisuals();
 
 private:
     uint32_t value;
@@ -141,6 +169,7 @@ private:
     lv_obj_t *sliderFill;
     lv_obj_t *sliderKnob;
     lv_obj_t *valueLabel;
+    FormatCallbackType formatCallback;
 };
 
 // === Screen Flow Manager ===
@@ -152,11 +181,11 @@ struct ScreenFlow {
     void init();
     void destroy();
     void setScreen(Screen *newScreen);
-    Screen *getScreen() const;
     void back();
     void next(Screen *nextScreen);
 
     Screen *operator->() const;
+    Screen *getScreen() const;
 
 protected:
     Screen *screen;

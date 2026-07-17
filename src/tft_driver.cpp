@@ -60,8 +60,8 @@ void tft_driver_gpio_init(void)
  */
 void tft_backlight_pwm_set_raw(uint16_t value) 
 {
-    if (value > 999U) {
-        value = 999U;
+    if (value > 999) {
+        value = 999;
     }
     TIM2->CCR4 = value;
 }
@@ -69,15 +69,9 @@ void tft_backlight_pwm_set_raw(uint16_t value)
 /**
  * @brief Set the PWM value for the backlight
  * 
- * @param value PWM value (0-1000)
+ * @param value PWM value (0-100)
  */
 void tft_backlight_pwm_set(uint32_t value) 
 {
-    tft_backlight_pwm_set_raw(100 + (uint16_t)((value * 900) / 1000));
-}
-
-void tft_update_ui(uint16_t slider, bool pressed) 
-{
-    (void)slider;
-    (void)pressed;
+    tft_backlight_pwm_set_raw((uint16_t)((value * 10) / 1000));
 }

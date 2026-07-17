@@ -118,12 +118,12 @@ void MenuScreen::load()
         const bool isSelected = (i == 0);
         rows[i] = lv_obj_create(menu);
         lv_obj_remove_style_all(rows[i]);
-        style_menu_row(rows[i], isSelected);
+        _style_menu_row(rows[i], isSelected);
         lv_obj_set_pos(rows[i], 0, i * kMenuScreenItemHeight);
-        labels[i] = create_menu_label(rows[i], itemLabels[i], isSelected);
+        labels[i] = _style_create_menu_label(rows[i], itemLabels[i], isSelected);
     }
 
-    refreshMenuScreen();
+    _refreshMenuScreen();
 
     lv_scr_load(screen);
 }
@@ -131,19 +131,20 @@ void MenuScreen::load()
 uint8_t MenuScreen::_first_visible_start_index(uint8_t selected_index)
 {
     int16_t first = static_cast<int16_t>(selected_index) - 2;
-    const int16_t last_first = static_cast<int16_t>(count) - static_cast<int16_t>(MenuScreen::kMenuScreenVisibleItems);
+    const int16_t last_first = (count > MenuScreen::kMenuScreenVisibleItems) ? 
+        (static_cast<int16_t>(count) - static_cast<int16_t>(MenuScreen::kMenuScreenVisibleItems)) : 0;
     return static_cast<uint8_t>(std::clamp<int16_t>(first, 0, last_first));
 }
 
-void MenuScreen::refreshMenuScreen()
+void MenuScreen::_refreshMenuScreen()
 {
     const uint8_t first_index = _first_visible_start_index(selected);
     for (uint8_t i = 0; i < kMenuScreenVisibleItems && i < count; ++i) {
         const uint8_t item_index = first_index + i;
         const bool selected = (item_index == this->selected);
-        style_menu_row(rows[i], selected);
+        _style_menu_row(rows[i], selected);
         lv_label_set_text(labels[i], itemLabels[item_index]);
-        style_menu_label(labels[i], selected);
+        _style_menu_label(labels[i], selected);
     }
 }
 
@@ -151,7 +152,7 @@ void MenuScreen::setValue(uint32_t index)
 {
     // allows negative values to wrap around the menu items
     selected = (((int32_t)index % count) + count) % count;
-    refreshMenuScreen();
+    _refreshMenuScreen();
 }
 
 uint32_t MenuScreen::getValue() const
@@ -159,9 +160,8 @@ uint32_t MenuScreen::getValue() const
     return selected;
 }
 
-void MenuScreen::style_menu_row(lv_obj_t *row, bool selected)
+void MenuScreen::_style_menu_row(lv_obj_t *row, bool selected)
 {
-   
     lv_obj_set_size(row, kMenuScreenItemWidth, kMenuScreenItemHeight);
     lv_obj_set_style_radius(row, kMenuScreenCornerRadius, LV_PART_MAIN);
     lv_obj_set_style_border_width(row, 0, LV_PART_MAIN);
@@ -170,24 +170,30 @@ void MenuScreen::style_menu_row(lv_obj_t *row, bool selected)
     lv_obj_set_style_bg_color(row, selected ? lv_color_white() : lv_color_black(), LV_PART_MAIN);
 }
 
-void MenuScreen::style_menu_label(lv_obj_t *label, bool selected)
+void MenuScreen::_style_menu_label(lv_obj_t *label, bool selected)
 {
     lv_obj_set_style_text_color(label, selected ? lv_color_black() : lv_color_white(), LV_PART_MAIN);
     lv_obj_set_style_text_font(label, kMenuScreenLabelFont, LV_PART_MAIN);
+    lv_label_set_long_mode(label, selected ? LV_LABEL_LONG_SCROLL_CIRCULAR : LV_LABEL_LONG_CLIP);
 }
 
-lv_obj_t *MenuScreen::create_menu_label(lv_obj_t *parent, const char *text, bool selected)
+lv_obj_t *MenuScreen::_style_create_menu_label(lv_obj_t *parent, const char *text, bool selected)
 {
     lv_obj_t *label = lv_label_create(parent);
     lv_label_set_text(label, text);
-    style_menu_label(label, selected);
-    lv_obj_set_pos(label, 8, 2);
+    _style_menu_label(label, selected);
+    // row boundaries and settings for label/clipping scrolling
+    lv_obj_set_style_anim_speed(label, kMenuScreenItemScrollSpeed, LV_PART_MAIN);
+    lv_obj_set_width(label, kMenuScreenItemWidth - (2 * kMenuScreenItemStartX));
+    lv_label_set_long_mode(label, LV_LABEL_LONG_CLIP);
+    // position in the row
+    lv_obj_set_pos(label, kMenuScreenItemStartX, kMenuScreenItemStartY);
     return label;
 }
 
 // === Slider Screen ===
 
-void SliderScreen::refreshVisuals()
+void SliderScreen::_refreshVisuals()
 {
     const uint32_t clampedValue = (value < minValue) ? minValue : ((value > maxValue) ? maxValue : value);
     const uint32_t range = (maxValue > minValue) ? (maxValue - minValue) : 1;
@@ -201,13 +207,19 @@ void SliderScreen::refreshVisuals()
 
     lv_obj_set_x(sliderKnob, knobX);
 
-    lv_label_set_text_fmt(valueLabel, "%lu%s", static_cast<unsigned long>(clampedValue), unit);
+    if (formatCallback) {
+        char buf[32];
+        lv_label_set_text(valueLabel, formatCallback(clampedValue, buf, sizeof(buf) - 1));
+    }
+    else {
+        lv_label_set_text_fmt(valueLabel, "%lu%s", static_cast<unsigned long>(clampedValue), unit);
+    }
+    
 }
 
 void SliderScreen::load() 
 {
     Screen::load();
-
 
     lv_obj_t *container = lv_obj_create(screen);
     lv_obj_remove_style_all(container);
@@ -262,7 +274,7 @@ void SliderScreen::load()
     lv_obj_set_style_text_align(valueLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     lv_obj_set_pos(valueLabel, 0, lv_obj_get_y(slider) + kSliderScreenSliderHeight + kSliderScreenValueTopGap);
 
-    refreshVisuals();
+    _refreshVisuals();
 
     lv_scr_load(screen);
 }
@@ -270,7 +282,7 @@ void SliderScreen::load()
 void SliderScreen::setValue(uint32_t value)
 {
     this->value = std::clamp<int32_t>(value, minValue, maxValue);
-    refreshVisuals();
+    _refreshVisuals();
 }
 
 uint32_t SliderScreen::getValue() const
@@ -310,11 +322,6 @@ void ScreenFlow::setScreen(Screen *newScreen)
     screen->load();
 }
 
-Screen *ScreenFlow::getScreen() const
-{
-    return screen;
-}
-
 void ScreenFlow::back()
 {
     Serial.print("back: ");
@@ -352,3 +359,9 @@ Screen *ScreenFlow::operator->() const
 {
     return screen;
 }
+
+Screen *ScreenFlow::getScreen() const
+{
+    return screen;
+}
+
