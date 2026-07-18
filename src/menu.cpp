@@ -11,7 +11,6 @@
 #include "eeprom.h"
 
 ScreenFlow screenFlow;
-EEPROM eeprom;
 
 #define sizeof_array(arr) (sizeof(arr) / sizeof(arr[0]))
 
@@ -77,23 +76,13 @@ static const char *current_slider_format_callback(uint32_t value, char *buf, siz
 }
 
 /**
- * @brief Get ScreenFlow class instance
+ * @brief Menu constructor
  * 
- * @return ScreenFlow& 
  */
-ScreenFlow &Menu::getScreenFlow()
+Menu::Menu() :
+    eeprom(EEPROM::getInstance()),
+    steps(0)
 {
-    return screenFlow;
-}
-
-/**
- * @brief Get EEPROM class instance
- * 
- * @return EEPROM& 
- */
-EEPROM &Menu::getEEPROM()
-{
-    return eeprom;
 }
 
 /**

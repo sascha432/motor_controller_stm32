@@ -10,6 +10,7 @@
 #include <stdbool.h>
 #include "lvgl.h"
 
+// TFT driver selection
 #define TFT_DRIVER_ST7735           1
 #define TFT_DRIVER_ST7789           2
 #ifndef TFT_DRIVER

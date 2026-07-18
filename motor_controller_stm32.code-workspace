@@ -17,6 +17,24 @@
 			"statusBar.debuggingForeground": "#FFFCFD",
 			"statusBar.noFolderBackground": "#580D3B",
 			"statusBar.noFolderForeground": "#FFFCFD"
-		}
+		},
+		"cSpell.words": [
+			"AFIO",
+			"CCMR1",
+			"eeprom",
+			"GPIOA",
+			"GPIOB",
+			"GPIOC",
+			"GPIOD",
+			"IOPAEN",
+			"IOPBEN",
+			"IOPCEN",
+			"IOPDEN",
+			"lvgl",
+			"MAPR",
+			"MOSFET",
+			"QDEC",
+			"SMCR"
+		]
 	}
 }

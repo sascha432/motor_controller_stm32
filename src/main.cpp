@@ -8,6 +8,10 @@
 #include "pid_controller.h"
 #include "adc.h"
 #include "leds.h"
+#include "tft_driver.h"
+#include "ui.h"
+#include "menu.h"
+#include "eeprom.h"
 
 static char cType = 'r';
 static int debugSpeed = 500;
@@ -15,20 +19,32 @@ static uint32_t debugStep = -1;
 static uint32_t lastCurrent = 0;
 
 I2CHelper i2c;
-Button<TOGGLE_PIN, GPIOB_BASE, false> startButton;
-Button<BACK_PIN, GPIOA_BASE, false> backButton;
-RotaryEncoder<PA6, PA7, GPIOA_BASE> knob;
+Button<KNOB_BUTTON_PIN, false> knobButton;
+Button<START_BUTTON_PIN, false> startButton;
+Button<BACK_BUTTON_PIN, false> backButton;
+RotaryEncoder<PA6, PA7> knob;
 PidController pid;
-MT6701Encoder<MT6701_I2C_PIN, GPIOB_BASE, false> motorEncoder;
+MT6701Encoder<MT6701_I2C_PIN, false> motorEncoder;
 ADC adc;
 LEDs leds;
+Menu menu;
 
 static void button_isr() {
-    // group by GPIO port
-    uint32_t idrb = ((GPIO_TypeDef *)GPIOB_BASE)->IDR;
-    startButton.isr(idrb);
-    uint32_t idra = ((GPIO_TypeDef *)GPIOA_BASE)->IDR;
-    backButton.isr(idra);
+    #if defined(STM32F107xC)
+        uint32_t idrD = ((GPIO_TypeDef *)GPIOD_BASE)->IDR;
+        knobButton.isr(idrD);
+        backButton.isr(idrD);
+        startButton.isr(idrD);
+    #elif defined(STM32F103xC)
+        uint32_t idrB = ((GPIO_TypeDef *)GPIOB_BASE)->IDR;
+        startButton.isr(idrB);
+        uint32_t idrA = ((GPIO_TypeDef *)GPIOA_BASE)->IDR;
+        knobButton.isr(idrA);
+        backButton.isr(idrA);
+        TODO pin macros need to be  chagned and isr too
+    #else
+        #error missing ISR implementation for this MCU
+    #endif
 }
 
 static void knob_isr() {
@@ -39,41 +55,106 @@ static void pid_timer_isr() {
     pid.isr();
 }
 
-extern "C" int _write(int file, char *ptr, int len)
+// --- TODO refactor start
+static constexpr uint32_t kRotaryFullRotation = 1;
+static int32_t rotaryValue = 0;
+static int32_t rotaryValueOld = 0;
+
+void setRotaryValue(int32_t value) 
 {
-    Serial.write((uint8_t*)ptr, len);
-    return len;
+    rotaryValue = value * kRotaryFullRotation;
+    rotaryValueOld = rotaryValue;
 }
+
+int32_t getRotaryValue() 
+{
+    return (rotaryValue / kRotaryFullRotation);
+}
+
+void led_pwm_set(uint8_t value) 
+{
+    // DUMMY
+//     // Set the PWM duty cycle for the LED brightness
+//     // Assuming TIM2 is used for PWM on PB5 (LED pin)
+//     TIM2->CCR1 = (uint32_t)(value * (TIM2->ARR + 1) / 100); // Scale value to timer range
+}
+
+void applyEEPROMSettings() 
+{
+    auto &eeprom = EEPROM::getInstance();
+    tft_backlight_pwm_set(eeprom.getTFTBrightness());
+    led_pwm_set(eeprom.getLEDBrightness());
+}
+
+// --- refactor end
 
 void setup()
 {
-    Serial.begin(115200);
+    #if DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL
+        Serial.begin(115200);
+    #elif DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL4
+        Serial4.begin(115200);
+    #endif
 
-    // === I2C ===
+    // Initialize and read EEPROM on I2C1 on PB8/9
     i2c.initI2C1Remapped();
+    auto &eeprom = EEPROM::getInstance();
+    eeprom.init();
+    eeprom.read(eeprom.getData());
 
-    // === LEDs ===
+    // LEDs
     leds.init();
 
-    // === motor encoder ===
+    // motor encoder
     motorEncoder.init();
     if (0) {
         motorEncoder.programPPR(i2c, PidController::kPPR);
     }
 
-    // === buttons ===
-    startButton.init(button_isr);
+    // buttons
+    knobButton.init(button_isr);
     backButton.init(button_isr);
+    startButton.init(button_isr);
 
-    // === rotary encoder knob ===
+    // rotary encoder knob
     knob.init();
     knob.enable(knob_isr);
 
-    // === ADC with DMA ===
+    // ADC with DMA
     adc.init();
 
-    // === PID controller ===
+    // PID controller
     pid.init(pid_timer_isr);
+
+    // Initialize display driver
+    tft_driver_init();
+    tft_clear_display();
+
+    // Initialize LVGL and register flush callback
+    lv_init();
+    tft_driver_lvgl_init();
+
+#if 1
+    // quick color flashing test
+    tft_backlight_pwm_set(100);
+    uint16_t colors[] = {0xF800, 0x07E0, 0x001F, 0xFFFF};// Red, Green, Blue, White
+    int c = 0;
+
+    for(;;) {
+        uint32_t start = millis();
+        tft_clear_display(colors[c++%4]);
+        uint32_t dur = millis() - start;
+        DEBUG_PRINT(DEBUG_DEBUG, "Clear display took %lu ms", dur);
+        delay(250);
+    }
+#endif
+
+    // // Show welcome screen and load main menu
+    // menu.showWelcomeScreen();
+    // // Apply settings after welcome screen since it turns the backlight on
+    // applyEEPROMSettings(); 
+    // menu.loadMainMenu();
+
 }
 
 void motorOff() {
@@ -114,6 +195,28 @@ void toggleMotor() {
     }
 }
 
+void loop()
+{
+    if (startButton.isPressed()) {
+    }
+    if (backButton.isPressed()) {
+    }
+    if (backButton.isPressed()) {
+    }
+    static uint32_t lastTime = 0;
+    if (millis() - lastTime >= 100) {
+
+        auto knobDelta = knob.getDeltaPositionAndMultiplier();
+        if (knobDelta.hasPosition()) {
+
+            auto tmp = knobDelta.getPosition();
+            DEBUG_PRINT(DEBUG_DEBUG, "knob=%d", tmp);
+
+        }
+    }
+}
+
+#if 0
 void loop()
 {
     if (startButton.isPressed()) {
@@ -391,3 +494,4 @@ void loop()
         #endif
     }
 }
+#endif

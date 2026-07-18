@@ -5,6 +5,7 @@
 #pragma once
 
 #include "i2c.h"
+#include "debug.h"
 
 /**
  * @brief MT6701 magnetic encoder I2C configuration
@@ -123,7 +124,7 @@ private:
  * @tparam GPIO_PORT_ADDR GPIO port address for I2C enable
  * @tparam ACTIVE_LOW_I2C true if I2C enable is active low, false if active high
  */
-template<uint8_t GPIO_PIN, uint32_t GPIO_PORT_ADDR, bool ACTIVE_LOW_I2C>
+template<uint8_t GPIO_PIN, bool ACTIVE_LOW_I2C, uint32_t GPIO_PORT_ADDR = digitalPinToGPIOBase<GPIO_PIN>()>
 struct MT6701Encoder {
 
     /**
@@ -179,12 +180,12 @@ struct MT6701Encoder {
             auto result = config.setPPR(ppr);
             if (result && writeEEPROM) {
                 result = config.writeEEPROM();
-                DEBUG_PRINTF("MT6701 write EEPROM result: %u", result);
+                DEBUG_PRINT(DEBUG_DEBUG, "MT6701 write EEPROM result: %u", result);
             }
-            DEBUG_PRINTF("MT6701 PPR: %u", config.getPPR());
+            DEBUG_PRINT(DEBUG_DEBUG, "MT6701 PPR: %u", config.getPPR());
         }
         else {
-            DEBUG_PRINTF("MT6701 not detected at address 0x%02x", MT6701Config::MT6701_ADDR);
+            DEBUG_PRINT(DEBUG_DEBUG, "MT6701 not detected at address 0x%02x", MT6701Config::MT6701_ADDR);
         }
 
         setI2CEnablePin(ACTIVE_LOW_I2C);

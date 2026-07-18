@@ -109,9 +109,9 @@ th:nth-child(4), td:nth-child(4) { width: 46%; }
 
 | Signal | STM32 pin | Type | Notes |
 |---|---|---|---|
-| BTN_3 | PD10 | DIN IRQ | 100 nF debounce cap |
-| BTN_2 | PD9 | DIN IRQ | 100 nF debounce cap |
-| BTN_1 | PD8 | DIN IRQ | 100 nF debounce cap |
+| BTN_3 | PD10 | DIN IRQ | Start Button, 100 nF debounce cap |
+| BTN_2 | PD9 | DIN IRQ | Back Button, 100 nF debounce cap |
+| BTN_1 | PD8 | DIN IRQ | Rotary Knob, 100 nF debounce cap |
 
 ## Revision: PCB Rev1.1 only
 

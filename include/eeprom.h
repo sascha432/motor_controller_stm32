@@ -5,10 +5,16 @@
 #pragma once
 
 #include <stdint.h>
-#include "ui.h"
+#include "ui_constants.h"
 
 struct EEPROM 
 {
+    static EEPROM &getInstance()
+    {
+        static EEPROM instance;
+        return instance;
+    }
+
     static constexpr uint32_t kMagic = 0xDEADBEEF;
     static constexpr uint32_t kVersion = 1;
 
@@ -247,7 +253,6 @@ struct EEPROM
     {
         return data.control_mode ? getMotorRPM() : getMotorPWM();
     }
-
 
 protected:
     Data data;

@@ -6,6 +6,7 @@
 
 #include <HardwareTimer.h>
 #include "helpers.h"
+#include "eeprom.h"
 
 struct PidController 
 {
@@ -110,7 +111,7 @@ struct PidController
     template<typename ISRCallback>
     void init(ISRCallback callback) {
         running = false;
-        setRPM(DEFAULT_RPM);
+        setRPM(EEPROM::getInstance().getMotorRPM());
 
         // === PWM on TIM1 CH1 (PA8, PA9) ===
         // Enable AFIO and GPIOA for PA8/PA9
