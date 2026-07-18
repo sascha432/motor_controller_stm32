@@ -452,20 +452,32 @@ void Menu::showWelcomeScreen()
     lv_timer_handler();
     tft_backlight_pwm_set(eeprom.getTFTBrightness());
 
-    // delay(UIConstants::kWelcomeScreenTimeout);
-
-    // gradually increase LED brightness to target value
-    uint32_t start = millis();
-    uint8_t targetBrightness = eeprom.getLEDBrightness();
-    float currentBrightness = 0;
-    float step = targetBrightness / (UIConstants::kWelcomeScreenTimeout / 8.0f);
-    while(millis() - start < UIConstants::kWelcomeScreenTimeout) {
-        if (currentBrightness + step <= targetBrightness) {
-            currentBrightness += step;
-        }
-        LEDs<0, 0>::illuminationLedSetPWM(currentBrightness);
-        delay(8);
+    if (UIConstants::kEnableIlluminationLEDFading) {
+        // gradually increase LED brightness to target value
+        uint32_t start = millis();
+        uint8_t targetBrightness = eeprom.getLEDBrightness();
+        float currentBrightness = 0;
+        float step = targetBrightness / (UIConstants::kWelcomeScreenTimeout / 8.0f);
+        targetBrightness -= step;
+        for(;;) {
+            uint32_t elapsed = millis() - start;
+            if (elapsed >= UIConstants::kWelcomeScreenTimeout) {
+                break;
+            }
+            if (currentBrightness < targetBrightness) {
+                currentBrightness += step;
+            }
+            LEDs::illuminationLedSetPWM(currentBrightness);
+            // blink motor LEDs
+            ((elapsed / 500) & 0x01) ? LEDs::onLED1() : LEDs::onLED2();
+            delay(8);
+        }   
+        LEDs::offLED1and2();
+    } 
+    else {
+        delay(UIConstants::kWelcomeScreenTimeout);
     }
+
     clear_user_inputs();
 }
 
@@ -514,7 +526,7 @@ int32_t Menu::updateRotaryValue(int32_t value)
             break;
         case Screen::Type::LED_BRIGHTNESS:
             eeprom.setLEDBrightness(getValue());
-            LEDs<0, 0>::illuminationLedSetPWM(eeprom.getLEDBrightness());
+            LEDs::illuminationLedSetPWM(eeprom.getLEDBrightness());
             break;
     }
     return getValue();

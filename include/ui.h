@@ -12,7 +12,7 @@
 
 // set to 1 to create previous screens using Screen::load() instead of lv_scr_load(screen->screen)
 // more CPU vs memory usage tradeoff
-#define RECREATE_PREV_SCREEN    1
+#define RECREATE_PREV_SCREEN                1
 
 // === Base Screen class ===
 struct Screen

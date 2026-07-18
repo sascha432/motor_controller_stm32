@@ -5,15 +5,16 @@
 #pragma once
 
 #include "helpers.h"
+#include "pins.h"
 
 /**
  * @brief Charlieplexed LEDs
  * 
  */
 template <uint32_t GPIO_LEDS_PIN, uint32_t GPIO_ILLUMINATION_LED_PIN, uint32_t GPIO_LEDS_PORT_ADDRESS = (digitalPinToGPIOBase<GPIO_LEDS_PIN>()), uint32_t GPIO_ILLUMINATION_PORT_ADDRESS = (digitalPinToGPIOBase<GPIO_ILLUMINATION_LED_PIN>())>
-struct LEDs {
+struct LEDs_T {
 
-    void init() 
+    static void init() 
     {
         // Enable GPIO port clock
         RCC->APB2ENR |= RCC_APB2ENR_IOPxEN(GPIO_LEDS_PORT_ADDRESS) | RCC_APB2ENR_IOPxEN(GPIO_ILLUMINATION_PORT_ADDRESS);
@@ -26,14 +27,14 @@ struct LEDs {
         static_assert(GPIO_ILLUMINATION_LED_PIN == PB10, "Illumination LED pin must be PB10");
     }
 
-    void offLED1and2() 
+    static void offLED1and2() 
     {
         // MODE=00, CNF=01 (floating input) to turn both LEDs off
         GPIO_CRx_REG(GPIO_LEDS_PORT_ADDRESS, GPIO_LEDS_PIN) &= ~(0xF << digitalPinShift(GPIO_LEDS_PIN));
         GPIO_CRx_REG(GPIO_LEDS_PORT_ADDRESS, GPIO_LEDS_PIN) |= (0x4 << digitalPinShift(GPIO_LEDS_PIN));
     }
 
-    void onLED1() 
+    static void onLED1() 
     {
         ((GPIO_TypeDef *)GPIO_LEDS_PORT_ADDRESS)->BSRR = (1U << digitalPinToBit(GPIO_LEDS_PIN)); // set pin high to turn on LED1
         // MODE=10 (2MHz), CNF=00 (push-pull)
@@ -41,7 +42,7 @@ struct LEDs {
         GPIO_CRx_REG(GPIO_LEDS_PORT_ADDRESS, GPIO_LEDS_PIN) |= (0x2 << digitalPinShift(GPIO_LEDS_PIN));
     }
 
-    void onLED2() 
+    static void onLED2() 
     {
         ((GPIO_TypeDef *)GPIO_LEDS_PORT_ADDRESS)->BSRR = (1U << (digitalPinToBit(GPIO_LEDS_PIN) + 16)); // set pin low to turn on LED2
         // MODE=10 (2MHz), CNF=00 (push-pull)
@@ -64,3 +65,5 @@ struct LEDs {
         TIM2->CCR3 = (uint16_t)(brightness * 1000);
     }
 };
+
+using LEDs = LEDs_T<MOTOR_LEDS_PIN, ILLUMINATION_LED_PIN>;

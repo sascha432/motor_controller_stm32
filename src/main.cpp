@@ -25,7 +25,6 @@ Button<BACK_BUTTON_PIN, false> backButton;
 
 RotaryEncoder<ROTARY_ENCODER_PIN_A, ROTARY_ENCODER_PIN_B> knob;
 MT6701Encoder<MT6701_I2C_ENABLE_PIN, false> motorEncoder;
-LEDs<MOTOR_LEDS_PIN, ILLUMINATION_LED_PIN> leds;
 PidController pid;
 ADC adc;
 Menu menu;
@@ -68,16 +67,12 @@ void apply_eeprom_settings()
 {
     auto &eeprom = EEPROM::getInstance();
     tft_backlight_pwm_set(eeprom.getTFTBrightness());
-    LEDs<0,0 >::illuminationLedSetPWM(eeprom.getLEDBrightness());
+    LEDs::illuminationLedSetPWM(eeprom.getLEDBrightness());
 }
 
 void setup()
 {
-    #if DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL
-        Serial.begin(115200);
-    #elif DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL4
-        Serial4.begin(115200);
-    #endif
+    debug_init();
 
     // Initialize and read EEPROM on I2C1 on PB8/9
     i2c.initI2C1Remapped();
@@ -86,7 +81,7 @@ void setup()
     eeprom.read(eeprom.getData());
 
     // LEDs
-    leds.init();
+    LEDs::init();
 
     // motor encoder
     motorEncoder.init();
@@ -201,6 +196,20 @@ void loop()
         lv_timer_handler();
         lastLvHandler = millis();
     }
+
+#if 1
+    // ADC debugoutput and blink motor LEDs
+    {
+        static uint32_t lastTime = 0;
+        static uint32_t counter = 0;
+        if (millis() - lastTime >= 100) {
+            lastTime = millis();
+            adc.debugPrint();
+            // ((++counter / 10) & 0x01) ? LEDs::onLED1() : LEDs::onLED2();
+        }
+    }
+#endif
+
 }
 
 #if 0
