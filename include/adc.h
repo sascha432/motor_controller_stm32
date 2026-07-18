@@ -6,14 +6,139 @@
 
 #include "helpers.h"
 
+/**
+ * @brief Convert ADC values to millivolt
+ *
+ * @tparam RES_TOP      Resistor value of the top resistor in the divider
+ * @tparam RES_BOTTOM   Resistor value of the bottom resistor in the divider
+ * @tparam VREF         Reference voltage in millivolts
+ * @tparam ADC_MAX      ADC maximum value
+ */
+template<uint32_t RES_TOP, uint32_t RES_BOTTOM, uint32_t AVREF_MILLIVOLT = 3300, uint32_t ADC_MAX = 4095>
+struct ADCVoltageConverterT
+{
+    static constexpr uint32_t kAVRef = AVREF_MILLIVOLT;
+    static constexpr uint32_t kResistorTop = RES_TOP;
+    static constexpr uint32_t kResistorBottom = RES_BOTTOM;
+    static constexpr uint32_t kDividerRatio = kAVRef * (static_cast<float>(kResistorTop + kResistorBottom) / static_cast<float>(kResistorBottom));
+    static constexpr uint32_t kADCMax = ADC_MAX;
+
+    static constexpr uint32_t convert(uint16_t adcValue) {
+        return (adcValue * kDividerRatio) / kADCMax;
+    }
+};
+
+/**
+ * @brief Convert ADC values to milliamps
+ *
+ * @tparam SHUNT_MILLIOHM   Shunt resistor value in milliohms
+ * @tparam AVREF_MILLIVOLT  ADC reference voltage in millivolts
+ * @tparam ADC_MAX          ADC maximum value
+ *
+ * Example:
+ * ADCCurrentConverter<10, 3300>  // 10mΩ shunt, 3.3V ADC reference
+ */
+template<uint32_t SHUNT_MILLIOHM, uint32_t GAIN, uint32_t AVREF_MILLIVOLT = 3300, uint32_t ADC_MAX = 4095>
+struct ADCCurrentConverterT
+{
+    static constexpr uint32_t kShunt = SHUNT_MILLIOHM;
+    static constexpr uint32_t kGain = GAIN;
+    static constexpr uint32_t kAVRef = AVREF_MILLIVOLT;
+    static constexpr uint32_t kADCMax = ADC_MAX;
+
+    /**
+     * @brief Convert ADC reading to current
+     * @return Current in milliamps
+     */
+    static constexpr uint32_t convert(uint16_t adcValue)
+    {
+        return adcValue * (kAVRef * 1000U / 4095U) / (kShunt * kGain);
+    }
+};
+
+/**
+ * @brief Convert ADC readings to temperature in Celsius using NTC thermistor
+ * 
+ * @tparam NTC_SERIES_RESISTANCE    Series resistor value in ohms
+ * @tparam NTC_NOMINAL_RESISTANCE   Nominal resistance of the NTC thermistor in ohms
+ * @tparam NTC_BETA_COEFF           Beta coefficient of the NTC thermistor
+ * @tparam NTC_NOMINAL_TEMP         Nominal temperature of the NTC thermistor in Celsius
+ * @tparam HIGH_SIDE_NTC            True if the NTC thermistor is connected to the high side (VCC)
+ * @tparam ADC_MAX                  ADC maximum value
+ */
+template<uint32_t NTC_SERIES_RESISTANCE = 10000, uint32_t NTC_NOMINAL_RESISTANCE = 10000, uint32_t NTC_BETA_COEFF = 3950, uint32_t NTC_NOMINAL_TEMP = 25, bool HIGH_SIDE_NTC = false, uint32_t ADC_MAX = 4095>
+struct NTCConverterT
+{
+    static constexpr uint32_t kSeriesResistance = NTC_SERIES_RESISTANCE;
+    static constexpr uint32_t kNominalResistance = NTC_NOMINAL_RESISTANCE;
+    static constexpr uint32_t kBetaCoefficient = NTC_BETA_COEFF;
+    static constexpr uint32_t kNominalTemperature = NTC_NOMINAL_TEMP;
+
+    static float convert(uint16_t adcValue)
+    {
+        if (adcValue == 0 || adcValue >= ADC_MAX) {
+            return 0.0f;
+        }
+
+        float resistance;
+
+        if constexpr (HIGH_SIDE_NTC) {
+            // VCC - NTC - ADC - Rseries - GND
+            resistance =
+                (static_cast<float>(ADC_MAX) /
+                 static_cast<float>(adcValue) - 1.0f)
+                * static_cast<float>(kSeriesResistance);
+        }
+        else {
+            // VCC - Rseries - ADC - NTC - GND
+            resistance =
+                static_cast<float>(kSeriesResistance) *
+                static_cast<float>(adcValue) /
+                (static_cast<float>(ADC_MAX) - adcValue);
+        }
+
+        float temperature = log(resistance / static_cast<float>(kNominalResistance));
+        temperature /= static_cast<float>(kBetaCoefficient);
+        temperature += 1.0f / (static_cast<float>(kNominalTemperature) + 273.15f);
+        temperature = 1.0f / temperature;
+        return temperature - 273.15f;
+    }
+};
+
+static constexpr uint32_t kADCVRefVoltage = 3300;
+
+using ADCVoltageConverter = ADCVoltageConverterT<100000, 9100, kADCVRefVoltage>;
+using ADCCurrentConverter = ADCCurrentConverterT<4, 20, kADCVRefVoltage>;
+using ADCTemperatureConverter = NTCConverterT<10000, 10000, 3950, 25>;
+
 struct ADCBufferType {
     uint16_t isense;
     uint16_t vsense;
     uint16_t external_ntc;
     uint16_t driver_ntc;
 
-    // TODO add unit converters
+    uint32_t getInputCurrent() const {
+        return ADCCurrentConverter::convert(isense);
+    }
+
+    uint32_t getInputVoltage() const {
+        return ADCVoltageConverter::convert(vsense);
+    }
+
+    float getExternalTemperature() const {
+        return ADCTemperatureConverter::convert(external_ntc);
+    }
+
+    float getDriverTemperature() const {
+        return ADCTemperatureConverter::convert(driver_ntc);
+    }
 };
+
+// static range checks need to be updated if constants are changed
+static_assert(ADCVoltageConverter::convert(100) == 966, "static check failed");
+static_assert(ADCVoltageConverter::convert(4095) == 39563, "static check failed, uint32_t overflow?");
+static_assert(ADCCurrentConverter::convert(100) == 1006, "static check failed");
+static_assert(ADCCurrentConverter::convert(4095) == 41205, "static check failed");
 
 /**
  * @brief ADC class to read multiple channels using DMA
@@ -21,22 +146,18 @@ struct ADCBufferType {
  */
 struct ADC {
 
-    static constexpr uint32_t kNumConversions = 2;      // number of channels
-    // static constexpr uint32_t kNumConversions = 4;      // number of channels
+    static constexpr uint32_t kNumConversions = 4;      // number of channels
 
-    void init() {
+    void init() 
+    {
         // Enable GPIOA/GPIOC and ADC1 clocks
-        RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_IOPBEN | RCC_APB2ENR_ADC1EN;
-        // RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_IOPCEN | RCC_APB2ENR_ADC1EN;
+        RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_IOPCEN | RCC_APB2ENR_ADC1EN;
 
-        GPIOA->CRL &= ~(0xF << (0 * 4));   // PA0 analog
-        GPIOB->CRL &= ~(0xF << (1 * 4));   // PB1 analog
-
-        // // Configure analog mode
-        // GPIOA->CRL &= ~(0xF << (2 * 4));   // PA2 analog
-        // GPIOA->CRL &= ~(0xF << (3 * 4));   // PA3 analog
-        // GPIOC->CRL &= ~(0xF << (4 * 4));   // PC4 analog
-        // GPIOC->CRL &= ~(0xF << (5 * 4));   // PC5 analog        
+        // Configure analog mode
+        GPIOA->CRL &= ~(0xF << (2 * 4));   // PA2 analog
+        GPIOA->CRL &= ~(0xF << (3 * 4));   // PA3 analog
+        GPIOC->CRL &= ~(0xF << (4 * 4));   // PC4 analog
+        GPIOC->CRL &= ~(0xF << (5 * 4));   // PC5 analog        
 
         // ADC scan mode (multiple channels)
         ADC1->CR1 |= ADC_CR1_SCAN;        
@@ -44,30 +165,24 @@ struct ADC {
         // set the number of conversions in the regular ADC sequence.
         ADC1->SQR1 = ((kNumConversions - 1) << 20);
         ADC1->SQR3 =
-            (0 << 0) |          // dma[0]: ADC channel 0 (PA0)
-            (9 << 5);           // dma[1]: ADC channel 9 (PB1)
-        // ADC1->SQR3 =
-        //     (2  << 0)  |        // rank 1: PA2
-        //     (3  << 5)  |        // rank 2: PA3
-        //     (14 << 10) |        // rank 3: PC4
-        //     (15 << 15);         // rank 4: PC5            
+            (2  << 0)  |        // rank 1: PA2
+            (3  << 5)  |        // rank 2: PA3
+            (14 << 10) |        // rank 3: PC4
+            (15 << 15);         // rank 4: PC5            
 
         // Clear and set ADC clock divider
         RCC->CFGR &= ~RCC_CFGR_ADCPRE;
         RCC->CFGR |= RCC_CFGR_ADCPRE_DIV6;   // 72MHz / 6 = 12MHz ADC clock
 
         // sampling time 239.5 cycles = about 20 microseconds per conversion
-        ADC1->SMPR2 =
-            (7 << (0 * 3)) |     // CH0 PA0 
-            (7 << (9 * 3));      // CH9 PB1
 
-        // // PA2, PA3 in SMPR2
-        // ADC1->SMPR2 |= (7 << (2 * 3));   // CH2
-        // ADC1->SMPR2 |= (7 << (3 * 3));   // CH3
+        // PA2, PA3 in SMPR2
+        ADC1->SMPR2 |= (7 << (2 * 3));   // CH2
+        ADC1->SMPR2 |= (7 << (3 * 3));   // CH3
 
-        // // PC4, PC5 in SMPR1
-        // ADC1->SMPR1 |= (7 << ((14 - 10) * 3)); // CH14
-        // ADC1->SMPR1 |= (7 << ((15 - 10) * 3)); // CH15            
+        // PC4, PC5 in SMPR1
+        ADC1->SMPR1 |= (7 << ((14 - 10) * 3)); // CH14
+        ADC1->SMPR1 |= (7 << ((15 - 10) * 3)); // CH15            
 
         // enable DMA
         RCC->AHBENR |= RCC_AHBENR_DMA1EN;
@@ -139,15 +254,19 @@ struct ADC {
     //     }
     // }
 
-    void debugPrint(Stream &stream) const {
-        stream.print("ADC: ");
-        for (uint8_t i = 0; i < kNumConversions; i++) {
-            stream.print(adc_buffer[i]);
-            if (i < kNumConversions - 1) {
-                stream.print(',');
-            }
-        }
-        stream.println();
+    void debugPrint() const
+    {
+        auto tmp = *(ADCBufferType *)adc_buffer;
+        DEBUG_PRINT(
+            DEBUG_DEBUG, 
+            "ADC: %umA,%umV,%u.%01uC,%u.%01uC 2",
+            tmp.getInputCurrent(), 
+            tmp.getInputVoltage(), 
+            (uint32_t)(tmp.getExternalTemperature()),
+            (uint32_t)(tmp.getExternalTemperature() * 10) % 10,
+            (uint32_t)(tmp.getDriverTemperature()),
+            (uint32_t)(tmp.getDriverTemperature() * 10) % 10
+        );
     }
 
     volatile uint16_t adc_buffer[kNumConversions];
