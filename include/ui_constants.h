@@ -29,7 +29,7 @@ struct UIConstants
     static constexpr uint32_t kMinMotorStallTimeout = 100;              // Motor stall time in milliseconds
     static constexpr uint32_t kMaxMotorStallTimeout = 10000;            // Motor stall time in milliseconds
     static constexpr int32_t kMotorStallTimeoutStep = 100;              // Motor stall time step in milliseconds
-    static constexpr uint8_t kMinMosfetTemperature = 50;                // Min. MOSFET temperature in °C
+    static constexpr uint8_t kMinMosfetTemperature = 10;                // Min. MOSFET temperature in °C
     static constexpr uint8_t kMaxMosfetTemperature = 175;               // Max. MOSFET temperature in °C
     static constexpr uint8_t kMinMotorTemperature = 30;                 // Min. Motor temperature in °C
     static constexpr uint8_t kMaxMotorTemperature = 105;                // Max. Motor temperature in °C

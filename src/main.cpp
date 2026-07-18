@@ -63,9 +63,10 @@ void clear_user_inputs()
     knob.clear();
 }
 
+auto &eeprom = EEPROM::getInstance();
+
 void apply_eeprom_settings() 
 {
-    auto &eeprom = EEPROM::getInstance();
     tft_backlight_pwm_set(eeprom.getTFTBrightness());
     LEDs::illuminationLedSetPWM(eeprom.getLEDBrightness());
 }
@@ -76,7 +77,6 @@ void setup()
 
     // Initialize and read EEPROM on I2C1 on PB8/9
     i2c.initI2C1Remapped();
-    auto &eeprom = EEPROM::getInstance();
     eeprom.init();
     eeprom.read(eeprom.getData());
 
@@ -194,12 +194,49 @@ void loop()
             DEBUG_PRINT(DEBUG_DEBUG, "knob=%d", newPosition);
         }
         lv_timer_handler();
+
+        // check NTC sensors
+        static bool triggered = false;
+        uint32_t overTemperature = 0;
+        if (adc.getMotorNTCValue() < eeprom.getMotorTemperatureLimitADC()) {
+            overTemperature |= 0x01;
+            LEDs::onLED1();
+        }
+        if (adc.getMosfetNTCValue() < eeprom.getMosfetTemperatureLimitADC()) {
+            overTemperature |= 0x02;
+            LEDs::onLED2();
+        }
+        if (overTemperature) {
+            auto adcValues = adc.readAll();
+            triggered = true;
+            if (pid.running) {
+                motorOff();
+            }
+            DEBUG_PRINT(DEBUG_ERROR, "OVER TEMPERATURE: flag=%02x motor=%u mosfet=%u", overTemperature, (uint32_t)adcValues.getMotorTemperature(), (uint32_t)adcValues.getMosfetTemperature());
+        }
+        if (!overTemperature && triggered) {
+            triggered = false;
+            LEDs::offLED1and2();
+        }
+
+        // ADC temperature debugging
+        if (0) {
+            static uint16_t lastMotorNTCValue = 0;
+            static uint16_t lastMosfetNTCValue = 0;
+            uint16_t motorNTCValue = adc.getMotorNTCValue() / 64; // only on significant changes
+            uint16_t mosfetNTCValue = adc.getMosfetNTCValue() / 64;
+            if (motorNTCValue != lastMotorNTCValue || mosfetNTCValue != lastMosfetNTCValue) {
+                lastMotorNTCValue = motorNTCValue;
+                lastMosfetNTCValue = mosfetNTCValue;
+                DEBUG_PRINT(DEBUG_DEBUG, "motor=%u/%u mosfet=%u/%u", adc.getMotorNTCValue(), eeprom.getMotorTemperatureLimitADC(), adc.getMosfetNTCValue(), eeprom.getMosfetTemperatureLimitADC());
+            }
+        }
+
         lastLvHandler = millis();
     }
 
-#if 1
     // ADC debugoutput and blink motor LEDs
-    {
+    if (false) {
         static uint32_t lastTime = 0;
         static uint32_t counter = 0;
         if (millis() - lastTime >= 100) {
@@ -208,8 +245,6 @@ void loop()
             // ((++counter / 10) & 0x01) ? LEDs::onLED1() : LEDs::onLED2();
         }
     }
-#endif
-
 }
 
 #if 0
@@ -223,36 +258,7 @@ void loop()
         DEBUG_PRINTF("BACK BTN RELEASED");
     }
     #endif
-    #if 0
-    if (backButton.isPressed()) {
-        static uint32_t num = 0;
-        switch(num++ % 3) {
-            case 0:
-                pid.setRPM(200);
-                break;
-            case 1:
-                pid.setRPM(5000);
-                break;
-        }
-    }
-    #endif
-    #if 1
-    if (backButton.isPressed()) {
-        static uint32_t num = 0;
-        DEBUG_PRINTF("BACK BTN PRESSED %u", num);
-        switch(num++ % 3) {
-            case 0:
-                leds.onLED1();
-                break;
-            case 1:
-                leds.onLED2();
-                break;
-            case 2:
-                leds.off();
-                break;
-        }
-    }
-    #endif
+
 
     // static uint32_t lastTime3 = 0;
     // if (millis() - lastTime3 >= 100) {

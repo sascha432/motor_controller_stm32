@@ -6,6 +6,7 @@
 
 #include <stdint.h>
 #include "ui_constants.h"
+#include "adc.h"
 
 struct EEPROM 
 {
@@ -73,9 +74,9 @@ struct EEPROM
         {}
     };
 
-    static void init();
-    static void read(Data &data);
-    static void write(const Data &data);
+    void init();
+    void read(Data &data);
+    void write(const Data &data);
 
     Data &getData()
     {
@@ -85,6 +86,7 @@ struct EEPROM
     void resetDefaults()
     {
         data = Data();
+        updateTemperatureLimits();
     }
 
     uint8_t getTFTBrightness() const
@@ -195,6 +197,12 @@ struct EEPROM
     void setMosfetTemperatureLimit(uint8_t value) 
     {
         data.mosfet_temperature_limit = value;
+        mosfet_temperature_limit_adc = ADCTemperatureConverter::reverse(value);
+    }
+
+    uint16_t getMosfetTemperatureLimitADC() const
+    {
+        return mosfet_temperature_limit_adc;
     }
 
     uint8_t getMotorTemperatureLimit() const
@@ -205,6 +213,12 @@ struct EEPROM
     void setMotorTemperatureLimit(uint8_t value) 
     {
         data.motor_temperature_limit = value;
+        motor_temperature_limit_adc = ADCTemperatureConverter::reverse(value);
+    }
+
+    uint16_t getMotorTemperatureLimitADC() const
+    {
+        return motor_temperature_limit_adc;
     }
 
     uint8_t getMaxPWM() const
@@ -255,5 +269,10 @@ struct EEPROM
     }
 
 protected:
+    void updateTemperatureLimits();
+
+protected:
     Data data;
+    uint16_t mosfet_temperature_limit_adc;
+    uint16_t motor_temperature_limit_adc;
 };

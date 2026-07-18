@@ -5,6 +5,7 @@
 #pragma once
 
 #include "helpers.h"
+#include "debug.h"
 
 /**
  * @brief Convert ADC values to millivolt
@@ -103,18 +104,47 @@ struct NTCConverterT
         temperature = 1.0f / temperature;
         return temperature - 273.15f;
     }
+
+    static uint16_t reverse(float temperature)
+    {
+        // Celsius to Kelvin
+        float temperatureK = temperature + 273.15f;
+
+        // Calculate NTC resistance
+        float resistance =
+            kNominalResistance *
+            exp(kBetaCoefficient *
+            (1.0f / temperatureK -
+             1.0f / (kNominalTemperature + 273.15f)));
+
+        float adc;
+
+        if constexpr (HIGH_SIDE_NTC) {
+            // VCC - NTC - ADC - Rseries - GND
+            adc =
+                static_cast<float>(ADC_MAX) *
+                kSeriesResistance /
+                (resistance + kSeriesResistance);
+        }
+        else {
+            // VCC - Rseries - ADC - NTC - GND
+            adc =
+                static_cast<float>(ADC_MAX) *
+                resistance /
+                (resistance + kSeriesResistance);
+        }
+        return static_cast<uint16_t>(adc);
+    }    
 };
 
-static constexpr uint32_t kADCVRefVoltage = 3300;
-
-using ADCVoltageConverter = ADCVoltageConverterT<100000, 9100, kADCVRefVoltage>;
-using ADCCurrentConverter = ADCCurrentConverterT<4, 20, kADCVRefVoltage>;
+using ADCVoltageConverter = ADCVoltageConverterT<100000, 9100, 3300>;
+using ADCCurrentConverter = ADCCurrentConverterT<4, 20, 3300>;
 using ADCTemperatureConverter = NTCConverterT<10000, 10000, 3950, 25>;
 
 struct ADCBufferType {
     uint16_t isense;
     uint16_t vsense;
-    uint16_t external_ntc;
+    uint16_t motor_ntc;
     uint16_t driver_ntc;
 
     uint32_t getInputCurrent() const {
@@ -125,11 +155,11 @@ struct ADCBufferType {
         return ADCVoltageConverter::convert(vsense);
     }
 
-    float getExternalTemperature() const {
-        return ADCTemperatureConverter::convert(external_ntc);
+    float getMotorTemperature() const {
+        return ADCTemperatureConverter::convert(motor_ntc);
     }
 
-    float getDriverTemperature() const {
+    float getMosfetTemperature() const {
         return ADCTemperatureConverter::convert(driver_ntc);
     }
 };
@@ -229,43 +259,30 @@ struct ADC {
         return adc_buffer[index];
     }
 
-    ADCBufferType &readAll() const {
+    ADCBufferType readAll() const {
         return *(ADCBufferType *)adc_buffer;
     }
 
-    // ADCBufferType readAll() const {
-    //     ADCBufferType tmp;
-    //     readAll(tmp);
-    //     return tmp;
-    // }
+    uint16_t getMotorNTCValue() const {
+        return adc_buffer[2];
+    }
 
-    // void readAll(ADCBufferType &results) const {
-    //     results.isense = adc_buffer[0];
-    //     results.vsense = adc_buffer[1];
-    //     if (kNumConversions >= 4) {
-    //         results.external_ntc = adc_buffer[2];
-    //         results.driver_ntc = adc_buffer[3];
-    //     }
-    // }
-
-    // void readAll(uint16_t *results) const {
-    //     for (uint8_t i = 0; i < kNumConversions; i++) {
-    //         results[i] = adc_buffer[i];
-    //     }
-    // }
+    uint16_t getMosfetNTCValue() const {
+        return adc_buffer[3];
+    }
 
     void debugPrint() const
     {
         auto tmp = *(ADCBufferType *)adc_buffer;
         DEBUG_PRINT(
             DEBUG_DEBUG, 
-            "ADC: %umA,%umV,%u.%01uC,%u.%01uC 2",
+            "ADC: %umA,%umV,%u.%01uC,%u.%01uC %u %u",
             tmp.getInputCurrent(), 
             tmp.getInputVoltage(), 
-            (uint32_t)(tmp.getExternalTemperature()),
-            (uint32_t)(tmp.getExternalTemperature() * 10) % 10,
-            (uint32_t)(tmp.getDriverTemperature()),
-            (uint32_t)(tmp.getDriverTemperature() * 10) % 10
+            (uint32_t)(tmp.getMotorTemperature()),
+            (uint32_t)(tmp.getMotorTemperature() * 10) % 10,
+            (uint32_t)(tmp.getMosfetTemperature()),
+            (uint32_t)(tmp.getMosfetTemperature() * 10) % 10
         );
     }
 
