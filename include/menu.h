@@ -28,9 +28,6 @@ struct Menu
     void restorePreviousMenu();
 
 protected:
-    void setRotaryValue(int32_t value);
-    int32_t getRotaryValue() const;
-
     int32_t steps;
     EEPROM &eeprom;
 };

@@ -35,6 +35,8 @@
 #define MOTOR_LEDS_PIN              PB12            // motor LEDs pin
 #endif
 
+#define ILLUMINATION_LED_PIN        PB10            // illumination LED pin
+
 // TFT pins
 #define TFT_PIN_CLK                 PB13
 #define TFT_PIN_MOSI                PB15

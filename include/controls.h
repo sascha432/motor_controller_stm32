@@ -7,6 +7,8 @@
 #include "helpers.h"
 #include "pins.h"
 
+#define ROTARY_ENCODER_USE_ACCELERATION 0
+
 /**
  * @brief Button template for handling GPIO buttons with debounce and interrupt support
  * 
@@ -37,6 +39,15 @@ struct Button
         state = ((GPIO_TypeDef *)GPIO_PORT_ADDR)->IDR & (1 << digitalPinToBit(GPIO_PIN));
         pressed = (state == ACTIVE_STATE);
         released = !pressed;
+    }
+
+    /**
+     * @brief remove pressed state
+     * 
+     */
+    void clear()
+    {
+        isPressed();
     }
 
     /**
@@ -176,6 +187,18 @@ struct RotaryEncoder {
         lastTimestamp = ms();
     }
 
+    void clear()
+    {
+        __disable_irq();
+        position = 0;
+        lastTimestamp = ms();
+        #if ROTARY_ENCODER_USE_ACCELERATION
+        deltaFiltered = 0;
+        #endif
+        oldState = readState();
+        __enable_irq();
+    }
+
     template<typename ISRCallback>
     void enable(ISRCallback callback) {
         attachInterrupt(digitalPinToInterrupt(GPIO_PIN_A), callback, CHANGE);
@@ -202,6 +225,7 @@ struct RotaryEncoder {
         uint32_t timestamp = ms();
         uint32_t delta = timestamp - lastTimestamp;
         lastTimestamp = timestamp;
+        #if ROTARY_ENCODER_USE_ACCELERATION
         if (!delta) {
             // skip to avoid division by zero
         }
@@ -216,6 +240,7 @@ struct RotaryEncoder {
             // deltaFiltered = (deltaFiltered * 15 + delta) / 16;
             deltaFiltered = deltaFiltered - (deltaFiltered >> 4) + (delta >> 4);
         }
+        #endif
     }
 
     /**
@@ -231,6 +256,7 @@ struct RotaryEncoder {
         return tmpDelta;
     }
 
+    #if ROTARY_ENCODER_USE_ACCELERATION
     /**
      * @brief Get the Delta Position object and clean up the position counter
      * 
@@ -266,20 +292,12 @@ struct RotaryEncoder {
         }
         return multiplier;
     }
-
-    /**
-     * @brief Set knob position
-     * 
-     * @param value 
-     */
-    void setPosition(int32_t value) {
-        __disable_irq();
-        position += value * 4; // add position to the counter to keep unfinished rotations and acceleration
-        __enable_irq();
-    }
+    #endif
 
     volatile int32_t position;
     volatile uint32_t lastTimestamp;
+    #if ROTARY_ENCODER_USE_ACCELERATION
     volatile uint32_t deltaFiltered;
+    #endif
     volatile uint8_t oldState;    
 };

@@ -24,10 +24,10 @@ Button<START_BUTTON_PIN, false> startButton;
 Button<BACK_BUTTON_PIN, false> backButton;
 
 RotaryEncoder<ROTARY_ENCODER_PIN_A, ROTARY_ENCODER_PIN_B> knob;
-PidController pid;
 MT6701Encoder<MT6701_I2C_ENABLE_PIN, false> motorEncoder;
+LEDs<MOTOR_LEDS_PIN, ILLUMINATION_LED_PIN> leds;
+PidController pid;
 ADC adc;
-LEDs<MOTOR_LEDS_PIN> leds;
 Menu menu;
 
 static void button_isr() {
@@ -56,38 +56,20 @@ static void pid_timer_isr() {
     pid.isr();
 }
 
-// --- TODO refactor start
-static constexpr uint32_t kRotaryFullRotation = 1;
-static int32_t rotaryValue = 0;
-static int32_t rotaryValueOld = 0;
-
-void setRotaryValue(int32_t value) 
+void clear_user_inputs() 
 {
-    rotaryValue = value * kRotaryFullRotation;
-    rotaryValueOld = rotaryValue;
+    knobButton.clear();
+    backButton.clear();
+    startButton.clear();
+    knob.clear();
 }
 
-int32_t getRotaryValue() 
-{
-    return (rotaryValue / kRotaryFullRotation);
-}
-
-void led_pwm_set(uint8_t value) 
-{
-    // DUMMY
-//     // Set the PWM duty cycle for the LED brightness
-//     // Assuming TIM2 is used for PWM on PB5 (LED pin)
-//     TIM2->CCR1 = (uint32_t)(value * (TIM2->ARR + 1) / 100); // Scale value to timer range
-}
-
-void applyEEPROMSettings() 
+void apply_eeprom_settings() 
 {
     auto &eeprom = EEPROM::getInstance();
     tft_backlight_pwm_set(eeprom.getTFTBrightness());
-    led_pwm_set(eeprom.getLEDBrightness());
+    LEDs<0,0 >::illuminationLedSetPWM(eeprom.getLEDBrightness());
 }
-
-// --- refactor end
 
 void setup()
 {
@@ -153,7 +135,7 @@ void setup()
     // Show welcome screen and load main menu
     menu.showWelcomeScreen();
     // Apply settings after welcome screen since it turns the backlight on
-    applyEEPROMSettings(); 
+    apply_eeprom_settings(); 
     menu.loadMainMenu();
 }
 
@@ -211,16 +193,14 @@ void loop()
     // handle ui updates and rotary encoder
     static uint32_t lastLvHandler = 0;
     if (millis() - lastLvHandler >= 5) {
-        auto knobDelta = knob.getDeltaPositionAndMultiplier();
-        if (knobDelta.hasPosition()) {
-            auto newPosition = menu.updateRotaryValue(knobDelta.getPosition());
-            knob.setPosition(newPosition);
-            DEBUG_PRINT(DEBUG_DEBUG, "knob=%d value=%d", newPosition, menu.getValue());
+        int32_t delta = knob.getDeltaPosition();
+        if (delta) {
+            int32_t newPosition = menu.updateRotaryValue(menu.getValue() + delta);
+            DEBUG_PRINT(DEBUG_DEBUG, "knob=%d", newPosition);
         }
         lv_timer_handler();
         lastLvHandler = millis();
     }
-
 }
 
 #if 0

@@ -9,6 +9,10 @@
 #include "menu.h"
 #include "ui.h"
 #include "eeprom.h"
+#include "leds.h"
+
+void clear_user_inputs();
+void apply_eeprom_settings();
 
 ScreenFlow screenFlow;
 
@@ -62,12 +66,6 @@ static const char *kRestoreDefaultsMenuItems[] = {
     "Cancel"                    // 1
 };
 
-// TODO remove globals later
-void setRotaryValue(int32_t value);
-int32_t getRotaryValue();
-void led_pwm_set(uint8_t value);
-void applyEEPROMSettings();
-
 // custom format for current and conversion from uint16_t to float
 static const char *current_slider_format_callback(uint32_t value, char *buf, size_t bufSize) 
 {
@@ -94,7 +92,7 @@ void Menu::restorePreviousMenu()
     DEBUG_PRINT(DEBUG_DEBUG, "value=%d", getValue());
     screenFlow.back(); // restore previous screen
     setSteps(0);
-    setRotaryValue(getValue()); // restore previous menu position
+    clear_user_inputs();
 }
 
 /**
@@ -268,8 +266,6 @@ void Menu::handleButtonPress()
             break;
         // === LED brightness menu ===
         case Screen::Type::LED_BRIGHTNESS:
-            eeprom.setLEDBrightness(getValue());                // TODO redundant, already set in live update
-            led_pwm_set(eeprom.getLEDBrightness());             // TODO redundant, already set in live update
             restorePreviousMenu();
             break;
         // === motor brake menu ===
@@ -332,8 +328,6 @@ void Menu::handleButtonPress()
             break;
         // === TFT brightness menu ===
         case Screen::Type::TFT_BRIGHTNESS:
-            eeprom.setTFTBrightness(getValue());    // TODO redundant, already set in live update
-            tft_backlight_pwm_set(eeprom.getTFTBrightness());   // TODO redundant, already set in live update
             restorePreviousMenu();
             break;
         // === MOSFET temperature limit menu ===
@@ -395,7 +389,7 @@ void Menu::handleButtonPress()
                 case 0: // Restore
                     eeprom.resetDefaults();
                     eeprom.write(eeprom.getData());
-                    applyEEPROMSettings();
+                    apply_eeprom_settings();
                     screenFlow.next(new InfoScreen(Screen::Type::EEPROM_RESTORED, "Restored"));
                     lv_timer_handler();
                     delay(UIConstants::kInfoScreenTimeout);
@@ -421,7 +415,13 @@ void Menu::handleBackButtonPress()
 {
     DEBUG_PRINT(DEBUG_DEBUG, "enter screen=%p id=%d value=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), getValue());
     switch(screenFlow->getId()) {
+        case Screen::Type::START:
+        case Screen::Type::MAIN_MENU:
+        case Screen::Type::WELCOME:
+            // no back button available
+            break;
         default:
+            restorePreviousMenu();
             break;
     }
     DEBUG_PRINT(DEBUG_DEBUG, "leave screen=%p id=%d value=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), getValue());
@@ -451,7 +451,22 @@ void Menu::showWelcomeScreen()
     screenFlow.setScreen(new WelcomeScreen());
     lv_timer_handler();
     tft_backlight_pwm_set(eeprom.getTFTBrightness());
-    delay(UIConstants::kWelcomeScreenTimeout);
+
+    // delay(UIConstants::kWelcomeScreenTimeout);
+
+    // gradually increase LED brightness to target value
+    uint32_t start = millis();
+    uint8_t targetBrightness = eeprom.getLEDBrightness();
+    float currentBrightness = 0;
+    float step = targetBrightness / (UIConstants::kWelcomeScreenTimeout / 8.0f);
+    while(millis() - start < UIConstants::kWelcomeScreenTimeout) {
+        if (currentBrightness + step <= targetBrightness) {
+            currentBrightness += step;
+        }
+        LEDs<0, 0>::illuminationLedSetPWM(currentBrightness);
+        delay(8);
+    }
+    clear_user_inputs();
 }
 
 /**
@@ -467,6 +482,7 @@ void Menu::loadMainMenu()
     ));
     setSteps(0);
     setValue(0);
+    clear_user_inputs();
 }
 
 void Menu::loadStartScreen()
@@ -475,6 +491,7 @@ void Menu::loadStartScreen()
     screenFlow.setScreen(new InfoScreen(Screen::Type::START, "Start"));
     setSteps(0);
     setValue(0);
+    clear_user_inputs();
 }
 
 /**
@@ -484,10 +501,11 @@ void Menu::loadStartScreen()
  */
 int32_t Menu::updateRotaryValue(int32_t value)
 {
-    setRotaryValue(value);
     screenFlow->setValue(
         // add steps as multiplier to the Screen value independent of the rotary encoder acceleration
-        (steps > 1) ? (screenFlow->getValue() + static_cast<int32_t>(value - screenFlow->getValue()) * steps) : value                                                               
+        (steps == 1 || steps == 0) ? 
+            value : 
+            (screenFlow->getValue() + static_cast<int32_t>(value - screenFlow->getValue()) * steps)
     );
     switch(screenFlow->getId()) {
         case Screen::Type::TFT_BRIGHTNESS:
@@ -496,7 +514,7 @@ int32_t Menu::updateRotaryValue(int32_t value)
             break;
         case Screen::Type::LED_BRIGHTNESS:
             eeprom.setLEDBrightness(getValue());
-            led_pwm_set(eeprom.getLEDBrightness());
+            LEDs<0, 0>::illuminationLedSetPWM(eeprom.getLEDBrightness());
             break;
     }
     return getValue();
@@ -509,7 +527,6 @@ int32_t Menu::updateRotaryValue(int32_t value)
  */
 void Menu::setValue(int32_t value)
 {
-    setRotaryValue(value);
     screenFlow->setValue(value);
 }
 
@@ -532,24 +549,4 @@ void Menu::setSteps(int32_t steps)
 {
     DEBUG_PRINT(DEBUG_DEBUG, "steps=%d", steps);
     this->steps = steps;
-}
-
-/**
- * @brief Set rotary encoder value
- * 
- * @param value 
- */
-void Menu::setRotaryValue(int32_t value)
-{
-    ::setRotaryValue(value);
-}
-
-/**
- * @brief Get rotary encoder value
- * 
- * @return int32_t 
- */
-int32_t Menu::getRotaryValue() const
-{
-    return ::getRotaryValue();
 }

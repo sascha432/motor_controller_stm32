@@ -35,8 +35,8 @@ struct UIConstants
     static constexpr uint8_t kMaxMotorTemperature = 105;                // Max. Motor temperature in °C
 
     // eeprom default values
-    static constexpr uint8_t kDefaultTFTBrightness = 80;                // Default TFT Brightness
-    static constexpr uint8_t kDefaultLEDBrightness = 50;                // Default LED Brightness
+    static constexpr uint8_t kDefaultTFTBrightness = 90;                // Default TFT Brightness
+    static constexpr uint8_t kDefaultLEDBrightness = 25;                // Default LED Brightness
     static constexpr float kDefaultInputCurrent = 10.0f;                // Default input current in A
     static constexpr float kDefaultMotorCurrent = 40.0f;                // Default peak motor current in A
     static constexpr uint8_t kDefaultMotorBrake = 50;                   // Default motor brake in percentage (0-100)
@@ -50,6 +50,6 @@ struct UIConstants
     static constexpr uint16_t kDefaultMotorRPM = 250;                   // Default motor RPM value in RPM
 
     // ui menu timeouts
-    static constexpr uint32_t kWelcomeScreenTimeout = 2000;             // WelcomeScreen timeout in milliseconds
+    static constexpr uint32_t kWelcomeScreenTimeout = 3000;             // WelcomeScreen timeout in milliseconds
     static constexpr uint32_t kInfoScreenTimeout = 2000;                // Default InfoScreen timeout in milliseconds
 };
