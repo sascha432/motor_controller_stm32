@@ -111,6 +111,12 @@ void SystemClock_Config(void)
      *   - peripheral clock calculations
      */
     SystemCoreClock = 72000000;
+
+    /*
+    * Reconfigure SysTick for the new clock.
+    * HAL_Delay() depends on this.
+    */
+    SysTick_Config(SystemCoreClock / 1000);    
 }
 
 #endif
