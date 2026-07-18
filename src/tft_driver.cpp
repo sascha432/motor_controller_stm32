@@ -21,7 +21,7 @@ lv_disp_drv_t s_lvgl_disp_drv;
 void tft_driver_gpio_init(void)
 {
     // Enable GPIOC and GPIOD clocks
-    RCC->APB2ENR |= RCC_APB2ENR_IOPCEN | RCC_APB2ENR_IOPDEN;
+    RCC->APB2ENR |= RCC_APB2ENR_IOPCEN | RCC_APB2ENR_IOPDEN | RCC_APB2ENR_IOPBEN;
 
     // TFT_PIN_RST/PC6, TFT_PIN_RS/PC7 (CRL)
     GPIOC->CRL &= ~((0xF << (6 * 4)) | (0xF << (7 * 4)));
@@ -32,6 +32,10 @@ void tft_driver_gpio_init(void)
     // TFT_PIN_CS/PD15 (CRH)
     GPIOD->CRH &= ~(0xF << ((15 - 8) * 4));
     GPIOD->CRH |=  (0x3 << ((15 - 8) * 4)); // PD15 output PP 50MHz
+
+    // set pins to default state
+    TFT_PIN_CS_HIGH();
+    TFT_PIN_RS_HIGH();
 
     // backlight PWM on TFT_PIN_LED/PB11
     RCC->APB2ENR |= RCC_APB2ENR_AFIOEN | RCC_APB2ENR_IOPBEN;
@@ -45,22 +49,26 @@ void tft_driver_gpio_init(void)
     GPIOB->CRH &= ~(0xF << ((11 - 8) * 4));
     GPIOB->CRH |=  (0xB << ((11 - 8) * 4));
 
+    // LED_PWM/PB10 = Alternate Function Push-Pull, 50 MHz (CRH)
+    GPIOB->CRH &= ~(0xF << ((10 - 8) * 4));
+    GPIOB->CRH |=  (0xB << ((10 - 8) * 4));
+
     TIM2->CR1 = 0;
     TIM2->PSC = 71;      /* 72MHz / (71+1) = 1MHz timer clock */
     TIM2->ARR = 999;     /* 1MHz / (999+1) = 1kHz PWM */
-    TIM2->CCR4 = 0;      /* 0% duty at startup */
 
-    TIM2->CCMR2 &= ~(TIM_CCMR2_CC4S | TIM_CCMR2_OC4M | TIM_CCMR2_OC4PE);
-    TIM2->CCMR2 |= TIM_CCMR2_OC4M_1 | TIM_CCMR2_OC4M_2 | TIM_CCMR2_OC4PE;
+    // Duty cycle 0
+    TIM2->CCR3 = 0;
+    TIM2->CCR4 = 0;
 
-    // Enable TIM2 Channel 4 output on the pin
-    TIM2->CCER |= TIM_CCER_CC4E;
+    TIM2->CCMR2 &= ~(TIM_CCMR2_CC3S | TIM_CCMR2_OC3M | TIM_CCMR2_OC3PE | TIM_CCMR2_CC4S | TIM_CCMR2_OC4M | TIM_CCMR2_OC4PE);
+    TIM2->CCMR2 |= TIM_CCMR2_OC3M_1 | TIM_CCMR2_OC3M_2 | TIM_CCMR2_OC3PE | TIM_CCMR2_OC4M_1 | TIM_CCMR2_OC4M_2 | TIM_CCMR2_OC4PE;
+
+    // Enable TIM2 Channel 2 & 4 output on the pin
+    TIM2->CCER |= TIM_CCER_CC3E | TIM_CCER_CC4E;
 
     TIM2->EGR = TIM_EGR_UG;
     TIM2->CR1 |= TIM_CR1_ARPE | TIM_CR1_CEN;
-
-    TFT_PIN_CS_HIGH();
-    TFT_PIN_RS_HIGH();
 }
 
 /**
