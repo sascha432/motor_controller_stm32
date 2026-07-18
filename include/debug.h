@@ -41,6 +41,7 @@
 #endif
 
 const char *debug_function_name(const char *signature, char *out, size_t outSize);
+void debug_init(void);
 
 #if DEBUG_OUTPUT == DEBUG_OUTPUT_NONE
 

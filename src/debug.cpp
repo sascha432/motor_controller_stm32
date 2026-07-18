@@ -2,6 +2,7 @@
   Author: sascha_lammers@gmx.de
 */
 
+#include <Arduino.h>
 #include "debug.h"
 
 const char *debug_function_name(const char *signature, char *out, size_t outSize)
@@ -63,4 +64,30 @@ void debug_swd_printf(const char *fmt, ...)
     debug_swd_write(buf);
 }
 
+static void debug_swd_init()
+{
+    // Enable TRCENA in DEMCR (Debug Exception and Monitor Control Register)
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+
+    // Unlock ITM (Instrumentation Trace Macrocell)
+    ITM->LAR = 0xC5ACCE55;
+
+    // Enable ITM and set the trace bus ID
+    ITM->TCR = ITM_TCR_ITMENA_Msk | ITM_TCR_SYNCENA_Msk | ITM_TCR_TSENA_Msk | (1U << 16);
+
+    // Enable stimulus port 0
+    ITM->TER |= 1UL;
+}
+
 #endif
+
+void debug_init(void) 
+{
+    #if DEBUG_OUTPUT == DEBUG_OUTPUT_SWD
+        debug_swd_init();
+    #elif DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL
+        Serial.begin(115200);
+    #elif DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL4
+        Serial4.begin(115200);
+    #endif
+}
