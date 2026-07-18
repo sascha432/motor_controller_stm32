@@ -6,7 +6,6 @@
 
 #include <Arduino.h>
 
-#define MT6701_I2C_PIN              PB0             // MT6701 I2C enable pin
 #define PID_WRITE_MOTOR_PWM(level)      (TIM1->CCR1 = (level))
 
 #define DEBUG_HUMAN 0
@@ -22,7 +21,88 @@
 template<typename PIN_TYPE>
 constexpr uint8_t digitalPinToBit(PIN_TYPE pin) 
 {
-    return __builtin_ctz(STM_GPIO_PIN(digitalPinToPinName(pin)));
+    switch(pin) {
+        case PA0: case PB0: case PC0: case PD0: case PE0:
+            return 0;
+        case PA1: case PB1: case PC1: case PD1: case PE1:
+            return 1;
+        case PA2: case PB2: case PC2: case PD2: case PE2:
+            return 2;
+        case PA3: case PB3: case PC3: case PD3: case PE3:
+            return 3;
+        case PA4: case PB4: case PC4: case PD4: case PE4:
+            return 4;
+        case PA5: case PB5: case PC5: case PD5: case PE5:
+            return 5;
+        case PA6: case PB6: case PC6: case PD6: case PE6:
+            return 6;
+        case PA7: case PB7: case PC7: case PD7: case PE7:
+            return 7;
+        case PA8: case PB8: case PC8: case PD8: case PE8:
+            return 8;
+        case PA9: case PB9: case PC9: case PD9: case PE9:
+            return 9;
+        case PA10: case PB10: case PC10: case PD10: case PE10:
+            return 10;
+        case PA11: case PB11: case PC11: case PD11: case PE11:
+            return 11;
+        case PA12: case PB12: case PC12: case PD12: case PE12:
+            return 12;
+        case PA13: case PB13: case PC13: case PD13: case PE13:
+            return 13;
+        case PA14: case PB14: case PC14: case PD14: case PE14:
+            return 14;
+        case PA15: case PB15: case PC15: case PD15: case PE15:
+            return 15;
+    }
+    return 0;
+}
+
+/**
+ * @brief translate arduino digital pin number to GPIO pin number
+ * 
+ * @tparam PIN_TYPE 
+ * @param pin Arduino digital pin number
+ * @return constexpr uint8_t GPIO pin number 0-15
+ */
+template<uint32_t PIN>
+constexpr uint8_t digitalPinToBit() 
+{
+    switch(PIN) {
+        case PA0: case PB0: case PC0: case PD0: case PE0:
+            return 0;
+        case PA1: case PB1: case PC1: case PD1: case PE1:
+            return 1;
+        case PA2: case PB2: case PC2: case PD2: case PE2:
+            return 2;
+        case PA3: case PB3: case PC3: case PD3: case PE3:
+            return 3;
+        case PA4: case PB4: case PC4: case PD4: case PE4:
+            return 4;
+        case PA5: case PB5: case PC5: case PD5: case PE5:
+            return 5;
+        case PA6: case PB6: case PC6: case PD6: case PE6:
+            return 6;
+        case PA7: case PB7: case PC7: case PD7: case PE7:
+            return 7;
+        case PA8: case PB8: case PC8: case PD8: case PE8:
+            return 8;
+        case PA9: case PB9: case PC9: case PD9: case PE9:
+            return 9;
+        case PA10: case PB10: case PC10: case PD10: case PE10:
+            return 10;
+        case PA11: case PB11: case PC11: case PD11: case PE11:
+            return 11;
+        case PA12: case PB12: case PC12: case PD12: case PE12:
+            return 12;
+        case PA13: case PB13: case PC13: case PD13: case PE13:
+            return 13;
+        case PA14: case PB14: case PC14: case PD14: case PE14:
+            return 14;
+        case PA15: case PB15: case PC15: case PD15: case PE15:
+            return 15;
+    }
+    return 0;
 }
 
 /**
@@ -32,11 +112,21 @@ constexpr uint8_t digitalPinToBit(PIN_TYPE pin)
  * @return constexpr uint32_t GPIOx_BASE address, or 0 for invalid port
  */
 template<uint32_t PIN>
-constexpr uint32_t digitalPinToGPIOBase() {
-    constexpr uint32_t kGPIOPortStride = (GPIOB_BASE - GPIOA_BASE);
-    constexpr uint32_t kMaxPortIndex = 6U; // Ports A..G on STM32F1
-    constexpr uint32_t port = STM_PORT(PIN);
-    return (port <= kMaxPortIndex) ? (GPIOA_BASE + (port * kGPIOPortStride)) : 0U;
+constexpr uint32_t digitalPinToGPIOBase() 
+{
+    switch(PIN) {
+        case PA0: case PA1: case PA2: case PA3: case PA4: case PA5: case PA6: case PA7: case PA8: case PA9: case PA10: case PA11: case PA12: case PA13: case PA14: case PA15:
+            return GPIOA_BASE;
+        case PB0: case PB1: case PB2: case PB3: case PB4: case PB5: case PB6: case PB7: case PB8: case PB9: case PB10: case PB11: case PB12: case PB13: case PB14: case PB15:
+            return GPIOB_BASE;
+        case PC0: case PC1: case PC2: case PC3: case PC4: case PC5: case PC6: case PC7: case PC8: case PC9: case PC10: case PC11: case PC12: case PC13: case PC14: case PC15:
+            return GPIOC_BASE;
+        case PD0: case PD1: case PD2: case PD3: case PD4: case PD5: case PD6: case PD7: case PD8: case PD9: case PD10: case PD11: case PD12: case PD13: case PD14: case PD15:
+            return GPIOD_BASE;  
+        case PE0: case PE1: case PE2: case PE3: case PE4: case PE5: case PE6: case PE7: case PE8: case PE9: case PE10: case PE11: case PE12: case PE13: case PE14: case PE15:
+            return GPIOE_BASE;
+    }
+    return 0;
 }
 
 /**
@@ -49,10 +139,19 @@ constexpr uint32_t digitalPinToGPIOBase() {
 template<typename PIN_TYPE>
 inline uint32_t digitalPinToGPIOBase(PIN_TYPE pin) 
 {
-    constexpr uint32_t kGPIOPortStride = (GPIOB_BASE - GPIOA_BASE);
-    constexpr uint32_t kMaxPortIndex = 6U; // Ports A..G on STM32F1
-    uint32_t port = STM_PORT(digitalPinToPinName(pin));
-    return (port <= kMaxPortIndex) ? (GPIOA_BASE + (port * kGPIOPortStride)) : 0U;
+    switch(pin) {
+        case PA0: case PA1: case PA2: case PA3: case PA4: case PA5: case PA6: case PA7: case PA8: case PA9: case PA10: case PA11: case PA12: case PA13: case PA14: case PA15:
+            return GPIOA_BASE;
+        case PB0: case PB1: case PB2: case PB3: case PB4: case PB5: case PB6: case PB7: case PB8: case PB9: case PB10: case PB11: case PB12: case PB13: case PB14: case PB15:
+            return GPIOB_BASE;
+        case PC0: case PC1: case PC2: case PC3: case PC4: case PC5: case PC6: case PC7: case PC8: case PC9: case PC10: case PC11: case PC12: case PC13: case PC14: case PC15:
+            return GPIOC_BASE;
+        case PD0: case PD1: case PD2: case PD3: case PD4: case PD5: case PD6: case PD7: case PD8: case PD9: case PD10: case PD11: case PD12: case PD13: case PD14: case PD15:
+            return GPIOD_BASE;  
+        case PE0: case PE1: case PE2: case PE3: case PE4: case PE5: case PE6: case PE7: case PE8: case PE9: case PE10: case PE11: case PE12: case PE13: case PE14: case PE15:
+            return GPIOE_BASE;
+    }
+    return 0;
 }
 
 /**
