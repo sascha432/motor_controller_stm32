@@ -1,45 +1,49 @@
 /**
   Author: sascha_lammers@gmx.de
 
-  Baremetal SPI driver for ST7735 - DMA TX based
+  Baremetal SPI driver for ST7789 - DMA TX based
 */
 
 #include <Arduino.h>
 #include <stm32f1xx.h>
 #include "tft_driver.h"
 
-#if TFT_DRIVER == TFT_DRIVER_ST7735
+#if TFT_DRIVER == TFT_DRIVER_ST7789
 
-/* Display color modes */
-#define ST7735_COLMOD_65K 0x05
-#define ST7735_COLMOD_262K 0x06
+// Display offset for landscape
+#define ST7789_COL_OFS              40
+#define ST7789_ROW_OFS              53
 
-/* ST7735 commands */
-#define ST7735_NOP 0x00
-#define ST7735_SWRESET 0x01
-#define ST7735_RDDID 0x04
-#define ST7735_RDDST 0x09
-#define ST7735_SLPIN 0x10
-#define ST7735_SLPOUT 0x11
-#define ST7735_PTLON 0x12
-#define ST7735_NORON 0x13
-#define ST7735_INVOFF 0x20
-#define ST7735_INVON 0x21
-#define ST7735_DISPOFF 0x28
-#define ST7735_DISPON 0x29
-#define ST7735_CASET 0x2A
-#define ST7735_RASET 0x2B
-#define ST7735_RAMWR 0x2C 
-#define ST7735_COLMOD 0x3A
-#define ST7735_FRMCTR1 0xB1
-#define ST7735_MADCTL 0x36
-#define ST7735_PWCTR1 0xC0
-#define ST7735_PWCTR2 0xC1
-#define ST7735_PWCTR3 0xC2
-#define ST7735_VMCTR1 0xC5
-#define ST7735_PWCTR6 0xFC
-#define ST7735_GMCTRP1 0xE0
-#define ST7735_GMCTRN1 0xE1
+// Display color modes 
+#define ST7789_COLMOD_65K           0x05
+#define ST7789_COLMOD_262K          0x06
+
+// ST7789 commands
+#define ST7789_NOP                  0x00
+#define ST7789_SWRESET              0x01
+#define ST7789_RDDID                0x04
+#define ST7789_RDDST                0x09
+#define ST7789_SLPIN                0x10
+#define ST7789_SLPOUT               0x11
+#define ST7789_PTLON                0x12
+#define ST7789_NORON                0x13
+#define ST7789_INVOFF               0x20
+#define ST7789_INVON                0x21
+#define ST7789_DISPOFF              0x28
+#define ST7789_DISPON               0x29
+#define ST7789_CASET                0x2A
+#define ST7789_RASET                0x2B
+#define ST7789_RAMWR                0x2C     
+#define ST7789_COLMOD               0x3A
+#define ST7789_FRMCTR1              0xB1
+#define ST7789_MADCTL               0x36
+#define ST7789_PWCTR1               0xC0
+#define ST7789_PWCTR2               0xC1
+#define ST7789_PWCTR3               0xC2
+#define ST7789_VMCTR1               0xC5
+#define ST7789_PWCTR6               0xFC
+#define ST7789_GMCTRP1              0xE0
+#define ST7789_GMCTRN1              0xE1
 
 static uint8_t g_tft_color_chunk[TFT_DMA_TX_CHUNK_PIXELS * 2];
 static uint8_t g_tft_pixel_chunk[TFT_DMA_TX_CHUNK_PIXELS * 2];
@@ -111,7 +115,7 @@ void tft_write_window_pixels(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1,
 {
     set_column(x0, x1);
     set_row(y0, y1);
-    tft_driver_send_command(ST7735_RAMWR);
+    tft_driver_send_command(ST7789_RAMWR);
     write_pixel_buffer_rgb565(pixels, pixel_count);
 }
 
@@ -120,9 +124,12 @@ void tft_write_window_pixels(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1,
  */
 static void set_column(uint16_t x0, uint16_t x1) 
 {
-    uint8_t data[4] = {(uint8_t)(x0 >> 8), (uint8_t)(x0 & 0xFF), 
-                       (uint8_t)(x1 >> 8), (uint8_t)(x1 & 0xFF)};
-    tft_driver_send_command(ST7735_CASET);
+    #if ST7789_ROW_OFS != 0
+        x0 += ST7789_COL_OFS;
+        x1 += ST7789_COL_OFS;
+    #endif
+    uint8_t data[4] = {(uint8_t)(x0 >> 8), (uint8_t)(x0 & 0xFF), (uint8_t)(x1 >> 8), (uint8_t)(x1 & 0xFF)};
+    tft_driver_send_command(ST7789_CASET);
     tft_driver_send_data(data, 4);
 }
 
@@ -131,16 +138,19 @@ static void set_column(uint16_t x0, uint16_t x1)
  */
 static void set_row(uint16_t y0, uint16_t y1) 
 {
-    uint8_t data[4] = {(uint8_t)(y0 >> 8), (uint8_t)(y0 & 0xFF), 
-                       (uint8_t)(y1 >> 8), (uint8_t)(y1 & 0xFF)};
-    tft_driver_send_command(ST7735_RASET);
+    #if ST7789_ROW_OFS != 0
+        y0 += ST7789_ROW_OFS;
+        y1 += ST7789_ROW_OFS;
+    #endif
+    uint8_t data[4] = {(uint8_t)(y0 >> 8), (uint8_t)(y0 & 0xFF), (uint8_t)(y1 >> 8), (uint8_t)(y1 & 0xFF)};
+    tft_driver_send_command(ST7789_RASET);
     tft_driver_send_data(data, 4);
 }
 
 /**
- * Initialize ST7735 display
+ * Initialize ST7789 display
  */
-static void st7735_init(void) 
+static void ST7789_init(void) 
 {
     /* Hardware reset */
     TFT_PIN_RST_LOW();
@@ -149,80 +159,65 @@ static void st7735_init(void)
     delay(120);
 
     /* Software reset */
-    tft_driver_send_command(ST7735_SWRESET);
+    tft_driver_send_command(ST7789_SWRESET);
     delay(150);
 
     /* Exit sleep mode */
-    tft_driver_send_command(ST7735_SLPOUT);
+    tft_driver_send_command(ST7789_SLPOUT);
     delay(120);
 
     /* Frame rate control */
-    tft_driver_send_command(ST7735_FRMCTR1);
+    tft_driver_send_command(ST7789_FRMCTR1);
     uint8_t frmctr[] = {0x01, 0x2C, 0x2D};
     tft_driver_send_data(frmctr, 3);
     delay(10);
 
     /* Memory access control */
-    tft_driver_send_command(ST7735_MADCTL);
-    uint8_t madctl[] = {0xA0};
+    tft_driver_send_command(ST7789_MADCTL);
+    uint8_t madctl[] = {0x0};
     tft_driver_send_data(madctl, 1);
 
     /* Color mode: 16-bit */
-    tft_driver_send_command(ST7735_COLMOD);
+    tft_driver_send_command(ST7789_COLMOD);
     uint8_t colmod[] = {0x05};
     tft_driver_send_data(colmod, 1);
     delay(10);
 
     /* Power control */
-    tft_driver_send_command(ST7735_PWCTR1);
+    tft_driver_send_command(ST7789_PWCTR1);
     uint8_t pwctr1[] = {0xA2, 0x02, 0x84};
     tft_driver_send_data(pwctr1, 3);
 
-    tft_driver_send_command(ST7735_PWCTR2);
+    tft_driver_send_command(ST7789_PWCTR2);
     uint8_t pwctr2[] = {0xC5};
     tft_driver_send_data(pwctr2, 1);
 
-    tft_driver_send_command(ST7735_PWCTR3);
+    tft_driver_send_command(ST7789_PWCTR3);
     uint8_t pwctr3[] = {0x0A, 0x00};
     tft_driver_send_data(pwctr3, 2);
 
-    tft_driver_send_command(ST7735_VMCTR1);
+    tft_driver_send_command(ST7789_VMCTR1);
     uint8_t vmctr1[] = {0x0E};
     tft_driver_send_data(vmctr1, 1);
     delay(10);
 
     /* Gamma */
-    tft_driver_send_command(ST7735_GMCTRP1);
+    tft_driver_send_command(ST7789_GMCTRP1);
     uint8_t gp[] = {0x10, 0x0E, 0x02, 0x03, 0x0E, 0x07, 0x02, 0x07, 0x0A, 0x12, 0x27, 0x37, 0x00, 0x0D, 0x0E, 0x10};
     tft_driver_send_data(gp, 16);
 
-    tft_driver_send_command(ST7735_GMCTRN1);
+    tft_driver_send_command(ST7789_GMCTRN1);
     uint8_t gn[] = {0x10, 0x0E, 0x03, 0x03, 0x0F, 0x06, 0x02, 0x08, 0x0A, 0x13, 0x26, 0x36, 0x00, 0x0D, 0x0E, 0x10};
     tft_driver_send_data(gn, 16);
     delay(10);
 
     /* Exit invert */
-    tft_driver_send_command(ST7735_INVOFF);
+    tft_driver_send_command(ST7789_INVON);
     delay(10);
 
     /* Display on */
-    tft_driver_send_command(ST7735_DISPON);
+    tft_driver_send_command(ST7789_DISPON);
     delay(100);
-}
-
-/**
- * Initialize driver
- */
-void tft_driver_init(void) 
-{
-    // === init GPIO pins ===
-    tft_driver_gpio_init();
-
-    // === SPI setup ===
-    tft_driver_spi_init();
-
-    // === Display setup ===
-    st7735_init();
 }
 
 /**
@@ -237,4 +232,19 @@ void tft_clear_display(uint16_t color)
     write_color_pixels(color, (uint32_t)TFT_DIM_WIDTH * TFT_DIM_HEIGHT);
 }
 
-#endif // TFT_DRIVER == TFT_DRIVER_ST7735
+/**
+ * Initialize driver
+ */
+void tft_driver_init(void) 
+{
+    // === init GPIO pins ===
+    tft_driver_gpio_init();
+
+    // === SPI setup ===
+    tft_driver_spi_init();
+
+    // === Display setup ===
+    ST7789_init();
+}
+
+#endif // TFT_DRIVER == TFT_DRIVER_ST7789
