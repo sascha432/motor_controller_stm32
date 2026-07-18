@@ -6,6 +6,11 @@
 
 #include "helpers.h"
 
+// button pins
+#define KNOB_BUTTON_PIN             PD8             // knob button pin
+#define BACK_BUTTON_PIN             PD9             // back button pin
+#define START_BUTTON_PIN            PD10            // start button pin
+
 /**
  * @brief Button template for handling GPIO buttons with debounce and interrupt support
  * 
@@ -13,7 +18,7 @@
  * @tparam GPIO_PORT_ADDR GPIO port address, e.g. GPIOA_BASE, GPIOB_BASE, etc.
  * @tparam ACTIVE_STATE false for active low, true for active high
  */
-template<uint8_t GPIO_PIN, uint32_t GPIO_PORT_ADDR, bool ACTIVE_STATE, uint32_t kDebounceTimeMs = 50>
+template<uint8_t GPIO_PIN, bool ACTIVE_STATE, uint32_t kDebounceTimeMs = 50, uint32_t GPIO_PORT_ADDR = digitalPinToGPIOBase<GPIO_PIN>()>
 struct Button 
 {
     template<typename ISRCallback>
@@ -123,7 +128,7 @@ struct Button
  * @tparam PIN_B bit for pin B in the GPIO IDR register
  * @tparam GPIO_PORT_ADDR address of the GPIO port, pin A and pin B must be on the same port
  */
-template<uint8_t GPIO_PIN_A, uint8_t GPIO_PIN_B, uint32_t GPIO_PORT_ADDR>
+template<uint8_t GPIO_PIN_A, uint8_t GPIO_PIN_B, uint32_t GPIO_PORT_ADDR = digitalPinToGPIOBase<GPIO_PIN_A>()>
 struct RotaryEncoder {
 
     static constexpr uint32_t kMultiplierConstant = 0xffffff;       // speed multiplier constant - higher value = faster acceleration, lower value = slower acceleration
@@ -157,6 +162,8 @@ struct RotaryEncoder {
     }
 
     void init() {
+        static_assert(digitalPinToGPIOBase<GPIO_PIN_A>() == digitalPinToGPIOBase<GPIO_PIN_B>(), "Rotary encoder pins must be on the same GPIO port");
+        
         // Enable GPIOx clock
         RCC->APB2ENR |= RCC_APB2ENR_IOPxEN(GPIO_PORT_ADDR); 
 
@@ -215,6 +222,11 @@ struct RotaryEncoder {
         }
     }
 
+    /**
+     * @brief Get the Delta Position object and clean up the position counter
+     * 
+     * @return int32_t 
+     */
     int32_t getDeltaPosition() {
         __disable_irq();
         int32_t tmpDelta = (position / 4); // full rotations only
@@ -223,6 +235,11 @@ struct RotaryEncoder {
         return tmpDelta;
     }
 
+    /**
+     * @brief Get the Delta Position object and clean up the position counter
+     * 
+     * @return State 
+     */
     State getDeltaPositionAndMultiplier() {
         __disable_irq();
         int32_t tmpDelta = (position / 4); // full rotations only
@@ -232,6 +249,12 @@ struct RotaryEncoder {
         return State(tmpDelta, getMultiplier(tmpFiltered));
     }
 
+    /**
+     * @brief Get the multiplier based on the integral value
+     * 
+     * @param integral The integral value
+     * @return uint32_t The calculated multiplier
+     */
     uint32_t getMultiplier(uint32_t integral) const {
         // dead zone
         uint32_t multiplier = integral < (3 * 256 * 1024) ? 1 : (integral / (256 * 1024));

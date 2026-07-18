@@ -6,12 +6,13 @@
 
 #include <stdint.h>
 
-struct ScreenFlow;
 struct EEPROM;
 
 // === Menu class ===
 struct Menu 
 {
+    Menu();
+
     void handleButtonPress();
     void handleBackButtonPress();
     void handleStartButtonPress();
@@ -26,12 +27,10 @@ struct Menu
     void loadStartScreen();
     void restorePreviousMenu();
 
-    static ScreenFlow &getScreenFlow();
-    static EEPROM &getEEPROM();
-
 protected:
     void setRotaryValue(int32_t value);
     int32_t getRotaryValue() const;
 
     int32_t steps;
+    EEPROM &eeprom;
 };
