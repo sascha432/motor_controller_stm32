@@ -23,6 +23,7 @@ struct Menu
 
     void showWelcomeScreen();
     void loadMainMenu();
+    void loadStartScreen();
     void restorePreviousMenu();
 
     static ScreenFlow &getScreenFlow();

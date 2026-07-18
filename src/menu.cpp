@@ -102,6 +102,7 @@ EEPROM &Menu::getEEPROM()
  */
 void Menu::restorePreviousMenu()
 {
+    DEBUG_PRINT(DEBUG_DEBUG, "value=%d", getValue());
     screenFlow.back(); // restore previous screen
     setSteps(0);
     setRotaryValue(getValue()); // restore previous menu position
@@ -113,13 +114,38 @@ void Menu::restorePreviousMenu()
  */
 void Menu::handleButtonPress()
 {
+    DEBUG_PRINT(DEBUG_DEBUG, "enter screen=%p id=%d value=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), getValue());
     // Handle button press based on the current screen
     switch(screenFlow->getId()) {
+        // === start screen ===
+        case Screen::Type::START:
+            loadMainMenu();
+            break;
         // === main menu ===
         case Screen::Type::MAIN_MENU:
             switch(getValue()) {
                 case 0: // Speed
-                    //TODO
+                    switch(eeprom.getControlMode() == EEPROM::kControlModePID) {
+                        case true: // PID mode
+                            screenFlow.next(new SliderScreen(
+                                Screen::Type::MOTOR_SPEED, 
+                                "Motor Speed", 
+                                eeprom.getMinRPM(), 
+                                eeprom.getMaxRPM(),
+                                "RPM"
+                            ));
+                            break;
+                        case false: // PWM mode
+                            screenFlow.next(new SliderScreen(
+                                Screen::Type::MOTOR_SPEED, 
+                                "Motor Speed", 
+                                1,
+                                eeprom.getMaxPWM(),
+                                "%"
+                            ));
+                            break;
+                    }
+                    setValue(eeprom.getSpeed());
                     break;
                 case 1: // Control Mode
                     screenFlow.next(new MenuScreen(
@@ -127,7 +153,7 @@ void Menu::handleButtonPress()
                         kControlModeItems, 
                         sizeof_array(kControlModeItems)
                     ));
-                    setValue(0);
+                    setValue(eeprom.getControlMode());
                     break;
                 case 2: // LED Brightness
                     screenFlow.next(new SliderScreen(
@@ -177,7 +203,7 @@ void Menu::handleButtonPress()
                     setValue(0);
                     break;
                 case 7: // Restore Defaults
-                    screenFlow.setScreen(new MenuScreen(
+                    screenFlow.next(new MenuScreen(
                         Screen::Type::RESTORE_DEFAULTS_CONFIRMATION, 
                         kRestoreDefaultsMenuItems, 
                         sizeof_array(kRestoreDefaultsMenuItems)
@@ -189,11 +215,15 @@ void Menu::handleButtonPress()
                     screenFlow.setScreen(new InfoScreen(Screen::Type::EEPROM_SAVED, "Saved"));
                     lv_timer_handler();
                     //TODO change to start screen
-                    delay(UIConstants::kDefaultInfoScreenTimeout);
-                    showWelcomeScreen();
+                    delay(UIConstants::kInfoScreenTimeout);
                     loadMainMenu();
                     break;
             }
+            break;
+        // === motor speed menu ===
+        case Screen::Type::MOTOR_SPEED:
+            eeprom.setSpeed(getValue());
+            restorePreviousMenu();
             break;
         // === motor stall timeout menu ===
         case Screen::Type::MOTOR_STALL_TIMEOUT:
@@ -304,7 +334,7 @@ void Menu::handleButtonPress()
                         kMotorDirectionItems, 
                         sizeof_array(kMotorDirectionItems)
                     ));
-                    setValue(0);
+                    setValue(eeprom.getMotorDirection());
                     break;
                 case 5: // Back
                     restorePreviousMenu();
@@ -377,18 +407,21 @@ void Menu::handleButtonPress()
                     eeprom.resetDefaults();
                     eeprom.write(eeprom.getData());
                     applyEEPROMSettings();
-                    screenFlow.setScreen(new InfoScreen(Screen::Type::EEPROM_RESTORED, "Restored"));
+                    screenFlow.next(new InfoScreen(Screen::Type::EEPROM_RESTORED, "Restored"));
                     lv_timer_handler();
-                    delay(UIConstants::kDefaultInfoScreenTimeout);
+                    delay(UIConstants::kInfoScreenTimeout);
+                    loadMainMenu();
+                    break;
+                default: // Cancel
+                    restorePreviousMenu();
                     break;
             }
-            restorePreviousMenu();
             break;
         default:
-            Serial.print("Unhandled main menu id: ");
-            Serial.println(static_cast<int>(screenFlow->getId()));
+            DEBUG_PRINT(DEBUG_WARNING, "MainMenu: unhandled id: %d", static_cast<int>(screenFlow->getId()));
             break;
     }
+    DEBUG_PRINT(DEBUG_DEBUG, "leave screen=%p id=%d value=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), getValue());
 }
 
 /**
@@ -418,7 +451,14 @@ void Menu::loadMainMenu()
     ));
     setSteps(0);
     setValue(0);
-    // setRotaryValue(0);
+}
+
+void Menu::loadStartScreen()
+{
+    //TODO dummy
+    screenFlow.setScreen(new InfoScreen(Screen::Type::START, "Start"));
+    setSteps(0);
+    setValue(0);
 }
 
 /**
@@ -474,6 +514,7 @@ int32_t Menu::getValue() const
  */
 void Menu::setSteps(int32_t steps)
 {
+    DEBUG_PRINT(DEBUG_DEBUG, "steps=%d", steps);
     this->steps = steps;
 }
 

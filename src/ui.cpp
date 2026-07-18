@@ -13,12 +13,15 @@ lv_obj_t *Screen::emptyScreen = nullptr;
 
 Screen::Screen(Type id) : 
     screen(nullptr),
+    prevScreen(nullptr),
     id(id)
 {
+    DEBUG_PRINT(DEBUG_DEBUG, "ctor");
 }
 
 Screen::~Screen()
 {
+    DEBUG_PRINT(DEBUG_DEBUG, "screen=%p", screen);
      if (screen) {
         lv_scr_load(emptyScreen);
         lv_obj_del(screen);
@@ -27,8 +30,7 @@ Screen::~Screen()
 
 void Screen::load() 
 {
-    Serial.print("load: ");
-    Serial.println((uintptr_t)screen, HEX);
+    DEBUG_PRINT(DEBUG_DEBUG, "screen=%p", screen);
     if (screen) {
         auto tmp = screen;
         screen = lv_obj_create(nullptr);
@@ -48,10 +50,12 @@ Screen::Type Screen::getId() const
 
 void Screen::setValue(uint32_t value)
 {
+    DEBUG_PRINT(DEBUG_DEBUG, "value=%u", value);
 }
 
 uint32_t Screen::getValue() const
 {
+    DEBUG_PRINT(DEBUG_DEBUG, "value=0");
     return 0;
 }
 
@@ -64,8 +68,7 @@ void Screen::_fatal_error(const char *msg)
         digitalWrite(PE5, LOW);
         delay(100);
         if (num++ % 10 == 0) {
-            Serial.print("UI ERROR: ");
-            Serial.println(msg);
+            DEBUG_PRINT(DEBUG_ERROR, "UI ERROR: %s", msg);
         }
     }
 }
@@ -86,18 +89,15 @@ WelcomeScreen::WelcomeScreen() :
     char buf[32];
     snprintf(buf, sizeof(buf)- 1, "Version %u.%u.%u", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
     message = strdup(buf);
-    Serial.print("WelcomeScreen: ");
-    Serial.println(message);
 }
 
 // === Info Screen ===
 
 void InfoScreen::load()
 {
+    DEBUG_PRINT(DEBUG_NOTICE, "message=%s", message ? message : "<NULL>");
     Screen::load();
     lv_obj_t *label = lv_label_create(screen);
-    Serial.print("InfoScreen: ");
-    Serial.println(message);
     lv_label_set_text(label, message);
     lv_obj_set_style_text_color(label, lv_color_white(), LV_PART_MAIN);
     lv_obj_set_style_text_font(label, font, LV_PART_MAIN);
@@ -119,6 +119,7 @@ MenuScreen::MenuScreen(Type id, const char **itemLabels, size_t itemCount) :
 
 void MenuScreen::load() 
 {
+    DEBUG_PRINT(DEBUG_NOTICE, "items=%u selected=%u", count, selected);
     Screen::load();
     lv_obj_t *menu = lv_obj_create(screen);
 
@@ -171,7 +172,7 @@ void MenuScreen::setValue(uint32_t index)
         selected = (((int32_t)index % count) + count) % count;
     #else
         // no wrapping
-        selected =  std::clamp<int32_t>(index, 0, count - 1);
+        selected = std::clamp<int16_t>(index, 0, count - 1);
     #endif
     _refreshMenuScreen();
 }
@@ -216,7 +217,7 @@ lv_obj_t *MenuScreen::_style_create_menu_label(lv_obj_t *parent, const char *tex
 
 void SliderScreen::_refreshVisuals()
 {
-    const uint32_t clampedValue = (value < minValue) ? minValue : ((value > maxValue) ? maxValue : value);
+    const uint32_t clampedValue =  std::clamp<uint32_t>(value, minValue, maxValue);
     const uint32_t range = (maxValue > minValue) ? (maxValue - minValue) : 1;
     const uint32_t percent = ((clampedValue - minValue) * 100U) / range;
 
@@ -227,6 +228,8 @@ void SliderScreen::_refreshVisuals()
     knobX = std::clamp<lv_coord_t>(knobX, -(kSliderScreenKnobSize / 2), kSliderScreenContainerWidth - (kSliderScreenKnobSize / 2));
 
     lv_obj_set_x(sliderKnob, knobX);
+
+    DEBUG_PRINT(DEBUG_DEBUG, "callback=%p", formatCallback);
 
     if (formatCallback) {
         char buf[32];
@@ -240,27 +243,40 @@ void SliderScreen::_refreshVisuals()
 
 void SliderScreen::load() 
 {
+    DEBUG_PRINT(DEBUG_NOTICE, "range=%u-%u value=%u label=%s unit=%s", minValue, maxValue, value, label, unit ? unit : "<NULL>");
     Screen::load();
 
     lv_obj_t *container = lv_obj_create(screen);
     lv_obj_remove_style_all(container);
     lv_obj_set_pos(container, kSliderScreenContainerX, kSliderScreenContainerY);
-    lv_obj_set_size(container, kSliderScreenContainerWidth, TFT_DIM_HEIGHT - kSliderScreenContainerY);
+    lv_obj_set_size(container, kSliderScreenContainerWidth, kSliderScreenContainerHeight);
     lv_obj_set_style_bg_opa(container, LV_OPA_TRANSP, LV_PART_MAIN);
     lv_obj_set_style_border_width(container, 0, LV_PART_MAIN);
     lv_obj_set_style_pad_all(container, 0, LV_PART_MAIN);
 
-    lv_obj_t *titleObj = lv_label_create(container);
+    lv_obj_t *titleRow = lv_obj_create(container);
+    lv_obj_remove_style_all(titleRow);
+    lv_obj_set_size(titleRow, kSliderScreenContainerWidth, lv_font_get_line_height(kSliderScreenLabelFont));
+    lv_obj_set_style_bg_opa(titleRow, LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_style_border_width(titleRow, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(titleRow, 0, LV_PART_MAIN);
+    lv_obj_set_style_clip_corner(titleRow, true, LV_PART_MAIN);
+    lv_obj_set_pos(titleRow, 0, 0);
+
+    lv_obj_t *titleObj = lv_label_create(titleRow);
     lv_label_set_text(titleObj, label);
     lv_obj_set_style_text_color(titleObj, lv_color_white(), LV_PART_MAIN);
     lv_obj_set_style_text_font(titleObj, kSliderScreenLabelFont, LV_PART_MAIN);
     lv_obj_set_width(titleObj, kSliderScreenContainerWidth);
-    lv_obj_set_style_text_align(titleObj, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+    lv_obj_set_style_text_align(titleObj, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
+    lv_obj_set_style_anim_speed(titleObj, kSliderScreenTitleAnimSpeed, LV_PART_MAIN);
+    lv_label_set_long_mode(titleObj, LV_LABEL_LONG_CLIP);
     lv_obj_set_pos(titleObj, 0, 0);
+    lv_label_set_long_mode(titleObj, LV_LABEL_LONG_SCROLL_CIRCULAR);
 
     lv_obj_t *slider = lv_obj_create(container);
     lv_obj_remove_style_all(slider);
-    lv_obj_set_pos(slider, 0, lv_obj_get_height(titleObj) + kSliderScreenTitleBottomGap);
+    lv_obj_set_pos(slider, 0, lv_obj_get_height(titleRow) + kSliderScreenTitleBottomGap);
     lv_obj_set_size(slider, kSliderScreenContainerWidth, kSliderScreenSliderHeight);
     lv_obj_set_style_bg_color(slider, lv_palette_darken(LV_PALETTE_GREY, 2), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(slider, LV_OPA_COVER, LV_PART_MAIN);
@@ -293,7 +309,7 @@ void SliderScreen::load()
     lv_obj_set_style_text_font(valueLabel, kSliderScreenValueFont, LV_PART_MAIN);
     lv_obj_set_width(valueLabel, kSliderScreenContainerWidth);
     lv_obj_set_style_text_align(valueLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    lv_obj_set_pos(valueLabel, 0, lv_obj_get_y(slider) + kSliderScreenSliderHeight + kSliderScreenValueTopGap);
+    lv_obj_align_to(valueLabel, slider, LV_ALIGN_OUT_BOTTOM_MID, 0, 8);
 
     _refreshVisuals();
 
@@ -325,8 +341,7 @@ void ScreenFlow::init()
 
 void ScreenFlow::destroy()
 {
-    Serial.print("destroying screen: ");
-    Serial.println((uintptr_t)screen, HEX);
+    DEBUG_PRINT(DEBUG_DEBUG, "screen=%p", screen);
     if (screen) {
         lv_scr_load(Screen::emptyScreen);
         delete screen;
@@ -336,8 +351,7 @@ void ScreenFlow::destroy()
 
 void ScreenFlow::setScreen(Screen *newScreen)
 {
-    Serial.print("setScreen: ");
-    Serial.println((uintptr_t)newScreen, HEX);
+    DEBUG_PRINT(DEBUG_DEBUG, "new=%p old=%p", newScreen, screen);
     destroy();
     screen = newScreen;
     screen->load();
@@ -345,8 +359,7 @@ void ScreenFlow::setScreen(Screen *newScreen)
 
 void ScreenFlow::back()
 {
-    Serial.print("back: ");
-    Serial.println((uintptr_t)screen->prevScreen, HEX);
+    DEBUG_PRINT(DEBUG_DEBUG, "prev=%p current=%p", screen->prevScreen, screen);
     if (screen->prevScreen) {
         lv_scr_load(Screen::emptyScreen);
         auto tmp = screen->prevScreen;
@@ -362,10 +375,7 @@ void ScreenFlow::back()
 
 void ScreenFlow::next(Screen *nextScreen)
 {
-    Serial.print("next: ");
-    Serial.print((uintptr_t)screen, HEX);
-    Serial.print(" -> ");
-    Serial.println((uintptr_t)nextScreen, HEX);
+    DEBUG_PRINT(DEBUG_DEBUG, "next=%p current=%p", nextScreen, screen);
     nextScreen->prevScreen = screen;
     #if RECREATE_PREV_SCREEN
     if (nextScreen->prevScreen) {
@@ -385,4 +395,3 @@ Screen *ScreenFlow::getScreen() const
 {
     return screen;
 }
-

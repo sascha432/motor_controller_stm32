@@ -42,6 +42,9 @@ struct EEPROM
         uint8_t control_mode;
         uint8_t mosfet_temperature_limit;
         uint8_t motor_temperature_limit;
+        uint8_t max_pwm;
+        uint8_t motor_pwm;
+        uint16_t motor_rpm;
 
         Data() : 
             magic(kMagic), 
@@ -52,12 +55,15 @@ struct EEPROM
             motor_current_limit(kCurrentToUint16(UIConstants::kDefaultMotorCurrent)), 
             min_rpm(UIConstants::kDefaultMinRPM),
             max_rpm(UIConstants::kDefaultMaxRPM),
-            motor_stall_timeout(UIConstants::kMinMotorStallTimeout),
+            motor_stall_timeout(UIConstants::kDefaultMotorStallTimeout),
             motor_direction(kMotorDirectionForward),
             motor_brake(UIConstants::kDefaultMotorBrake),
             control_mode(kControlModePID),
             mosfet_temperature_limit(UIConstants::kDefaultMosfetTemperatureLimit),
-            motor_temperature_limit(UIConstants::kDefaultMotorTemperatureLimit)
+            motor_temperature_limit(UIConstants::kDefaultMotorTemperatureLimit),
+            max_pwm(UIConstants::kDefaultMaxPWM),
+            motor_pwm(UIConstants::kDefaultMotorPWM),
+            motor_rpm(UIConstants::kDefaultMotorRPM)
         {}
     };
 
@@ -194,6 +200,54 @@ struct EEPROM
     {
         data.motor_temperature_limit = value;
     }
+
+    uint8_t getMaxPWM() const
+    {
+        return data.max_pwm;
+    }
+
+    void setMaxPWM(uint8_t value) 
+    {
+        data.max_pwm = value;
+    }
+
+    uint8_t getMotorPWM() const
+    {
+        return data.motor_pwm;
+    }
+
+    void setMotorPWM(uint8_t value) 
+    {
+        data.motor_pwm = value;
+    }
+
+    uint16_t getMotorRPM() const
+    {
+        return data.motor_rpm;
+    }
+
+    void setMotorRPM(uint16_t value) 
+    {
+        data.motor_rpm = value;
+    }
+
+    void setSpeed(uint32_t value)
+    {
+        switch(data.control_mode) {
+            case kControlModePWM:
+                setMotorPWM(static_cast<uint8_t>(value));
+                break;
+            case kControlModePID:
+                setMotorRPM(static_cast<uint16_t>(value));
+                break;
+        }
+    }
+
+    uint32_t getSpeed() const
+    {
+        return data.control_mode ? getMotorRPM() : getMotorPWM();
+    }
+
 
 protected:
     Data data;

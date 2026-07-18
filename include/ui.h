@@ -8,18 +8,20 @@
 #include <stdlib.h>
 #include "lvgl.h"
 #include "tft_driver.h"
+#include "debug.h"
 
 // set to 1 to create previous screens using Screen::load() instead of lv_scr_load(screen->screen)
 // more CPU vs memory usage tradeoff
-#define RECREATE_PREV_SCREEN 0
+#define RECREATE_PREV_SCREEN    1
 
-#define VERSION_MAJOR 1
-#define VERSION_MINOR 0
-#define VERSION_PATCH 0
+#define VERSION_MAJOR           1
+#define VERSION_MINOR           0
+#define VERSION_PATCH           0
 
 // === UI constants ===
-struct UIConstants {
-
+struct UIConstants 
+{
+    // ui slider min/max values
     static constexpr float kMinInputCurrent = 0.1f;                     // min. input current in A
     static constexpr float kMaxInputCurrent = 40.0f;                    // max. input current in A
     static constexpr float kInputCurrentStep = 0.1f;                    // input current step in A (make sure min/max is divisible by this value)
@@ -32,26 +34,32 @@ struct UIConstants {
     static constexpr uint8_t kMaxTFTBrightness = 100;                   // Max. TFT Brightness
     static constexpr uint8_t kMinLEDBrightness = 0;                     // Min. LED Brightness
     static constexpr uint8_t kMaxLEDBrightness = 100;                   // Max. LED Brightness
-    static constexpr uint32_t kWelcomeScreenTimeout = 2000;             // WelcomeScreen timeout in milliseconds
     static constexpr uint32_t kMinMotorStallTimeout = 100;              // Motor stall time in milliseconds
     static constexpr uint32_t kMaxMotorStallTimeout = 10000;            // Motor stall time in milliseconds
     static constexpr int32_t kMotorStallTimeoutStep = 100;              // Motor stall time step in milliseconds
-    static constexpr uint8_t kDefaultMotorBrake = 50;                   // Default motor brake in percentage (0-100)
     static constexpr uint8_t kMinMosfetTemperature = 50;                // Min. MOSFET temperature in °C
     static constexpr uint8_t kMaxMosfetTemperature = 175;               // Max. MOSFET temperature in °C
     static constexpr uint8_t kMinMotorTemperature = 30;                 // Min. Motor temperature in °C
     static constexpr uint8_t kMaxMotorTemperature = 105;                // Max. Motor temperature in °C
 
+    // eeprom default values
     static constexpr uint8_t kDefaultTFTBrightness = 80;                // Default TFT Brightness
     static constexpr uint8_t kDefaultLEDBrightness = 50;                // Default LED Brightness
     static constexpr float kDefaultInputCurrent = 10.0f;                // Default input current in A
     static constexpr float kDefaultMotorCurrent = 40.0f;                // Default peak motor current in A
-    static constexpr uint16_t kDefaultMinRPM = 1000;                    // Default min. motor RPM
-    static constexpr uint16_t kDefaultMaxRPM = 5000;                    // Default max. motor RPM
+    static constexpr uint8_t kDefaultMotorBrake = 50;                   // Default motor brake in percentage (0-100)
+    static constexpr uint16_t kDefaultMotorStallTimeout = 1500;         // Default motor stall time in milliseconds
+    static constexpr uint16_t kDefaultMinRPM = 10;                      // Default min. motor RPM
+    static constexpr uint16_t kDefaultMaxRPM = 15000;                   // Default max. motor RPM
     static constexpr uint8_t kDefaultMosfetTemperatureLimit = 85;       // Default MOSFET temperature limit in °C
     static constexpr uint8_t kDefaultMotorTemperatureLimit = 50;        // Default motor temperature limit in °C
+    static constexpr uint8_t kDefaultMaxPWM = 100;                      // Max. PWM value in percentage (0-100)
+    static constexpr uint8_t kDefaultMotorPWM = 20;                     // Default motor PWM value in percentage (0-100)
+    static constexpr uint16_t kDefaultMotorRPM = 250;                   // Default motor RPM value in RPM
 
-    static constexpr uint32_t kDefaultInfoScreenTimeout = 2000;         // Default InfoScreen timeout in milliseconds
+    // ui menu timeouts
+    static constexpr uint32_t kWelcomeScreenTimeout = 2000;             // WelcomeScreen timeout in milliseconds
+    static constexpr uint32_t kInfoScreenTimeout = 2000;                // Default InfoScreen timeout in milliseconds
 };
 
 // === Base Screen class ===
@@ -81,31 +89,46 @@ struct Screen
         MOSFET_TEMPERATURE_LIMIT,
         MOTOR_TEMPERATURE_LIMIT,
         RESTORE_DEFAULTS_CONFIRMATION,
-        EEPROM_RESTORED
+        EEPROM_RESTORED,
+        MOTOR_SPEED
     };
 
-    // Screen style constants
+    // welcome screen style constants
     static constexpr const lv_font_t *kWelcomeScreenLabelFont = &lv_font_montserrat_18;
-    
+
+    // info screen style constants    
     static constexpr const lv_font_t *kInfoScreenLabelFont = &lv_font_montserrat_18;
 
-    static constexpr const lv_font_t *kMenuScreenLabelFont = &lv_font_montserrat_14;
+    // menu screen style constants
     static constexpr lv_coord_t kMenuScreenVisibleItems = 5;
+    #if TFT_DIM_HEIGHT == 135
+        static constexpr const lv_font_t *kMenuScreenLabelFont = &lv_font_montserrat_18;
+        static constexpr lv_coord_t kMenuScreenItemHeight = 26;
+    #else
+        static constexpr const lv_font_t *kMenuScreenLabelFont = &lv_font_montserrat_14;
+        static constexpr lv_coord_t kMenuScreenItemHeight = 20;
+    #endif
     static constexpr lv_coord_t kMenuScreenStartX = 10;
-    static constexpr lv_coord_t kMenuScreenStartY = 9;
+    static constexpr lv_coord_t kMenuScreenStartY = TFT_DIM_HEIGHT - (kMenuScreenVisibleItems * kMenuScreenItemHeight) - 1;
     static constexpr lv_coord_t kMenuScreenItemStartX = 8;
     static constexpr lv_coord_t kMenuScreenItemStartY = 2;
-    static constexpr lv_coord_t kMenuScreenItemHeight = 20;
     static constexpr lv_coord_t kMenuScreenItemWidth = TFT_DIM_WIDTH - (2 * kMenuScreenStartX);
     static constexpr uint32_t kMenuScreenItemScrollSpeed = 10;
     static constexpr uint8_t kMenuScreenCornerRadius = 4;
 
-    static constexpr const lv_font_t *kSliderScreenLabelFont = &lv_font_montserrat_12;
+    // slider screen style constants
+    static constexpr const lv_font_t *kSliderScreenLabelFont = &lv_font_montserrat_14;
     static constexpr const lv_font_t *kSliderScreenValueFont = &lv_font_montserrat_18;
     static constexpr lv_coord_t kSliderScreenContainerX = 16;
-    static constexpr lv_coord_t kSliderScreenContainerY = 20;
+    #if TFT_DIM_HEIGHT == 135
+        static constexpr lv_coord_t kSliderScreenContainerY = 20;
+    #else
+        static constexpr lv_coord_t kSliderScreenContainerY = 27;
+    #endif
     static constexpr lv_coord_t kSliderScreenContainerWidth = TFT_DIM_WIDTH - 24;
+    static constexpr lv_coord_t kSliderScreenContainerHeight = TFT_DIM_HEIGHT - kSliderScreenContainerY;
     static constexpr lv_coord_t kSliderScreenTitleBottomGap = 35;
+    static constexpr lv_coord_t kSliderScreenTitleAnimSpeed = 10;
     static constexpr lv_coord_t kSliderScreenSliderHeight = 24;
     static constexpr lv_coord_t kSliderScreenSliderBorder = 2;
     static constexpr lv_coord_t kSliderScreenSliderRadius = 6;
