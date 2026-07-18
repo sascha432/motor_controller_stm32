@@ -414,6 +414,33 @@ void Menu::handleButtonPress()
 }
 
 /**
+ * @brief Handle back button press
+ * 
+ */
+void Menu::handleBackButtonPress()
+{
+    DEBUG_PRINT(DEBUG_DEBUG, "enter screen=%p id=%d value=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), getValue());
+    switch(screenFlow->getId()) {
+        default:
+            break;
+    }
+    DEBUG_PRINT(DEBUG_DEBUG, "leave screen=%p id=%d value=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), getValue());
+}
+
+/**
+ * @brief Handle start button press
+ */
+void Menu::handleStartButtonPress()
+{
+    DEBUG_PRINT(DEBUG_DEBUG, "enter screen=%p id=%d value=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), getValue());
+    switch(screenFlow->getId()) {
+        default:
+            break;
+    }
+    DEBUG_PRINT(DEBUG_DEBUG, "leave screen=%p id=%d value=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), getValue());
+}
+
+/**
  * @brief Show welcome screen for a few seconds
  * 
  */

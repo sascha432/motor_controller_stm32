@@ -5,11 +5,7 @@
 #pragma once
 
 #include "helpers.h"
-
-// button pins
-#define KNOB_BUTTON_PIN             PD8             // knob button pin
-#define BACK_BUTTON_PIN             PD9             // back button pin
-#define START_BUTTON_PIN            PD10            // start button pin
+#include "pins.h"
 
 /**
  * @brief Button template for handling GPIO buttons with debounce and interrupt support
@@ -169,7 +165,7 @@ struct RotaryEncoder {
 
         // Input with pull-up/pull-down (CNF=10, MODE=00)
         GPIO_CRx_REG(GPIO_PORT_ADDR, GPIO_PIN_A) &= ~(0xF << digitalPinShift(GPIO_PIN_A));
-        GPIO_CRx_REG(GPIO_PORT_ADDR, GPIO_PIN_B) &= ~(0xF << digitalPinShift(GPIO_PIN_B));
+        GPIO_CRx_REG(GPIO_PORT_ADDR, GPIO_PIN_B) &= ~(0xF << digitalPinShift(GPIO_PIN_B));//TODO this line causes infinite loop in the debugger
         GPIO_CRx_REG(GPIO_PORT_ADDR, GPIO_PIN_A) |= (0x8 << digitalPinShift(GPIO_PIN_A));
         GPIO_CRx_REG(GPIO_PORT_ADDR, GPIO_PIN_B) |= (0x8 << digitalPinShift(GPIO_PIN_B));
 
@@ -269,6 +265,17 @@ struct RotaryEncoder {
             multiplier *= 2;
         }
         return multiplier;
+    }
+
+    /**
+     * @brief Set knob position
+     * 
+     * @param value 
+     */
+    void setPosition(int32_t value) {
+        __disable_irq();
+        position += value * 4; // add position to the counter to keep unfinished rotations and acceleration
+        __enable_irq();
     }
 
     volatile int32_t position;

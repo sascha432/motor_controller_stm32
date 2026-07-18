@@ -7,28 +7,38 @@
 #include "helpers.h"
 
 /**
- * @brief charlieplexed LEDs on PB12
+ * @brief Charlieplexed LEDs
  * 
  */
+template <uint32_t GPIO_PIN, uint32_t GPIO_PORT_ADDRESS = digitalPinToGPIOBase<GPIO_PIN>()>
 struct LEDs {
 
     void init() {
-        // Enable GPIOB clock
-        RCC->APB2ENR |= RCC_APB2ENR_IOPBEN;
+        // Enable GPIO port clock
+        RCC->APB2ENR |= RCC_APB2ENR_IOPxEN(GPIO_PORT_ADDRESS);
         off();
     }
 
     void off() {
-        GPIOB->CRH = (GPIOB->CRH & ~(0xF << digitalPinShift(PB12))) | (0x4 << digitalPinShift(PB12)); // MODE=00, CNF=01 (floating input)
+        // MODE=00, CNF=01 (floating input)
+        ((GPIO_TypeDef *)GPIO_PORT_ADDRESS)->CRH = 
+            (((GPIO_TypeDef *)GPIO_PORT_ADDRESS)->CRH & ~(0xF << digitalPinShift(PB12))) | 
+            (0x4 << digitalPinShift(PB12)); 
     }
 
     void onLED1() {
-        GPIOB->BSRR = GPIO_BSRR_BS12; // set pin high
-        GPIOB->CRH = (GPIOB->CRH & ~(0xF << digitalPinShift(PB12))) | (0x2 << digitalPinShift(PB12)); // MODE=10 (2MHz), CNF=00 (push-pull)
+        ((GPIO_TypeDef *)GPIO_PORT_ADDRESS)->BSRR = GPIO_BSRR_BS12; // set pin high
+        // MODE=10 (2MHz), CNF=00 (push-pull)
+        ((GPIO_TypeDef *)GPIO_PORT_ADDRESS)->CRH = 
+            (((GPIO_TypeDef *)GPIO_PORT_ADDRESS)->CRH & ~(0xF << digitalPinShift(PB12))) | 
+            (0x2 << digitalPinShift(PB12)); 
     }
 
     void onLED2() {
-        GPIOB->BSRR = GPIO_BSRR_BR12; // set pin low
-        GPIOB->CRH = (GPIOB->CRH & ~(0xF << digitalPinShift(PB12))) | (0x2 << digitalPinShift(PB12)); // MODE=10 (2MHz), CNF=00 (push-pull)
+        ((GPIO_TypeDef *)GPIO_PORT_ADDRESS)->BSRR = GPIO_BSRR_BR12; // set pin low
+        // MODE=10 (2MHz), CNF=00 (push-pull)
+        ((GPIO_TypeDef *)GPIO_PORT_ADDRESS)->CRH = 
+            (((GPIO_TypeDef *)GPIO_PORT_ADDRESS)->CRH & ~(0xF << digitalPinShift(PB12))) | 
+            (0x2 << digitalPinShift(PB12)); 
     }
 };

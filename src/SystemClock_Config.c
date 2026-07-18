@@ -6,7 +6,7 @@
 
 #include <stm32f1xx.h>
 
-#if defined(STM32F107xC)
+#if defined(STM32F107xC) 
 
 /*
     * STM32F107 clock configuration

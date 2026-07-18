@@ -22,11 +22,12 @@ I2CHelper i2c;
 Button<KNOB_BUTTON_PIN, false> knobButton;
 Button<START_BUTTON_PIN, false> startButton;
 Button<BACK_BUTTON_PIN, false> backButton;
-RotaryEncoder<PA6, PA7> knob;
+
+RotaryEncoder<ROTARY_ENCODER_PIN_A, ROTARY_ENCODER_PIN_B> knob;
 PidController pid;
-MT6701Encoder<MT6701_I2C_PIN, false> motorEncoder;
+MT6701Encoder<MT6701_I2C_ENABLE_PIN, false> motorEncoder;
 ADC adc;
-LEDs leds;
+LEDs<MOTOR_LEDS_PIN> leds;
 Menu menu;
 
 static void button_isr() {
@@ -134,8 +135,8 @@ void setup()
     lv_init();
     tft_driver_lvgl_init();
 
-#if 1
-    // quick color flashing test
+#if 0
+    // color flashing test loop
     tft_backlight_pwm_set(100);
     uint16_t colors[] = {0xF800, 0x07E0, 0x001F, 0xFFFF};// Red, Green, Blue, White
     int c = 0;
@@ -149,12 +150,11 @@ void setup()
     }
 #endif
 
-    // // Show welcome screen and load main menu
-    // menu.showWelcomeScreen();
-    // // Apply settings after welcome screen since it turns the backlight on
-    // applyEEPROMSettings(); 
-    // menu.loadMainMenu();
-
+    // Show welcome screen and load main menu
+    menu.showWelcomeScreen();
+    // Apply settings after welcome screen since it turns the backlight on
+    applyEEPROMSettings(); 
+    menu.loadMainMenu();
 }
 
 void motorOff() {
@@ -197,23 +197,30 @@ void toggleMotor() {
 
 void loop()
 {
+    // handle buttons
+    if (knobButton.isPressed()) {
+        menu.handleButtonPress();
+    }
+    if (backButton.isPressed()) {
+        menu.handleBackButtonPress();
+    }
     if (startButton.isPressed()) {
+        menu.handleStartButtonPress();
     }
-    if (backButton.isPressed()) {
-    }
-    if (backButton.isPressed()) {
-    }
-    static uint32_t lastTime = 0;
-    if (millis() - lastTime >= 100) {
 
+    // handle ui updates and rotary encoder
+    static uint32_t lastLvHandler = 0;
+    if (millis() - lastLvHandler >= 5) {
         auto knobDelta = knob.getDeltaPositionAndMultiplier();
         if (knobDelta.hasPosition()) {
-
-            auto tmp = knobDelta.getPosition();
-            DEBUG_PRINT(DEBUG_DEBUG, "knob=%d", tmp);
-
+            auto newPosition = menu.updateRotaryValue(knobDelta.getPosition());
+            knob.setPosition(newPosition);
+            DEBUG_PRINT(DEBUG_DEBUG, "knob=%d value=%d", newPosition, menu.getValue());
         }
+        lv_timer_handler();
+        lastLvHandler = millis();
     }
+
 }
 
 #if 0

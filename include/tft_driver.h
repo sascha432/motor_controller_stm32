@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "lvgl.h"
+#include "pins.h"
 
 // TFT driver selection
 #define TFT_DRIVER_ST7735           1
@@ -16,22 +17,6 @@
 #ifndef TFT_DRIVER
 #define TFT_DRIVER                  TFT_DRIVER_ST7789
 #endif
-
-// TFT pins
-#define TFT_PIN_CLK                 PB13
-#define TFT_PIN_MOSI                PB15
-#define TFT_PIN_RS                  PC7
-#define TFT_PIN_RST                 PC6
-#define TFT_PIN_CS                  PD15
-#define TFT_PIN_LED                 PB11
-
-// PIN macros
-#define TFT_PIN_RS_HIGH()           GPIOC->BSRR = (1 << 7)
-#define TFT_PIN_RS_LOW()            GPIOC->BSRR = (1 << (7 + 16))
-#define TFT_PIN_CS_HIGH()           GPIOD->BSRR = (1 << 15)
-#define TFT_PIN_CS_LOW()            GPIOD->BSRR = (1 << (15 + 16))
-#define TFT_PIN_RST_HIGH()          GPIOC->BSRR = (1 << 6)
-#define TFT_PIN_RST_LOW()           GPIOC->BSRR = (1 << (6 +  16))
 
 // get dimensions from lvgl conf
 #define TFT_DIM_WIDTH               LV_HOR_RES_MAX
