@@ -12,7 +12,8 @@
 #define EEPROM_PAGE_SIZE        8u          // bytes per page
 #define EEPROM_SIZE             256u        // total bytes
 #define EEPROM_WRITE_MS         5u          // typical write cycle time
-#define EEPROM_WAIT_RETRIES     1000u
+#define EEPROM_WAIT_RETRIES     1000u       // number of retries for waiting for write cycle to complete
+#define EEPROM_VALIDATE_WRITE   0
 
 extern I2CHelper i2c;
 
@@ -55,11 +56,11 @@ void EEPROM::write()
     }
     DEBUG_PRINT(DEBUG_DEBUG, "write=%u magic=%08x version=%d sequence=%d", result, data.magic, data.version, data.sequence);
 
-    #if 0
-    Data tmp;
-    tmp.invalidate();
-    result = eepromReadBytes(0, reinterpret_cast<uint8_t *>(&tmp), sizeof(tmp));
-    DEBUG_PRINT(DEBUG_DEBUG, "verify=%u magic=%08x version=%d sequence=%d", result, tmp.magic, tmp.version, tmp.sequence);
+    #if EEPROM_VALIDATE_WRITE
+        Data tmp;
+        tmp.invalidate();
+        result = eepromReadBytes(0, reinterpret_cast<uint8_t *>(&tmp), sizeof(tmp));
+        DEBUG_PRINT(DEBUG_DEBUG, "verify=%u magic=%08x version=%d sequence=%d", result, tmp.magic, tmp.version, tmp.sequence);
     #endif
 }
 
@@ -76,7 +77,6 @@ void EEPROM::updateTemperatureLimits()
 // Poll the EEPROM with a dummy control-byte write until it ACKs,
 // which signals the internal write cycle (tWR, ~5 ms) has finished.
 //------------------------------------------------------------------
-
 bool eepromWaitReady(void)
 {
     uint32_t retries = EEPROM_WAIT_RETRIES;
