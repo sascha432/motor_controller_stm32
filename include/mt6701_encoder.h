@@ -127,7 +127,7 @@ private:
 template<uint8_t GPIO_PIN, bool ACTIVE_LOW_I2C, uint32_t GPIO_PORT_ADDR = digitalPinToGPIOBase<GPIO_PIN>()>
 struct MT6701Encoder {
 
-    static constexpr GPIO_TypeDef *GPIO_PORT = reinterpret_cast<GPIO_TypeDef *>(GPIO_PORT_ADDR);
+    inline GPIO_TypeDef *getGPIOPort() const { return (GPIO_TypeDef *)GPIO_PORT_ADDR; }
 
     /**
      * @brief select encoder mode
@@ -137,8 +137,8 @@ struct MT6701Encoder {
     void setI2CEnablePin(bool state) 
     {
         (ACTIVE_LOW_I2C ? !state : state) ?
-            (GPIO_PORT->BSRR = (1 << digitalPinToBit(GPIO_PIN))) : 
-            (GPIO_PORT->BRR  = (1 << digitalPinToBit(GPIO_PIN)))
+            (getGPIOPort()->BSRR = (1 << digitalPinToBit(GPIO_PIN))) : 
+            (getGPIOPort()->BRR  = (1 << digitalPinToBit(GPIO_PIN)))
         ;
         // wait for the encoder to change state
         delayMicroseconds(10);

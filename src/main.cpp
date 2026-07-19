@@ -47,12 +47,19 @@ static void button_isr() {
     #endif
 }
 
-static void knob_isr() {
+static void knob_isr() 
+{
     knob.isr();
 }
 
-static void pid_timer_isr() {
+static void pid_timer_isr() 
+{
     pid.isr();
+}
+
+static void pid_fault_isr()
+{
+    pid.fault_isr();
 }
 
 void clear_user_inputs() 
@@ -105,7 +112,7 @@ void setup()
     adc.initDAC();
 
     // PID controller
-    pid.init(pid_timer_isr);
+    pid.init(pid_timer_isr, pid_fault_isr);
 
     // Initialize display driver
     tft_driver_init();

@@ -140,6 +140,18 @@ constexpr uint32_t digitalPinToGPIOBase()
 }
 
 /**
+ * @brief translate arduino pin macro to GPIO_TypeDef pointer
+ * 
+ * @tparam PIN Arduino pin macro (e.g. PA0, PB10, PD7)
+ * @return constexpr GPIO_TypeDef* GPIO_TypeDef pointer, or nullptr for invalid port 
+ */
+template<uint32_t PIN>
+constexpr GPIO_TypeDef *digitalPinToGPIO() 
+{
+    return reinterpret_cast<GPIO_TypeDef *>(digitalPinToGPIOBase<PIN>());
+}
+
+/**
  * @brief runtime overload for Arduino digital pin numbers
  *
  * @tparam PIN_TYPE
@@ -188,15 +200,50 @@ constexpr uint32_t RCC_APB2ENR_IOPxEN(uint32_t GPIO_PORT_ADDR)
 }
 
 /**
+ * @brief translate GPIO port address to RCC_APB2ENR_IOPxEN bits
+ * 
+ * @param gpio_port GPIO_TypeDef pointer
+ * @return bit mask for APB2ENR
+ */
+constexpr uint32_t RCC_APB2ENR_IOPxEN(GPIO_TypeDef *gpio_port) 
+{
+    return (1U << (((uint32_t)gpio_port >> 10U) & 0x0f));
+}
+
+/**
  * @brief get configuration register for GPIO pin
  * 
  * @param gpio_addr GPIOx_BASE address
  * @param pin Arduino PIN number
- * @return volatile& 
+ * @return volatile uint32_t&
+ */
+inline volatile uint32_t &GPIO_CRx_REG(GPIO_TypeDef *gpio_port, uint32_t pin)
+{
+    return (digitalPinToBit(pin) < 8) ? (gpio_port)->CRL : (gpio_port)->CRH;
+}
+
+/**
+ * @brief get configuration register for GPIO pin
+ * 
+ * @param gpio_addr GPIOx_BASE address
+ * @param pin Arduino PIN number
+ * @return volatile uint32_t&
  */
 inline volatile uint32_t &GPIO_CRx_REG(uint32_t gpio_addr, uint32_t pin)
 {
-    return (digitalPinToBit(pin) < 8) ? ((GPIO_TypeDef *)gpio_addr)->CRL : ((GPIO_TypeDef *)gpio_addr)->CRH;
+    return GPIO_CRx_REG(reinterpret_cast<GPIO_TypeDef *>(gpio_addr), pin);
+}
+
+/**
+ * @brief get configuration register for GPIO pin
+ * 
+ * @tparam Arduino PIN number (PA0, PB10, PD7, etc.)
+ * @return volatile uint32_t&
+ */
+template<uint32_t PIN>
+inline volatile uint32_t &GPIO_CRx_REG()
+{
+    return GPIO_CRx_REG(digitalPinToGPIO<PIN>(), PIN);
 }
 
 /**
