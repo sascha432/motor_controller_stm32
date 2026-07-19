@@ -261,11 +261,9 @@ void loop()
     // ADC debugoutput and blink motor LEDs
     if (false) {
         static uint32_t lastTime = 0;
-        static uint32_t counter = 0;
         if (millis() - lastTime >= 100) {
             lastTime = millis();
             adc.debugPrint();
-            // ((++counter / 10) & 0x01) ? LEDs::onLED1() : LEDs::onLED2();
         }
     }
 

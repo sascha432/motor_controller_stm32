@@ -19,6 +19,8 @@
 template<uint8_t GPIO_PIN, bool ACTIVE_STATE, uint32_t kDebounceTimeMs = 50, uint32_t GPIO_PORT_ADDR = digitalPinToGPIOBase<GPIO_PIN>()>
 struct Button 
 {
+    static constexpr GPIO_TypeDef *GPIO_PORT = reinterpret_cast<GPIO_TypeDef *>(GPIO_PORT_ADDR);
+
     template<typename ISRCallback>
     void init(ISRCallback callback) {
 
@@ -30,13 +32,13 @@ struct Button
         GPIO_CRx_REG(GPIO_PORT_ADDR, GPIO_PIN) |= (0x8 << digitalPinShift(GPIO_PIN));
 
         // Select pull-up (ODR bit = 1)
-        ((GPIO_TypeDef *)GPIO_PORT_ADDR)->ODR |= (1 << digitalPinToBit(GPIO_PIN));
+        GPIO_PORT->ODR |= (1 << digitalPinToBit(GPIO_PIN));
 
         // --- interrupt — use Arduino attachInterrupt only
         attachInterrupt(digitalPinToInterrupt(GPIO_PIN), callback, CHANGE);
 
         lastDebounceTime = 0;
-        state = ((GPIO_TypeDef *)GPIO_PORT_ADDR)->IDR & (1 << digitalPinToBit(GPIO_PIN));
+        state = GPIO_PORT->IDR & (1 << digitalPinToBit(GPIO_PIN));
         pressed = (state == ACTIVE_STATE);
         released = !pressed;
     }
@@ -138,6 +140,8 @@ struct Button
 template<uint8_t GPIO_PIN_A, uint8_t GPIO_PIN_B, uint32_t GPIO_PORT_ADDR = digitalPinToGPIOBase<GPIO_PIN_A>()>
 struct RotaryEncoder {
 
+    static constexpr GPIO_TypeDef *GPIO_PORT = reinterpret_cast<GPIO_TypeDef *>(GPIO_PORT_ADDR);
+
     static constexpr uint32_t kMultiplierConstant = 0xffffff;       // speed multiplier constant - higher value = faster acceleration, lower value = slower acceleration
     static constexpr uint32_t kResetAccelerationTime = 250;         // reset acceleration if no movement for 1 second
 
@@ -160,7 +164,7 @@ struct RotaryEncoder {
 
     inline uint8_t readState() const {
         // copy volatile register to local variable to let the compiler optimize the bit operations
-        uint32_t idr = ((GPIO_TypeDef *)GPIO_PORT_ADDR)->IDR;
+        uint32_t idr = GPIO_PORT->IDR;
         return (((idr >> digitalPinToBit(GPIO_PIN_A)) & 0x1) | ((idr >> (digitalPinToBit(GPIO_PIN_B) - 1)) & 0x2));
     }
 
@@ -176,12 +180,12 @@ struct RotaryEncoder {
 
         // Input with pull-up/pull-down (CNF=10, MODE=00)
         GPIO_CRx_REG(GPIO_PORT_ADDR, GPIO_PIN_A) &= ~(0xF << digitalPinShift(GPIO_PIN_A));
-        GPIO_CRx_REG(GPIO_PORT_ADDR, GPIO_PIN_B) &= ~(0xF << digitalPinShift(GPIO_PIN_B));//TODO this line causes infinite loop in the debugger
+        GPIO_CRx_REG(GPIO_PORT_ADDR, GPIO_PIN_B) &= ~(0xF << digitalPinShift(GPIO_PIN_B));
         GPIO_CRx_REG(GPIO_PORT_ADDR, GPIO_PIN_A) |= (0x8 << digitalPinShift(GPIO_PIN_A));
         GPIO_CRx_REG(GPIO_PORT_ADDR, GPIO_PIN_B) |= (0x8 << digitalPinShift(GPIO_PIN_B));
 
         // Select pull-up (ODR bit = 1)
-        ((GPIO_TypeDef *)GPIO_PORT_ADDR)->ODR |= (1 << digitalPinToBit(GPIO_PIN_A)) | (1 << digitalPinToBit(GPIO_PIN_B));
+        GPIO_PORT->ODR |= (1 << digitalPinToBit(GPIO_PIN_A)) | (1 << digitalPinToBit(GPIO_PIN_B));
 
         oldState = readState();
         lastTimestamp = ms();

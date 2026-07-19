@@ -12,6 +12,8 @@
 #else
 #define MT6701_I2C_PIN              PB7             // MT6701 encoder I2C pin
 #endif
+#define MT6701_I2C_SCL_PIN          PB6             // MT6701 encoder I2C SCL pin
+#define MT6701_I2C_SDA_PIN          PB7             // MT6701 encoder I2C SDA pin
 
 // Rotary encoder pins
 #define ROTARY_ENCODER_PIN_A        PA6
@@ -30,6 +32,10 @@
 
 #define DRV8701_FAULT_PIN           PB14            // DRV8701 nFAULT pin
 #define OCP_INT_PIN                 PB12            // INA381 ALERT#
+#define DRV_SNSOUT_PIN              PD11            // DRV8701 SNSOUT pin
+
+#define DRVOCP_VREF_DAC_PIN         PA4             // DRV8701 VREF overcurrent protection
+#define OCP_VREF_DAC_PIN            PA5             // INA381 CMPREF overcurrent protection
 
 // Charlieplexed LEDs
 #if defined(STM32F107xC)
@@ -39,6 +45,9 @@
 #endif
 
 #define ILLUMINATION_LED_PIN        PB10            // illumination LED pin
+
+#define USB_DN_PIN                  PA11            // USB D- pin
+#define USB_DP_PIN                  PA12            // USB D+ pin
 
 // TFT pins
 #define TFT_PIN_CLK                 PB13

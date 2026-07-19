@@ -127,6 +127,8 @@ private:
 template<uint8_t GPIO_PIN, bool ACTIVE_LOW_I2C, uint32_t GPIO_PORT_ADDR = digitalPinToGPIOBase<GPIO_PIN>()>
 struct MT6701Encoder {
 
+    static constexpr GPIO_TypeDef *GPIO_PORT = reinterpret_cast<GPIO_TypeDef *>(GPIO_PORT_ADDR);
+
     /**
      * @brief select encoder mode
      * 
@@ -135,8 +137,8 @@ struct MT6701Encoder {
     void setI2CEnablePin(bool state) 
     {
         (ACTIVE_LOW_I2C ? !state : state) ?
-            (((GPIO_TypeDef *)GPIO_PORT_ADDR)->BSRR = (1 << digitalPinToBit(GPIO_PIN))) : 
-            (((GPIO_TypeDef *)GPIO_PORT_ADDR)->BRR  = (1 << digitalPinToBit(GPIO_PIN)))
+            (GPIO_PORT->BSRR = (1 << digitalPinToBit(GPIO_PIN))) : 
+            (GPIO_PORT->BRR  = (1 << digitalPinToBit(GPIO_PIN)))
         ;
         // wait for the encoder to change state
         delayMicroseconds(10);
@@ -180,9 +182,9 @@ struct MT6701Encoder {
             auto result = config.setPPR(ppr);
             if (result && writeEEPROM) {
                 result = config.writeEEPROM();
-                DEBUG_PRINT(DEBUG_DEBUG, "MT6701 write EEPROM result: %u", result);
+                DEBUG_PRINT(DEBUG_DEBUG, "write EEPROM=%u", result);
             }
-            DEBUG_PRINT(DEBUG_DEBUG, "MT6701 PPR: %u", config.getPPR());
+            DEBUG_PRINT(DEBUG_DEBUG, "PPR=%u", config.getPPR());
         }
         else {
             DEBUG_PRINT(DEBUG_DEBUG, "MT6701 not detected at address 0x%02x", MT6701Config::MT6701_ADDR);
