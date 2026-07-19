@@ -21,6 +21,8 @@
 #define DEBUG_HUMAN 0
 #define HAVE_DEBUG_PID_CONTROLLER 1
 
+using InterruptCallbackType = void (*)();
+
 /**
  * @brief translate arduino digital pin number to GPIO pin number
  * 

@@ -186,28 +186,29 @@ void loop()
 {
     // handle buttons
     if (knobButton.isPressed()) {
-        // menu.handleButtonPress();
+        menu.handleButtonPress();
+    }
+    if (backButton.isPressed()) {
+        menu.handleBackButtonPress();
+    }
+    if (startButton.isPressed()) {
+        // menu.handleStartButtonPress();
         static uint32_t count=0;
         count++;
-        switch (count % 3) {
+        switch (count % 4) {
             case 0:
-                PID_WRITE_MOTOR_PWM_ON(1800, 0);
+                PID_WRITE_MOTOR_PWM_ON(900, 0);
                 break;
             case 1:
                 PID_WRITE_MOTOR_PWM_ON(1800, 1);
                 break;
             case 2:
+                PID_WRITE_MOTOR_PWM_BREAK(2700);
+                break;
+            case 3:
                 PID_WRITE_MOTOR_PWM_OFF();
                 break;
         }
-    }
-    if (backButton.isPressed()) {
-        // menu.handleBackButtonPress();
-        PID_WRITE_MOTOR_PWM_BREAK(900);
-    }
-    if (startButton.isPressed()) {
-        // menu.handleStartButtonPress();
-        PID_WRITE_MOTOR_PWM_OFF();
     }
 
     // handle ui updates and rotary encoder
