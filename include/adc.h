@@ -270,12 +270,7 @@ struct ADC {
         // Enable DAC clock
         RCC->APB1ENR |= RCC_APB1ENR_DACEN;
 
-        /*
-        Configure PA4 and PA5 as analog input mode
-        GPIO CRL:
-        MODE[1:0] = 00
-        CNF[1:0]  = 00
-        */
+        // Configure PA4 and PA5 as analog input mode GPIO CRL: MODE[1:0] = 00 CNF[1:0] = 00
         GPIOA->CRL &= ~(0xf << (4 * 4));   // clear PA4
         GPIOA->CRL &= ~(0xf << (5 * 4));   // clear PA5
 
