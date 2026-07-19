@@ -178,6 +178,10 @@ struct ADC {
 
     static constexpr uint32_t kNumConversions = 4;      // number of channels
 
+    /**
+     * @brief Initialize the ADC and DMA for reading multiple channels
+     * 
+     */
     void init() 
     {
         // Enable GPIOA/GPIOC and ADC1 clocks
@@ -255,18 +259,95 @@ struct ADC {
         ADC1->CR2 |= ADC_CR2_SWSTART;       // Start
     }
 
+    /**
+     * @brief Initialize the DAC for reference voltages
+     * 
+     */
+    void initDAC()
+    {
+        // Enable GPIOA clock
+        RCC->APB2ENR |= RCC_APB2ENR_IOPAEN;
+        // Enable DAC clock
+        RCC->APB1ENR |= RCC_APB1ENR_DACEN;
+
+        /*
+        Configure PA4 and PA5 as analog input mode
+        GPIO CRL:
+        MODE[1:0] = 00
+        CNF[1:0]  = 00
+        */
+        GPIOA->CRL &= ~(0xf << (4 * 4));   // clear PA4
+        GPIOA->CRL &= ~(0xf << (5 * 4));   // clear PA5
+
+        // Enable DAC channel 1 and channel 2
+        DAC->CR |= DAC_CR_EN1 | DAC_CR_EN2;
+    }
+
+    /**
+     * @brief convert eeprom values (current * 500) to DAC values based on the 3.3V vref, 4mΩ shunt and 20x gain
+     * 
+     * @param limit 
+     * @return ** constexpr uint16_t 
+     */
+    static constexpr uint16_t _currentLimitValueToDAC(uint16_t limit)
+    {
+        uint32_t dac = ((uint32_t)limit * 1985) / 10000 + 62;
+        return std::min<uint32_t>(dac, 4095);
+    }
+
+    /**
+     * @brief Set DAC voltage for the DRV8701 reference voltage
+     * 
+     * @param value 
+     */
+    void setMotorCurrentLimit(uint16_t value)
+    {
+        DAC->DHR12R1 = _currentLimitValueToDAC(value) & 0xfff;
+    }
+
+    /**
+     * @brief Set DAC voltage for the INA381 comparator reference voltage
+     * 
+     * @param value 
+     */
+    void setInputCurrentLimit(uint16_t value)
+    {
+        DAC->DHR12R2 = _currentLimitValueToDAC(value) & 0xfff;
+    }
+
+    /**
+     * @brief Read single ADC value from the buffer
+     * 
+     * @param index 
+     * @return uint16_t 
+     */
     uint16_t read(uint8_t index) const {
         return adc_buffer[index];
     }
 
+    /**
+     * @brief Copy ADC buffer into struct
+     * 
+     * @return ADCBufferType 
+     */
     ADCBufferType readAll() const {
         return *(ADCBufferType *)adc_buffer;
     }
 
+    /**
+     * @brief Get the Motor NTC value
+     * 
+     * @return uint16_t 
+     */
     uint16_t getMotorNTCValue() const {
         return adc_buffer[2];
     }
 
+    /**
+     * @brief Get the Mosfet NTC value
+     * 
+     * @return uint16_t 
+     */
     uint16_t getMosfetNTCValue() const {
         return adc_buffer[3];
     }
@@ -288,3 +369,5 @@ struct ADC {
 
     volatile uint16_t adc_buffer[kNumConversions];
 };
+
+extern ADC adc;
