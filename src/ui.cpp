@@ -457,11 +457,12 @@ void ScreenFlow::back()
         auto tmp = screen->prevScreen;
         delete screen;
         screen = tmp;
-        #if RECREATE_PREV_SCREEN
-            screen->load();
-        #else
+        if (kUIKeepScreenObjectsInMemory) {
             lv_scr_load(screen->screen);
-        #endif
+        }
+        else {
+            screen->load();
+        }
     }
 }
 
@@ -469,11 +470,9 @@ void ScreenFlow::next(Screen *nextScreen)
 {
     DEBUG_PRINT(DEBUG_DEBUG, "next=%p current=%p", nextScreen, screen);
     nextScreen->prevScreen = screen;
-    #if RECREATE_PREV_SCREEN
-    if (nextScreen->prevScreen) {
+    if (kUIKeepScreenObjectsInMemory == false && nextScreen->prevScreen) {
         lv_obj_clean(nextScreen->prevScreen->screen);
     }
-    #endif
     screen = nextScreen;
     screen->load();
 }

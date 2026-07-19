@@ -8,28 +8,11 @@
 #include "ui_constants.h"
 #include "lvgl.h"
 #include "tft_driver.h"
+#include "helpers.h"
 #include "debug.h"
 
-// set to 1 to create previous screens using Screen::load() instead of lv_scr_load(screen->screen)
-// more CPU vs memory usage tradeoff
-#define RECREATE_PREV_SCREEN                1
-
-/**
- * @brief Float printf converters
- * 
- * printf("32.1=" SPRINTF_FP1_FMT "\n", CONVERT_TO_FP2(32.1))
- * printf("123.45=" SPRINTF_FP2_FMT "\n", CONVERT_TO_FP2(123.56))
- * 
- */
-
-
-
-#define CONVERT_TO_FP1(value)               (int32_t)(value / 1000), ((uint32_t)(value / 100) % 10)
-#define CONVERT_TO_FP2(value)               (int32_t)(value / 1000), ((uint32_t)(value / 10) % 100)
-
-#define SPRINTF_FP1_FMT                     "%d.%u"
-#define SPRINTF_FP2_FMT                     "%d.%02u"
-
+// set to true to keep screen objects in memory when switching screens
+static constexpr bool kUIKeepScreenObjectsInMemory = false;
 
 // === Base Screen class ===
 struct Screen

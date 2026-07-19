@@ -138,7 +138,7 @@ void setup()
 }
 
 void motorOff() {
-    PID_WRITE_MOTOR_PWM(0);
+    PID_WRITE_MOTOR_PWM_OFF();
     __disable_irq();
     if (pid.running) {
         pid.running = false;
@@ -179,13 +179,28 @@ void loop()
 {
     // handle buttons
     if (knobButton.isPressed()) {
-        menu.handleButtonPress();
+        // menu.handleButtonPress();
+        static uint32_t count=0;
+        count++;
+        switch (count % 3) {
+            case 0:
+                PID_WRITE_MOTOR_PWM_ON(1800, 0);
+                break;
+            case 1:
+                PID_WRITE_MOTOR_PWM_ON(1800, 1);
+                break;
+            case 2:
+                PID_WRITE_MOTOR_PWM_OFF();
+                break;
+        }
     }
     if (backButton.isPressed()) {
-        menu.handleBackButtonPress();
+        // menu.handleBackButtonPress();
+        PID_WRITE_MOTOR_PWM_BREAK(900);
     }
     if (startButton.isPressed()) {
-        menu.handleStartButtonPress();
+        // menu.handleStartButtonPress();
+        PID_WRITE_MOTOR_PWM_OFF();
     }
 
     // handle ui updates and rotary encoder
@@ -260,6 +275,15 @@ void loop()
             lastTime2 = millis();
             auto x = adc.readAll();
             DEBUG_PRINT(DEBUG_DEBUG, "Current=%d mA ADC=%u", (int)x.getInputCurrent(), x.isense);
+        }
+    }
+
+    if (true) {
+        static uint32_t lastTime3 = 0;
+        if (millis() - lastTime3 >= 250) {
+            lastTime3 = millis();
+            pinMode(DRV8701_FAULT_PIN, INPUT);
+            DEBUG_PRINT(DEBUG_DEBUG, "fault=%u", (uint32_t)digitalRead(DRV8701_FAULT_PIN));
         }
     }
 }

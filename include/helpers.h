@@ -6,8 +6,18 @@
 
 #include <Arduino.h>
 
-#define PID_WRITE_MOTOR_PWM(level)      (TIM1->CCR1 = (level))
+/**
+ * @brief Float printf converters
+ * 
+ * printf("32.1=" SPRINTF_FP1_FMT "\n", CONVERT_TO_FP2(32.1))
+ * printf("123.45=" SPRINTF_FP2_FMT "\n", CONVERT_TO_FP2(123.56))
+ * 
+ */
+#define CONVERT_TO_FP1(value)               (int32_t)(value / 1000), ((uint32_t)(value / 100) % 10)
+#define CONVERT_TO_FP2(value)               (int32_t)(value / 1000), ((uint32_t)(value / 10) % 100)
 
+#define SPRINTF_FP1_FMT                     "%d.%u"
+#define SPRINTF_FP2_FMT                     "%d.%02u"
 #define DEBUG_HUMAN 0
 #define HAVE_DEBUG_PID_CONTROLLER 1
 
