@@ -123,18 +123,16 @@ struct PidController
         GPIOA->CRH &= ~(GPIO_CRH_MODE8 | GPIO_CRH_CNF8);
         GPIOA->CRH |= (GPIO_CRH_MODE8 | GPIO_CRH_CNF8_1); // 50MHz, AF push-pull
 
-        #if 0 // disabled for serial debug
         // PA9 AF push-pull (CRH: pin 9)
         GPIOA->CRH &= ~(GPIO_CRH_MODE9 | GPIO_CRH_CNF9);
         GPIOA->CRH |= (GPIO_CRH_MODE9 | GPIO_CRH_CNF9_1); // 50MHz, AF push-pull    
-        #endif
 
-        // PWM setup on TIM1 CH1
+        // PWM setup on TIM1 CH1 and CH2
         TIM1->PSC = 0;
         TIM1->ARR = kMaxPWMLevel - 1;
-        PID_WRITE_MOTOR_PWM(0);
-        TIM1->CCMR1 |= (6 << TIM_CCMR1_OC1M_Pos);
-        TIM1->CCER |= TIM_CCER_CC1E;
+        PID_WRITE_MOTOR_PWM_OFF();
+        TIM1->CCMR1 |= (6 << TIM_CCMR1_OC1M_Pos) | (6 << TIM_CCMR1_OC2M_Pos); // PWM mode 1 on CH1 and CH2
+        TIM1->CCER |= TIM_CCER_CC1E | TIM_CCER_CC2E;
         TIM1->BDTR |= TIM_BDTR_MOE; // main output enable for TIM1
         TIM1->CR1 |= TIM_CR1_CEN;
 
@@ -340,7 +338,7 @@ struct PidController
 
         // apply new PWM level if motor is running
         if (running) {
-            PID_WRITE_MOTOR_PWM(clampPWMLevel(pwmLevel));
+            PID_WRITE_MOTOR_PWM_ON(clampPWMLevel(pwmLevel), 0);//TODO eeprom.getData().getDirection() == EEPROM::kMotorDirectionReverse);
         }
 
         #if 1
