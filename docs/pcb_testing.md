@@ -13,14 +13,14 @@
 - TFT, knob, buttons are working
 - TFT backlight working
 - LED lightning: added pulldown to pwm to avoid flashing during reset
-- EEPROM no shorts
 - INA K connections fixed and output filter added
 - INA alert# triggers interrupt
-- DRV8701 motor limit: TODO test if vref limits the current
+- DRV8701 powers up without faults after providing 3.3v on nSLEEP
 - Motor LEDs working, floating seems to cause minor glow
 - 4 ADC channels working current, voltage, 2x temp.
 - DAC outputs working DRV8701 vref and INA381 comparator vref
 - AT24C02CM5 EEPROM is working
+- TODO DRV8701 fault after turning PWM on
 
 ### Rev 1.1
 

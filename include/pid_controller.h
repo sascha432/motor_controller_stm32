@@ -88,10 +88,13 @@ struct PidController
     template<typename ISRCallback>
     inline void enable(ISRCallback callback) {
         TIM4->CR1 |= TIM_CR1_CEN;
-        attachInterrupt(digitalPinToInterrupt(DRV8701_FAULT_PIN), callback, CHANGE);
-        attachInterrupt(digitalPinToInterrupt(OCP_INT_PIN), callback, CHANGE);
-        attachInterrupt(digitalPinToInterrupt(DRV_SNSOUT_PIN), callback, CHANGE);
+        // all faults are active low
+        attachInterrupt(digitalPinToInterrupt(DRV8701_FAULT_PIN), callback, FALLING);
+        attachInterrupt(digitalPinToInterrupt(OCP_INT_PIN), callback, FALLING);
+        attachInterrupt(digitalPinToInterrupt(DRV_SNSOUT_PIN), callback, FALLING);
         timer.resume();
+        // update faults
+        readFaults();
     }
 
     /**
@@ -394,25 +397,41 @@ struct PidController
     void fault_isr() 
     {
         // TODO add emergency stop and fault handling
-        if (digitalPinToGPIO<DRV8701_FAULT_PIN>()->IDR & (1 << digitalPinToBit(DRV8701_FAULT_PIN))) {
+        if ((digitalPinToGPIO<DRV8701_FAULT_PIN>()->IDR & (1 << digitalPinToBit(DRV8701_FAULT_PIN))) == 0) {
             faults.drv8701Fault = true;
+            faults.count++;
         }
-        if (digitalPinToGPIO<OCP_INT_PIN>()->IDR & (1 << digitalPinToBit(OCP_INT_PIN))) {
+        if ((digitalPinToGPIO<OCP_INT_PIN>()->IDR & (1 << digitalPinToBit(OCP_INT_PIN))) == 0) {
             faults.ocpFault = true;
+            faults.count++;
         }   
-        if (digitalPinToGPIO<DRV_SNSOUT_PIN>()->IDR & (1 << digitalPinToBit(DRV_SNSOUT_PIN))) {
+        if ((digitalPinToGPIO<DRV_SNSOUT_PIN>()->IDR & (1 << digitalPinToBit(DRV_SNSOUT_PIN))) == 0) {
             faults.snsoutFault = true;
+            faults.count++;
         }
+    }
+
+    /**
+     * @brief Update internal fault states
+     * 
+     */
+    void readFaults() 
+    {
+        faults.drv8701Fault = (digitalPinToGPIO<DRV8701_FAULT_PIN>()->IDR & (1 << digitalPinToBit(DRV8701_FAULT_PIN))) == 0;
+        faults.ocpFault = (digitalPinToGPIO<OCP_INT_PIN>()->IDR & (1 << digitalPinToBit(OCP_INT_PIN))) == 0;
+        faults.snsoutFault = (digitalPinToGPIO<DRV_SNSOUT_PIN>()->IDR & (1 << digitalPinToBit(DRV_SNSOUT_PIN))) == 0;
+        faults.count = 0;
     }
 
     void debugPrintFaults() const 
     {
-        DEBUG_PRINT(DEBUG_DEBUG, "FAULT=%d OCP=%d SNSOUT=%d", faults.drv8701Fault, faults.ocpFault, faults.snsoutFault);
+        DEBUG_PRINT(DEBUG_DEBUG, "FAULT=%d OCP=%d SNSOUT=%d COUNT=%d", faults.drv8701Fault, faults.ocpFault, faults.snsoutFault, faults.count);
     }
 
 public:
     struct FaultStates {
-        FaultStates() : drv8701Fault(false), ocpFault(false), snsoutFault(false) {}
+        FaultStates() : count(0), drv8701Fault(false), ocpFault(false), snsoutFault(false) {}
+        uint32_t count;
         bool drv8701Fault : 1;
         bool ocpFault : 1;
         bool snsoutFault : 1;
