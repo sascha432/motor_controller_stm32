@@ -165,7 +165,10 @@ struct RotaryEncoder {
     inline uint8_t readState() const {
         // copy volatile register to local variable to let the compiler optimize the bit operations
         uint32_t idr = getGPIOPort()->IDR;
-        return (((idr >> digitalPinToBit(GPIO_PIN_A)) & 0x1) | ((idr >> (digitalPinToBit(GPIO_PIN_B) - 1)) & 0x2));
+        
+        return 
+            (((idr >> digitalPinToBit(GPIO_PIN_A)) & 0x1) |         // shift pin A to bit 0
+            ((idr >> (digitalPinToBit(GPIO_PIN_B) - 1)) & 0x2));    // shift pin B to bit 1
     }
 
     inline uint32_t ms() const {

@@ -8,7 +8,7 @@
 #include "helpers.h"
 #include "eeprom.h"
 
-struct PidController 
+struct PidController
 {
     static constexpr float kKpDefault = 0.12f;
     static constexpr float kKiDefault = 0.8f;
@@ -70,46 +70,37 @@ struct PidController
     }
 
     /**
-     * @brief initialize QDEC pins for MT6701 encoder
-     * 
-     */
-    inline void initQDECpins() {
-        // ENC1_A and ENC1_B on PB6 and PB7 / GPIOB
-        RCC->APB2ENR |= RCC_APB2ENR_IOPBEN;
-
-        // Input with pull-up/pull-down (CNF=10, MODE=00)
-        GPIOB->CRL &= ~((0xF << (6 * 4)) | (0xF << (7 * 4))); // Clear pin configs
-        GPIOB->CRL |=  ((0x8 << (6 * 4)) | (0x8 << (7 * 4))); // CNF=10, MODE=00
-
-        // Select pull-up (ODR bit = 1)
-        GPIOB->ODR |= (1 << 6) | (1 << 7);
-    }
-
-    /**
      * @brief disable PID controller
-     * 
+     *
      */
     inline void disable() {
         TIM4->CR1 &= ~TIM_CR1_CEN;
-        timer.pause();   
+        timer.pause();
+        detachInterrupt(digitalPinToInterrupt(DRV8701_FAULT_PIN));
+        detachInterrupt(digitalPinToInterrupt(OCP_INT_PIN));
+        detachInterrupt(digitalPinToInterrupt(DRV_SNSOUT_PIN));
     }
 
     /**
      * @brief enable PID controller
-     * 
+     *
      */
-    inline void enable() {
+    template<typename ISRCallback>
+    inline void enable(ISRCallback callback) {
         TIM4->CR1 |= TIM_CR1_CEN;
+        attachInterrupt(digitalPinToInterrupt(DRV8701_FAULT_PIN), callback, CHANGE);
+        attachInterrupt(digitalPinToInterrupt(OCP_INT_PIN), callback, CHANGE);
+        attachInterrupt(digitalPinToInterrupt(DRV_SNSOUT_PIN), callback, CHANGE);
         timer.resume();
     }
 
     /**
      * @brief initialize PID controller
-     * 
+     *
      * @param callback PID loop callback
      */
     template<typename ISRCallback>
-    void init(ISRCallback callback) {
+    void init(ISRCallback callback, ISRCallback faultCallback) {
         running = false;
         setRPM(EEPROM::getInstance().getMotorRPM());
 
@@ -125,7 +116,7 @@ struct PidController
 
         // PA9 AF push-pull (CRH: pin 9)
         GPIOA->CRH &= ~(GPIO_CRH_MODE9 | GPIO_CRH_CNF9);
-        GPIOA->CRH |= (GPIO_CRH_MODE9 | GPIO_CRH_CNF9_1); // 50MHz, AF push-pull    
+        GPIOA->CRH |= (GPIO_CRH_MODE9 | GPIO_CRH_CNF9_1); // 50MHz, AF push-pull
 
         // PWM setup on TIM1 CH1 and CH2
         TIM1->PSC = 0;
@@ -136,8 +127,17 @@ struct PidController
         TIM1->BDTR |= TIM_BDTR_MOE; // main output enable for TIM1
         TIM1->CR1 |= TIM_CR1_CEN;
 
-        initQDECpins();
+        // ENC1_A and ENC1_B on PB6 and PB7 / GPIOB
+        RCC->APB2ENR |= RCC_APB2ENR_IOPBEN;
 
+        // Input with pull-up/pull-down (CNF=10, MODE=00)
+        GPIOB->CRL &= ~((0xF << (6 * 4)) | (0xF << (7 * 4))); // Clear pin configs
+        GPIOB->CRL |=  ((0x8 << (6 * 4)) | (0x8 << (7 * 4))); // CNF=10, MODE=00
+
+        // Select pull-up (ODR bit = 1)
+        GPIOB->ODR |= (1 << 6) | (1 << 7);
+
+        // TIM4 setup
         RCC->APB2ENR |= RCC_APB2ENR_AFIOEN; // alternative function clock enable
         RCC->APB1ENR |= RCC_APB1ENR_TIM4EN; // enable TIM4 clock
 
@@ -149,10 +149,28 @@ struct PidController
         TIM4->ARR = 0xFFFF;
         TIM4->CNT = 0;
 
-        // Call PID ISR every 5 ms
+        // Fault interrupt pins DRV8701_FAULT_PIN, OCP_INT_PIN, DRV_SNSOUT_PIN
+        RCC->APB2ENR |= RCC_APB2ENR_IOPxEN(DRV8701_FAULT_PIN) | RCC_APB2ENR_IOPxEN(OCP_INT_PIN) | RCC_APB2ENR_IOPxEN(DRV_SNSOUT_PIN);
+
+        // clear conf
+        GPIO_CRx_REG<DRV8701_FAULT_PIN>()   &= ~(0xf << digitalPinShift(DRV8701_FAULT_PIN));
+        GPIO_CRx_REG<OCP_INT_PIN>()         &= ~(0xf << digitalPinShift(OCP_INT_PIN));
+        GPIO_CRx_REG<DRV_SNSOUT_PIN>()      &= ~(0xf << digitalPinShift(DRV_SNSOUT_PIN));
+
+        // CNF=10, MODE=00
+        GPIO_CRx_REG<DRV8701_FAULT_PIN>()   |= (0x8 << digitalPinShift(DRV8701_FAULT_PIN));
+        GPIO_CRx_REG<OCP_INT_PIN>()         |= (0x8 << digitalPinShift(OCP_INT_PIN));
+        GPIO_CRx_REG<DRV_SNSOUT_PIN>()      |= (0x8 << digitalPinShift(DRV_SNSOUT_PIN));
+        
+        // Select pull-up (ODR bit = 1)
+        digitalPinToGPIO<DRV8701_FAULT_PIN>()->ODR  |= (1 << digitalPinToBit(DRV8701_FAULT_PIN));
+        digitalPinToGPIO<OCP_INT_PIN>()->ODR        |= (1 << digitalPinToBit(OCP_INT_PIN));
+        digitalPinToGPIO<DRV_SNSOUT_PIN>()->ODR     |= (1 << digitalPinToBit(DRV_SNSOUT_PIN));
+
+        // PID loop, call ISR every 5 ms
         timer.setOverflow(kPIDInterval * 1000, MICROSEC_FORMAT);
         timer.attachInterrupt(callback);
-        enable();
+        enable(faultCallback);
     }
 
     inline void setKp(float value) {
@@ -191,8 +209,8 @@ struct PidController
 
     inline int32_t calcPWMLevel(int32_t error, int32_t integral, int32_t derivative) const {
         return (
-            (error * (int64_t)KpPreCalc) + 
-            (integral * (int64_t)KiPreCalc) + 
+            (error * (int64_t)KpPreCalc) +
+            (integral * (int64_t)KiPreCalc) +
             (derivative * (int64_t)KdPreCalc)
         ) / kScaleFactor;
     }
@@ -293,7 +311,7 @@ struct PidController
         stream.print(" KiPreCalc=");
         stream.print(KiPreCalc);
         stream.print(" KdPreCalc=");
-        stream.println(KdPreCalc);  
+        stream.println(KdPreCalc);
         stream.print("cpi=");
         stream.print(cpi);
         stream.print(" cpiIntegralLimit=");
@@ -313,11 +331,19 @@ struct PidController
         stream.println("=== PID DEBUG END ===");
     }
 
-    void isr() {
+    /**
+     * @brief Interrupt service routine for the PID controller.
+     * 
+     * This function should be called at a fixed interval defined by kPIDInterval.
+     * It reads the encoder counter, calculates the error, derivative, and integral,
+     * updates the PWM output, and handles anti-windup.
+     */
+    void isr() 
+    {
         // most timers are 16bit counters only
         int32_t delta = getDelta(readEncoderCounter());
         // reverse direction if wired the opposite way
-        if (reverseDirection) {  
+        if (reverseDirection) {
             delta = -delta;
         }
 
@@ -362,6 +388,37 @@ struct PidController
         #endif
     }
 
+    /**
+     * @brief Interrupt service routine for handling motor controller faults
+     */
+    void fault_isr() 
+    {
+        // TODO add emergency stop and fault handling
+        if (digitalPinToGPIO<DRV8701_FAULT_PIN>()->IDR & (1 << digitalPinToBit(DRV8701_FAULT_PIN))) {
+            faults.drv8701Fault = true;
+        }
+        if (digitalPinToGPIO<OCP_INT_PIN>()->IDR & (1 << digitalPinToBit(OCP_INT_PIN))) {
+            faults.ocpFault = true;
+        }   
+        if (digitalPinToGPIO<DRV_SNSOUT_PIN>()->IDR & (1 << digitalPinToBit(DRV_SNSOUT_PIN))) {
+            faults.snsoutFault = true;
+        }
+    }
+
+    void debugPrintFaults() const 
+    {
+        DEBUG_PRINT(DEBUG_DEBUG, "FAULT=%d OCP=%d SNSOUT=%d", faults.drv8701Fault, faults.ocpFault, faults.snsoutFault);
+    }
+
+public:
+    struct FaultStates {
+        FaultStates() : drv8701Fault(false), ocpFault(false), snsoutFault(false) {}
+        bool drv8701Fault : 1;
+        bool ocpFault : 1;
+        bool snsoutFault : 1;
+    };
+
+public:
     HardwareTimer timer;
 
     float Kp;
@@ -385,6 +442,7 @@ struct PidController
 
     bool running;
     bool reverseDirection;
+    volatile FaultStates faults;
 
     #if HAVE_DEBUG_PID_CONTROLLER
         volatile uint32_t lastRpmMeasured;

@@ -285,10 +285,9 @@ void loop()
 
     if (true) {
         static uint32_t lastTime3 = 0;
-        if (millis() - lastTime3 >= 250) {
+        if (millis() - lastTime3 >= 1000) {
             lastTime3 = millis();
-            pinMode(DRV8701_FAULT_PIN, INPUT);
-            DEBUG_PRINT(DEBUG_DEBUG, "fault=%u", (uint32_t)digitalRead(DRV8701_FAULT_PIN));
+            pid.debugPrintFaults();
         }
     }
 }
