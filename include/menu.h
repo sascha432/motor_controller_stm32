@@ -7,6 +7,7 @@
 #include <stdint.h>
 
 struct EEPROM;
+struct ScreenFlow;
 
 // === Menu class ===
 struct Menu 
@@ -26,6 +27,8 @@ struct Menu
     void loadMainMenu();
     void loadStartScreen();
     void restorePreviousMenu();
+
+    ScreenFlow &getScreenFlow();
 
 protected:
     int32_t steps;

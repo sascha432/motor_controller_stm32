@@ -36,7 +36,8 @@ static const char *kAdvancedMenuItems[] = {
     "Motor Temperature",        // 2
     "Motor RPM Settings",       // 3
     "Motor Direction",          // 4
-    "Back"                      // 5
+    "Diagnostics",              // 5
+    "Back"                      // 6
 };
 
 static const char *kMotorRPMSettingsItems[] = {
@@ -69,7 +70,8 @@ static const char *kRestoreDefaultsMenuItems[] = {
 // custom format for current and conversion from uint16_t to float
 static const char *current_slider_format_callback(uint32_t value, char *buf, size_t bufSize) 
 {
-    snprintf(buf, bufSize, "%.1f A", EEPROM::kUint16ToCurrent(value));
+    uint32_t current = value * 2; // value = A * 500, so multiply by 2 to get mA
+    snprintf(buf, bufSize, SPRINTF_FP1_FMT " A", CONVERT_TO_FP1(current));
     return buf;
 }
 
@@ -256,12 +258,10 @@ void Menu::handleButtonPress()
             break;
         // === input current limits menu ===
         case Screen::Type::INPUT_CURRENT_LIMIT:
-            eeprom.setInputCurrentLimit(getValue());
             restorePreviousMenu();
             break;
         // === motor current limits menu ===
         case Screen::Type::MOTOR_CURRENT_LIMIT:
-            eeprom.setMotorCurrentLimit(getValue());
             restorePreviousMenu();
             break;
         // === LED brightness menu ===
@@ -321,7 +321,11 @@ void Menu::handleButtonPress()
                     ));
                     setValue(eeprom.getMotorDirection());
                     break;
-                case 5: // Back
+                case 5: // Diagnostics
+                    screenFlow.next(new DiagnosticsScreen(Screen::Type::DIAGNOSTICS));
+                    setValue(0);
+                    break;
+                case 6: // Back
                     restorePreviousMenu();
                     break;
             }
@@ -381,6 +385,10 @@ void Menu::handleButtonPress()
         // === max RPM menu ===
         case Screen::Type::MAX_RPM:
             eeprom.setMaxRPM(getValue());
+            restorePreviousMenu();
+            break;
+        // === diagnostics menu ===
+        case Screen::Type::DIAGNOSTICS:
             restorePreviousMenu();
             break;
         // === restore defaults confirmation menu ===
@@ -528,6 +536,14 @@ int32_t Menu::updateRotaryValue(int32_t value)
             eeprom.setLEDBrightness(getValue());
             LEDs::illuminationLedSetPWM(eeprom.getLEDBrightness());
             break;
+        case Screen::Type::INPUT_CURRENT_LIMIT:
+            eeprom.setInputCurrentLimit(getValue());
+            adc.setInputCurrentLimit(eeprom.getInputCurrentLimit());
+            break;
+        case Screen::Type::MOTOR_CURRENT_LIMIT:
+            eeprom.setMotorCurrentLimit(getValue());
+            adc.setMotorCurrentLimit(eeprom.getMotorCurrentLimit());
+            break;
     }
     return getValue();
 }
@@ -561,4 +577,14 @@ void Menu::setSteps(int32_t steps)
 {
     DEBUG_PRINT(DEBUG_DEBUG, "steps=%d", steps);
     this->steps = steps;
+}
+
+/**
+ * @brief Return reference to the ScreenFlow object
+ * 
+ * @return ScreenFlow& 
+ */
+ScreenFlow &Menu::getScreenFlow()
+{
+    return screenFlow;
 }

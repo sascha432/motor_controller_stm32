@@ -69,6 +69,8 @@ void apply_eeprom_settings()
 {
     tft_backlight_pwm_set(eeprom.getTFTBrightness());
     LEDs::illuminationLedSetPWM(eeprom.getLEDBrightness());
+    adc.setInputCurrentLimit(eeprom.getInputCurrentLimit());
+    adc.setMotorCurrentLimit(eeprom.getMotorCurrentLimit());
 }
 
 void setup()
@@ -100,6 +102,8 @@ void setup()
 
     // ADC with DMA
     adc.init();
+    // DAC
+    adc.initDAC();
 
     // PID controller
     pid.init(pid_timer_isr);
@@ -195,6 +199,11 @@ void loop()
         }
         lv_timer_handler();
 
+        auto &screenFlow = menu.getScreenFlow();
+        if (screenFlow->getId() == Screen::Type::DIAGNOSTICS) {
+            reinterpret_cast<DiagnosticsScreen *>(screenFlow.getScreen())->update();
+        }
+
         // check NTC sensors
         static bool triggered = false;
         uint32_t overTemperature = 0;
@@ -212,7 +221,7 @@ void loop()
             if (pid.running) {
                 motorOff();
             }
-            DEBUG_PRINT(DEBUG_ERROR, "OVER TEMPERATURE: flag=%02x motor=%u mosfet=%u", overTemperature, (uint32_t)adcValues.getMotorTemperature(), (uint32_t)adcValues.getMosfetTemperature());
+            DEBUG_PRINT(DEBUG_ERROR, "OVER TEMPERATURE: flag=%02x motor=%d mosfet=%d", overTemperature, (int32_t)adcValues.getMotorTemperature(), (int32_t)adcValues.getMosfetTemperature());
         }
         if (!overTemperature && triggered) {
             triggered = false;
@@ -245,175 +254,20 @@ void loop()
             // ((++counter / 10) & 0x01) ? LEDs::onLED1() : LEDs::onLED2();
         }
     }
+
+    if (false) {
+        static uint32_t lastTime2 = 0;
+        if (millis() - lastTime2 >= 250) {
+            lastTime2 = millis();
+            auto x = adc.readAll();
+            DEBUG_PRINT(DEBUG_DEBUG, "Current=%d mA ADC=%u", (int)x.getInputCurrent(), x.isense);
+        }
+    }
 }
 
 #if 0
 void loop()
 {
-    if (startButton.isPressed()) {
-        toggleMotor();
-    }
-    #if 0
-    if (backButton.isReleased()) {
-        DEBUG_PRINTF("BACK BTN RELEASED");
-    }
-    #endif
-
-
-    // static uint32_t lastTime3 = 0;
-    // if (millis() - lastTime3 >= 100) {
-    //     lastTime3 = millis();
-    //     adc.debugPrint(Serial);
-    // }
-
-    if (Serial.available()) {
-        static constexpr auto kRPMChange = 10;
-        static constexpr auto kPIDChange = 0.01;
-        int ch;
-        switch (ch = Serial.read()) {
-        case 0x7f: // switch to programming mode if handshake is received
-        case 'x': // manual key
-            pinMode(PA5, OUTPUT);
-            digitalWrite(PA5, LOW);
-            delay(100);
-            NVIC_SystemReset();
-            for(;;) {}
-            break;
-        case 'c':
-            pid.printDebug(Serial);
-            break;
-        case 'm':
-            // motor must be off and pid controller disabled to program the encoder
-            if (pid.running) {
-                DEBUG_PRINTF("MOTOR OFF...");
-                motorOff();
-                delay(2000);
-            }
-            pid.disable();
-            motorEncoder.programPPR(i2c, PidController::kPPR);
-            // re-init pid after programming
-            pid.initQDECpins();
-            pid.enable();
-            break;
-        case 'u':
-            switch(pid.getRPM()) {
-                case 100:
-                    pid.setRPM(2000);
-                    break;
-                default:
-                    pid.setRPM(100);
-                    break;
-            }
-            break;
-        case 'P':
-            {
-                char buf[64];
-                buf[Serial.readBytesUntil(',', buf, sizeof(buf) - 1)] = 0;
-                if (buf[0] == '=') {
-                    if (buf[1]) {
-                        pid.setKp(atof(buf + 1));
-                    }
-                    Serial.print("P");
-                    Serial.print(buf);
-                    buf[Serial.readBytesUntil(',', buf, sizeof(buf) - 1)] = 0;
-                    if (*buf) {
-                        pid.setKi(atof(buf));
-                    }
-                    Serial.print(" I=");
-                    Serial.print(buf);
-                    buf[Serial.readBytesUntil('\n', buf, sizeof(buf) - 1)] = 0;
-                    if (*buf) {
-                        pid.setKd(atof(buf));
-                    }
-                    Serial.print(" D=");
-                    Serial.println(buf);
-                    // update limits after changing pid values
-                    pid.setRPM(pid.getRPM());
-                }
-                else {
-                    Serial.println("INVALID PID");
-                }
-            }
-            break;
-        case 'R':
-            {
-                char buf[32];
-                buf[Serial.readBytesUntil('\n', buf, sizeof(buf) - 1)] = 0;
-                if (buf[0] == '=') {
-                    uint32_t rpm = pid.clampRPM(atoi(buf + 1));
-                    pid.setRPM(rpm);
-                    if (pid.running) {
-                        if (rpm == 0) {
-                            motorOff();
-                        }
-                    }
-                }
-            }
-            break;
-        case '+':
-            switch(cType) {
-                case 'r':
-                    pid.setRPM(pid.rpm + kRPMChange);
-                    break;
-                case 'p':
-                    pid.setKp(pid.Kp + kPIDChange);
-                    break;
-                case 'i':
-                    pid.setKi(pid.Ki + kPIDChange);
-                    break;
-                case 'd':
-                    pid.setKd(pid.Kd + kPIDChange);
-                    break;
-                case 'w':
-                    pid.antiWindupReduction = std::clamp(pid.antiWindupReduction + 1, 0, 99);
-                    Serial.print("W=");
-                    Serial.println(pid.antiWindupReduction);
-                    break;
-            }
-            break;
-        case '-':
-            switch(cType) {
-                case 'r':
-                    pid.setRPM(pid.rpm - kRPMChange);
-                    break;
-                case 'p':
-                    pid.setKp(pid.Kp - kPIDChange);
-                    break;
-                case 'i':
-                    pid.setKi(pid.Ki - kPIDChange);
-                    break;
-                case 'd':
-                    pid.setKd(pid.Kd - kPIDChange);
-                    break;
-                case 'w':
-                    pid.antiWindupReduction = std::clamp(pid.antiWindupReduction - 1, 0, 99);
-                    Serial.print("W=");
-                    Serial.println(pid.antiWindupReduction);
-                    break;
-            }
-            break;
-        case 'r':
-        case 'p':
-        case 'i':
-        case 'd':
-        case 'w':
-            cType = ch;
-            break;
-        case 't':
-            debugSpeed = debugSpeed != 500 ? 500 : 50;
-            break;
-        case '0':
-            motorOff();
-            break;
-        case '1':
-            motorOn();
-            break;
-        case ' ':
-            toggleMotor();
-            break;
-        }
-    }
-
     #if DEBUG_HUMAN == 0
         if (pid.lastDebugNewData) {
             auto tmpLastRpmMeasured = pid.lastRpmMeasured;

@@ -5,6 +5,7 @@
 */
 
 #include "ui.h"
+#include "adc.h"
 #include <Arduino.h>
 
 // === Base Screen ===
@@ -325,6 +326,101 @@ void SliderScreen::setValue(uint32_t value)
 uint32_t SliderScreen::getValue() const
 {
     return value;
+}
+
+// === Diagnostics Screen ===
+
+void DiagnosticsScreen::load()
+{
+    Screen::load();
+
+    // Create container for diagnostics information
+    lv_obj_t *container = lv_obj_create(screen);
+    lv_obj_remove_style_all(container);
+    lv_obj_set_pos(container, 10, 10);
+    lv_obj_set_size(container, TFT_DIM_WIDTH - 20, TFT_DIM_HEIGHT - 20);
+    lv_obj_set_style_bg_opa(container, LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_style_border_width(container, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(container, 0, LV_PART_MAIN);
+
+    // Firmware label
+    firmwareLabel = lv_label_create(container);
+    lv_obj_set_style_text_color(firmwareLabel, lv_color_white(), LV_PART_MAIN);
+    lv_obj_set_style_text_font(firmwareLabel, Screen::kDiagnosticsScreenLabelFont, LV_PART_MAIN);
+    lv_obj_set_pos(firmwareLabel, 0, 0);
+    lv_obj_set_width(firmwareLabel, TFT_DIM_WIDTH - 20);
+    lv_label_set_long_mode(firmwareLabel, LV_LABEL_LONG_CLIP);
+
+    // VCC label
+    vccLabel = lv_label_create(container);
+    lv_obj_set_style_text_color(vccLabel, lv_color_white(), LV_PART_MAIN);
+    lv_obj_set_style_text_font(vccLabel, Screen::kDiagnosticsScreenLabelFont, LV_PART_MAIN);
+    lv_obj_set_pos(vccLabel, 0, 20);
+    lv_obj_set_width(vccLabel, TFT_DIM_WIDTH - 20);
+    lv_label_set_long_mode(vccLabel, LV_LABEL_LONG_CLIP);
+
+    // Current label
+    currentLabel = lv_label_create(container);
+    lv_obj_set_style_text_color(currentLabel, lv_color_white(), LV_PART_MAIN);
+    lv_obj_set_style_text_font(currentLabel, Screen::kDiagnosticsScreenLabelFont, LV_PART_MAIN);
+    lv_obj_set_pos(currentLabel, 0, 40);
+    lv_obj_set_width(currentLabel, TFT_DIM_WIDTH - 20);
+    lv_label_set_long_mode(currentLabel, LV_LABEL_LONG_CLIP);
+
+    // Motor temperature label
+    motorTempLabel = lv_label_create(container);
+    lv_obj_set_style_text_color(motorTempLabel, lv_color_white(), LV_PART_MAIN);
+    lv_obj_set_style_text_font(motorTempLabel, Screen::kDiagnosticsScreenLabelFont, LV_PART_MAIN);
+    lv_obj_set_pos(motorTempLabel, 0, 60);
+    lv_obj_set_width(motorTempLabel, TFT_DIM_WIDTH - 20);
+    lv_label_set_long_mode(motorTempLabel, LV_LABEL_LONG_CLIP);
+
+    // MOSFET temperature label
+    mosfetTempLabel = lv_label_create(container);
+    lv_obj_set_style_text_color(mosfetTempLabel, lv_color_white(), LV_PART_MAIN);
+    lv_obj_set_style_text_font(mosfetTempLabel, Screen::kDiagnosticsScreenLabelFont, LV_PART_MAIN);
+    lv_obj_set_pos(mosfetTempLabel, 0, 80);
+    lv_obj_set_width(mosfetTempLabel, TFT_DIM_WIDTH - 20);
+    lv_label_set_long_mode(mosfetTempLabel, LV_LABEL_LONG_CLIP);
+
+    char buf[64];
+    snprintf(buf, sizeof(buf) - 1, "Firmware %u.%u.%u PCB Rev %u.%u",  VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, PCB_REV_MAJOR, PCB_REV_MINOR);
+    lv_label_set_text(firmwareLabel, buf);
+
+    _refreshVisuals();
+
+    lv_scr_load(screen);
+}
+
+void DiagnosticsScreen::_refreshVisuals()
+{
+    char buf[64];
+    auto adcValues = adc.readAll();
+
+    uint32_t vccRaw = adcValues.getInputVoltage();
+    uint32_t currentRaw = adcValues.getInputCurrent();
+    int16_t motorTempRaw = adcValues.getMotorTemperature();
+    int16_t mosfetTempRaw = adcValues.getMosfetTemperature();
+
+    vcc.update(vccRaw);
+    current.update(currentRaw);
+    motorTemp.update(motorTempRaw);
+    mosfetTemp.update(mosfetTempRaw);
+
+    snprintf(buf, sizeof(buf) - 1, "VCC %u.%uV (%u.%uV/%u.%uV)", CONVERT_TO_FP1(vccRaw), CONVERT_TO_FP1(vcc.min), CONVERT_TO_FP1(vcc.max));
+    lv_label_set_text(vccLabel, buf);
+
+    snprintf(buf, sizeof(buf) - 1, "Current %u.%02uA (%u.%02uA/%u.%02uA)", CONVERT_TO_FP2(currentRaw), CONVERT_TO_FP2(current.min), CONVERT_TO_FP2(current.max));
+    lv_label_set_text(currentLabel, buf);
+
+    snprintf(buf, sizeof(buf) - 1, "Motor %dC (%dC/%dC)", (int32_t)motorTempRaw, (int32_t)motorTemp.min, (int32_t)motorTemp.max);
+    lv_label_set_text(motorTempLabel, buf);
+
+    // snprintf(buf, sizeof(buf) - 1, "MOSFETs %dC (%dC/%dC)", (int32_t)mosfetTempRaw, (int32_t)mosfetTemp.min, (int32_t)mosfetTemp.max);
+    pinMode(PB12, INPUT);
+    pinMode(PB14, INPUT);
+    snprintf(buf, sizeof(buf) - 1, "limits %u %u", digitalRead(PB12), digitalRead(PB14));
+    lv_label_set_text(mosfetTempLabel, buf);
 }
 
 // === Screen Flow Manager ===

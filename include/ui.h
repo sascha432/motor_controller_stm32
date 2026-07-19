@@ -14,6 +14,23 @@
 // more CPU vs memory usage tradeoff
 #define RECREATE_PREV_SCREEN                1
 
+/**
+ * @brief Float printf converters
+ * 
+ * printf("32.1=" SPRINTF_FP1_FMT "\n", CONVERT_TO_FP2(32.1))
+ * printf("123.45=" SPRINTF_FP2_FMT "\n", CONVERT_TO_FP2(123.56))
+ * 
+ */
+
+
+
+#define CONVERT_TO_FP1(value)               (int32_t)(value / 1000), ((uint32_t)(value / 100) % 10)
+#define CONVERT_TO_FP2(value)               (int32_t)(value / 1000), ((uint32_t)(value / 10) % 100)
+
+#define SPRINTF_FP1_FMT                     "%d.%u"
+#define SPRINTF_FP2_FMT                     "%d.%02u"
+
+
 // === Base Screen class ===
 struct Screen
 {
@@ -42,7 +59,8 @@ struct Screen
         MOTOR_TEMPERATURE_LIMIT,
         RESTORE_DEFAULTS_CONFIRMATION,
         EEPROM_RESTORED,
-        MOTOR_SPEED
+        MOTOR_SPEED,
+        DIAGNOSTICS
     };
 
     // welcome screen style constants
@@ -86,6 +104,8 @@ struct Screen
     static constexpr lv_coord_t kSliderScreenSliderRadius = 6;
     static constexpr lv_coord_t kSliderScreenKnobSize = 30;
     static constexpr lv_coord_t kSliderScreenValueTopGap = 40;
+
+    static constexpr const lv_font_t *kDiagnosticsScreenLabelFont = &lv_font_montserrat_14;
 
     Screen(Type id);
     virtual ~Screen();
@@ -207,6 +227,71 @@ private:
     lv_obj_t *sliderKnob;
     lv_obj_t *valueLabel;
     FormatCallbackType formatCallback;
+};
+
+// === Diagnostics Screen ===
+
+struct DiagnosticsScreen :  public Screen
+{
+    DiagnosticsScreen(Type id) : Screen(id),
+        firmwareLabel(nullptr),
+        vccLabel(nullptr),
+        currentLabel(nullptr),
+        motorTempLabel(nullptr),
+        mosfetTempLabel(nullptr)
+    {}
+
+    virtual void load() override;
+
+    void update() {
+        _refreshVisuals();
+    }
+
+    template<uint32_t UPDATE_RATE_MILLIS = 30000>
+    struct MinMax {
+        uint32_t lastUpdate;
+        int16_t min;
+        int16_t max;
+
+        MinMax()
+        {
+            reset();
+        }
+
+        void reset()
+        {
+            lastUpdate = HAL_GetTick();
+            min = INT16_MAX;
+            max = INT16_MIN;
+        }
+
+        void update(int16_t value) 
+        {
+            if ((HAL_GetTick() - lastUpdate) > UPDATE_RATE_MILLIS) {
+                reset();
+            }
+            if (value < min) {
+                min = value;
+            }
+            if (value > max) {
+                max = value;
+            }
+        }
+    };
+
+protected:
+    void _refreshVisuals();
+
+private:
+    lv_obj_t *firmwareLabel;
+    lv_obj_t *vccLabel;
+    lv_obj_t *currentLabel;
+    lv_obj_t *motorTempLabel;
+    lv_obj_t *mosfetTempLabel;
+    MinMax<5000> vcc;
+    MinMax<5000> current;
+    MinMax<30000> motorTemp;    
+    MinMax<30000> mosfetTemp;
 };
 
 // === Screen Flow Manager ===
