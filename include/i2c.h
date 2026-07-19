@@ -161,11 +161,16 @@ struct I2CHelper {
      * @return true if the read was successful
      * @return false if an error occurred
      */
+
     bool readBytes(uint8_t address, uint8_t *data, uint16_t length)
     {
         if (length == 0) {
             return false;
         }
+
+        // Keep receiver state in a known default configuration.
+        I2C1->CR1 |= I2C_CR1_ACK;
+        I2C1->CR1 &= ~I2C_CR1_POS;
 
         // START
         I2C1->CR1 |= I2C_CR1_START;
@@ -190,30 +195,41 @@ struct I2CHelper {
             }
         }
 
-        // Clear ADDR
-        (void)I2C1->SR1;
-        (void)I2C1->SR2;
-
-        if (length != 0) {
-            // Single byte requires STOP first
-            if (length == 1) {
-                I2C1->CR1 &= ~I2C_CR1_ACK;
-                I2C1->CR1 |= I2C_CR1_STOP;
+        if (length == 1) {
+            I2C1->CR1 &= ~I2C_CR1_ACK;
+            // Clear ADDR before STOP for 1-byte read on STM32F1.
+            (void)I2C1->SR1;
+            (void)I2C1->SR2;
+            I2C1->CR1 |= I2C_CR1_STOP;
+            
+            timeout = kTimeoutMicros;
+            while (!(I2C1->SR1 & I2C_SR1_RXNE)) {
+                if (isTimeout(timeout)) {
+                    return I2CError();
+                }
             }
-            // Read bytes
-            while (length--) {
+            *data = I2C1->DR;
+        } else {
+            // Clear ADDR, then read all bytes while scheduling NACK+STOP
+            // before receiving the final byte.
+            (void)I2C1->SR1;
+            (void)I2C1->SR2;
+
+            while (length > 0) {
                 timeout = kTimeoutMicros;
                 while (!(I2C1->SR1 & I2C_SR1_RXNE)) {
                     if (isTimeout(timeout)) {
                         return I2CError();
                     }
                 }
+
+                if (length == 2) {
+                    I2C1->CR1 &= ~I2C_CR1_ACK;
+                    I2C1->CR1 |= I2C_CR1_STOP;
+                }
+
                 *data++ = I2C1->DR;
-            }
-            // Clear ACK after sending the last byte, if not cleared before
-            if (I2C1->CR1 & I2C_CR1_ACK) {
-                I2C1->CR1 &= ~I2C_CR1_ACK;
-                I2C1->CR1 |= I2C_CR1_STOP;
+                --length;
             }
         }
 

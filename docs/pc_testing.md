@@ -20,6 +20,7 @@
 - Motor LEDs working, floating seems to cause minor glow
 - 4 ADC channels working current, voltage, 2x temp.
 - DAC outputs working DRV8701 vref and INA381 comparator vref
+- AT24C02CM5 EEPROM is working
 
 ### Rev 1.1
 

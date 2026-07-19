@@ -345,6 +345,9 @@ void DiagnosticsScreen::load()
 
     // Firmware label
     firmwareLabel = lv_label_create(container);
+    char buf[64];
+    snprintf(buf, sizeof(buf) - 1, "Firmware %u.%u.%u PCB Rev %u.%u",  VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, PCB_REV_MAJOR, PCB_REV_MINOR);
+    lv_label_set_text(firmwareLabel, buf);
     lv_obj_set_style_text_color(firmwareLabel, lv_color_white(), LV_PART_MAIN);
     lv_obj_set_style_text_font(firmwareLabel, Screen::kDiagnosticsScreenLabelFont, LV_PART_MAIN);
     lv_obj_set_pos(firmwareLabel, 0, 0);
@@ -383,10 +386,6 @@ void DiagnosticsScreen::load()
     lv_obj_set_width(mosfetTempLabel, TFT_DIM_WIDTH - 20);
     lv_label_set_long_mode(mosfetTempLabel, LV_LABEL_LONG_CLIP);
 
-    char buf[64];
-    snprintf(buf, sizeof(buf) - 1, "Firmware %u.%u.%u PCB Rev %u.%u",  VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, PCB_REV_MAJOR, PCB_REV_MINOR);
-    lv_label_set_text(firmwareLabel, buf);
-
     _refreshVisuals();
 
     lv_scr_load(screen);
@@ -416,10 +415,7 @@ void DiagnosticsScreen::_refreshVisuals()
     snprintf(buf, sizeof(buf) - 1, "Motor %dC (%dC/%dC)", (int32_t)motorTempRaw, (int32_t)motorTemp.min, (int32_t)motorTemp.max);
     lv_label_set_text(motorTempLabel, buf);
 
-    // snprintf(buf, sizeof(buf) - 1, "MOSFETs %dC (%dC/%dC)", (int32_t)mosfetTempRaw, (int32_t)mosfetTemp.min, (int32_t)mosfetTemp.max);
-    pinMode(PB12, INPUT);
-    pinMode(PB14, INPUT);
-    snprintf(buf, sizeof(buf) - 1, "limits %u %u", digitalRead(PB12), digitalRead(PB14));
+    snprintf(buf, sizeof(buf) - 1, "MOSFETs %dC (%dC/%dC)", (int32_t)mosfetTempRaw, (int32_t)mosfetTemp.min, (int32_t)mosfetTemp.max);
     lv_label_set_text(mosfetTempLabel, buf);
 }
 

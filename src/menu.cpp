@@ -200,7 +200,7 @@ void Menu::handleButtonPress()
                     setValue(1);
                     break;
                 case 8:
-                    eeprom.write(eeprom.getData());
+                    eeprom.write();
                     screenFlow.setScreen(new InfoScreen(Screen::Type::EEPROM_SAVED, "Saved"));
                     lv_timer_handler();
                     //TODO change to start screen
@@ -396,7 +396,7 @@ void Menu::handleButtonPress()
             switch(getValue()) {
                 case 0: // Restore
                     eeprom.resetDefaults();
-                    eeprom.write(eeprom.getData());
+                    eeprom.write();
                     apply_eeprom_settings();
                     screenFlow.next(new InfoScreen(Screen::Type::EEPROM_RESTORED, "Restored"));
                     lv_timer_handler();

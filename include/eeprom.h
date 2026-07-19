@@ -37,6 +37,7 @@ struct EEPROM
     struct Data {
         uint32_t magic;
         uint32_t version;
+        uint32_t sequence;
         uint8_t tft_brightness;
         uint8_t led_brightness;
         uint16_t input_current_limit;
@@ -56,6 +57,7 @@ struct EEPROM
         Data() : 
             magic(kMagic), 
             version(kVersion), 
+            sequence(1),
             tft_brightness(UIConstants::kDefaultTFTBrightness), 
             led_brightness(UIConstants::kDefaultLEDBrightness), 
             input_current_limit(kCurrentToUint16(UIConstants::kDefaultInputCurrent)), 
@@ -72,11 +74,15 @@ struct EEPROM
             motor_pwm(UIConstants::kDefaultMotorPWM),
             motor_rpm(UIConstants::kDefaultMotorRPM)
         {}
+
+        void invalidate() {
+            memset(this, 0xcc, sizeof(*this));
+        }
     };
 
     void init();
-    void read(Data &data);
-    void write(const Data &data);
+    void read();
+    void write();
 
     Data &getData()
     {

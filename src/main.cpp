@@ -78,9 +78,8 @@ void setup()
     debug_init();
 
     // Initialize and read EEPROM on I2C1 on PB8/9
-    i2c.initI2C1Remapped();
     eeprom.init();
-    eeprom.read(eeprom.getData());
+    eeprom.read();
 
     // LEDs
     LEDs::init();
