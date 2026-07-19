@@ -1,5 +1,7 @@
 /**
   Author: sascha_lammers@gmx.de
+
+  Pin assignments see stm32_pin_assignment.md for details
 */
 
 #pragma once
@@ -12,18 +14,18 @@
 #else
 #define MT6701_I2C_PIN              PB7             // MT6701 encoder I2C pin
 #endif
-#define MT6701_I2C_SCL_PIN          PB6             // MT6701 encoder I2C SCL pin
-#define MT6701_I2C_SDA_PIN          PB7             // MT6701 encoder I2C SDA pin
+#define MT6701_I2C_SCL_PIN          PB6             // MT6701 encoder I2C SCL pin / A
+#define MT6701_I2C_SDA_PIN          PB7             // MT6701 encoder I2C SDA pin / B
 
 // Rotary encoder pins
-#define ROTARY_ENCODER_PIN_A        PA6
-#define ROTARY_ENCODER_PIN_B        PA7
+#define ROTARY_ENCODER_PIN_A        PA6             // A
+#define ROTARY_ENCODER_PIN_B        PA7             // B
 
 // Button pins
 #if defined(STM32F107xC)
-#define KNOB_BUTTON_PIN             PD8             // knob button pin
-#define BACK_BUTTON_PIN             PD9             // back button pin
-#define START_BUTTON_PIN            PD10            // start button pin
+#define KNOB_BUTTON_PIN             PD8             // BTN_1 knob button pin
+#define BACK_BUTTON_PIN             PD9             // BTN_2 back button pin
+#define START_BUTTON_PIN            PD10            // BTN_3 start button pin
 #else
 #define KNOB_BUTTON_PIN             PD8             // knob button pin
 #define BACK_BUTTON_PIN             PD9             // back button pin
@@ -46,8 +48,18 @@
 
 #define ILLUMINATION_LED_PIN        PB10            // illumination LED pin
 
+// USB
 #define USB_DN_PIN                  PA11            // USB D- pin
 #define USB_DP_PIN                  PA12            // USB D+ pin
+
+// SWD
+#define SWD_SWCLK_PIN               PA14            // SWCLK pin
+#define SWD_SWDIO_PIN               PA13            // SWDIO pin
+#define SWD_SWO_PIN                 PB3             // SWO pin
+
+// debug UART pins requires PCB Rev 1.1
+#define PAD_TX4                     PC10             // UART4 TX pin
+#define PAD_RX4                     PC11             // UART4 RX pin
 
 // TFT pins
 #define TFT_PIN_CLK                 PB13
