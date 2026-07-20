@@ -23,6 +23,7 @@ MT6701Encoder<MT6701_I2C_ENABLE_PIN, false> motorEncoder;
 PidController pid;
 ADC adc;
 Menu menu;
+Helpers::Stats stats;
 
 static void button_isr() {
     #if defined(STM32F107xC)
@@ -152,7 +153,8 @@ void setup()
     menu.loadStartScreen();
 }
 
-void motorOff() {
+void motorOff() 
+{
     PID_WRITE_MOTOR_PWM_OFF();
     __disable_irq();
     if (pid.running) {
@@ -168,7 +170,8 @@ void motorOff() {
     }
 }
 
-void motorOn() {
+void motorOn() 
+{
     __disable_irq();
     if (!pid.running) {
         pid.running = true;
@@ -183,7 +186,8 @@ void motorOn() {
     }
 }
 
-bool toggleMotor() {
+bool toggleMotor() 
+{
     if (pid.running) {
         motorOff();
         return false;
@@ -191,6 +195,44 @@ bool toggleMotor() {
     else {
         motorOn();
         return true;
+    }
+}
+
+static volatile uint32_t isense_sum = 0;
+static volatile uint32_t isense_count = 0;
+static volatile uint16_t isense_peak = 0;
+
+void update_stats()
+{
+    auto v = adc.readAll();
+    stats.minMax.vcc.update(v.vsense);
+    stats.minMax.motorTemp.update(v.motor_ntc);
+    stats.minMax.mosfetTemp.update(v.driver_ntc);
+    if (isense_count > 0) {
+        if (isense_count < 0xffff) { // skip if no data available or count is too high to avoid overflow
+            stats.integral.current.update(isense_sum / isense_count);
+        }
+        stats.minMax.current.update(isense_peak);
+        DEBUG_PRINT(DEBUG_DEBUG, "sum=%lu count=%lu avg=%lu peak=%u", isense_sum, isense_count, isense_sum / isense_count, isense_peak);
+        __disable_irq();
+        isense_peak = 0;
+        isense_sum = 0;
+        isense_count = 0;
+        __enable_irq();
+    }
+}
+
+extern "C" void DMA1_Channel1_IRQHandler()
+{
+    if (DMA1->ISR & DMA_ISR_TCIF1)
+    {
+        DMA1->IFCR = DMA_IFCR_CTCIF1;  // clear transfer complete
+        auto value = adc.getISenseValue();
+        if (value > isense_peak) {
+            isense_peak = value;
+        }
+        isense_sum += value;
+        isense_count++;
     }
 }
 
@@ -207,6 +249,23 @@ void loop()
         menu.handleStartButtonPress();
     }
 
+    if (pid.faults.count) {
+        static uint32_t lastFaultTime = 0;
+        if (millis() - lastFaultTime >= 1000) {
+            lastFaultTime = millis();
+            pid.faults.reset();
+            LEDs::offLED1and2();
+        }
+        else {
+            if (pid.faults.ocpFault) {
+                LEDs::onLED1();
+            }
+            if (pid.faults.snsoutFault) {
+                LEDs::onLED2();
+            }
+        }
+    }
+
     // handle ui updates and rotary encoder
     static uint32_t lastLvHandler = 0;
     if (millis() - lastLvHandler >= 5) {
@@ -221,6 +280,7 @@ void loop()
         switch(screenFlow->getId()) {
             case Screen::Type::DASHBOARD:
             case Screen::Type::DIAGNOSTICS:
+                update_stats();
                 screenFlow->update();
             default:
                 break;
@@ -275,7 +335,7 @@ void loop()
         }
     }
 
-    if (true) { // print faults
+    if (false) { // print faults
         static uint32_t lastTime3 = 0;
         if (millis() - lastTime3 >= 1000) {
             lastTime3 = millis();

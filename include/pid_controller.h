@@ -439,10 +439,19 @@ struct PidController
 public:
     struct FaultStates {
         FaultStates() : count(0), drv8701Fault(false), ocpFault(false), snsoutFault(false) {}
-        uint32_t count;
-        bool drv8701Fault : 1;
-        bool ocpFault : 1;
-        bool snsoutFault : 1;
+        volatile uint32_t count;
+        volatile bool drv8701Fault : 1;
+        volatile bool ocpFault : 1;
+        volatile bool snsoutFault : 1;
+
+        void reset() {
+            __disable_irq();
+            count = 0;
+            drv8701Fault = false;
+            ocpFault = false;
+            snsoutFault = false;
+            __enable_irq();
+        }
     };
 
 public:
@@ -469,7 +478,7 @@ public:
 
     bool running;
     bool reverseDirection;
-    volatile FaultStates faults;
+    FaultStates faults;
 
     #if HAVE_DEBUG_PID_CONTROLLER
         volatile uint32_t lastRpmMeasured;

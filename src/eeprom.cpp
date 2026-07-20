@@ -47,7 +47,7 @@ void EEPROM::read()
     updateTemperatureLimits();
 }
 
-void EEPROM::write()
+bool EEPROM::write()
 {
     // read EEPROM and compare with current data to avoid unnecessary writes
     Data tmp;
@@ -56,7 +56,7 @@ void EEPROM::write()
     if (result) {
         if (tmp == data) {
             DEBUG_PRINT(DEBUG_DEBUG, "EEPROM write skipped, no changes");
-            return;
+            return false;
         }
     }
     else if (!result) {
@@ -76,6 +76,7 @@ void EEPROM::write()
         result = eepromReadBytes(0, reinterpret_cast<uint8_t *>(&tmp), sizeof(tmp));
         DEBUG_PRINT(DEBUG_DEBUG, "verify=%u magic=%08x version=%d sequence=%d", result, tmp.magic, tmp.version, tmp.sequence);
     #endif
+    return result;
 }
 
 void EEPROM::updateTemperatureLimits()

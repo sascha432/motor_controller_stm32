@@ -94,7 +94,7 @@ struct EEPROM
 
     void init();
     void read();
-    void write();
+    bool write();
 
     Data &getData()
     {

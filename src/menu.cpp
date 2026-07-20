@@ -104,10 +104,11 @@ void Menu::restorePreviousMenu()
  */
 void Menu::saveEEPROMChanges()
 {
-    eeprom.write();
-    screenFlow.setScreen(new InfoScreen(Screen::Type::EEPROM_SAVED, "Saved"));
-    lv_timer_handler();
-    abortableDelay(UIConstants::kInfoScreenTimeout);
+    if (eeprom.write()) {
+        screenFlow.setScreen(new InfoScreen(Screen::Type::EEPROM_SAVED, "Saved"));
+        lv_timer_handler();
+        abortableDelay(UIConstants::kInfoScreenTimeout);
+    }
     loadStartScreen();
 }
 

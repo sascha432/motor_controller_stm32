@@ -206,7 +206,7 @@ struct ADC {
 
         // Clear and set ADC clock divider
         RCC->CFGR &= ~RCC_CFGR_ADCPRE;
-        RCC->CFGR |= RCC_CFGR_ADCPRE_DIV6;   // 72MHz / 6 = 12MHz ADC clock
+        RCC->CFGR |= RCC_CFGR_ADCPRE_DIV8;   // 72MHz / 8 = 9MHz ADC clock
 
         // sampling time 239.5 cycles = about 20 microseconds per conversion
 
@@ -232,7 +232,10 @@ struct ADC {
             DMA_CCR_MINC |       // increment memory
             DMA_CCR_PSIZE_0 |    // 16-bit peripheral
             DMA_CCR_MSIZE_0 |    // 16-bit memory
-            DMA_CCR_CIRC;        // repeat forever
+            DMA_CCR_CIRC |       // repeat forever
+            DMA_CCR_TCIE;        // enable transfer complete interrupt
+        
+        NVIC_EnableIRQ(DMA1_Channel1_IRQn); // enable DMA1 channel 1 interrupt
 
         DMA1_Channel1->CCR |= DMA_CCR_EN;
 
@@ -330,20 +333,36 @@ struct ADC {
     }
 
     /**
-     * @brief Get the Motor NTC value
+     * @brief Get the Input Current value in ADC units
+     * 
+     */
+    inline uint16_t getISenseValue() const {
+        return adc_buffer[0];
+    }
+
+    /**
+     * @brief Get the Input Voltage value in ADC units
+     * 
+     */
+    inline uint16_t getVSenseValue() const {
+        return adc_buffer[1];
+    }
+
+    /**
+     * @brief Get the Motor NTC value in ADC units
      * 
      * @return uint16_t 
      */
-    uint16_t getMotorNTCValue() const {
+    inline uint16_t getMotorNTCValue() const {
         return adc_buffer[2];
     }
 
     /**
-     * @brief Get the Mosfet NTC value
+     * @brief Get the Mosfet NTC value in ADC units
      * 
      * @return uint16_t 
      */
-    uint16_t getMosfetNTCValue() const {
+    inline uint16_t getMosfetNTCValue() const {
         return adc_buffer[3];
     }
 

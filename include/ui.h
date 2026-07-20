@@ -14,42 +14,6 @@
 // set to true to keep screen objects in memory when switching screens
 static constexpr bool kUIKeepScreenObjectsInMemory = false;
 
-namespace UI {
-
-template<uint32_t UPDATE_RATE_MILLIS = 30000>
-struct MinMax {
-    uint32_t lastUpdate;
-    int16_t min;
-    int16_t max;
-
-    MinMax()
-    {
-        reset();
-    }
-
-    void reset()
-    {
-        lastUpdate = HAL_GetTick();
-        min = INT16_MAX;
-        max = INT16_MIN;
-    }
-
-    void update(int16_t value) 
-    {
-        if ((HAL_GetTick() - lastUpdate) > UPDATE_RATE_MILLIS) {
-            reset();
-        }
-        if (value < min) {
-            min = value;
-        }
-        if (value > max) {
-            max = value;
-        }
-    }
-};
-
-};
-
 // === Base Screen class ===
 struct Screen
 {
@@ -87,7 +51,7 @@ struct Screen
     static constexpr const lv_font_t *kWelcomeScreenLabelFont = &lv_font_montserrat_18;
 
     // info screen style constants    
-    static constexpr const lv_font_t *kInfoScreenLabelFont = &lv_font_montserrat_18;
+    static constexpr const lv_font_t *kInfoScreenLabelFont = &lv_font_montserrat_24;
 
     // menu screen style constants
     static constexpr lv_coord_t kMenuScreenVisibleItems = 5;
@@ -127,8 +91,11 @@ struct Screen
 
     static constexpr const lv_font_t *kDiagnosticsScreenLabelFont = &lv_font_montserrat_14;
 
+    static constexpr lv_coord_t kDashboardScreenContainerWidth = TFT_DIM_WIDTH - 16;
+    static constexpr lv_coord_t kDashboardScreenContainerHeight = TFT_DIM_HEIGHT - 12;
+    static constexpr lv_coord_t kDashboardScreenColumnWidth = (kDashboardScreenContainerWidth / 2) - 4;
     static constexpr const lv_font_t *kDashboardScreenFont = &lv_font_montserrat_14;
-    static constexpr const lv_font_t *kDashboardScreenCenterFont = &lv_font_montserrat_18;
+    static constexpr const lv_font_t *kDashboardScreenBigFont = &lv_font_montserrat_24;
 
 
     Screen(Type id);
@@ -281,10 +248,6 @@ private:
     lv_obj_t *currentLabel;
     lv_obj_t *motorTempLabel;
     lv_obj_t *mosfetTempLabel;
-    UI::MinMax<5000> vcc;
-    UI::MinMax<5000> current;
-    UI::MinMax<30000> motorTemp;    
-    UI::MinMax<30000> mosfetTemp;
 };
 
 // === Dashboard Screen ===
@@ -321,10 +284,6 @@ protected:
     lv_obj_t *pwmLabel;
     lv_obj_t *pwmBarBackground;
     lv_obj_t *pwmBarFill;
-    UI::MinMax<5000> vcc;
-    UI::MinMax<5000> current;
-    UI::MinMax<30000> motorTemp;    
-    UI::MinMax<30000> mosfetTemp;
 };
 
 // === Start Screen ===
@@ -352,4 +311,3 @@ struct ScreenFlow {
 protected:
     Screen *screen;
 };
-

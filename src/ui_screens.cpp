@@ -400,28 +400,48 @@ void DiagnosticsScreen::load()
 void DiagnosticsScreen::_refreshVisuals()
 {
     char buf[64];
-    auto adcValues = adc.readAll();
+    auto v = adc.readAll();
 
-    uint32_t vccRaw = adcValues.getInputVoltage();
-    uint32_t currentRaw = adcValues.getInputCurrent();
-    int16_t motorTempRaw = adcValues.getMotorTemperature();
-    int16_t mosfetTempRaw = adcValues.getMosfetTemperature();
+    // create vars for the macro CONVERT_TO_FP1 to avoid double function calls
+    uint32_t vccRaw = v.getInputVoltage();
+    uint32_t currentRaw = ADCCurrentConverter::convert(stats.integral.current.get()); //v.getInputCurrent();
+    int32_t motorTempRaw = v.getMotorTemperature();
+    int32_t mosfetTempRaw = v.getMosfetTemperature();
+    uint16_t minCurrent = ADCVoltageConverter::convert(stats.minMax.vcc.getMin());
+    uint32_t maxCurrent = ADCVoltageConverter::convert(stats.minMax.vcc.getMax());
+    uint32_t minVcc = ADCCurrentConverter::convert(stats.minMax.current.getMin());
+    uint32_t maxVcc = ADCCurrentConverter::convert(stats.minMax.current.getMax());
+    int32_t minMotorTemp = stats.minMax.motorTemp.getMin();
+    int32_t maxMotorTemp = stats.minMax.motorTemp.getMax();
+    int32_t minMosfetTemp = stats.minMax.mosfetTemp.getMin();
+    int32_t maxMosfetTemp = stats.minMax.mosfetTemp.getMax();
 
-    vcc.update(vccRaw);
-    current.update(currentRaw);
-    motorTemp.update(motorTempRaw);
-    mosfetTemp.update(mosfetTempRaw);
-
-    snprintf(buf, sizeof(buf) - 1, "VCC %u.%uV (%u.%uV/%u.%uV)", CONVERT_TO_FP1(vccRaw), CONVERT_TO_FP1(vcc.min), CONVERT_TO_FP1(vcc.max));
+    snprintf(buf, sizeof(buf) - 1, "VCC %u.%uV (%u.%uV/%u.%uV)", 
+        CONVERT_TO_FP1(vccRaw), 
+        CONVERT_TO_FP1(minCurrent), 
+        CONVERT_TO_FP1(maxCurrent)
+    );
     lv_label_set_text(vccLabel, buf);
 
-    snprintf(buf, sizeof(buf) - 1, "Current %u.%02uA (%u.%02uA/%u.%02uA)", CONVERT_TO_FP2(currentRaw), CONVERT_TO_FP2(current.min), CONVERT_TO_FP2(current.max));
+    snprintf(buf, sizeof(buf) - 1, "Current %u.%02uA (%u.%02uA/%u.%02uA)", 
+        CONVERT_TO_FP2(currentRaw), 
+        CONVERT_TO_FP2(minCurrent), 
+        CONVERT_TO_FP2(maxCurrent)
+    );
     lv_label_set_text(currentLabel, buf);
 
-    snprintf(buf, sizeof(buf) - 1, "Motor %dC (%dC/%dC)", (int32_t)motorTempRaw, (int32_t)motorTemp.min, (int32_t)motorTemp.max);
+    snprintf(buf, sizeof(buf) - 1, "Motor %dC (%dC/%dC)",
+        motorTempRaw,
+        minMotorTemp,
+        maxMotorTemp
+    );
     lv_label_set_text(motorTempLabel, buf);
 
-    snprintf(buf, sizeof(buf) - 1, "MOSFETs %dC (%dC/%dC)", (int32_t)mosfetTempRaw, (int32_t)mosfetTemp.min, (int32_t)mosfetTemp.max);
+    snprintf(buf, sizeof(buf) - 1, "MOSFETs %dC (%dC/%dC)",
+        mosfetTempRaw,
+        minMosfetTemp,
+        maxMosfetTemp
+    );
     lv_label_set_text(mosfetTempLabel, buf);
 }
 
@@ -434,53 +454,50 @@ void DashboardScreen::load()
     lv_obj_t *container = lv_obj_create(screen);
     lv_obj_remove_style_all(container);
     lv_obj_set_pos(container, 8, 6);
-    lv_obj_set_size(container, TFT_DIM_WIDTH - 16, TFT_DIM_HEIGHT - 12);
+    lv_obj_set_size(container, kDashboardScreenContainerWidth, kDashboardScreenContainerHeight);
     lv_obj_set_style_bg_opa(container, LV_OPA_TRANSP, LV_PART_MAIN);
     lv_obj_set_style_border_width(container, 0, LV_PART_MAIN);
     lv_obj_set_style_pad_all(container, 0, LV_PART_MAIN);
 
-    const lv_coord_t containerWidth = lv_obj_get_width(container);
-    const lv_coord_t columnWidth = (containerWidth / 2) - 4;
-
     voltageLabel = lv_label_create(container);
     lv_obj_set_style_text_color(voltageLabel, lv_color_white(), LV_PART_MAIN);
     lv_obj_set_style_text_font(voltageLabel, Screen::kDashboardScreenFont, LV_PART_MAIN);
-    lv_obj_set_width(voltageLabel, columnWidth);
+    lv_obj_set_width(voltageLabel, kDashboardScreenColumnWidth);
     lv_obj_set_style_text_align(voltageLabel, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
     lv_obj_set_pos(voltageLabel, 0, 0);
 
     currentLabel = lv_label_create(container);
     lv_obj_set_style_text_color(currentLabel, lv_color_white(), LV_PART_MAIN);
     lv_obj_set_style_text_font(currentLabel, Screen::kDashboardScreenFont, LV_PART_MAIN);
-    lv_obj_set_width(currentLabel, columnWidth);
+    lv_obj_set_width(currentLabel, kDashboardScreenColumnWidth);
     lv_obj_set_style_text_align(currentLabel, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
     lv_obj_set_pos(currentLabel, 0, 18);
 
     motorTempLabel = lv_label_create(container);
     lv_obj_set_style_text_color(motorTempLabel, lv_color_white(), LV_PART_MAIN);
     lv_obj_set_style_text_font(motorTempLabel, Screen::kDashboardScreenFont, LV_PART_MAIN);
-    lv_obj_set_width(motorTempLabel, columnWidth);
+    lv_obj_set_width(motorTempLabel, kDashboardScreenColumnWidth);
     lv_obj_set_style_text_align(motorTempLabel, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
-    lv_obj_set_pos(motorTempLabel, containerWidth - columnWidth, 0);
+    lv_obj_set_pos(motorTempLabel, kDashboardScreenContainerWidth - kDashboardScreenColumnWidth, 0);
 
     mosfetTempLabel = lv_label_create(container);
     lv_obj_set_style_text_color(mosfetTempLabel, lv_color_white(), LV_PART_MAIN);
     lv_obj_set_style_text_font(mosfetTempLabel, Screen::kDashboardScreenFont, LV_PART_MAIN);
-    lv_obj_set_width(mosfetTempLabel, columnWidth);
+    lv_obj_set_width(mosfetTempLabel, kDashboardScreenColumnWidth);
     lv_obj_set_style_text_align(mosfetTempLabel, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
-    lv_obj_set_pos(mosfetTempLabel, containerWidth - columnWidth, 18);
+    lv_obj_set_pos(mosfetTempLabel, kDashboardScreenContainerWidth - kDashboardScreenColumnWidth, 18);
 
     rpmLabel = lv_label_create(container);
     lv_obj_set_style_text_color(rpmLabel, lv_color_white(), LV_PART_MAIN);
-    lv_obj_set_style_text_font(rpmLabel, Screen::kDashboardScreenCenterFont, LV_PART_MAIN);
-    lv_obj_set_width(rpmLabel, containerWidth);
+    lv_obj_set_style_text_font(rpmLabel, Screen::kDashboardScreenBigFont, LV_PART_MAIN);
+    lv_obj_set_width(rpmLabel, kDashboardScreenContainerWidth);
     lv_obj_set_style_text_align(rpmLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     lv_obj_set_pos(rpmLabel, 0, (TFT_DIM_HEIGHT / 2) - 22);
 
     pwmBarBackground = lv_obj_create(container);
     lv_obj_remove_style_all(pwmBarBackground);
-    lv_obj_set_size(pwmBarBackground, containerWidth, 16);
-    lv_obj_set_pos(pwmBarBackground, 0, lv_obj_get_height(container) - 24);
+    lv_obj_set_size(pwmBarBackground, kDashboardScreenContainerWidth, 16);
+    lv_obj_set_pos(pwmBarBackground, 0, kDashboardScreenContainerHeight - 24);
     lv_obj_set_style_bg_color(pwmBarBackground, lv_palette_darken(LV_PALETTE_GREY, 2), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(pwmBarBackground, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_radius(pwmBarBackground, 4, LV_PART_MAIN);
@@ -490,7 +507,7 @@ void DashboardScreen::load()
 
     pwmBarFill = lv_obj_create(pwmBarBackground);
     lv_obj_remove_style_all(pwmBarFill);
-    lv_obj_set_size(pwmBarFill, 0, lv_obj_get_height(pwmBarBackground));
+    lv_obj_set_size(pwmBarFill, 0, 16);
     lv_obj_set_pos(pwmBarFill, 0, 0);
     lv_obj_set_style_bg_color(pwmBarFill, lv_color_white(), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(pwmBarFill, LV_OPA_COVER, LV_PART_MAIN);
@@ -500,7 +517,7 @@ void DashboardScreen::load()
     pwmLabel = lv_label_create(container);
     lv_obj_set_style_text_color(pwmLabel, lv_color_white(), LV_PART_MAIN);
     lv_obj_set_style_text_font(pwmLabel, Screen::kDashboardScreenFont, LV_PART_MAIN);
-    lv_obj_set_width(pwmLabel, containerWidth);
+    lv_obj_set_width(pwmLabel, kDashboardScreenContainerWidth);
     lv_obj_set_style_text_align(pwmLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     lv_obj_align_to(pwmLabel, pwmBarBackground, LV_ALIGN_OUT_TOP_MID, 0, -4);
 
@@ -513,25 +530,22 @@ void DashboardScreen::_refreshVisuals()
 {
     char buf[32];
     auto v = adc.readAll();
+    // create vars for the macro CONVERT_TO_FP1 to avoid double function calls
     uint32_t vccRaw = v.getInputVoltage();
-    uint32_t currentRaw = v.getInputCurrent();
-    int16_t motorTempRaw = v.getMotorTemperature();
-    int16_t mosfetTempRaw = v.getMosfetTemperature();
+    uint32_t currentRaw = ADCCurrentConverter::convert(stats.integral.current.get());
+    int32_t motorTempRaw = v.getMotorTemperature();
+    int32_t mosfetTempRaw = v.getMosfetTemperature();
+    uint32_t maxVoltage = ADCVoltageConverter::convert(stats.minMax.vcc.getMax());
+    uint32_t maxCurrent = ADCCurrentConverter::convert(stats.minMax.current.getMax());
 
-    vcc.update(vccRaw);
-    current.update(currentRaw);
-    motorTemp.update(motorTempRaw);
-    mosfetTemp.update(mosfetTempRaw);
-
-    const uint8_t pwmPercent = pid.lastPwmLevel * 100 / pid.kMaxPWMLevel;
-
-    snprintf(buf, sizeof(buf) - 1, "%u.%uV", CONVERT_TO_FP1(vccRaw));
+    uint32_t pwmPercent = pid.lastPwmLevel * 100 / pid.kMaxPWMLevel;
+    snprintf(buf, sizeof(buf) - 1, "%u.%uV (%u.%uV)", CONVERT_TO_FP1(vccRaw), CONVERT_TO_FP1(maxVoltage));
     lv_label_set_text(voltageLabel, buf);
 
-    snprintf(buf, sizeof(buf) - 1, "%u.%uA", CONVERT_TO_FP1(currentRaw));
+    snprintf(buf, sizeof(buf) - 1, "%u.%uA (%u.%uA)", CONVERT_TO_FP1(currentRaw), CONVERT_TO_FP1(maxCurrent));
     lv_label_set_text(currentLabel, buf);
 
-    snprintf(buf, sizeof(buf) - 1, "%d" "\xC2\xB0", motorTempRaw);
+    snprintf(buf, sizeof(buf) - 1, "%d" "\xC2\xB0" "C", motorTempRaw);
     lv_label_set_text(motorTempLabel, buf);
 
     snprintf(buf, sizeof(buf) - 1, "%d" "\xC2\xB0" "C", mosfetTempRaw);
@@ -540,9 +554,8 @@ void DashboardScreen::_refreshVisuals()
     snprintf(buf, sizeof(buf) - 1, "%u RPM", pid.lastRpmMeasured);
     lv_label_set_text(rpmLabel, buf);
 
-    lv_label_set_text_fmt(pwmLabel, "PWM %u%%", static_cast<unsigned>(pwmPercent));
+    lv_label_set_text_fmt(pwmLabel, "PWM %u%%", pwmPercent);
 
-    const lv_coord_t barWidth = lv_obj_get_width(pwmBarBackground);
-    const lv_coord_t fillWidth = static_cast<lv_coord_t>((static_cast<uint32_t>(barWidth) * pwmPercent) / 100U);
-    lv_obj_set_size(pwmBarFill, fillWidth, lv_obj_get_height(pwmBarBackground));
+    const lv_coord_t fillWidth = static_cast<lv_coord_t>((kDashboardScreenContainerWidth * pwmPercent) / 100U);
+    lv_obj_set_size(pwmBarFill, fillWidth, 16);
 }
