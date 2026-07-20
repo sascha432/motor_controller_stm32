@@ -8,6 +8,7 @@
 #include "ui.h"
 #include "adc.h"
 #include "pid_controller.h"
+#include "stats.h"
 
 // === Base Screen ===
 
@@ -400,47 +401,32 @@ void DiagnosticsScreen::load()
 void DiagnosticsScreen::_refreshVisuals()
 {
     char buf[64];
-    auto v = adc.readAll();
-
-    // create vars for the macro CONVERT_TO_FP1 to avoid double function calls
-    uint32_t vccRaw = v.getInputVoltage();
-    uint32_t currentRaw = ADCCurrentConverter::convert(stats.integral.current.get()); //v.getInputCurrent();
-    int32_t motorTempRaw = v.getMotorTemperature();
-    int32_t mosfetTempRaw = v.getMosfetTemperature();
-    uint16_t minCurrent = ADCVoltageConverter::convert(stats.minMax.vcc.getMin());
-    uint32_t maxCurrent = ADCVoltageConverter::convert(stats.minMax.vcc.getMax());
-    uint32_t minVcc = ADCCurrentConverter::convert(stats.minMax.current.getMin());
-    uint32_t maxVcc = ADCCurrentConverter::convert(stats.minMax.current.getMax());
-    int32_t minMotorTemp = stats.minMax.motorTemp.getMin();
-    int32_t maxMotorTemp = stats.minMax.motorTemp.getMax();
-    int32_t minMosfetTemp = stats.minMax.mosfetTemp.getMin();
-    int32_t maxMosfetTemp = stats.minMax.mosfetTemp.getMax();
 
     snprintf(buf, sizeof(buf) - 1, "VCC %u.%uV (%u.%uV/%u.%uV)", 
-        CONVERT_TO_FP1(vccRaw), 
-        CONVERT_TO_FP1(minCurrent), 
-        CONVERT_TO_FP1(maxCurrent)
+        CONVERT_TO_FP1(stats.vcc), 
+        CONVERT_TO_FP1(stats.min.vcc), 
+        CONVERT_TO_FP1(stats.max.vcc)
     );
     lv_label_set_text(vccLabel, buf);
 
     snprintf(buf, sizeof(buf) - 1, "Current %u.%02uA (%u.%02uA/%u.%02uA)", 
-        CONVERT_TO_FP2(currentRaw), 
-        CONVERT_TO_FP2(minCurrent), 
-        CONVERT_TO_FP2(maxCurrent)
+        CONVERT_TO_FP2(stats.current), 
+        CONVERT_TO_FP2(stats.min.current), 
+        CONVERT_TO_FP2(stats.max.current)
     );
     lv_label_set_text(currentLabel, buf);
 
     snprintf(buf, sizeof(buf) - 1, "Motor %dC (%dC/%dC)",
-        motorTempRaw,
-        minMotorTemp,
-        maxMotorTemp
+        stats.motorTemp,
+        stats.min.motorTemp,
+        stats.max.motorTemp
     );
     lv_label_set_text(motorTempLabel, buf);
 
     snprintf(buf, sizeof(buf) - 1, "MOSFETs %dC (%dC/%dC)",
-        mosfetTempRaw,
-        minMosfetTemp,
-        maxMosfetTemp
+        stats.mosfetTemp,
+        stats.min.mosfetTemp,
+        stats.max.mosfetTemp
     );
     lv_label_set_text(mosfetTempLabel, buf);
 }
@@ -529,29 +515,21 @@ void DashboardScreen::load()
 void DashboardScreen::_refreshVisuals()
 {
     char buf[32];
-    auto v = adc.readAll();
-    // create vars for the macro CONVERT_TO_FP1 to avoid double function calls
-    uint32_t vccRaw = v.getInputVoltage();
-    uint32_t currentRaw = ADCCurrentConverter::convert(stats.integral.current.get());
-    int32_t motorTempRaw = v.getMotorTemperature();
-    int32_t mosfetTempRaw = v.getMosfetTemperature();
-    uint32_t maxVoltage = ADCVoltageConverter::convert(stats.minMax.vcc.getMax());
-    uint32_t maxCurrent = ADCCurrentConverter::convert(stats.minMax.current.getMax());
 
     uint32_t pwmPercent = pid.lastPwmLevel * 100 / pid.kMaxPWMLevel;
-    snprintf(buf, sizeof(buf) - 1, "%u.%uV (%u.%uV)", CONVERT_TO_FP1(vccRaw), CONVERT_TO_FP1(maxVoltage));
+    snprintf(buf, sizeof(buf) - 1, "%u.%uV (%u.%uV)", CONVERT_TO_FP1(stats.vcc), CONVERT_TO_FP1(stats.max.vcc));
     lv_label_set_text(voltageLabel, buf);
 
-    snprintf(buf, sizeof(buf) - 1, "%u.%uA (%u.%uA)", CONVERT_TO_FP1(currentRaw), CONVERT_TO_FP1(maxCurrent));
+    snprintf(buf, sizeof(buf) - 1, "%u.%uA (%u.%uA)", CONVERT_TO_FP1(stats.current), CONVERT_TO_FP1(stats.max.current));
     lv_label_set_text(currentLabel, buf);
 
-    snprintf(buf, sizeof(buf) - 1, "%d" "\xC2\xB0" "C", motorTempRaw);
+    snprintf(buf, sizeof(buf) - 1, "%d" "\xC2\xB0" "C", stats.motorTemp);
     lv_label_set_text(motorTempLabel, buf);
 
-    snprintf(buf, sizeof(buf) - 1, "%d" "\xC2\xB0" "C", mosfetTempRaw);
+    snprintf(buf, sizeof(buf) - 1, "%d" "\xC2\xB0" "C", stats.mosfetTemp);
     lv_label_set_text(mosfetTempLabel, buf);
 
-    snprintf(buf, sizeof(buf) - 1, "%u RPM", pid.lastRpmMeasured);
+    snprintf(buf, sizeof(buf) - 1, "%u RPM", pid.clampPWMLevel(pid.lastRpmMeasured));
     // snprintf(buf, sizeof(buf) - 1, "c=%u f=%u ocp=%u sns=%u", pid.faults.count, pid.faults.drv8701Fault, pid.faults.ocpFault, pid.faults.snsoutFault);
     lv_label_set_text(rpmLabel, buf);
 

@@ -15,7 +15,7 @@
 #define EEPROM_WAIT_RETRIES     1000u       // number of retries for waiting for write cycle to complete
 #define EEPROM_VALIDATE_WRITE   0
 
-extern I2CHelper i2c;
+I2CHelper i2c;
 
 bool eepromWriteByte(uint8_t memAddress, uint8_t data);
 int16_t eepromReadByte(uint8_t memAddress);
@@ -81,8 +81,8 @@ bool EEPROM::write()
 
 void EEPROM::updateTemperatureLimits()
 {
-    mosfet_temperature_limit_adc = ADCTemperatureConverter::reverse(data.mosfet_temperature_limit);
-    motor_temperature_limit_adc = ADCTemperatureConverter::reverse(data.motor_temperature_limit);
+    mosfet_temperature_limit_adc = ADCConverter::NTC::reverse(data.mosfet_temperature_limit);
+    motor_temperature_limit_adc = ADCConverter::NTC::reverse(data.motor_temperature_limit);
 }
 
 

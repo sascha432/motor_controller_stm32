@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include "ui_constants.h"
 #include "adc.h"
+#include "i2c.h"
 
 struct EEPROM 
 {
@@ -215,7 +216,7 @@ struct EEPROM
     void setMosfetTemperatureLimit(uint8_t value) 
     {
         data.mosfet_temperature_limit = value;
-        mosfet_temperature_limit_adc = ADCTemperatureConverter::reverse(value);
+        mosfet_temperature_limit_adc = ADCConverter::NTC::reverse(value);
     }
 
     uint16_t getMosfetTemperatureLimitADC() const
@@ -231,7 +232,7 @@ struct EEPROM
     void setMotorTemperatureLimit(uint8_t value) 
     {
         data.motor_temperature_limit = value;
-        motor_temperature_limit_adc = ADCTemperatureConverter::reverse(value);
+        motor_temperature_limit_adc = ADCConverter::NTC::reverse(value);
     }
 
     uint16_t getMotorTemperatureLimitADC() const
@@ -294,3 +295,5 @@ protected:
     uint16_t mosfet_temperature_limit_adc;
     uint16_t motor_temperature_limit_adc;
 };
+
+extern I2CHelper i2c;

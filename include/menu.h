@@ -37,3 +37,5 @@ protected:
     int32_t steps;
     EEPROM &eeprom;
 };
+
+extern Menu menu;

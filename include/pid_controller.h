@@ -6,6 +6,7 @@
 
 #include <HardwareTimer.h>
 #include "helpers.h"
+#include "pins.h"
 #include "eeprom.h"
 
 struct PidController

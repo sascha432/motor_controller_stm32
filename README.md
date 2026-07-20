@@ -5,12 +5,13 @@ learn how the stm32 works...
 
 ## Features
 
-- Rotary encoder, 3 push buttons, and 125x240 TFT display
-- DRV8701 motor driver (12-36V, 80A)
-- PID motor controller
-- Overcurrent protection
-- MT6701 magnetic encoder with up to 1024 PPR support
-- LED constant current driver
+- 12-36V, 20A continuous, 40A peak
+- Adjustable cycle by cycle motor current limit (0.5-40A)
+- Adjustable max. current with signal LED (0.5-40A)
+- 1.14" 135x240 TFT display, rotary encoder and 3 buttons for easy navigation
+- Support for magnetic encoder MT6701 in A/B mode up to 1024PPR (55000 RPM)
+- Dimmable LED with CC driver 3-26V/350mA/5W
+- Current, voltage and temperature monitoring
 
 ## Controller schematics and PCB
 

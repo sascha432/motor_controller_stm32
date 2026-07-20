@@ -12,18 +12,14 @@
 #include "ui.h"
 #include "menu.h"
 #include "eeprom.h"
+#include "stats.h"
 
-I2CHelper i2c;
 Button<KNOB_BUTTON_PIN, false> knobButton;
 Button<START_BUTTON_PIN, false> startButton;
 Button<BACK_BUTTON_PIN, false> backButton;
 
 RotaryEncoder<ROTARY_ENCODER_PIN_A, ROTARY_ENCODER_PIN_B> knob;
 MT6701Encoder<MT6701_I2C_ENABLE_PIN, false> motorEncoder;
-PidController pid;
-ADC adc;
-Menu menu;
-Helpers::Stats stats;
 
 static void button_isr() {
     #if defined(STM32F107xC)
@@ -200,44 +196,6 @@ bool toggleMotor()
     }
 }
 
-static volatile uint32_t isense_sum = 0;
-static volatile uint32_t isense_count = 0;
-static volatile uint16_t isense_peak = 0;
-
-void update_stats()
-{
-    auto v = adc.readAll();
-    stats.minMax.vcc.update(v.vsense);
-    stats.minMax.motorTemp.update(v.motor_ntc);
-    stats.minMax.mosfetTemp.update(v.driver_ntc);
-    if (isense_count > 0) { // skip if no data available
-        if (isense_count < 0xffff) { // skip if count is too high to avoid overflow
-            stats.integral.current.update(isense_sum / isense_count);
-        }
-        stats.minMax.current.update(isense_peak);
-        // DEBUG_PRINT(DEBUG_DEBUG, "sum=%lu count=%lu avg=%lu peak=%u", isense_sum, isense_count, isense_sum / isense_count, isense_peak);
-        isense_peak = 0;
-        __disable_irq();
-        isense_sum = 0;
-        isense_count = 0;
-        __enable_irq();
-    }
-}
-
-extern "C" void DMA1_Channel1_IRQHandler()
-{
-    if (DMA1->ISR & DMA_ISR_TCIF1)
-    {
-        DMA1->IFCR = DMA_IFCR_CTCIF1;  // clear transfer complete
-        auto value = adc.getISenseValue();
-        if (value > isense_peak) {
-            isense_peak = value;
-        }
-        isense_sum += value;
-        isense_count++;
-    }
-}
-
 void loop()
 {
     // handle buttons
@@ -290,7 +248,7 @@ void loop()
                 // }
                 // fallthrough
             case Screen::Type::DIAGNOSTICS:
-                update_stats();
+                stats.update();
                 screenFlow->update();
                 break;
             default:
@@ -338,7 +296,7 @@ void loop()
         lastLvHandler = millis();
     }
 
-    if (false) { // ADC debugoutput and blink motor LEDs
+    if (false) { // ADC debugoutput
         static uint32_t lastTime = 0;
         if (millis() - lastTime >= 100) {
             lastTime = millis();
@@ -375,15 +333,14 @@ void loop()
                 auto tmpLastPwmLevel = pid.lastPwmLevel;
                 pid.lastDebugNewData = false;
                 static uint32_t debugStep = 0;
-                auto v = adc.readAll();
                 DEBUG_PRINT(DEBUG_DEBUG, "%lu,%d,%d,%u,%u,%u.%u,%u.%u", 
                     debugStep++, 
                     tmpLastRpmMeasured, 
                     pid.clampPWMLevel(tmpLastPwmLevel), 
-                    v.getInputVoltage(),
-                    v.getInputCurrent(),
-                    CONVERT_TO_FP1(v.getMotorTemperature()),
-                    CONVERT_TO_FP1(v.getMosfetTemperature())
+                    stats.vcc,
+                    stats.current,
+                    CONVERT_TO_FP1(stats.motorTemp),
+                    CONVERT_TO_FP1(stats.mosfetTemp)
                 );
                 // D,debugStep,lastRpmMeasured,lastPwmLevel,lastCurrent(mA)
                 // Serial.print("D,");

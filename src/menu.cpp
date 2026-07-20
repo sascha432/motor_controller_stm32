@@ -17,9 +17,7 @@ void apply_eeprom_settings();
 bool is_any_button_down();
 
 ScreenFlow screenFlow;
-extern PidController pid;
-
-#define sizeof_array(arr) (sizeof(arr) / sizeof(arr[0]))
+Menu menu;
 
 static const char *kMainMenuItems[] = {
     "Speed",                    // 0
