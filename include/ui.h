@@ -14,6 +14,42 @@
 // set to true to keep screen objects in memory when switching screens
 static constexpr bool kUIKeepScreenObjectsInMemory = false;
 
+namespace UI {
+
+template<uint32_t UPDATE_RATE_MILLIS = 30000>
+struct MinMax {
+    uint32_t lastUpdate;
+    int16_t min;
+    int16_t max;
+
+    MinMax()
+    {
+        reset();
+    }
+
+    void reset()
+    {
+        lastUpdate = HAL_GetTick();
+        min = INT16_MAX;
+        max = INT16_MIN;
+    }
+
+    void update(int16_t value) 
+    {
+        if ((HAL_GetTick() - lastUpdate) > UPDATE_RATE_MILLIS) {
+            reset();
+        }
+        if (value < min) {
+            min = value;
+        }
+        if (value > max) {
+            max = value;
+        }
+    }
+};
+
+};
+
 // === Base Screen class ===
 struct Screen
 {
@@ -43,7 +79,8 @@ struct Screen
         RESTORE_DEFAULTS_CONFIRMATION,
         EEPROM_RESTORED,
         MOTOR_SPEED,
-        DIAGNOSTICS
+        DIAGNOSTICS,
+        DASHBOARD
     };
 
     // welcome screen style constants
@@ -90,6 +127,10 @@ struct Screen
 
     static constexpr const lv_font_t *kDiagnosticsScreenLabelFont = &lv_font_montserrat_14;
 
+    static constexpr const lv_font_t *kDashboardScreenFont = &lv_font_montserrat_14;
+    static constexpr const lv_font_t *kDashboardScreenCenterFont = &lv_font_montserrat_18;
+
+
     Screen(Type id);
     virtual ~Screen();
 
@@ -98,6 +139,7 @@ struct Screen
     virtual uint32_t getValue() const;
 
     virtual void load();
+    virtual void update();
 
     void _style_screen(lv_obj_t *screen);
     void _fatal_error(const char *msg);
@@ -230,38 +272,6 @@ struct DiagnosticsScreen :  public Screen
         _refreshVisuals();
     }
 
-    template<uint32_t UPDATE_RATE_MILLIS = 30000>
-    struct MinMax {
-        uint32_t lastUpdate;
-        int16_t min;
-        int16_t max;
-
-        MinMax()
-        {
-            reset();
-        }
-
-        void reset()
-        {
-            lastUpdate = HAL_GetTick();
-            min = INT16_MAX;
-            max = INT16_MIN;
-        }
-
-        void update(int16_t value) 
-        {
-            if ((HAL_GetTick() - lastUpdate) > UPDATE_RATE_MILLIS) {
-                reset();
-            }
-            if (value < min) {
-                min = value;
-            }
-            if (value > max) {
-                max = value;
-            }
-        }
-    };
-
 protected:
     void _refreshVisuals();
 
@@ -271,10 +281,57 @@ private:
     lv_obj_t *currentLabel;
     lv_obj_t *motorTempLabel;
     lv_obj_t *mosfetTempLabel;
-    MinMax<5000> vcc;
-    MinMax<5000> current;
-    MinMax<30000> motorTemp;    
-    MinMax<30000> mosfetTemp;
+    UI::MinMax<5000> vcc;
+    UI::MinMax<5000> current;
+    UI::MinMax<30000> motorTemp;    
+    UI::MinMax<30000> mosfetTemp;
+};
+
+// === Dashboard Screen ===
+
+struct DashboardScreen : public Screen
+{
+    DashboardScreen(Type id = Screen::Type::DASHBOARD) :
+        Screen(id),
+        voltageLabel(nullptr),
+        currentLabel(nullptr),
+        motorTempLabel(nullptr),
+        mosfetTempLabel(nullptr),
+        rpmLabel(nullptr),
+        pwmLabel(nullptr),
+        pwmBarBackground(nullptr),
+        pwmBarFill(nullptr)
+    {}
+
+    void update() {
+        _refreshVisuals();
+    }
+
+    virtual void load() override;
+
+protected:
+    void _refreshVisuals();
+
+protected:
+    lv_obj_t *voltageLabel;
+    lv_obj_t *currentLabel;
+    lv_obj_t *motorTempLabel;
+    lv_obj_t *mosfetTempLabel;
+    lv_obj_t *rpmLabel;
+    lv_obj_t *pwmLabel;
+    lv_obj_t *pwmBarBackground;
+    lv_obj_t *pwmBarFill;
+    UI::MinMax<5000> vcc;
+    UI::MinMax<5000> current;
+    UI::MinMax<30000> motorTemp;    
+    UI::MinMax<30000> mosfetTemp;
+};
+
+// === Start Screen ===
+
+struct StartScreen : public InfoScreen
+{
+    StartScreen() : InfoScreen(Screen::Type::START, "Start") {}
 };
 
 // === Screen Flow Manager ===

@@ -13,6 +13,7 @@
 
 void clear_user_inputs();
 void apply_eeprom_settings();
+bool is_any_button_down();
 
 ScreenFlow screenFlow;
 
@@ -299,7 +300,7 @@ void Menu::handleButtonPress()
                         "MOSFET Temperature Limit", 
                         UIConstants::kMinMosfetTemperature,
                         UIConstants::kMaxMosfetTemperature,
-                        "°C"
+                        "\xC2\xB0" "C"
                     ));
                     setValue(eeprom.getMosfetTemperatureLimit());
                     break;
@@ -309,7 +310,7 @@ void Menu::handleButtonPress()
                         "Motor Temperature Limit", 
                         UIConstants::kMinMotorTemperature,
                         UIConstants::kMaxMotorTemperature,
-                        "°C"
+                        "\xC2\xB0" "C"
                     ));
                     setValue(eeprom.getMotorTemperatureLimit());
                     break;
@@ -433,6 +434,7 @@ void Menu::handleBackButtonPress()
     switch(screenFlow->getId()) {
         case Screen::Type::START:
         case Screen::Type::WELCOME:
+        case Screen::Type::DASHBOARD:
             // no back button available
             break;
         case Screen::Type::MAIN_MENU:
@@ -445,6 +447,8 @@ void Menu::handleBackButtonPress()
     DEBUG_PRINT(DEBUG_DEBUG, "leave screen=%p id=%d value=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), getValue());
 }
 
+bool toggleMotor();//TODO remove
+
 /**
  * @brief Handle start button press
  */
@@ -453,8 +457,13 @@ void Menu::handleStartButtonPress()
     DEBUG_PRINT(DEBUG_DEBUG, "enter screen=%p id=%d value=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), getValue());
     switch(screenFlow->getId()) {
         case Screen::Type::START:
-            void toggleMotor();
-            toggleMotor();
+        case Screen::Type::DASHBOARD:
+            if (toggleMotor()) {
+                loadDashboardScreen();
+            }
+            else {
+                loadStartScreen();
+            }
             break;
         default:
             break;
@@ -519,10 +528,26 @@ void Menu::loadMainMenu()
     clear_user_inputs();
 }
 
+/**
+ * @brief Start motor screen with some info
+ * 
+ */
 void Menu::loadStartScreen()
 {
-    //TODO dummy
-    screenFlow.setScreen(new InfoScreen(Screen::Type::START, "Start"));
+    screenFlow.setScreen(new StartScreen());
+    setSteps(0);
+    setValue(0);
+    clear_user_inputs();
+}
+
+/**
+ * @brief Show motor dashboard screen with speed and other info while running
+ * 
+ */
+void Menu::loadDashboardScreen()
+{
+    // screenFlow.setScreen(new InfoScreen(Screen::Type::DASHBOARD, "TEST"));
+    screenFlow.setScreen(new DashboardScreen());
     setSteps(0);
     setValue(0);
     clear_user_inputs();
@@ -607,11 +632,7 @@ void Menu::abortableDelay(uint32_t ms)
 {
     uint32_t start = millis();
     while (millis() - start < ms) {
-        // TODO implement abort on button press
-        if (false) {
-            // ignore user inputs for a short time to avoid accidental button presses
-            // TODO check if that works
-            delay(100);
+        if (is_any_button_down()) {
             clear_user_inputs();
             break;
         }

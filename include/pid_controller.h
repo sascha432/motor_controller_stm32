@@ -477,3 +477,5 @@ public:
         volatile bool lastDebugNewData = false;
     #endif
 };
+
+extern PidController pid;

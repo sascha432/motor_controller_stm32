@@ -13,10 +13,6 @@
 #include "menu.h"
 #include "eeprom.h"
 
-static char cType = 'r';
-static uint32_t debugStep = -1;
-static uint32_t lastCurrent = 0;
-
 I2CHelper i2c;
 Button<KNOB_BUTTON_PIN, false> knobButton;
 Button<START_BUTTON_PIN, false> startButton;
@@ -61,8 +57,21 @@ static void pid_fault_isr()
     pid.fault_isr();
 }
 
+bool is_any_button_down()
+{
+    return knobButton.isDown() || backButton.isDown() || startButton.isDown();
+}
+
 void clear_user_inputs() 
 {
+    // wait until all buttons are released
+    while(is_any_button_down()) {
+    }
+
+    // some extra time
+    delay(10);
+
+    // clear states
     knobButton.clear();
     backButton.clear();
     startButton.clear();
@@ -151,7 +160,6 @@ void motorOff() {
         __enable_irq();
         Serial.println("STOP");
         DEBUG_PRINT(DEBUG_DEBUG, "STOP");
-        debugStep = -1;
     }
     else {
         __enable_irq();
@@ -168,7 +176,6 @@ void motorOn() {
         pid.reset();
         Serial.println("START");
         DEBUG_PRINT(DEBUG_DEBUG, "START: rpm=%d", pid.getRPM());
-        debugStep = 0;
     } else {
         __enable_irq();
         Serial.println("ERR=RUNNING");
@@ -176,12 +183,14 @@ void motorOn() {
     }
 }
 
-void toggleMotor() {
+bool toggleMotor() {
     if (pid.running) {
         motorOff();
+        return false;
     }
     else {
         motorOn();
+        return true;
     }
 }
 
@@ -201,17 +210,22 @@ void loop()
     // handle ui updates and rotary encoder
     static uint32_t lastLvHandler = 0;
     if (millis() - lastLvHandler >= 5) {
+        // handle rotary encoder
         int32_t delta = knob.getDeltaPosition();
         if (delta) {
             int32_t newPosition = menu.updateRotaryValue(menu.getValue() + delta);
             DEBUG_PRINT(DEBUG_DEBUG, "knob=%d", newPosition);
         }
-        lv_timer_handler();
-
+        // handle LVGL updates
         auto &screenFlow = menu.getScreenFlow();
-        if (screenFlow->getId() == Screen::Type::DIAGNOSTICS) {
-            reinterpret_cast<DiagnosticsScreen *>(screenFlow.getScreen())->update();
+        switch(screenFlow->getId()) {
+            case Screen::Type::DASHBOARD:
+            case Screen::Type::DIAGNOSTICS:
+                screenFlow->update();
+            default:
+                break;
         }
+        lv_timer_handler();
 
         // check NTC sensors
         static bool triggered = false;
@@ -284,33 +298,32 @@ void loop()
 
     if (false) {
         static uint32_t lastTime5 = 0;
-        if (millis() - lastTime5 >= 250) {
+        if (pid.running && millis() - lastTime5 >= 250) {
             if (pid.lastDebugNewData) {
                 auto tmpLastRpmMeasured = pid.lastRpmMeasured;
                 auto tmpLastPwmLevel = pid.lastPwmLevel;
                 pid.lastDebugNewData = false;
-                if (debugStep != -1) {
-                    auto v = adc.readAll();
-                    DEBUG_PRINT(DEBUG_DEBUG, "%lu,%d,%d,%u,%u,%u.%u,%u.%u", 
-                        debugStep++, 
-                        tmpLastRpmMeasured, 
-                        pid.clampPWMLevel(tmpLastPwmLevel), 
-                        v.getInputVoltage(),
-                        v.getInputCurrent(),
-                        CONVERT_TO_FP1(v.getMotorTemperature()),
-                        CONVERT_TO_FP1(v.getMosfetTemperature())
-                    );
-                    // D,debugStep,lastRpmMeasured,lastPwmLevel,lastCurrent(mA)
-                    // Serial.print("D,");
-                    // Serial.print(debugStep++);
-                    // Serial.print(',');
-                    // Serial.print(tmpLastRpmMeasured);
-                    // Serial.print(',');
-                    // Serial.print(pid.clampPWMLevel(tmpLastPwmLevel));
-                    // Serial.print(',');
-                    // Serial.print((uint32_t)((adc.readAll().isense / 4095.0f) * 3300.0f));
-                    Serial.println();
-                }
+                static uint32_t debugStep = 0;
+                auto v = adc.readAll();
+                DEBUG_PRINT(DEBUG_DEBUG, "%lu,%d,%d,%u,%u,%u.%u,%u.%u", 
+                    debugStep++, 
+                    tmpLastRpmMeasured, 
+                    pid.clampPWMLevel(tmpLastPwmLevel), 
+                    v.getInputVoltage(),
+                    v.getInputCurrent(),
+                    CONVERT_TO_FP1(v.getMotorTemperature()),
+                    CONVERT_TO_FP1(v.getMosfetTemperature())
+                );
+                // D,debugStep,lastRpmMeasured,lastPwmLevel,lastCurrent(mA)
+                // Serial.print("D,");
+                // Serial.print(debugStep++);
+                // Serial.print(',');
+                // Serial.print(tmpLastRpmMeasured);
+                // Serial.print(',');
+                // Serial.print(pid.clampPWMLevel(tmpLastPwmLevel));
+                // Serial.print(',');
+                // Serial.print((uint32_t)((adc.readAll().isense / 4095.0f) * 3300.0f));
+                // Serial.println();
                 lastTime5 = millis();
             }
 

@@ -546,4 +546,3 @@ void DashboardScreen::_refreshVisuals()
     const lv_coord_t fillWidth = static_cast<lv_coord_t>((static_cast<uint32_t>(barWidth) * pwmPercent) / 100U);
     lv_obj_set_size(pwmBarFill, fillWidth, lv_obj_get_height(pwmBarBackground));
 }
-

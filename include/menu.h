@@ -26,6 +26,7 @@ struct Menu
     void showWelcomeScreen();
     void loadMainMenu();
     void loadStartScreen();
+    void loadDashboardScreen();
     void restorePreviousMenu();
     void saveEEPROMChanges();
 

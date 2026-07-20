@@ -21,7 +21,7 @@
 // get dimensions from lvgl conf
 #define TFT_DIM_WIDTH               LV_HOR_RES_MAX
 #define TFT_DIM_HEIGHT              LV_VER_RES_MAX
-#define TFT_BUFFER_SIZE             (TFT_DIM_WIDTH * 100) // at least 10, increase if RAM is available
+#define TFT_BUFFER_SIZE             (TFT_DIM_WIDTH * 64) // at least 10, increase if RAM is available
 
 #define TFT_DMA_CH                  DMA1_Channel5
 #define TFT_DMA_TX_CHUNK_PIXELS     64
