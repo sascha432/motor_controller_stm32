@@ -10,12 +10,14 @@
 #include "ui.h"
 #include "eeprom.h"
 #include "leds.h"
+#include "pid_controller.h"
 
 void clear_user_inputs();
 void apply_eeprom_settings();
 bool is_any_button_down();
 
 ScreenFlow screenFlow;
+extern PidController pid;
 
 #define sizeof_array(arr) (sizeof(arr) / sizeof(arr[0]))
 
@@ -550,7 +552,7 @@ void Menu::loadDashboardScreen()
     // screenFlow.setScreen(new InfoScreen(Screen::Type::DASHBOARD, "TEST"));
     screenFlow.setScreen(new DashboardScreen());
     setSteps(0);
-    setValue(0);
+    setValue(eeprom.getMotorRPM());
     clear_user_inputs();
 }
 
@@ -584,7 +586,7 @@ int32_t Menu::updateRotaryValue(int32_t value)
             eeprom.setMotorCurrentLimit(getValue());
             adc.setMotorCurrentLimit(eeprom.getMotorCurrentLimit());
             break;
-    }
+    }   
     return getValue();
 }
 

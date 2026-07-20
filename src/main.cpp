@@ -177,9 +177,11 @@ void motorOn()
         pid.running = true;
         __enable_irq();
         pid.reset();
+        pid.setRPM(eeprom.getSpeed());
         Serial.println("START");
         DEBUG_PRINT(DEBUG_DEBUG, "START: rpm=%d", pid.getRPM());
-    } else {
+    } 
+    else {
         __enable_irq();
         Serial.println("ERR=RUNNING");
         DEBUG_PRINT(DEBUG_ERROR, "MOTOR RUNNING");
@@ -208,14 +210,14 @@ void update_stats()
     stats.minMax.vcc.update(v.vsense);
     stats.minMax.motorTemp.update(v.motor_ntc);
     stats.minMax.mosfetTemp.update(v.driver_ntc);
-    if (isense_count > 0) {
-        if (isense_count < 0xffff) { // skip if no data available or count is too high to avoid overflow
+    if (isense_count > 0) { // skip if no data available
+        if (isense_count < 0xffff) { // skip if count is too high to avoid overflow
             stats.integral.current.update(isense_sum / isense_count);
         }
         stats.minMax.current.update(isense_peak);
-        DEBUG_PRINT(DEBUG_DEBUG, "sum=%lu count=%lu avg=%lu peak=%u", isense_sum, isense_count, isense_sum / isense_count, isense_peak);
-        __disable_irq();
+        // DEBUG_PRINT(DEBUG_DEBUG, "sum=%lu count=%lu avg=%lu peak=%u", isense_sum, isense_count, isense_sum / isense_count, isense_peak);
         isense_peak = 0;
+        __disable_irq();
         isense_sum = 0;
         isense_count = 0;
         __enable_irq();
@@ -251,7 +253,7 @@ void loop()
 
     if (pid.faults.count) {
         static uint32_t lastFaultTime = 0;
-        if (millis() - lastFaultTime >= 1000) {
+        if (millis() - lastFaultTime >= 500) {
             lastFaultTime = millis();
             pid.faults.reset();
             LEDs::offLED1and2();
@@ -270,18 +272,27 @@ void loop()
     static uint32_t lastLvHandler = 0;
     if (millis() - lastLvHandler >= 5) {
         // handle rotary encoder
+        int32_t newPosition;
         int32_t delta = knob.getDeltaPosition();
         if (delta) {
-            int32_t newPosition = menu.updateRotaryValue(menu.getValue() + delta);
+            newPosition = menu.updateRotaryValue(menu.getValue() + delta);
             DEBUG_PRINT(DEBUG_DEBUG, "knob=%d", newPosition);
         }
         // handle LVGL updates
         auto &screenFlow = menu.getScreenFlow();
         switch(screenFlow->getId()) {
             case Screen::Type::DASHBOARD:
+                // TODO
+                // if (delta) {
+                //     eeprom.setMotorRPM(newPosition);
+                //     pid.setRPM(eeprom.getMotorRPM());
+                //     DEBUG_PRINT(DEBUG_DEBUG, "DASHBOARD: rpm=%d", (int)eeprom.getMotorRPM());
+                // }
+                // fallthrough
             case Screen::Type::DIAGNOSTICS:
                 update_stats();
                 screenFlow->update();
+                break;
             default:
                 break;
         }

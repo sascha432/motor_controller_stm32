@@ -552,6 +552,7 @@ void DashboardScreen::_refreshVisuals()
     lv_label_set_text(mosfetTempLabel, buf);
 
     snprintf(buf, sizeof(buf) - 1, "%u RPM", pid.lastRpmMeasured);
+    // snprintf(buf, sizeof(buf) - 1, "c=%u f=%u ocp=%u sns=%u", pid.faults.count, pid.faults.drv8701Fault, pid.faults.ocpFault, pid.faults.snsoutFault);
     lv_label_set_text(rpmLabel, buf);
 
     lv_label_set_text_fmt(pwmLabel, "PWM %u%%", pwmPercent);

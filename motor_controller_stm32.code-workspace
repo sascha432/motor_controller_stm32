@@ -132,7 +132,8 @@
 			"mosfet",
 			"RCC_CFGR_ADCPRE",
 			"SMPR1",
-			"SMPR2"
+			"SMPR2",
+			"snsout"
 		]
 	}
 }

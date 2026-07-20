@@ -23,6 +23,7 @@
 - DRV8701 fault after turning PWM on.. fixed swapped GL1 GH1 pins
 - motor is running with PWM
 - PID controller is regulating
+- DRV8701 current limit and INA OCP working
 
 ### Rev 1.1
 
