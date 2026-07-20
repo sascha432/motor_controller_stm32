@@ -4,9 +4,10 @@
   UI implementation using LVGL library
 */
 
+#include <Arduino.h>
 #include "ui.h"
 #include "adc.h"
-#include <Arduino.h>
+#include "pid_controller.h"
 
 // === Base Screen ===
 
@@ -42,6 +43,11 @@ void Screen::load()
         screen = lv_obj_create(nullptr);
     }
     _style_screen(screen);
+}
+
+void Screen::update()
+{
+    DEBUG_PRINT(DEBUG_DEBUG, "screen=%p", screen);
 }
 
 Screen::Type Screen::getId() const 
@@ -419,70 +425,125 @@ void DiagnosticsScreen::_refreshVisuals()
     lv_label_set_text(mosfetTempLabel, buf);
 }
 
-// === Screen Flow Manager ===
+// === Dashboard Screen ===
 
-ScreenFlow::ScreenFlow() : screen(nullptr)
+void DashboardScreen::load()
 {
+    Screen::load();
+
+    lv_obj_t *container = lv_obj_create(screen);
+    lv_obj_remove_style_all(container);
+    lv_obj_set_pos(container, 8, 6);
+    lv_obj_set_size(container, TFT_DIM_WIDTH - 16, TFT_DIM_HEIGHT - 12);
+    lv_obj_set_style_bg_opa(container, LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_style_border_width(container, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(container, 0, LV_PART_MAIN);
+
+    const lv_coord_t containerWidth = lv_obj_get_width(container);
+    const lv_coord_t columnWidth = (containerWidth / 2) - 4;
+
+    voltageLabel = lv_label_create(container);
+    lv_obj_set_style_text_color(voltageLabel, lv_color_white(), LV_PART_MAIN);
+    lv_obj_set_style_text_font(voltageLabel, Screen::kDashboardScreenFont, LV_PART_MAIN);
+    lv_obj_set_width(voltageLabel, columnWidth);
+    lv_obj_set_style_text_align(voltageLabel, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
+    lv_obj_set_pos(voltageLabel, 0, 0);
+
+    currentLabel = lv_label_create(container);
+    lv_obj_set_style_text_color(currentLabel, lv_color_white(), LV_PART_MAIN);
+    lv_obj_set_style_text_font(currentLabel, Screen::kDashboardScreenFont, LV_PART_MAIN);
+    lv_obj_set_width(currentLabel, columnWidth);
+    lv_obj_set_style_text_align(currentLabel, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
+    lv_obj_set_pos(currentLabel, 0, 18);
+
+    motorTempLabel = lv_label_create(container);
+    lv_obj_set_style_text_color(motorTempLabel, lv_color_white(), LV_PART_MAIN);
+    lv_obj_set_style_text_font(motorTempLabel, Screen::kDashboardScreenFont, LV_PART_MAIN);
+    lv_obj_set_width(motorTempLabel, columnWidth);
+    lv_obj_set_style_text_align(motorTempLabel, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
+    lv_obj_set_pos(motorTempLabel, containerWidth - columnWidth, 0);
+
+    mosfetTempLabel = lv_label_create(container);
+    lv_obj_set_style_text_color(mosfetTempLabel, lv_color_white(), LV_PART_MAIN);
+    lv_obj_set_style_text_font(mosfetTempLabel, Screen::kDashboardScreenFont, LV_PART_MAIN);
+    lv_obj_set_width(mosfetTempLabel, columnWidth);
+    lv_obj_set_style_text_align(mosfetTempLabel, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
+    lv_obj_set_pos(mosfetTempLabel, containerWidth - columnWidth, 18);
+
+    rpmLabel = lv_label_create(container);
+    lv_obj_set_style_text_color(rpmLabel, lv_color_white(), LV_PART_MAIN);
+    lv_obj_set_style_text_font(rpmLabel, Screen::kDashboardScreenCenterFont, LV_PART_MAIN);
+    lv_obj_set_width(rpmLabel, containerWidth);
+    lv_obj_set_style_text_align(rpmLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+    lv_obj_set_pos(rpmLabel, 0, (TFT_DIM_HEIGHT / 2) - 22);
+
+    pwmBarBackground = lv_obj_create(container);
+    lv_obj_remove_style_all(pwmBarBackground);
+    lv_obj_set_size(pwmBarBackground, containerWidth, 16);
+    lv_obj_set_pos(pwmBarBackground, 0, lv_obj_get_height(container) - 24);
+    lv_obj_set_style_bg_color(pwmBarBackground, lv_palette_darken(LV_PALETTE_GREY, 2), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(pwmBarBackground, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_radius(pwmBarBackground, 4, LV_PART_MAIN);
+    lv_obj_set_style_border_width(pwmBarBackground, 1, LV_PART_MAIN);
+    lv_obj_set_style_border_color(pwmBarBackground, lv_color_white(), LV_PART_MAIN);
+    lv_obj_set_style_pad_all(pwmBarBackground, 0, LV_PART_MAIN);
+
+    pwmBarFill = lv_obj_create(pwmBarBackground);
+    lv_obj_remove_style_all(pwmBarFill);
+    lv_obj_set_size(pwmBarFill, 0, lv_obj_get_height(pwmBarBackground));
+    lv_obj_set_pos(pwmBarFill, 0, 0);
+    lv_obj_set_style_bg_color(pwmBarFill, lv_color_white(), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(pwmBarFill, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_radius(pwmBarFill, 4, LV_PART_MAIN);
+    lv_obj_set_style_border_width(pwmBarFill, 0, LV_PART_MAIN);
+
+    pwmLabel = lv_label_create(container);
+    lv_obj_set_style_text_color(pwmLabel, lv_color_white(), LV_PART_MAIN);
+    lv_obj_set_style_text_font(pwmLabel, Screen::kDashboardScreenFont, LV_PART_MAIN);
+    lv_obj_set_width(pwmLabel, containerWidth);
+    lv_obj_set_style_text_align(pwmLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+    lv_obj_align_to(pwmLabel, pwmBarBackground, LV_ALIGN_OUT_TOP_MID, 0, -4);
+
+    _refreshVisuals();
+
+    lv_scr_load(screen);
 }
 
-void ScreenFlow::init()
+void DashboardScreen::_refreshVisuals()
 {
-    Screen::emptyScreen = lv_obj_create(nullptr);
-    lv_scr_load(Screen::emptyScreen);
+    char buf[32];
+    auto v = adc.readAll();
+    uint32_t vccRaw = v.getInputVoltage();
+    uint32_t currentRaw = v.getInputCurrent();
+    int16_t motorTempRaw = v.getMotorTemperature();
+    int16_t mosfetTempRaw = v.getMosfetTemperature();
+
+    vcc.update(vccRaw);
+    current.update(currentRaw);
+    motorTemp.update(motorTempRaw);
+    mosfetTemp.update(mosfetTempRaw);
+
+    const uint8_t pwmPercent = pid.lastPwmLevel * 100 / pid.kMaxPWMLevel;
+
+    snprintf(buf, sizeof(buf) - 1, "%u.%uV", CONVERT_TO_FP1(vccRaw));
+    lv_label_set_text(voltageLabel, buf);
+
+    snprintf(buf, sizeof(buf) - 1, "%u.%uA", CONVERT_TO_FP1(currentRaw));
+    lv_label_set_text(currentLabel, buf);
+
+    snprintf(buf, sizeof(buf) - 1, "%d" "\xC2\xB0", motorTempRaw);
+    lv_label_set_text(motorTempLabel, buf);
+
+    snprintf(buf, sizeof(buf) - 1, "%d" "\xC2\xB0" "C", mosfetTempRaw);
+    lv_label_set_text(mosfetTempLabel, buf);
+
+    snprintf(buf, sizeof(buf) - 1, "%u RPM", pid.lastRpmMeasured);
+    lv_label_set_text(rpmLabel, buf);
+
+    lv_label_set_text_fmt(pwmLabel, "PWM %u%%", static_cast<unsigned>(pwmPercent));
+
+    const lv_coord_t barWidth = lv_obj_get_width(pwmBarBackground);
+    const lv_coord_t fillWidth = static_cast<lv_coord_t>((static_cast<uint32_t>(barWidth) * pwmPercent) / 100U);
+    lv_obj_set_size(pwmBarFill, fillWidth, lv_obj_get_height(pwmBarBackground));
 }
 
-void ScreenFlow::destroy()
-{
-    DEBUG_PRINT(DEBUG_DEBUG, "screen=%p", screen);
-    if (screen) {
-        lv_scr_load(Screen::emptyScreen);
-        delete screen;
-    }
-    screen = nullptr;
-}
-
-void ScreenFlow::setScreen(Screen *newScreen)
-{
-    DEBUG_PRINT(DEBUG_DEBUG, "new=%p old=%p", newScreen, screen);
-    destroy();
-    screen = newScreen;
-    screen->load();
-}
-
-void ScreenFlow::back()
-{
-    DEBUG_PRINT(DEBUG_DEBUG, "prev=%p current=%p", screen->prevScreen, screen);
-    if (screen->prevScreen) {
-        lv_scr_load(Screen::emptyScreen);
-        auto tmp = screen->prevScreen;
-        delete screen;
-        screen = tmp;
-        if (kUIKeepScreenObjectsInMemory) {
-            lv_scr_load(screen->screen);
-        }
-        else {
-            screen->load();
-        }
-    }
-}
-
-void ScreenFlow::next(Screen *nextScreen)
-{
-    DEBUG_PRINT(DEBUG_DEBUG, "next=%p current=%p", nextScreen, screen);
-    nextScreen->prevScreen = screen;
-    if (kUIKeepScreenObjectsInMemory == false && nextScreen->prevScreen) {
-        lv_obj_clean(nextScreen->prevScreen->screen);
-    }
-    screen = nextScreen;
-    screen->load();
-}
-
-Screen *ScreenFlow::operator->() const 
-{
-    return screen;
-}
-
-Screen *ScreenFlow::getScreen() const
-{
-    return screen;
-}
