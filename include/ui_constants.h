@@ -54,7 +54,7 @@ struct UIConstants
 
     // ui menu timeouts
     static constexpr uint32_t kWelcomeScreenTimeout = 3000;             // WelcomeScreen timeout in milliseconds
-    static constexpr uint32_t kInfoScreenTimeout = 2000;                // Default InfoScreen timeout in milliseconds
+    static constexpr uint32_t kInfoScreenTimeout = 5000;                // Default InfoScreen timeout in milliseconds
 
     static constexpr bool kEnableIlluminationLEDFading = true;          // Enable fading of the illumination LED on the welcome screen
 };

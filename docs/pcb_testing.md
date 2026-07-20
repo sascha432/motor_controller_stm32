@@ -20,8 +20,7 @@
 - 4 ADC channels working current, voltage, 2x temp.
 - DAC outputs working DRV8701 vref and INA381 comparator vref
 - AT24C02CM5 EEPROM is working
-- DRV8701 GL1 GH1 swapped TODO replace low side fets and swap GL1/GH1
-- TODO DRV8701 fault after turning PWM on
+- DRV8701 fault after turning PWM on.. fixed swapped GL1 GH1 pins
 
 ### Rev 1.1
 

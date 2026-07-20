@@ -250,12 +250,14 @@ struct PidController
         return TIM4->CNT;
     }
 
-    void reset() {
+    void reset()
+    {
         lastCounter = readEncoderCounter();
         lastError = 0;
         lastDerivative = 0;
         integral = 0;
         avgRPM = 0;
+        readFaults();
     }
 
     void setIntegral(int32_t value) {

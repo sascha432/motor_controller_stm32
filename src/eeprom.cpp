@@ -37,7 +37,7 @@ void EEPROM::read()
     Data tmp;
     tmp.invalidate();
     bool result = eepromReadBytes(0, reinterpret_cast<uint8_t *>(&tmp), sizeof(tmp));
-    DEBUG_PRINT(DEBUG_DEBUG, "read=%u magic=%08x version=%d sequence=%d", result, tmp.magic, tmp.version, tmp.sequence);
+    DEBUG_PRINT(DEBUG_WARNING, "read=%u magic=%08x version=%d sequence=%d", result, tmp.magic, tmp.version, tmp.sequence);
 
     if (!result || tmp.magic != kMagic || tmp.version != kVersion) {
         resetDefaults();
@@ -49,15 +49,29 @@ void EEPROM::read()
 
 void EEPROM::write()
 {
+    // read EEPROM and compare with current data to avoid unnecessary writes
+    Data tmp;
+    tmp.invalidate();
+    bool result = eepromReadBytes(0, reinterpret_cast<uint8_t *>(&tmp), sizeof(tmp));
+    if (result) {
+        if (tmp == data) {
+            DEBUG_PRINT(DEBUG_DEBUG, "EEPROM write skipped, no changes");
+            return;
+        }
+    }
+    else if (!result) {
+        DEBUG_PRINT(DEBUG_WARNING, "EEPROM read failed");
+    }
+
+    // write data to EEPROM
     data.sequence++;
-    bool result = eepromWriteBytes(0, reinterpret_cast<uint8_t *>(&data), sizeof(data));
+    result = eepromWriteBytes(0, reinterpret_cast<uint8_t *>(&data), sizeof(data));
     if (!result) {
         data.sequence--;
     }
-    DEBUG_PRINT(DEBUG_DEBUG, "write=%u magic=%08x version=%d sequence=%d", result, data.magic, data.version, data.sequence);
+    DEBUG_PRINT(DEBUG_ERROR, "write=%u magic=%08x version=%d sequence=%d", result, data.magic, data.version, data.sequence);
 
     #if EEPROM_VALIDATE_WRITE
-        Data tmp;
         tmp.invalidate();
         result = eepromReadBytes(0, reinterpret_cast<uint8_t *>(&tmp), sizeof(tmp));
         DEBUG_PRINT(DEBUG_DEBUG, "verify=%u magic=%08x version=%d sequence=%d", result, tmp.magic, tmp.version, tmp.sequence);

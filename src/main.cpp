@@ -14,7 +14,6 @@
 #include "eeprom.h"
 
 static char cType = 'r';
-static int debugSpeed = 500;
 static uint32_t debugStep = -1;
 static uint32_t lastCurrent = 0;
 
@@ -141,7 +140,7 @@ void setup()
     menu.showWelcomeScreen();
     // Apply settings after welcome screen since it turns the backlight on
     apply_eeprom_settings(); 
-    menu.loadMainMenu();
+    menu.loadStartScreen();
 }
 
 void motorOff() {
@@ -151,11 +150,13 @@ void motorOff() {
         pid.running = false;
         __enable_irq();
         Serial.println("STOP");
+        DEBUG_PRINT(DEBUG_DEBUG, "STOP");
         debugStep = -1;
     }
     else {
         __enable_irq();
         Serial.println("ERR=NOT_RUNNING");
+        DEBUG_PRINT(DEBUG_ERROR, "MOTOR NOT RUNNING");
     }
 }
 
@@ -166,10 +167,12 @@ void motorOn() {
         __enable_irq();
         pid.reset();
         Serial.println("START");
+        DEBUG_PRINT(DEBUG_DEBUG, "START: rpm=%d", pid.getRPM());
         debugStep = 0;
     } else {
         __enable_irq();
         Serial.println("ERR=RUNNING");
+        DEBUG_PRINT(DEBUG_ERROR, "MOTOR RUNNING");
     }
 }
 
@@ -192,23 +195,7 @@ void loop()
         menu.handleBackButtonPress();
     }
     if (startButton.isPressed()) {
-        // menu.handleStartButtonPress();
-        static uint32_t count=0;
-        count++;
-        switch (count % 4) {
-            case 0:
-                PID_WRITE_MOTOR_PWM_ON(900, 0);
-                break;
-            case 1:
-                PID_WRITE_MOTOR_PWM_ON(1800, 1);
-                break;
-            case 2:
-                PID_WRITE_MOTOR_PWM_BREAK(2700);
-                break;
-            case 3:
-                PID_WRITE_MOTOR_PWM_OFF();
-                break;
-        }
+        menu.handleStartButtonPress();
     }
 
     // handle ui updates and rotary encoder
@@ -266,8 +253,7 @@ void loop()
         lastLvHandler = millis();
     }
 
-    // ADC debugoutput and blink motor LEDs
-    if (false) {
+    if (false) { // ADC debugoutput and blink motor LEDs
         static uint32_t lastTime = 0;
         if (millis() - lastTime >= 100) {
             lastTime = millis();
@@ -275,20 +261,58 @@ void loop()
         }
     }
 
-    if (false) {
-        static uint32_t lastTime2 = 0;
-        if (millis() - lastTime2 >= 250) {
-            lastTime2 = millis();
-            auto x = adc.readAll();
-            DEBUG_PRINT(DEBUG_DEBUG, "Current=%d mA ADC=%u", (int)x.getInputCurrent(), x.isense);
+    if (true) { // print faults
+        static uint32_t lastTime3 = 0;
+        if (millis() - lastTime3 >= 1000) {
+            lastTime3 = millis();
+            static uint32_t lastCounter = 0;
+            if (pid.faults.count != lastCounter) {
+                lastCounter = pid.faults.count;
+                pid.debugPrintFaults();
+            }
+        }
+    }
+
+    if (true) { // print RPM and encoder count
+        static uint32_t lastTime6 = 0;
+        if (millis() - lastTime6 >= 100) {
+            DEBUG_PRINT(DEBUG_DEBUG, "RPM=%d ENCODER=%u", pid.lastRpmMeasured, TIM4->CNT);
+            lastTime6 = millis();
         }
     }
 
     if (true) {
-        static uint32_t lastTime3 = 0;
-        if (millis() - lastTime3 >= 1000) {
-            lastTime3 = millis();
-            pid.debugPrintFaults();
+        static uint32_t lastTime5 = 0;
+        if (millis() - lastTime5 >= 250) {
+            if (pid.lastDebugNewData) {
+                auto tmpLastRpmMeasured = pid.lastRpmMeasured;
+                auto tmpLastPwmLevel = pid.lastPwmLevel;
+                pid.lastDebugNewData = false;
+                if (debugStep != -1) {
+                    auto v = adc.readAll();
+                    DEBUG_PRINT(DEBUG_DEBUG, "%lu,%d,%d,%u,%u,%u.%u,%u.%u", 
+                        debugStep++, 
+                        tmpLastRpmMeasured, 
+                        pid.clampPWMLevel(tmpLastPwmLevel), 
+                        v.getInputVoltage(),
+                        v.getInputCurrent(),
+                        CONVERT_TO_FP1(v.getMotorTemperature()),
+                        CONVERT_TO_FP1(v.getMosfetTemperature())
+                    );
+                    // D,debugStep,lastRpmMeasured,lastPwmLevel,lastCurrent(mA)
+                    // Serial.print("D,");
+                    // Serial.print(debugStep++);
+                    // Serial.print(',');
+                    // Serial.print(tmpLastRpmMeasured);
+                    // Serial.print(',');
+                    // Serial.print(pid.clampPWMLevel(tmpLastPwmLevel));
+                    // Serial.print(',');
+                    // Serial.print((uint32_t)((adc.readAll().isense / 4095.0f) * 3300.0f));
+                    Serial.println();
+                }
+                lastTime5 = millis();
+            }
+
         }
     }
 }

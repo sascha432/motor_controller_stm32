@@ -98,6 +98,19 @@ void Menu::restorePreviousMenu()
 }
 
 /**
+ * @brief Save changes to EEPROM and return to start screen
+ * 
+ */
+void Menu::saveEEPROMChanges()
+{
+    eeprom.write();
+    screenFlow.setScreen(new InfoScreen(Screen::Type::EEPROM_SAVED, "Saved"));
+    lv_timer_handler();
+    abortableDelay(UIConstants::kInfoScreenTimeout);
+    loadStartScreen();
+}
+
+/**
  * @brief Handle main button press based on the current screen and selected item
  * 
  */
@@ -200,12 +213,7 @@ void Menu::handleButtonPress()
                     setValue(1);
                     break;
                 case 8:
-                    eeprom.write();
-                    screenFlow.setScreen(new InfoScreen(Screen::Type::EEPROM_SAVED, "Saved"));
-                    lv_timer_handler();
-                    //TODO change to start screen
-                    delay(UIConstants::kInfoScreenTimeout);
-                    loadMainMenu();
+                    saveEEPROMChanges();
                     break;
             }
             break;
@@ -400,7 +408,7 @@ void Menu::handleButtonPress()
                     apply_eeprom_settings();
                     screenFlow.next(new InfoScreen(Screen::Type::EEPROM_RESTORED, "Restored"));
                     lv_timer_handler();
-                    delay(UIConstants::kInfoScreenTimeout);
+                    abortableDelay(UIConstants::kInfoScreenTimeout);
                     loadMainMenu();
                     break;
                 default: // Cancel
@@ -424,9 +432,11 @@ void Menu::handleBackButtonPress()
     DEBUG_PRINT(DEBUG_DEBUG, "enter screen=%p id=%d value=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), getValue());
     switch(screenFlow->getId()) {
         case Screen::Type::START:
-        case Screen::Type::MAIN_MENU:
         case Screen::Type::WELCOME:
             // no back button available
+            break;
+        case Screen::Type::MAIN_MENU:
+            saveEEPROMChanges();
             break;
         default:
             restorePreviousMenu();
@@ -442,6 +452,10 @@ void Menu::handleStartButtonPress()
 {
     DEBUG_PRINT(DEBUG_DEBUG, "enter screen=%p id=%d value=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), getValue());
     switch(screenFlow->getId()) {
+        case Screen::Type::START:
+            void toggleMotor();
+            toggleMotor();
+            break;
         default:
             break;
     }
@@ -587,4 +601,19 @@ void Menu::setSteps(int32_t steps)
 ScreenFlow &Menu::getScreenFlow()
 {
     return screenFlow;
+}
+
+void Menu::abortableDelay(uint32_t ms)
+{
+    uint32_t start = millis();
+    while (millis() - start < ms) {
+        // TODO implement abort on button press
+        if (false) {
+            // ignore user inputs for a short time to avoid accidental button presses
+            // TODO check if that works
+            delay(100);
+            clear_user_inputs();
+            break;
+        }
+    }
 }

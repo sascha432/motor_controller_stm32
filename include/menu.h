@@ -27,8 +27,10 @@ struct Menu
     void loadMainMenu();
     void loadStartScreen();
     void restorePreviousMenu();
+    void saveEEPROMChanges();
 
     ScreenFlow &getScreenFlow();
+    void abortableDelay(uint32_t ms);
 
 protected:
     int32_t steps;

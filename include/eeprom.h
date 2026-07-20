@@ -75,8 +75,20 @@ struct EEPROM
             motor_rpm(UIConstants::kDefaultMotorRPM)
         {}
 
-        void invalidate() {
-            memset(this, 0xcc, sizeof(*this));
+        bool operator==(const Data &other) const 
+        {
+            return memcmp(
+                &reinterpret_cast<const uint8_t *>(this)[offsetof(Data, tft_brightness)], 
+                &reinterpret_cast<const uint8_t *>(&other)[offsetof(Data, tft_brightness)],
+                sizeof(Data) - offsetof(Data, tft_brightness)
+            ) == 0;
+        }
+
+        void invalidate() 
+        {
+            magic = 0xcccccccc;
+            version = 0xcccccccc;
+            sequence = 0xcccccccc;
         }
     };
 
