@@ -21,6 +21,8 @@
 - DAC outputs working DRV8701 vref and INA381 comparator vref
 - AT24C02CM5 EEPROM is working
 - DRV8701 fault after turning PWM on.. fixed swapped GL1 GH1 pins
+- motor is running with PWM
+- PID controller is regulating
 
 ### Rev 1.1
 

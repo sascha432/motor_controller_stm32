@@ -273,15 +273,16 @@ void loop()
         }
     }
 
-    if (true) { // print RPM and encoder count
+    if (false) { // print RPM and encoder count
         static uint32_t lastTime6 = 0;
         if (millis() - lastTime6 >= 100) {
-            DEBUG_PRINT(DEBUG_DEBUG, "RPM=%d ENCODER=%u", pid.lastRpmMeasured, TIM4->CNT);
+            uint32_t idrB = GPIOB->IDR;
+            DEBUG_PRINT(DEBUG_DEBUG, "RPM=%d ENCODER=%u A=%u B=%u", pid.lastRpmMeasured, TIM4->CNT, (idrB >> 6) & 1U, (idrB >> 7) & 1U);
             lastTime6 = millis();
         }
     }
 
-    if (true) {
+    if (false) {
         static uint32_t lastTime5 = 0;
         if (millis() - lastTime5 >= 250) {
             if (pid.lastDebugNewData) {
