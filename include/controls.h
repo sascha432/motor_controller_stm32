@@ -125,7 +125,7 @@ struct RotaryEncoder {
     }
 
     RotaryEncoder() : 
-        timer(TIM5),
+        timer(TIM6),
         maxAcceleration(1),
         position(0)
     {}

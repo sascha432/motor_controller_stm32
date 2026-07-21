@@ -28,7 +28,7 @@ th:nth-child(4), td:nth-child(4) { width: 46%; }
 | DRV_TEMP | PC5 | ADC | ADC12_IN15 |
 | ISENSE | PA2 | ADC | ADC12_IN2 |
 | VSENSE | PA3 | ADC | ADC12_IN3 |
-| ENC1_ANALOG | PA1 | ADC | ADC12_IN1 |
+| ENC1_ANALOG | PA1 | ADC | ADC12_IN1/TIM5_CH2 |
 
 ### QDEC - rotary encoder ENC2
 

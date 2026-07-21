@@ -36,6 +36,12 @@
 #define OCP_INT_PIN                 PB12            // INA381 ALERT#
 #define DRV_SNSOUT_PIN              PD11            // DRV8701 SNSOUT pin
 
+#define EXT_NTC_PIN                 PC4             // ADC12_IN14
+#define DRV_TEMP_PIN                PC5             // ADC12_IN15
+#define ISENSE_PIN                  PA2             // ADC12_IN2
+#define VSENSE_PIN                  PA3             // ADC12_IN3
+#define ENC1_ANALOG_PIN             PA1             // ADC12_IN1
+
 #define DRVOCP_VREF_DAC_PIN         PA4             // DRV8701 VREF overcurrent protection
 #define OCP_VREF_DAC_PIN            PA5             // INA381 CMPREF overcurrent protection
 

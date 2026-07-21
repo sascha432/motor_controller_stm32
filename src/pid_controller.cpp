@@ -16,6 +16,11 @@ void PidController::reset()
     integral = 0;
     stats.rpm.reset();
     stats.pwm.reset();
+    TIM5->CNT = 0; // RPM counter
+    pulseCounter = 0;
+    loopCounter = 0;
+    errorCode = ErrorCodeType::NONE;
+    faults.reset();
     readFaults();
 }
 
@@ -28,6 +33,14 @@ void PidController::disable()
     detachInterrupt(digitalPinToInterrupt(DRV_SNSOUT_PIN));
 }
 
+// volatile uint32_t rpm_counter = 0;
+
+// static void counter_callback()
+// {
+//     rpm_counter++;
+//     // pid.rpm_isr();
+// }
+
 void PidController::enable(InterruptCallbackType callback)
 {
     TIM4->CR1 |= TIM_CR1_CEN;
@@ -35,6 +48,7 @@ void PidController::enable(InterruptCallbackType callback)
     attachInterrupt(digitalPinToInterrupt(DRV8701_FAULT_PIN), callback, FALLING);
     attachInterrupt(digitalPinToInterrupt(OCP_INT_PIN), callback, FALLING);
     attachInterrupt(digitalPinToInterrupt(DRV_SNSOUT_PIN), callback, FALLING);
+    // attachInterrupt(digitalPinToInterrupt(ENC1_ANALOG_PIN), counter_callback, FALLING);
     timer.resume();
     // update faults
     readFaults();
@@ -79,23 +93,61 @@ void PidController::init(InterruptCallbackType callback, InterruptCallbackType f
     TIM4->ARR = 0xFFFF;
     TIM4->CNT = 0;
 
+    // TIM5 setup for RPM counter
+    // Enable GPIOA and TIM5 clocks
+    RCC->APB2ENR |= RCC_APB2ENR_IOPAEN;
+    RCC->APB1ENR |= RCC_APB1ENR_TIM5EN;
+
+    // PA1 input floating
+    GPIOA->CRL &= ~(GPIO_CRL_MODE1 | GPIO_CRL_CNF1);
+    GPIOA->CRL |= GPIO_CRL_CNF1_0;       // input floating
+
+    // Reset TIM5
+    TIM5->CR1 = 0;
+    TIM5->CR2 = 0;
+    TIM5->SMCR = 0;
+    TIM5->DIER = 0;
+    TIM5->CCMR1 = 0;
+    TIM5->CCER = 0;
+
+    // CH2 as input, mapped to TI2
+    TIM5->CCMR1 |= TIM_CCMR1_CC2S_0;
+
+    // Falling edge detection
+    TIM5->CCER |= TIM_CCER_CC2P;
+
+    // Select TI2FP2 as trigger input
+    // TS = 110
+    TIM5->SMCR |= (6 << TIM_SMCR_TS_Pos);
+
+    // External clock mode 1
+    // SMS = 111
+    TIM5->SMCR |= (7 << TIM_SMCR_SMS_Pos);
+
+    // 32-bit counter
+    TIM5->ARR = 0xFFFFFFFF;
+
+    // Start
+    TIM5->CNT = 0;
+    TIM5->CR1 |= TIM_CR1_CEN;
+
     // Fault interrupt pins DRV8701_FAULT_PIN, OCP_INT_PIN, DRV_SNSOUT_PIN
     RCC->APB2ENR |= RCC_APB2ENR_IOPxEN(DRV8701_FAULT_PIN) | RCC_APB2ENR_IOPxEN(OCP_INT_PIN) | RCC_APB2ENR_IOPxEN(DRV_SNSOUT_PIN);
 
     // clear conf
-    GPIO_CRx_REG<DRV8701_FAULT_PIN>()   &= ~(0xf << digitalPinShift(DRV8701_FAULT_PIN));
-    GPIO_CRx_REG<OCP_INT_PIN>()         &= ~(0xf << digitalPinShift(OCP_INT_PIN));
-    GPIO_CRx_REG<DRV_SNSOUT_PIN>()      &= ~(0xf << digitalPinShift(DRV_SNSOUT_PIN));
+    GPIO_CRx_REG<DRV8701_FAULT_PIN>() &= ~(0xf << digitalPinShift(DRV8701_FAULT_PIN));
+    GPIO_CRx_REG<OCP_INT_PIN>() &= ~(0xf << digitalPinShift(OCP_INT_PIN));
+    GPIO_CRx_REG<DRV_SNSOUT_PIN>() &= ~(0xf << digitalPinShift(DRV_SNSOUT_PIN));
 
     // CNF=10, MODE=00
-    GPIO_CRx_REG<DRV8701_FAULT_PIN>()   |= (0x8 << digitalPinShift(DRV8701_FAULT_PIN));
-    GPIO_CRx_REG<OCP_INT_PIN>()         |= (0x8 << digitalPinShift(OCP_INT_PIN));
-    GPIO_CRx_REG<DRV_SNSOUT_PIN>()      |= (0x8 << digitalPinShift(DRV_SNSOUT_PIN));
+    GPIO_CRx_REG<DRV8701_FAULT_PIN>() |= (0x8 << digitalPinShift(DRV8701_FAULT_PIN));
+    GPIO_CRx_REG<OCP_INT_PIN>() |= (0x8 << digitalPinShift(OCP_INT_PIN));
+    GPIO_CRx_REG<DRV_SNSOUT_PIN>() |= (0x8 << digitalPinShift(DRV_SNSOUT_PIN));
 
     // Select pull-up (ODR bit = 1)
-    digitalPinToGPIO<DRV8701_FAULT_PIN>()->ODR  |= (1 << digitalPinToBit(DRV8701_FAULT_PIN));
-    digitalPinToGPIO<OCP_INT_PIN>()->ODR        |= (1 << digitalPinToBit(OCP_INT_PIN));
-    digitalPinToGPIO<DRV_SNSOUT_PIN>()->ODR     |= (1 << digitalPinToBit(DRV_SNSOUT_PIN));
+    digitalPinToGPIO<DRV8701_FAULT_PIN>()->ODR |= (1 << digitalPinToBit(DRV8701_FAULT_PIN));
+    digitalPinToGPIO<OCP_INT_PIN>()->ODR |= (1 << digitalPinToBit(OCP_INT_PIN));
+    digitalPinToGPIO<DRV_SNSOUT_PIN>()->ODR |= (1 << digitalPinToBit(DRV_SNSOUT_PIN));
 
     // PID loop, call ISR every 5 ms
     timer.setOverflow(kPIDInterval * 1000, MICROSEC_FORMAT);
@@ -131,7 +183,7 @@ void PidController::printDebug(Stream &stream) const
     stream.print("integral=");
     stream.print(integral);
     stream.print(" lastError=");
-    stream.print(lastError);
+    stream.print(static_cast<uint32_t>(lastError));
     stream.print(" lastDerivative=");
     stream.println(lastDerivative);
     stream.print("encoderCounter=");
@@ -139,10 +191,11 @@ void PidController::printDebug(Stream &stream) const
     stream.println("=== PID DEBUG END ===");
 }
 
-void PidController::motorOn() 
+void PidController::motorOn()
 {
     __disable_irq();
-    if (!running) {
+    if (!running)
+    {
         running = true;
         __enable_irq();
         reset();
@@ -150,37 +203,42 @@ void PidController::motorOn()
         Serial.println("START");
         DEBUG_PRINT(DEBUG_DEBUG, "START: rpm=%d", getRPM());
     }
-    else {
+    else
+    {
         __enable_irq();
         Serial.println("ERR=RUNNING");
         DEBUG_PRINT(DEBUG_ERROR, "MOTOR RUNNING");
     }
 }
 
-void PidController::motorOff() 
+void PidController::motorOff()
 {
     PID_WRITE_MOTOR_PWM_OFF();
     __disable_irq();
-    if (running) {
+    if (running)
+    {
         running = false;
         __enable_irq();
         Serial.println("STOP");
         DEBUG_PRINT(DEBUG_DEBUG, "STOP");
     }
-    else {
+    else
+    {
         __enable_irq();
         Serial.println("ERR=NOT_RUNNING");
         DEBUG_PRINT(DEBUG_ERROR, "MOTOR NOT RUNNING");
     }
 }
 
-bool PidController::motorToggle() 
+bool PidController::motorToggle()
 {
-    if (running) {
+    if (running)
+    {
         motorOff();
         return false;
     }
-    else {
+    else
+    {
         motorOn();
         return true;
     }
@@ -191,16 +249,19 @@ void PidController::isr()
 {
     // most timers are 16bit counters only
     int32_t delta = getDelta(readEncoderCounter());
+    pulseCounter += delta;
     // invert if sensor and motor direction are different
-    if (eeprom.getMotorDirection() != eeprom.getSensorDirection()) {
+    if (eeprom.getMotorDirection() != eeprom.getSensorDirection())
+    {
         delta = -delta;
     }
 
     int32_t pwmLevel;
 
-    if (eeprom.isPIDMode()) {
+    if (eeprom.isPIDMode())
+    {
         // calculate error and derivative
-        int32_t error = (getCountsPerInterval() - delta) ;
+        int32_t error = (getCountsPerInterval() - delta);
         int32_t derivative = (error - getLastError());
         setLastError(error);
 
@@ -214,20 +275,25 @@ void PidController::isr()
         // get pwm level and set output
         pwmLevel = calcPWMLevel(error, getIntegral(), derivative);
     }
-    else {
+    else
+    {
         pwmLevel = eeprom.getMotorPWM() * kMaxPWMLevel / 100;
     }
 
     auto clampedPwmLevel = clampPWMLevel(pwmLevel);
 
     // apply new PWM level if motor is running
-    if (running) {
+    if (running)
+    {
         PID_WRITE_MOTOR_PWM_ON(clampedPwmLevel, eeprom.isReverseDirection());
     }
 
-    if (eeprom.isPIDMode()) {
-        if (antiWindupReduction) {
-            if (pwmLevel < -kMaxPWMLevel || pwmLevel > (kMaxPWMLevel * 2)) {
+    if (eeprom.isPIDMode())
+    {
+        if (antiWindupReduction)
+        {
+            if (pwmLevel < -kMaxPWMLevel || pwmLevel > (kMaxPWMLevel * 2))
+            {
                 setIntegral(getIntegral() * antiWindupReduction / 100);
             }
         }
@@ -239,32 +305,56 @@ void PidController::isr()
     stats.rpm.add(deltaRPM);
     stats.pwm.add(clampedPwmLevel);
 
-    #if HAVE_DEBUG_PID_CONTROLLER
-        lastPwmLevel = pwmLevel;
-        lastRpmMeasured = deltaRPM;
-        lastDebugNewData = true;
-    #endif
+    if (running) {
+
+        loopCounter++;
+        if (loopCounter == (500 / kPIDInterval)) { // 500ms
+            if (readRpmCounter() >= 1 && pulseCounter < 10) { // we have 1 rotation but less than 10 pulses, something is wrong with the sensor
+                setErrorCode(ErrorCodeType::SENSOR);
+                // __enable_irq();
+                // DEBUG_PRINT(DEBUG_ERROR, "SENSOR ERROR r=%u, p=%u d=%d", readRpmCounter(), pulseCounter, delta);
+            }
+            else if (pulseCounter < (kCPR / 4)) { // quarter of a rotation or less, motor has stalled
+                setErrorCode(ErrorCodeType::STALL);
+                // __enable_irq();
+                // DEBUG_PRINT(DEBUG_ERROR, "MOTOR STALL r=%u, p=%u d=%d", readRpmCounter(), pulseCounter, delta);
+            }
+        }
+        // if (loopCounter<1000 && (loopCounter%10)==9) {
+        //     __enable_irq();
+        //     DEBUG_PRINT(DEBUG_DEBUG, "STARTUP r=%u, p=%u d=%d", readRpmCounter(), pulseCounter, delta);
+        // }
+    }
+
+#if HAVE_DEBUG_PID_CONTROLLER
+    lastPwmLevel = pwmLevel;
+    lastRpmMeasured = deltaRPM;
+    lastDebugNewData = true;
+#endif
 }
 
 void PidController::fault_isr()
 {
-    if ((digitalPinToGPIO<DRV8701_FAULT_PIN>()->IDR & (1 << digitalPinToBit(DRV8701_FAULT_PIN))) == 0) {
+    if ((digitalPinToGPIO<DRV8701_FAULT_PIN>()->IDR & (1 << digitalPinToBit(DRV8701_FAULT_PIN))) == 0)
+    {
         faults.drv8701Fault = true;
-        #if DEBUG
+#if DEBUG
         faults.count++;
-        #endif
+#endif
     }
-    if ((digitalPinToGPIO<OCP_INT_PIN>()->IDR & (1 << digitalPinToBit(OCP_INT_PIN))) == 0) {
+    if ((digitalPinToGPIO<OCP_INT_PIN>()->IDR & (1 << digitalPinToBit(OCP_INT_PIN))) == 0)
+    {
         faults.ocpFault = true;
-        #if DEBUG
+#if DEBUG
         faults.count++;
-        #endif
+#endif
     }
-    if ((digitalPinToGPIO<DRV_SNSOUT_PIN>()->IDR & (1 << digitalPinToBit(DRV_SNSOUT_PIN))) == 0) {
+    if ((digitalPinToGPIO<DRV_SNSOUT_PIN>()->IDR & (1 << digitalPinToBit(DRV_SNSOUT_PIN))) == 0)
+    {
         faults.snsoutFault = true;
-        #if DEBUG
+#if DEBUG
         faults.count++;
-        #endif
+#endif
     }
     // TODO add emergency stop and fault handling
 }

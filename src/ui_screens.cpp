@@ -444,10 +444,10 @@ void DiagnosticsScreen::_refreshVisuals()
     );
     lv_label_set_text(mosfetTempLabel, buf);
 
-    snprintf(buf, sizeof(buf) - 1, "RPM %u/%u PWM %u%%", 
+    snprintf(buf, sizeof(buf) - 1, "RPM %u/%u #%u", 
         pid.stats.rpm.avg(), 
         pid.getRPM(), 
-        eeprom.getMotorPWM()
+        pid.readRpmCounter()
     );
     lv_label_set_text(rpmPwmLabel, buf);
 }
@@ -550,14 +550,28 @@ void DashboardScreen::_refreshVisuals()
     snprintf(buf, sizeof(buf) - 1, "%d" "\xC2\xB0" "C", stats.mosfetTemp);
     lv_label_set_text(mosfetTempLabel, buf);
 
-    if (eeprom.isPIDMode()) {
-        snprintf(buf, sizeof(buf) - 1, "%u RPM (%u)", pid.clampPWMLevel(pid.stats.rpm.avg()), pid.getRPM());
+    if (pid.errorCode != PidController::ErrorCodeType::NONE) {
+        switch(pid.errorCode) {
+            case PidController::ErrorCodeType::MOTOR_OVER_TEMPERATURE:
+                snprintf(buf, sizeof(buf) - 1, "MOTOR %d" "\xC2\xB0" "C", stats.motorTemp);
+                break;
+            case PidController::ErrorCodeType::MOSFET_OVER_TEMPERATURE:
+                snprintf(buf, sizeof(buf) - 1, "MOSFET %d" "\xC2\xB0" "C", stats.mosfetTemp);
+                break;
+            default:
+                snprintf(buf, sizeof(buf) - 1, "ERROR #%u", static_cast<uint32_t>(pid.getErrorCode()));
+                break;
+        }
     }
     else {
-        snprintf(buf, sizeof(buf) - 1, "%u RPM", pid.clampPWMLevel(pid.stats.rpm.avg()));
+        if (eeprom.isPIDMode()) {
+            snprintf(buf, sizeof(buf) - 1, "%u RPM (%u)", pid.clampPWMLevel(pid.stats.rpm.avg()), pid.getRPM());
+        }
+        else {
+            snprintf(buf, sizeof(buf) - 1, "%u RPM", pid.clampPWMLevel(pid.stats.rpm.avg()));
+        }
     }
 
-    
     // snprintf(buf, sizeof(buf) - 1, "c=%u f=%u ocp=%u sns=%u", pid.faults.count, pid.faults.drv8701Fault, pid.faults.ocpFault, pid.faults.snsoutFault);
     lv_label_set_text(rpmLabel, buf);
 

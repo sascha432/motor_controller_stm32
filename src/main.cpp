@@ -174,43 +174,27 @@ void loop()
         lv_timer_handler();
 
         // check NTC sensors
-        static bool triggered = false;
-        uint32_t overTemperature = 0;
         if (adc.getMotorNTCValue() < eeprom.getMotorTemperatureLimitADC()) {
-            overTemperature |= 0x01;
-            LEDs::onLED1();
+            if (pid.running) {
+                pid.setErrorCode(PidController::ErrorCodeType::MOTOR_OVER_TEMPERATURE);
+            }
         }
         if (adc.getMosfetNTCValue() < eeprom.getMosfetTemperatureLimitADC()) {
-            overTemperature |= 0x02;
-            LEDs::onLED2();
-        }
-        if (overTemperature) {
-            auto adcValues = adc.readAll();
-            triggered = true;
             if (pid.running) {
-                pid.motorOff();
-            }
-            // DEBUG_PRINT(DEBUG_ERROR, "OVER TEMPERATURE: flag=%02x motor=%d mosfet=%d", overTemperature, (int32_t)adcValues.getMotorTemperature(), (int32_t)adcValues.getMosfetTemperature());
-        }
-        if (!overTemperature && triggered) {
-            triggered = false;
-            LEDs::offLED1and2();
-        }
-
-        // ADC temperature debugging
-        if (0) {
-            static uint16_t lastMotorNTCValue = 0;
-            static uint16_t lastMosfetNTCValue = 0;
-            uint16_t motorNTCValue = adc.getMotorNTCValue() / 64; // only on significant changes
-            uint16_t mosfetNTCValue = adc.getMosfetNTCValue() / 64;
-            if (motorNTCValue != lastMotorNTCValue || mosfetNTCValue != lastMosfetNTCValue) {
-                lastMotorNTCValue = motorNTCValue;
-                lastMosfetNTCValue = mosfetNTCValue;
-                DEBUG_PRINT(DEBUG_DEBUG, "motor=%u/%u mosfet=%u/%u", adc.getMotorNTCValue(), eeprom.getMotorTemperatureLimitADC(), adc.getMosfetNTCValue(), eeprom.getMosfetTemperatureLimitADC());
+                pid.setErrorCode(PidController::ErrorCodeType::MOSFET_OVER_TEMPERATURE);
             }
         }
-
         lastLvHandler = millis();
+    }
+
+    if (false) {
+        static uint32_t lastTime37 = 0;
+        if (millis() - lastTime37 >= 100) {
+            lastTime37 = millis();
+            // extern volatile uint32_t rpm_counter;
+            // DEBUG_PRINT(DEBUG_DEBUG, "RPM_COUNTER=%u", rpm_counter);
+            // DEBUG_PRINT(DEBUG_DEBUG, "TIM5=%u", TIM5->CNT);
+        }
     }
 
     if (false) { // print faults

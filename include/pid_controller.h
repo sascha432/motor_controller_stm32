@@ -50,6 +50,17 @@ struct PidController
         return (value * (60000 / kPIDInterval)) / kCPR;
     }
 
+    enum class ErrorCodeType : int32_t {
+        NONE = 0,
+        STALL,
+        SENSOR,
+        MOTOR_OVER_TEMPERATURE,
+        MOSFET_OVER_TEMPERATURE,
+        FAULT,
+        OCP,
+        SNSOUT,
+    };
+
     PidController() :
         timer(TIM2),
         rpm(0),
@@ -87,7 +98,8 @@ struct PidController
      */
     void init(InterruptCallbackType callback, InterruptCallbackType faultCallback);
 
-    inline void setKp(float value) {
+    inline void setKp(float value) 
+    {
         Kp = value;
         // pre calculate Kp to reduce calculations to 3 multiplications in the PID loop
         // scale value and reduce CPR
@@ -99,7 +111,8 @@ struct PidController
         KpPreCalc = value * static_cast<float>(kScaleFactor / ((kRPMToIntCountsT<kCPR>() / static_cast<double>(kMaxPWMLevel)) / static_cast<double>(kPWMScaleMultiplier)));
     }
 
-    inline void setKi(float value) {
+    inline void setKi(float value) 
+    {
         Ki = value;
         // scale value and reduce CPR
         // KiPreCalc = value * kFPScale / (kRPMToIntCounts(kCPR) / (float)kMaxPWMLevel);
@@ -110,7 +123,8 @@ struct PidController
         KiPreCalc = value * static_cast<float>(kScaleFactor * kPIDInterval / ((kRPMToIntCountsT<kCPR>() * 1000 / static_cast<double>(kMaxPWMLevel)) / static_cast<double>(kPWMScaleMultiplier)));
     }
 
-    inline void setKd(float value) {
+    inline void setKd(float value) 
+    {
         Kd = value;
         // scale value and reduce CPR
         // KdPreCalc = value * kFPScale / (kRPMToIntCounts(kCPR) / (float)kMaxPWMLevel);
@@ -121,7 +135,8 @@ struct PidController
         KdPreCalc = value * static_cast<float>(kScaleFactor * 1000 / ((kRPMToIntCountsT<kCPR>() * kPIDInterval / static_cast<double>(kMaxPWMLevel)) / static_cast<double>(kPWMScaleMultiplier)));
     }
 
-    inline int32_t calcPWMLevel(int32_t error, int32_t integral, int32_t derivative) const {
+    inline int32_t calcPWMLevel(int32_t error, int32_t integral, int32_t derivative) const 
+    {
         return (
             (error * (int64_t)KpPreCalc) +
             (integral * (int64_t)KiPreCalc) +
@@ -129,11 +144,13 @@ struct PidController
         ) / kScaleFactor;
     }
 
-    inline int32_t clampPWMLevel(int32_t value) const {
+    inline int32_t clampPWMLevel(int32_t value) const 
+    {
         return std::clamp<int32_t>(value, 0, kMaxPWMLevel);
     }
 
-    inline void setRPM(uint32_t value) {
+    inline void setRPM(uint32_t value) 
+    {
         // rev. per minute
         rpm = value;
         // to counts per interval
@@ -142,23 +159,32 @@ struct PidController
         cpiIntegralLimit = cpi * integralTimeLimit / kPIDInterval;
     }
 
-    inline uint32_t getRPM() const {
+    inline uint32_t getRPM() const 
+    {
         return rpm;
     }
 
-    inline uint32_t clampRPM(int32_t value) const {
+    inline uint32_t clampRPM(int32_t value) const 
+    {
         return std::clamp<int32_t>(value, 0, 55000);
     }
 
     // get delta since last call, counter is 16bit only
-    inline int32_t getDelta(uint32_t counter) {
+    inline int32_t getDelta(uint32_t counter) 
+    {
         int16_t delta = (int16_t)counter - (int16_t)lastCounter;
         lastCounter = counter;
         return delta;
     }
 
-    inline uint16_t readEncoderCounter() const {
+    inline uint16_t readEncoderCounter() const 
+    {
         return TIM4->CNT;
+    }
+
+    inline uint16_t readRpmCounter() const 
+    {
+        return TIM5->CNT;
     }
 
     void reset();
@@ -236,6 +262,18 @@ struct PidController
     void motorOff();
     bool motorToggle();
 
+    void setErrorCode(ErrorCodeType code) 
+    {
+        PID_WRITE_MOTOR_PWM_OFF();
+        running = false;
+        errorCode = code;
+    }
+
+    ErrorCodeType getErrorCode() const 
+    {
+        return errorCode;
+    }
+
     void debugPrintFaults() const 
     {
         DEBUG_PRINT(DEBUG_DEBUG, "FAULT=%d OCP=%d SNSOUT=%d COUNT=%d", faults.drv8701Fault, faults.ocpFault, faults.snsoutFault, faults.count);
@@ -310,6 +348,9 @@ public:
 
     bool running;
     FaultStates faults;
+    uint32_t loopCounter;
+    uint32_t pulseCounter;
+    ErrorCodeType errorCode;
 
     #if HAVE_DEBUG_PID_CONTROLLER
         volatile uint32_t lastRpmMeasured;
