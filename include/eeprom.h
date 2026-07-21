@@ -11,12 +11,6 @@
 
 struct EEPROM 
 {
-    static EEPROM &getInstance()
-    {
-        static EEPROM instance;
-        return instance;
-    }
-
     static constexpr uint32_t kMagic = 0xDEADBEEF;
     static constexpr uint32_t kVersion = 1;
 
@@ -297,3 +291,4 @@ protected:
 };
 
 extern I2CHelper i2c;
+extern EEPROM eeprom;

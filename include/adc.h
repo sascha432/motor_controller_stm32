@@ -157,21 +157,6 @@ struct ADC {
         return adc_buffer[3];
     }
 
-    void debugPrint() const
-    {
-        auto tmp = *(BufferType *)adc_buffer;
-        DEBUG_PRINT(
-            DEBUG_DEBUG, 
-            "ADC: %umA,%umV,%u.%01uC,%u.%01uC %u %u",
-            ADCCurrentConverter::convert(getISenseAverageValue()),
-            tmp.getInputVoltage(), 
-            (uint32_t)(tmp.getMotorTemperature()),
-            (uint32_t)(tmp.getMotorTemperature() * 10) % 10,
-            (uint32_t)(tmp.getMosfetTemperature()),
-            (uint32_t)(tmp.getMosfetTemperature() * 10) % 10
-        );
-    }
-
     volatile uint16_t adc_buffer[kNumConversions];
     volatile uint32_t isenseSum;
     volatile uint16_t isenseCount;

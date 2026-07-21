@@ -8,7 +8,7 @@
 #include "ui_constants.h"
 #include "lvgl.h"
 #include "tft_driver.h"
-#include "helpers.h"
+#include "controls.h"
 #include "debug.h"
 
 // set to true to keep screen objects in memory when switching screens
@@ -105,6 +105,21 @@ struct Screen
     virtual void setValue(uint32_t value);
     virtual uint32_t getValue() const;
 
+    inline void setMaxAcceleration(uint32_t value) 
+    {
+        maxAcceleration = value;
+    }
+
+    inline void setSteps(int32_t value) 
+    {
+        steps = value;
+    }
+
+    inline int32_t getSteps() const
+    {
+        return steps;
+    }
+
     virtual void load();
     virtual void update();
 
@@ -112,11 +127,14 @@ struct Screen
     void _fatal_error(const char *msg);
 
 protected:
-    lv_obj_t *screen;
-    Screen *prevScreen;
-    Type id;
-
     friend struct ScreenFlow;
+
+    lv_obj_t *screen;
+    Screen *prevScreen; // linked list to previous screen for back navigation
+    Type id;
+    uint32_t maxAcceleration;
+    int32_t steps;
+
     static lv_obj_t *emptyScreen;
 };
 
@@ -200,6 +218,7 @@ struct SliderScreen : public Screen
         valueLabel(nullptr),
         formatCallback(callback)
     {
+        maxAcceleration = sqrt(maxValue - minValue);
     }
 
     virtual void load() override;

@@ -6,8 +6,7 @@
 
 #include "helpers.h"
 #include "pins.h"
-
-#define ROTARY_ENCODER_USE_ACCELERATION 0
+#include "debug.h"
 
 /**
  * @brief Button template for handling GPIO buttons with debounce and interrupt support
@@ -103,25 +102,33 @@ struct RotaryEncoder {
 
     inline GPIO_TypeDef *getGPIOPort() const { return (GPIO_TypeDef *)GPIO_PORT_ADDR; }
 
-    static constexpr uint32_t kMultiplierConstant = 0xffffff;       // speed multiplier constant - higher value = faster acceleration, lower value = slower acceleration
-    static constexpr uint32_t kResetAccelerationTime = 250;         // reset acceleration if no movement for 1 second
+    static constexpr uint32_t kResetAccelerationTime = 250;                 // reset acceleration if no movement in milliseconds
+    static constexpr uint32_t kDefaultAccelerationFactor = 0xffffff;        // speed multiplier constant - higher value = faster acceleration, lower value = slower acceleration
 
-    struct State {
-    private:
-        int32_t position;
-        uint16_t multiplier;
+    static constexpr uint32_t kAccelerationFactorMenu = 0;                 // acceleration factor for menu navigation
+    static constexpr uint32_t kAccelerationFactorSlow = 0xfffff;           // acceleration factor for values up to 1000
+    static constexpr uint32_t kAccelerationFactorFast = 0xffffff;          // acceleration factor for values up to 10000
+    static constexpr uint32_t kAccelerationFactorCurrent = 0x2fffff;       // acceleration factor for current values
 
-    public:
-        State(int32_t position, uint16_t multiplier) : position(position), multiplier(multiplier) {}
-
-        bool hasPosition() const {
-            return position != 0;
+    /**
+     * @brief Helper to scale depending on the maximum value
+     * 
+     * @param maxValue 
+     * @return constexpr uint32_t 
+     */
+    static constexpr uint32_t kAccelerationHelper(uint32_t maxValue) 
+    {
+        if (maxValue < 500) {
+            return kAccelerationFactorMenu;
         }
+        return (0xfffffULL * maxValue) / 2048;
+    }
 
-        int32_t getPosition() const {
-            return position * multiplier;
-        }
-    };
+    RotaryEncoder() : 
+        timer(TIM5),
+        maxAcceleration(1),
+        position(0)
+    {}
 
     void init();
     void clear();
@@ -140,10 +147,6 @@ struct RotaryEncoder {
             ((idr >> (digitalPinToBit(GPIO_PIN_B) - 1)) & 0x2));    // shift pin B to bit 1
     }
 
-    inline uint32_t ms() const {
-        return HAL_GetTick();
-    }
-
     /**
      * @brief Get the Delta Position object and clean up the position counter
      * 
@@ -151,54 +154,35 @@ struct RotaryEncoder {
      */
     int32_t getDeltaPosition() {
         __disable_irq();
-        int32_t tmpDelta = (position / 4); // full rotations only
-        position -= tmpDelta * 4;
+        int32_t tmpDelta = (position / 2); // full rotations only
+        position -= tmpDelta * 2;
         __enable_irq();
         return tmpDelta;
     }
 
-    #if ROTARY_ENCODER_USE_ACCELERATION
     /**
-     * @brief Get the Delta Position object and clean up the position counter
+     * @brief Set the acceleration factor
      * 
-     * @return State 
+     * @param acceleration 
      */
-    State getDeltaPositionAndMultiplier() {
-        __disable_irq();
-        int32_t tmpDelta = (position / 4); // full rotations only
-        uint32_t tmpFiltered = deltaFiltered;
-        position -= tmpDelta * 4;
-        __enable_irq();
-        return State(tmpDelta, getMultiplier(tmpFiltered));
+    void setMaxAcceleration(uint32_t acceleration) 
+    {
+        DEBUG_PRINT(DEBUG_DEBUG, "acceleration=%u", acceleration);
+        maxAcceleration = acceleration + 1;
     }
 
-    /**
-     * @brief Get the multiplier based on the integral value
-     * 
-     * @param integral The integral value
-     * @return uint32_t The calculated multiplier
-     */
-    uint32_t getMultiplier(uint32_t integral) const {
-        // dead zone
-        uint32_t multiplier = integral < (3 * 256 * 1024) ? 1 : (integral / (256 * 1024));
-        // speed up
-        if (multiplier > 18) {
-            multiplier *= 6;
-        }
-        else if (multiplier > 12) {
-            multiplier *= 4;
-        }
-        else if (multiplier > 6) {
-            multiplier *= 2;
-        }
-        return multiplier;
-    }
-    #endif
-
+    HardwareTimer timer;
+    uint32_t maxAcceleration;
     volatile int32_t position;
-    volatile uint32_t lastTimestamp;
-    #if ROTARY_ENCODER_USE_ACCELERATION
-    volatile uint32_t deltaFiltered;
-    #endif
-    volatile uint8_t oldState;    
+    volatile int32_t acceleration;
 };
+
+using RotaryEncoderKnob = RotaryEncoder<ROTARY_ENCODER_PIN_A, ROTARY_ENCODER_PIN_B>;
+using StartButton = Button<START_BUTTON_PIN, false>;
+using KnobButton = Button<KNOB_BUTTON_PIN, false>;
+using BackButton = Button<BACK_BUTTON_PIN, false>;
+
+extern RotaryEncoderKnob knob;
+extern KnobButton knobButton;
+extern StartButton startButton;
+extern BackButton backButton;

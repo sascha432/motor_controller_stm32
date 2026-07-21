@@ -17,13 +17,14 @@
 struct UIConstants 
 {
     // ui slider min/max values
-    static constexpr float kMinInputCurrent = 0.1f;                     // min. input current in A
-    static constexpr float kMaxInputCurrent = 30.0f;                    // max. input current in A
-    static constexpr float kInputCurrentStep = 0.1f;                    // input current step in A (make sure min/max is divisible by this value)
-    static constexpr float kMinMotorCurrent = 0.5f;                     // min. peak motor current in A
+    static constexpr float kStepInputCurrent = 0.5f;                    // input current step in A
+    static constexpr float kMinInputCurrent = kStepInputCurrent * 2;    // min. input current in A
+    static constexpr float kMaxInputCurrent = 40.0f;                    // max. input current in A
+    static constexpr float kMotorCurrentStep = 0.5f;                    // motor current step in A
+    static constexpr float kMinMotorCurrent = kMotorCurrentStep * 2;    // min. peak motor current in A
     static constexpr float kMaxMotorCurrent = 40.0f;                    // max. peak motor current in A
-    static constexpr float kMotorCurrentStep = 0.5f;                    // motor current step in A (make sure min/max is divisible by this value)
-    static constexpr uint16_t kMinRPM = 10;                             // Min. Motor RPM
+    static constexpr uint16_t kStepMotorRPM = 10;                       // Motor RPM step
+    static constexpr uint16_t kMinRPM = kStepMotorRPM * 2;              // Min. Motor RPM
     static constexpr uint16_t kMaxRPM = 15000;                          // Max. Motor RPM
     static constexpr uint8_t kMinTFTBrightness = 5;                     // Min. TFT Brightness
     static constexpr uint8_t kMaxTFTBrightness = 100;                   // Max. TFT Brightness
@@ -31,7 +32,7 @@ struct UIConstants
     static constexpr uint8_t kMaxLEDBrightness = 100;                   // Max. LED Brightness
     static constexpr uint32_t kMinMotorStallTimeout = 100;              // Motor stall time in milliseconds
     static constexpr uint32_t kMaxMotorStallTimeout = 10000;            // Motor stall time in milliseconds
-    static constexpr int32_t kMotorStallTimeoutStep = 100;              // Motor stall time step in milliseconds
+    static constexpr int32_t kStepMotorStallTimeout = 100;              // Motor stall time step in milliseconds
     static constexpr uint8_t kMinMosfetTemperature = 50;                // Min. MOSFET temperature in °C
     static constexpr uint8_t kMaxMosfetTemperature = 175;               // Max. MOSFET temperature in °C
     static constexpr uint8_t kMinMotorTemperature = 30;                 // Min. Motor temperature in °C

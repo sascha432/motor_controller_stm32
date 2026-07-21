@@ -9,6 +9,8 @@
 #include "adc.h"
 #include "pid_controller.h"
 #include "stats.h"
+#include "controls.h"
+#include "menu.h"
 
 // === Base Screen ===
 
@@ -17,7 +19,9 @@ lv_obj_t *Screen::emptyScreen = nullptr;
 Screen::Screen(Type id) : 
     screen(nullptr),
     prevScreen(nullptr),
-    id(id)
+    id(id),
+    maxAcceleration(1),
+    steps(1)
 {
     DEBUG_PRINT(DEBUG_DEBUG, "ctor");
 }
@@ -44,6 +48,7 @@ void Screen::load()
         screen = lv_obj_create(nullptr);
     }
     _style_screen(screen);
+    knob.setMaxAcceleration(maxAcceleration);
 }
 
 void Screen::update()
@@ -58,12 +63,12 @@ Screen::Type Screen::getId() const
 
 void Screen::setValue(uint32_t value)
 {
-    DEBUG_PRINT(DEBUG_DEBUG, "value=%u", value);
+    // DEBUG_PRINT(DEBUG_DEBUG, "value=%u", value);
 }
 
 uint32_t Screen::getValue() const
 {
-    DEBUG_PRINT(DEBUG_DEBUG, "value=0");
+    // DEBUG_PRINT(DEBUG_DEBUG, "value=0");
     return 0;
 }
 
@@ -123,6 +128,7 @@ MenuScreen::MenuScreen(Type id, const char **itemLabels, size_t itemCount) :
     count(static_cast<uint8_t>(itemCount)),
     selected(0)
 {
+    steps = -1; // invert for menus
 }
 
 void MenuScreen::load() 

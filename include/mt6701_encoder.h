@@ -196,3 +196,7 @@ struct MT6701Encoder {
         i2c.initI2C1Remapped();
     }
 };
+
+using MotorEncoder = MT6701Encoder<MT6701_I2C_ENABLE_PIN, false>;
+
+extern MotorEncoder motorEncoder;

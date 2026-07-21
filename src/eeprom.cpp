@@ -16,6 +16,7 @@
 #define EEPROM_VALIDATE_WRITE   0
 
 I2CHelper i2c;
+EEPROM eeprom;
 
 bool eepromWriteByte(uint8_t memAddress, uint8_t data);
 int16_t eepromReadByte(uint8_t memAddress);

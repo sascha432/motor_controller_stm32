@@ -106,7 +106,6 @@ struct PidController
     template<typename ISRCallback>
     void init(ISRCallback callback, ISRCallback faultCallback) {
         running = false;
-        setRPM(EEPROM::getInstance().getMotorRPM());
 
         // === PWM on TIM1 CH1 (PA8, PA9) ===
         // Enable AFIO and GPIOA for PA8/PA9
@@ -130,16 +129,6 @@ struct PidController
         TIM1->CCER |= TIM_CCER_CC1E | TIM_CCER_CC2E;
         TIM1->BDTR |= TIM_BDTR_MOE; // main output enable for TIM1
         TIM1->CR1 |= TIM_CR1_CEN;
-
-        // ENC1_A and ENC1_B on PB6 and PB7 / GPIOB
-        RCC->APB2ENR |= RCC_APB2ENR_IOPBEN;
-
-        // Input with pull-up/pull-down (CNF=10, MODE=00)
-        GPIOB->CRL &= ~((0xF << (6 * 4)) | (0xF << (7 * 4))); // Clear pin configs
-        GPIOB->CRL |=  ((0x8 << (6 * 4)) | (0x8 << (7 * 4))); // CNF=10, MODE=00
-
-        // Select pull-up (ODR bit = 1)
-        GPIOB->ODR |= (1 << 6) | (1 << 7);
 
         // TIM4 setup
         RCC->APB2ENR |= RCC_APB2ENR_AFIOEN; // alternative function clock enable

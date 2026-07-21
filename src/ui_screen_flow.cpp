@@ -5,6 +5,8 @@
 */
 
 #include "ui.h"
+#include "controls.h"
+#include "menu.h"
 
 // === Screen Flow Manager ===
 
@@ -46,6 +48,7 @@ void ScreenFlow::back()
         screen = tmp;
         if (kUIKeepScreenObjectsInMemory) {
             lv_scr_load(screen->screen);
+            knob.setMaxAcceleration(screen->maxAcceleration);
         }
         else {
             screen->load();

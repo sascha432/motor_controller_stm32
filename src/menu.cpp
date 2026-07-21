@@ -12,10 +12,6 @@
 #include "leds.h"
 #include "pid_controller.h"
 
-void clear_user_inputs();
-void apply_eeprom_settings();
-bool is_any_button_down();
-
 ScreenFlow screenFlow;
 Menu menu;
 
@@ -80,9 +76,7 @@ static const char *current_slider_format_callback(uint32_t value, char *buf, siz
  * @brief Menu constructor
  * 
  */
-Menu::Menu() :
-    eeprom(EEPROM::getInstance()),
-    steps(0)
+Menu::Menu()
 {
 }
 
@@ -94,8 +88,7 @@ void Menu::restorePreviousMenu()
 {
     DEBUG_PRINT(DEBUG_DEBUG, "value=%d", getValue());
     screenFlow.back(); // restore previous screen
-    setSteps(0);
-    clear_user_inputs();
+    clearUserInput();
 }
 
 /**
@@ -185,7 +178,6 @@ void Menu::handleButtonPress()
                         UIConstants::kMaxMotorStallTimeout,
                         "ms"
                     ));
-                    setSteps(UIConstants::kMotorStallTimeoutStep);
                     setValue(eeprom.getMotorStallTimeout());
                     break;
                 case 5: // Motor Brake
@@ -246,7 +238,6 @@ void Menu::handleButtonPress()
                         "A", 
                         current_slider_format_callback
                     ));
-                    setSteps(eeprom.kCurrentToUint16(UIConstants::kInputCurrentStep));
                     setValue(eeprom.getInputCurrentLimit());
                     break;
                 case 1: // Motor Current Limit
@@ -258,7 +249,6 @@ void Menu::handleButtonPress()
                         "A", 
                         current_slider_format_callback
                     ));
-                    setSteps(eeprom.kCurrentToUint16(UIConstants::kMotorCurrentStep));
                     setValue(eeprom.getMotorCurrentLimit());
                     break;
                 case 2: // Back
@@ -407,7 +397,7 @@ void Menu::handleButtonPress()
                 case 0: // Restore
                     eeprom.resetDefaults();
                     eeprom.write();
-                    apply_eeprom_settings();
+                    menu.applyEEPROMSettings();
                     screenFlow.next(new InfoScreen(Screen::Type::EEPROM_RESTORED, "Restored"));
                     lv_timer_handler();
                     abortableDelay(UIConstants::kInfoScreenTimeout);
@@ -510,7 +500,7 @@ void Menu::showWelcomeScreen()
         delay(UIConstants::kWelcomeScreenTimeout);
     }
 
-    clear_user_inputs();
+    clearUserInput();
 }
 
 /**
@@ -524,9 +514,8 @@ void Menu::loadMainMenu()
         kMainMenuItems, 
         sizeof_array(kMainMenuItems)
     ));
-    setSteps(0);
     setValue(0);
-    clear_user_inputs();
+    clearUserInput();
 }
 
 /**
@@ -536,9 +525,8 @@ void Menu::loadMainMenu()
 void Menu::loadStartScreen()
 {
     screenFlow.setScreen(new StartScreen());
-    setSteps(0);
     setValue(0);
-    clear_user_inputs();
+    clearUserInput();
 }
 
 /**
@@ -547,11 +535,9 @@ void Menu::loadStartScreen()
  */
 void Menu::loadDashboardScreen()
 {
-    // screenFlow.setScreen(new InfoScreen(Screen::Type::DASHBOARD, "TEST"));
     screenFlow.setScreen(new DashboardScreen());
-    setSteps(0);
     setValue(eeprom.getMotorRPM());
-    clear_user_inputs();
+    clearUserInput();
 }
 
 /**
@@ -561,6 +547,7 @@ void Menu::loadDashboardScreen()
  */
 int32_t Menu::updateRotaryValue(int32_t value)
 {
+    int32_t steps = screenFlow->getSteps();
     screenFlow->setValue(
         // add steps as multiplier to the Screen value independent of the rotary encoder acceleration
         (steps == 1 || steps == 0) ? 
@@ -609,17 +596,6 @@ int32_t Menu::getValue() const
 }
 
 /**
- * @brief Set menu steps for slider screen
- * 
- * @param steps 
- */
-void Menu::setSteps(int32_t steps)
-{
-    DEBUG_PRINT(DEBUG_DEBUG, "steps=%d", steps);
-    this->steps = steps;
-}
-
-/**
  * @brief Return reference to the ScreenFlow object
  * 
  * @return ScreenFlow& 
@@ -633,9 +609,39 @@ void Menu::abortableDelay(uint32_t ms)
 {
     uint32_t start = millis();
     while (millis() - start < ms) {
-        if (is_any_button_down()) {
-            clear_user_inputs();
+        if (isAnyButtonDown()) {
+            clearUserInput();
             break;
         }
     }
+}
+
+bool Menu::isAnyButtonDown()
+{
+    return knobButton.isDown() || backButton.isDown() || startButton.isDown();
+}
+
+void Menu::clearUserInput()
+{
+    // wait until all buttons are released
+    while(isAnyButtonDown()) {
+    }
+
+    // some extra time
+    delay(10);
+
+    // clear states
+    knobButton.clear();
+    backButton.clear();
+    startButton.clear();
+    knob.clear();
+}
+
+void Menu::applyEEPROMSettings()
+{
+    tft_backlight_pwm_set(eeprom.getTFTBrightness());
+    LEDs::illuminationLedSetPWM(eeprom.getLEDBrightness());
+    adc.setInputCurrentLimit(eeprom.getInputCurrentLimit());
+    adc.setMotorCurrentLimit(eeprom.getMotorCurrentLimit());
+    pid.setRPM(eeprom.getMotorRPM());
 }

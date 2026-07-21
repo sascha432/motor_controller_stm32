@@ -179,11 +179,6 @@ struct Stats {
         Helpers::MinMax<32768> motorTemp;
         Helpers::MinMax<32768> mosfetTemp;
     } minMax;
-    // struct {
-        // Helpers::Integral<1024> current;
-        // Helpers::LowPass<512> current;
-        // Helpers::Raw current;
-    // } values;
 
     // helper variables to store the converted values for display purposes
     // units are millivolts, milliamps, degrees Celsius

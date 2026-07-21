@@ -22,12 +22,10 @@ void Stats::update()
     minMax.mosfetTemp.update(v.driver_ntc);
     auto isenseAvg = adc.getISenseAverageValue();
     minMax.current.update(isenseAvg);
-    // values.current.update(isense);
 
     // store converted values for display purposes
     vcc = ADCConverter::Voltage::convert(v.vsense);
     current = ADCConverter::Current::convert(isenseAvg);
-    // current = ADCConverter::Current::convert(values.current.get());
     motorTemp = ADCConverter::NTC::convert(v.motor_ntc);
     mosfetTemp = ADCConverter::NTC::convert(v.driver_ntc);
     min.vcc = ADCConverter::Voltage::convert(minMax.vcc.getMin());

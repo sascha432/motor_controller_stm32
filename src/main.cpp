@@ -14,12 +14,7 @@
 #include "eeprom.h"
 #include "stats.h"
 
-Button<KNOB_BUTTON_PIN, false> knobButton;
-Button<START_BUTTON_PIN, false> startButton;
-Button<BACK_BUTTON_PIN, false> backButton;
-
-RotaryEncoder<ROTARY_ENCODER_PIN_A, ROTARY_ENCODER_PIN_B> knob;
-MT6701Encoder<MT6701_I2C_ENABLE_PIN, false> motorEncoder;
+MotorEncoder motorEncoder;
 
 static void button_isr() {
     #if defined(STM32F107xC)
@@ -39,12 +34,12 @@ static void button_isr() {
     #endif
 }
 
-static void knob_isr() 
+static void knob_isr()
 {
     knob.isr();
 }
 
-static void pid_timer_isr() 
+static void pid_timer_isr()
 {
     pid.isr();
 }
@@ -52,37 +47,6 @@ static void pid_timer_isr()
 static void pid_fault_isr()
 {
     pid.fault_isr();
-}
-
-bool is_any_button_down()
-{
-    return knobButton.isDown() || backButton.isDown() || startButton.isDown();
-}
-
-void clear_user_inputs() 
-{
-    // wait until all buttons are released
-    while(is_any_button_down()) {
-    }
-
-    // some extra time
-    delay(10);
-
-    // clear states
-    knobButton.clear();
-    backButton.clear();
-    startButton.clear();
-    knob.clear();
-}
-
-auto &eeprom = EEPROM::getInstance();
-
-void apply_eeprom_settings() 
-{
-    tft_backlight_pwm_set(eeprom.getTFTBrightness());
-    LEDs::illuminationLedSetPWM(eeprom.getLEDBrightness());
-    adc.setInputCurrentLimit(eeprom.getInputCurrentLimit());
-    adc.setMotorCurrentLimit(eeprom.getMotorCurrentLimit());
 }
 
 void setup()
@@ -145,11 +109,12 @@ void setup()
     // Show welcome screen and load main menu
     menu.showWelcomeScreen();
     // Apply settings after welcome screen since it turns the backlight on
-    apply_eeprom_settings(); 
+    menu.applyEEPROMSettings();
+
     menu.loadStartScreen();
 }
 
-void motorOff() 
+void motorOff()
 {
     PID_WRITE_MOTOR_PWM_OFF();
     __disable_irq();
@@ -166,7 +131,7 @@ void motorOff()
     }
 }
 
-void motorOn() 
+void motorOn()
 {
     __disable_irq();
     if (!pid.running) {
@@ -176,7 +141,7 @@ void motorOn()
         pid.setRPM(eeprom.getSpeed());
         Serial.println("START");
         DEBUG_PRINT(DEBUG_DEBUG, "START: rpm=%d", pid.getRPM());
-    } 
+    }
     else {
         __enable_irq();
         Serial.println("ERR=RUNNING");
@@ -184,7 +149,7 @@ void motorOn()
     }
 }
 
-bool toggleMotor() 
+bool toggleMotor()
 {
     if (pid.running) {
         motorOff();
@@ -234,7 +199,7 @@ void loop()
         int32_t delta = knob.getDeltaPosition();
         if (delta) {
             newPosition = menu.updateRotaryValue(menu.getValue() + delta);
-            DEBUG_PRINT(DEBUG_DEBUG, "knob=%d", newPosition);
+            // DEBUG_PRINT(DEBUG_DEBUG, "menu=%d delta=%d", newPosition, delta);
         }
         // handle LVGL updates
         auto &screenFlow = menu.getScreenFlow();
@@ -273,7 +238,7 @@ void loop()
             if (pid.running) {
                 motorOff();
             }
-            DEBUG_PRINT(DEBUG_ERROR, "OVER TEMPERATURE: flag=%02x motor=%d mosfet=%d", overTemperature, (int32_t)adcValues.getMotorTemperature(), (int32_t)adcValues.getMosfetTemperature());
+            // DEBUG_PRINT(DEBUG_ERROR, "OVER TEMPERATURE: flag=%02x motor=%d mosfet=%d", overTemperature, (int32_t)adcValues.getMotorTemperature(), (int32_t)adcValues.getMosfetTemperature());
         }
         if (!overTemperature && triggered) {
             triggered = false;
@@ -294,14 +259,6 @@ void loop()
         }
 
         lastLvHandler = millis();
-    }
-
-    if (false) { // ADC debugoutput
-        static uint32_t lastTime = 0;
-        if (millis() - lastTime >= 100) {
-            lastTime = millis();
-            adc.debugPrint();
-        }
     }
 
     if (false) { // print faults
@@ -333,10 +290,10 @@ void loop()
                 auto tmpLastPwmLevel = pid.lastPwmLevel;
                 pid.lastDebugNewData = false;
                 static uint32_t debugStep = 0;
-                DEBUG_PRINT(DEBUG_DEBUG, "%lu,%d,%d,%u,%u,%u.%u,%u.%u", 
-                    debugStep++, 
-                    tmpLastRpmMeasured, 
-                    pid.clampPWMLevel(tmpLastPwmLevel), 
+                DEBUG_PRINT(DEBUG_DEBUG, "%lu,%d,%d,%u,%u,%u.%u,%u.%u",
+                    debugStep++,
+                    tmpLastRpmMeasured,
+                    pid.clampPWMLevel(tmpLastPwmLevel),
                     stats.vcc,
                     stats.current,
                     CONVERT_TO_FP1(stats.motorTemp),
