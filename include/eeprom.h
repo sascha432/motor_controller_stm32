@@ -12,7 +12,7 @@
 struct EEPROM 
 {
     static constexpr uint32_t kMagic = 0xDEADBEEF;
-    static constexpr uint32_t kVersion = 1;
+    static constexpr uint32_t kVersion = 2;
 
     // ~130A max.
     static constexpr uint16_t kCurrentToUint16(float current) {
@@ -29,6 +29,9 @@ struct EEPROM
     static constexpr uint8_t kMotorDirectionForward = 0;
     static constexpr uint8_t kMotorDirectionReverse = 1;
 
+    static constexpr uint8_t kSensorDirectionForward = 0;
+    static constexpr uint8_t kSensorDirectionReverse = 1;
+
     struct Data {
         uint32_t magic;
         uint32_t version;
@@ -41,6 +44,7 @@ struct EEPROM
         uint16_t max_rpm;
         uint16_t motor_stall_timeout;
         uint8_t motor_direction;
+        uint8_t sensor_direction;
         uint8_t motor_brake;
         uint8_t control_mode;
         uint8_t mosfet_temperature_limit;
@@ -61,6 +65,7 @@ struct EEPROM
             max_rpm(UIConstants::kDefaultMaxRPM),
             motor_stall_timeout(UIConstants::kDefaultMotorStallTimeout),
             motor_direction(kMotorDirectionForward),
+            sensor_direction(kSensorDirectionForward),
             motor_brake(UIConstants::kDefaultMotorBrake),
             control_mode(kControlModePID),
             mosfet_temperature_limit(UIConstants::kDefaultMosfetTemperatureLimit),
@@ -175,6 +180,16 @@ struct EEPROM
     uint8_t getMotorDirection() const
     {
         return data.motor_direction;
+    }
+
+    void setSensorDirection(uint8_t value) 
+    {
+        data.sensor_direction = value;
+    }
+
+    uint8_t getSensorDirection() const
+    {
+        return data.sensor_direction;
     }
 
     void setMotorDirection(uint8_t value) 
@@ -293,7 +308,7 @@ struct EEPROM
 
     uint32_t getSpeed() const
     {
-        return data.control_mode ? getMotorRPM() : getMotorPWM();
+        return data.control_mode == kControlModePID ? getMotorRPM() : getMotorPWM();
     }
 
 protected:

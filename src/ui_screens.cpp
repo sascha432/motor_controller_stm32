@@ -21,7 +21,8 @@ Screen::Screen(Type id) :
     prevScreen(nullptr),
     id(id),
     maxAcceleration(1),
-    steps(1)
+    steps(1),
+    value(0)
 {
     DEBUG_PRINT(DEBUG_DEBUG, "ctor");
 }
@@ -63,13 +64,12 @@ Screen::Type Screen::getId() const
 
 void Screen::setValue(uint32_t value)
 {
-    // DEBUG_PRINT(DEBUG_DEBUG, "value=%u", value);
+    this->value = value;
 }
 
 uint32_t Screen::getValue() const
 {
-    // DEBUG_PRINT(DEBUG_DEBUG, "value=0");
-    return 0;
+    return value;
 }
 
 void Screen::_fatal_error(const char *msg) 
@@ -522,7 +522,7 @@ void DashboardScreen::_refreshVisuals()
 {
     char buf[32];
 
-    uint32_t pwmPercent = pid.lastPwmLevel * 100 / pid.kMaxPWMLevel;
+    uint32_t pwmPercent = pid.stats.pwm.avg() * 100 / pid.kMaxPWMLevel;
     snprintf(buf, sizeof(buf) - 1, "%u.%uV (%u.%uV)", CONVERT_TO_FP1(stats.vcc), CONVERT_TO_FP1(stats.max.vcc));
     lv_label_set_text(voltageLabel, buf);
 
@@ -535,12 +535,19 @@ void DashboardScreen::_refreshVisuals()
     snprintf(buf, sizeof(buf) - 1, "%d" "\xC2\xB0" "C", stats.mosfetTemp);
     lv_label_set_text(mosfetTempLabel, buf);
 
-    snprintf(buf, sizeof(buf) - 1, "%u RPM", pid.clampPWMLevel(pid.rpmStats.avg()));
+    if (eeprom.isPIDMode()) {
+        snprintf(buf, sizeof(buf) - 1, "%u RPM (%u)", pid.clampPWMLevel(pid.stats.rpm.avg()), pid.getRPM());
+    }
+    else {
+        snprintf(buf, sizeof(buf) - 1, "%u RPM", pid.clampPWMLevel(pid.stats.rpm.avg()));
+    }
+
+    
     // snprintf(buf, sizeof(buf) - 1, "c=%u f=%u ocp=%u sns=%u", pid.faults.count, pid.faults.drv8701Fault, pid.faults.ocpFault, pid.faults.snsoutFault);
     lv_label_set_text(rpmLabel, buf);
 
     lv_label_set_text_fmt(pwmLabel, "PWM %u%%", pwmPercent);
 
-    const lv_coord_t fillWidth = static_cast<lv_coord_t>((kDashboardScreenContainerWidth * pwmPercent) / 100U);
+    const lv_coord_t fillWidth = static_cast<lv_coord_t>((kDashboardScreenContainerWidth * pid.stats.pwm.avg()) / pid.kMaxPWMLevel);
     lv_obj_set_size(pwmBarFill, fillWidth, 16);
 }

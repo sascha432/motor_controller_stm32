@@ -33,8 +33,9 @@ static const char *kAdvancedMenuItems[] = {
     "Motor Temperature",        // 2
     "Motor RPM Settings",       // 3
     "Motor Direction",          // 4
-    "Diagnostics",              // 5
-    "Back"                      // 6
+    "Sensor Direction",         // 5
+    "Diagnostics",              // 6
+    "Back"                      // 7
 };
 
 static const char *kMotorRPMSettingsItems[] = {
@@ -54,7 +55,7 @@ static const char *kControlModeItems[] = {
     "PID / Closed Loop"         // 1
 };
 
-static const char *kMotorDirectionItems[] = {
+static const char *kDirectionItems[] = {
     "Forward",                  // 0
     "Reverse"                   // 1
 };
@@ -102,7 +103,7 @@ void Menu::saveEEPROMChanges()
         lv_timer_handler();
         abortableDelay(UIConstants::kInfoScreenTimeout);
     }
-    loadStartScreen();
+
 }
 
 /**
@@ -209,23 +210,9 @@ void Menu::handleButtonPress()
                     break;
                 case 8:
                     saveEEPROMChanges();
+                    loadStartScreen();
                     break;
             }
-            break;
-        // === motor speed menu ===
-        case Screen::Type::MOTOR_SPEED:
-            eeprom.setSpeed(getValue());
-            restorePreviousMenu();
-            break;
-        // === motor stall timeout menu ===
-        case Screen::Type::MOTOR_STALL_TIMEOUT:
-            eeprom.setMotorStallTimeout(getValue());
-            restorePreviousMenu();
-            break;
-        // === control mode menu ===
-        case Screen::Type::CONTROL_MODE:
-            eeprom.setControlMode(getValue());
-            restorePreviousMenu();
             break;
         // === current limits menu ===
         case Screen::Type::CURRENT_LIMITS:
@@ -256,27 +243,10 @@ void Menu::handleButtonPress()
                     screenFlow.next(screen);
                     setValue(eeprom.getMotorCurrentLimit());
                     break;
-                case 2: // Back
+                default: // Back
                     restorePreviousMenu();
                     break;
             }
-            break;
-        // === input current limits menu ===
-        case Screen::Type::INPUT_CURRENT_LIMIT:
-            restorePreviousMenu();
-            break;
-        // === motor current limits menu ===
-        case Screen::Type::MOTOR_CURRENT_LIMIT:
-            restorePreviousMenu();
-            break;
-        // === LED brightness menu ===
-        case Screen::Type::LED_BRIGHTNESS:
-            restorePreviousMenu();
-            break;
-        // === motor brake menu ===
-        case Screen::Type::MOTOR_BRAKE:
-            eeprom.setMotorBrake(getValue());
-            restorePreviousMenu();
             break;
         // === advanced menu ===
         case Screen::Type::ADVANCED_MENU:
@@ -321,33 +291,27 @@ void Menu::handleButtonPress()
                 case 4: // Motor Direction
                     screenFlow.next(new MenuScreen(
                         Screen::Type::MOTOR_DIRECTION, 
-                        kMotorDirectionItems, 
-                        sizeof_array(kMotorDirectionItems)
+                        kDirectionItems, 
+                        sizeof_array(kDirectionItems)
                     ));
                     setValue(eeprom.getMotorDirection());
                     break;
-                case 5: // Diagnostics
+                case 5: // Sensor Direction
+                    screenFlow.next(new MenuScreen(
+                        Screen::Type::SENSOR_DIRECTION, 
+                        kDirectionItems, 
+                        sizeof_array(kDirectionItems)
+                    ));
+                    setValue(eeprom.getSensorDirection());
+                    break;
+                case 6: // Diagnostics
                     screenFlow.next(new DiagnosticsScreen(Screen::Type::DIAGNOSTICS));
                     setValue(0);
                     break;
-                case 6: // Back
+                default: // Back
                     restorePreviousMenu();
                     break;
             }
-            break;
-        // === TFT brightness menu ===
-        case Screen::Type::TFT_BRIGHTNESS:
-            restorePreviousMenu();
-            break;
-        // === MOSFET temperature limit menu ===
-        case Screen::Type::MOSFET_TEMPERATURE_LIMIT:
-            eeprom.setMosfetTemperatureLimit(getValue());
-            restorePreviousMenu();
-            break;
-        // === motor temperature limit menu ===
-        case Screen::Type::MOTOR_TEMPERATURE_LIMIT:
-            eeprom.setMotorTemperatureLimit(getValue());
-            restorePreviousMenu();
             break;
         // === motor RPM settings menu ===
         case Screen::Type::MOTOR_RPM_SETTINGS:
@@ -372,29 +336,10 @@ void Menu::handleButtonPress()
                     ));
                     setValue(eeprom.getMaxRPM());
                     break;
-                case 2: // Back
+                default: // Back
                     restorePreviousMenu();
                     break;
             }
-            break;
-        // === motor direction menu ===
-        case Screen::Type::MOTOR_DIRECTION:
-            eeprom.setMotorDirection(getValue());
-            restorePreviousMenu();
-            break;
-        // === min RPM menu ===
-        case Screen::Type::MIN_RPM:
-            eeprom.setMinRPM(getValue());
-            restorePreviousMenu();
-            break;
-        // === max RPM menu ===
-        case Screen::Type::MAX_RPM:
-            eeprom.setMaxRPM(getValue());
-            restorePreviousMenu();
-            break;
-        // === diagnostics menu ===
-        case Screen::Type::DIAGNOSTICS:
-            restorePreviousMenu();
             break;
         // === restore defaults confirmation menu ===
         case Screen::Type::RESTORE_DEFAULTS_CONFIRMATION:
@@ -412,6 +357,24 @@ void Menu::handleButtonPress()
                     restorePreviousMenu();
                     break;
             }
+            break;
+        // === mixed menus ===
+        case Screen::Type::MOTOR_DIRECTION:
+        case Screen::Type::SENSOR_DIRECTION:
+        case Screen::Type::MIN_RPM:
+        case Screen::Type::MAX_RPM:
+        case Screen::Type::TFT_BRIGHTNESS:
+        case Screen::Type::MOSFET_TEMPERATURE_LIMIT:
+        case Screen::Type::MOTOR_TEMPERATURE_LIMIT:
+        case Screen::Type::INPUT_CURRENT_LIMIT:
+        case Screen::Type::MOTOR_CURRENT_LIMIT:
+        case Screen::Type::LED_BRIGHTNESS:
+        case Screen::Type::MOTOR_BRAKE:
+        case Screen::Type::MOTOR_SPEED:
+        case Screen::Type::MOTOR_STALL_TIMEOUT:
+        case Screen::Type::CONTROL_MODE:
+        case Screen::Type::DIAGNOSTICS:
+            restorePreviousMenu();
             break;
         default:
             DEBUG_PRINT(DEBUG_WARNING, "MainMenu: unhandled id: %d", static_cast<int>(screenFlow->getId()));
@@ -435,6 +398,7 @@ void Menu::handleBackButtonPress()
             break;
         case Screen::Type::MAIN_MENU:
             saveEEPROMChanges();
+            loadStartScreen();
             break;
         default:
             restorePreviousMenu();
@@ -528,7 +492,7 @@ void Menu::loadMainMenu()
 void Menu::loadStartScreen()
 {
     screenFlow.setScreen(new StartScreen());
-    setValue(0);
+    setValue(eeprom.getSpeed());
     clearUserInput();
 }
 
@@ -538,8 +502,8 @@ void Menu::loadStartScreen()
  */
 void Menu::loadDashboardScreen()
 {
-    screenFlow.setScreen(new DashboardScreen());
-    setValue(eeprom.getMotorRPM());
+    screenFlow.setScreen(new DashboardScreen(eeprom.isPIDMode() ? 50 : 2));
+    setValue(eeprom.getSpeed());
     clearUserInput();
 }
 
@@ -552,6 +516,13 @@ int32_t Menu::updateRotaryValue(int32_t value)
 {
     screenFlow->setValue(screenFlow->getValue() + (value * screenFlow->getSteps()));
     switch(screenFlow->getId()) {
+        case Screen::Type::DASHBOARD:
+            eeprom.setSpeed(getValue());
+            if (eeprom.isPIDMode()) {
+                // in PID mode, update the PID controller with the new RPM value
+                pid.setRPM(eeprom.getSpeed());
+            }
+            break;
         case Screen::Type::TFT_BRIGHTNESS:
             eeprom.setTFTBrightness(getValue());
             tft_backlight_pwm_set(eeprom.getTFTBrightness());
@@ -567,6 +538,36 @@ int32_t Menu::updateRotaryValue(int32_t value)
         case Screen::Type::MOTOR_CURRENT_LIMIT:
             eeprom.setMotorCurrentLimit(getValue());
             adc.setMotorCurrentLimit(eeprom.getMotorCurrentLimit());
+            break;
+        case Screen::Type::MOTOR_DIRECTION:
+            eeprom.setMotorDirection(getValue());
+            break;
+        case Screen::Type::SENSOR_DIRECTION:
+            eeprom.setSensorDirection(getValue());
+            break;
+        case Screen::Type::MOTOR_BRAKE:
+            eeprom.setMotorBrake(getValue());
+            break;
+        case Screen::Type::CONTROL_MODE:
+            eeprom.setControlMode(getValue());
+            break;
+        case Screen::Type::MIN_RPM:
+            eeprom.setMinRPM(getValue());
+            break;
+        case Screen::Type::MAX_RPM:
+            eeprom.setMaxRPM(getValue());
+            break;
+        case Screen::Type::MOSFET_TEMPERATURE_LIMIT:
+            eeprom.setMosfetTemperatureLimit(getValue());
+            break;
+        case Screen::Type::MOTOR_TEMPERATURE_LIMIT:
+            eeprom.setMotorTemperatureLimit(getValue());
+            break;
+        case Screen::Type::MOTOR_SPEED:
+            eeprom.setSpeed(getValue());
+            break;
+        case Screen::Type::MOTOR_STALL_TIMEOUT:
+            eeprom.setMotorStallTimeout(getValue());
             break;
     }   
     return getValue();
@@ -623,9 +624,6 @@ void Menu::clearUserInput()
     // wait until all buttons are released
     while(isAnyButtonDown()) {
     }
-
-    // some extra time
-    delay(10);
 
     // clear states
     knobButton.clear();

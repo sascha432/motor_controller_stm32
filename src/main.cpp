@@ -150,19 +150,12 @@ void loop()
         int32_t delta = knob.getDeltaPosition();
         if (delta) {
             newPosition = menu.updateRotaryValue(delta);
-            // DEBUG_PRINT(DEBUG_DEBUG, "menu=%d delta=%d", newPosition, delta);
+            DEBUG_PRINT(DEBUG_DEBUG, "menu=%d delta=%d", newPosition, delta);
         }
         // handle LVGL updates
         auto &screenFlow = menu.getScreenFlow();
         switch(screenFlow->getId()) {
             case Screen::Type::DASHBOARD:
-                // TODO
-                // if (delta) {
-                //     eeprom.setMotorRPM(newPosition);
-                //     pid.setRPM(eeprom.getMotorRPM());
-                //     DEBUG_PRINT(DEBUG_DEBUG, "DASHBOARD: rpm=%d", (int)eeprom.getMotorRPM());
-                // }
-                // fallthrough
             case Screen::Type::DIAGNOSTICS:
                 stats.update();
                 screenFlow->update();

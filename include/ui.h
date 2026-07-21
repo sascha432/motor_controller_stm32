@@ -28,6 +28,7 @@ struct Screen
         ADVANCED_MENU,
         MOTOR_RPM_SETTINGS,
         MOTOR_DIRECTION,
+        SENSOR_DIRECTION,
         TFT_BRIGHTNESS,
         CURRENT_LIMITS,
         INPUT_CURRENT_LIMIT,
@@ -134,6 +135,7 @@ protected:
     Type id;
     uint32_t maxAcceleration;
     int32_t steps;
+    int32_t value;
 
     static lv_obj_t *emptyScreen;
 };
@@ -273,7 +275,7 @@ private:
 
 struct DashboardScreen : public Screen
 {
-    DashboardScreen(Type id = Screen::Type::DASHBOARD) :
+    DashboardScreen(uint32_t maxAcceleration, Type id = Screen::Type::DASHBOARD) :
         Screen(id),
         voltageLabel(nullptr),
         currentLabel(nullptr),
@@ -283,7 +285,9 @@ struct DashboardScreen : public Screen
         pwmLabel(nullptr),
         pwmBarBackground(nullptr),
         pwmBarFill(nullptr)
-    {}
+    {
+         this->maxAcceleration = maxAcceleration;
+    }
 
     void update() {
         _refreshVisuals();
