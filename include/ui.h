@@ -251,7 +251,8 @@ struct DiagnosticsScreen :  public Screen
         vccLabel(nullptr),
         currentLabel(nullptr),
         motorTempLabel(nullptr),
-        mosfetTempLabel(nullptr)
+        mosfetTempLabel(nullptr),
+        rpmPwmLabel(nullptr)
     {}
 
     virtual void load() override;
@@ -269,6 +270,7 @@ private:
     lv_obj_t *currentLabel;
     lv_obj_t *motorTempLabel;
     lv_obj_t *mosfetTempLabel;
+    lv_obj_t *rpmPwmLabel;
 };
 
 // === Dashboard Screen ===

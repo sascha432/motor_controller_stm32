@@ -399,6 +399,14 @@ void DiagnosticsScreen::load()
     lv_obj_set_width(mosfetTempLabel, TFT_DIM_WIDTH - 20);
     lv_label_set_long_mode(mosfetTempLabel, LV_LABEL_LONG_CLIP);
 
+    // RPM/PWM label
+    rpmPwmLabel = lv_label_create(container);
+    lv_obj_set_style_text_color(rpmPwmLabel, lv_color_white(), LV_PART_MAIN);
+    lv_obj_set_style_text_font(rpmPwmLabel, Screen::kDiagnosticsScreenLabelFont, LV_PART_MAIN);
+    lv_obj_set_pos(rpmPwmLabel, 0, 100);
+    lv_obj_set_width(rpmPwmLabel, TFT_DIM_WIDTH - 20);
+    lv_label_set_long_mode(rpmPwmLabel, LV_LABEL_LONG_CLIP);
+
     _refreshVisuals();
 
     lv_scr_load(screen);
@@ -435,6 +443,13 @@ void DiagnosticsScreen::_refreshVisuals()
         stats.max.mosfetTemp
     );
     lv_label_set_text(mosfetTempLabel, buf);
+
+    snprintf(buf, sizeof(buf) - 1, "RPM %u/%u PWM %u%%", 
+        pid.stats.rpm.avg(), 
+        pid.getRPM(), 
+        eeprom.getMotorPWM()
+    );
+    lv_label_set_text(rpmPwmLabel, buf);
 }
 
 // === Dashboard Screen ===
