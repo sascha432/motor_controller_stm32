@@ -55,9 +55,7 @@ struct PidController
         rpm(0),
         integralTimeLimit(kIntegralTimeLimit),
         antiWindupReduction(kAntiWindupReduction),
-        avgRPM(0),
-        running(false),
-        reverseDirection(false)
+        running(false)
     {
         setKp(kKpDefault);
         setKi(kKiDefault);
@@ -246,7 +244,7 @@ struct PidController
         lastError = 0;
         lastDerivative = 0;
         integral = 0;
-        avgRPM = 0;
+        rpmStats.reset();
         readFaults();
     }
 
@@ -337,48 +335,53 @@ struct PidController
     {
         // most timers are 16bit counters only
         int32_t delta = getDelta(readEncoderCounter());
-        // reverse direction if wired the opposite way
-        if (reverseDirection) {
+        if (eeprom.isReverseDirection()) {
             delta = -delta;
         }
 
-        // calculate error and derivative
-        int32_t error = (getCountsPerInterval() - delta) ;
-        int32_t derivative = (error - getLastError());
-        setLastError(error);
+        int32_t pwmLevel;
 
-        // apply filter
-        derivative = (derivative + getLastDerivative()) / 2;
-        setLastDerivative(derivative);
+        if (eeprom.isPIDMode()) {
+            // calculate error and derivative
+            int32_t error = (getCountsPerInterval() - delta) ;
+            int32_t derivative = (error - getLastError());
+            setLastError(error);
 
-        // update integral
-        updateIntegral(error);
+            // apply filter
+            derivative = (derivative + getLastDerivative()) / 2;
+            setLastDerivative(derivative);
 
-        // get pwm level and set output
-        int32_t pwmLevel = calcPWMLevel(error, getIntegral(), derivative);
+            // update integral
+            updateIntegral(error);
+
+            // get pwm level and set output
+            pwmLevel = calcPWMLevel(error, getIntegral(), derivative);
+        }
+        else {
+            pwmLevel = eeprom.getMotorPWM() * kMaxPWMLevel / 100;
+        }
 
         // apply new PWM level if motor is running
         if (running) {
-            PID_WRITE_MOTOR_PWM_ON(clampPWMLevel(pwmLevel), 0);//TODO eeprom.getData().getDirection() == EEPROM::kMotorDirectionReverse);
+            PID_WRITE_MOTOR_PWM_ON(clampPWMLevel(pwmLevel), eeprom.isReverseDirection());
         }
 
-        #if 1
-        if (antiWindupReduction) {
-            if (pwmLevel < -kMaxPWMLevel || pwmLevel > (kMaxPWMLevel * 2)) {
-                setIntegral(getIntegral() * antiWindupReduction / 100);
+        if (eeprom.isPIDMode()) {
+            if (antiWindupReduction) {
+                if (pwmLevel < -kMaxPWMLevel || pwmLevel > (kMaxPWMLevel * 2)) {
+                    setIntegral(getIntegral() * antiWindupReduction / 100);
+                }
             }
         }
-        #endif
 
         // uint32_t rpm = delta > 0 ? kIntCountsToRPM(delta) : 0;
-        uint32_t rpm = kIntCountsToRPM(delta & ~(delta >> 31));
+        uint32_t deltaRPM = kIntCountsToRPM(delta & ~(delta >> 31));
 
-        constexpr uint16_t kAvgInterval = 100 / kPIDInterval; // 100Hz avg
-        avgRPM = ((avgRPM * (kAvgInterval - 1)) + rpm) / kAvgInterval;
+        rpmStats.add(deltaRPM);
 
         #if HAVE_DEBUG_PID_CONTROLLER
             lastPwmLevel = pwmLevel;
-            lastRpmMeasured = rpm;
+            lastRpmMeasured = deltaRPM;
             lastDebugNewData = true;
         #endif
     }
@@ -468,10 +471,30 @@ public:
     int32_t KdPreCalc;
     int32_t cpi;
     int32_t cpiIntegralLimit;
-    uint32_t avgRPM;
+    struct {
+        uint32_t sum;
+        uint32_t count;
+
+        void reset() {
+            sum = 0;
+            count = 0;
+        }
+
+        void add(uint32_t value) {
+            sum += value;
+            if (++count > 1000 / kPIDInterval) { // rolling average over 1 second
+                sum -= sum / 16;
+                count -= count / 16;
+            }
+        }
+
+        uint32_t avg() const {
+            return count ? sum / count : 0;
+        }
+    } rpmStats;
 
     bool running;
-    bool reverseDirection;
+    // bool reverseDirection;
     FaultStates faults;
 
     #if HAVE_DEBUG_PID_CONTROLLER

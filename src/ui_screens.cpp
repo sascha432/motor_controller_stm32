@@ -535,7 +535,7 @@ void DashboardScreen::_refreshVisuals()
     snprintf(buf, sizeof(buf) - 1, "%d" "\xC2\xB0" "C", stats.mosfetTemp);
     lv_label_set_text(mosfetTempLabel, buf);
 
-    snprintf(buf, sizeof(buf) - 1, "%u RPM", pid.clampPWMLevel(pid.lastRpmMeasured));
+    snprintf(buf, sizeof(buf) - 1, "%u RPM", pid.clampPWMLevel(pid.rpmStats.avg()));
     // snprintf(buf, sizeof(buf) - 1, "c=%u f=%u ocp=%u sns=%u", pid.faults.count, pid.faults.drv8701Fault, pid.faults.ocpFault, pid.faults.snsoutFault);
     lv_label_set_text(rpmLabel, buf);
 

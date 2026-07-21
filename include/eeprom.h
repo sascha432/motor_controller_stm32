@@ -182,6 +182,11 @@ struct EEPROM
         data.motor_direction = value;
     }
 
+    bool isReverseDirection() const
+    {
+        return data.motor_direction == kMotorDirectionReverse;
+    }
+
     uint8_t getMotorBrake() const
     {
         return data.motor_brake;
@@ -195,6 +200,16 @@ struct EEPROM
     uint8_t getControlMode() const
     {
         return data.control_mode;
+    }
+
+    bool isPIDMode() const
+    {
+        return data.control_mode == kControlModePID;
+    }
+
+    bool isPWMMode() const
+    {
+        return data.control_mode == kControlModePWM;
     }
 
     void setControlMode(uint8_t value) 

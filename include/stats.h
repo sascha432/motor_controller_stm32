@@ -8,8 +8,7 @@
 
 namespace Helpers {
 
-    // DECAY_TIME should be a power of 2 so the compiler can optimize multiply/divide operations into bit shifts
-    template<uint32_t UPDATE_RATE_TIME = 32768>
+    template<uint32_t UPDATE_RATE_TIME = 10000>
     struct MinMax {
         uint32_t lastUpdate;
         int16_t min;
@@ -22,7 +21,6 @@ namespace Helpers {
 
         void reset()
         {
-            lastUpdate = HAL_GetTick();
             min = INT16_MAX;
             max = INT16_MIN;
         }
@@ -34,9 +32,11 @@ namespace Helpers {
             }
             if (value < min) {
                 min = value;
+                lastUpdate = HAL_GetTick();
             }
             if (value > max) {
                 max = value;
+                lastUpdate = HAL_GetTick();
             }
         }
 
@@ -174,10 +174,10 @@ struct Stats {
 
     // stats
     struct {
-        Helpers::MinMax<4096> vcc;
-        Helpers::MinMax<4096> current;
-        Helpers::MinMax<32768> motorTemp;
-        Helpers::MinMax<32768> mosfetTemp;
+        Helpers::MinMax<30000> vcc;
+        Helpers::MinMax<30000> current;
+        Helpers::MinMax<120000> motorTemp;
+        Helpers::MinMax<120000> mosfetTemp;
     } minMax;
 
     // helper variables to store the converted values for display purposes
