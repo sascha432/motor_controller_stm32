@@ -4,6 +4,12 @@
     "cpu": "cortex-m3",
     "extra_flags": "-DSTM32F107xC -DSTM32F1",
     "f_cpu": "72000000L",
+    "hwids": [
+      [
+        "0x0483",
+        "0x5740"
+      ]
+    ],
     "ldscript": "boards/STM32F107XC_FLASH.ld",
     "mcu": "stm32f107vct6",
     "product_line": "STM32F107xC",

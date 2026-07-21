@@ -7,7 +7,7 @@
 - 3.3V supply produces 3.27-3.29V, tested up to 200ma
 - LED cc driver produces 122mA for a 12V LED, shorted with mA range (50R?) 127mA
 - LED driver 27.09V disconnected max. voltage
-- USB connector and diode checked, TODO check 5.1k to data line and data to mcu
+- USB connector and diode checked
 - MCU working
 - DRV8701 no shorts
 - TFT, knob, buttons are working
@@ -24,6 +24,11 @@
 - motor is running with PWM
 - PID controller is regulating
 - DRV8701 current limit and INA OCP working
+- USB not detecting any device: TODO USB-C CC resistors: both CC1 and CC2 need 5.1k to GND for a device-only port.
+D+ and D- continuity from connector to PA12 and PA11.
+VBUS presence at the MCU board when connected to PC.
+Data-capable cable and direct PC port (no hub).
+D+ and D- not swapped.
 
 ### Rev 1.1
 

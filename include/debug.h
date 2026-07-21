@@ -47,7 +47,7 @@ void debug_init(void);
 
     #define DEBUG_PRINT(level, msg, ...) do {} while(0)
 
-#elif DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL
+#elif DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL || DEBUG_OUTPUT == DEBUG_OUTPUT_USB
 
     #define DEBUG_PRINT(level, msg, ...) \
         do { \
