@@ -138,15 +138,6 @@ struct RotaryEncoder {
 
     void isr();
 
-    inline uint8_t readState() const {
-        // copy volatile register to local variable to let the compiler optimize the bit operations
-        uint32_t idr = getGPIOPort()->IDR;
-        
-        return 
-            (((idr >> digitalPinToBit(GPIO_PIN_A)) & 0x1) |         // shift pin A to bit 0
-            ((idr >> (digitalPinToBit(GPIO_PIN_B) - 1)) & 0x2));    // shift pin B to bit 1
-    }
-
     /**
      * @brief Get the Delta Position object and clean up the position counter
      * 
@@ -167,7 +158,6 @@ struct RotaryEncoder {
      */
     void setMaxAcceleration(uint32_t acceleration) 
     {
-        DEBUG_PRINT(DEBUG_DEBUG, "acceleration=%u", acceleration);
         maxAcceleration = acceleration + 1;
     }
 

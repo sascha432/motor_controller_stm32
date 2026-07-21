@@ -89,10 +89,8 @@ void RotaryEncoder<GPIO_PIN_A, GPIO_PIN_B, GPIO_PORT_ADDR>::init()
 template <uint8_t GPIO_PIN_A, uint8_t GPIO_PIN_B, uint32_t GPIO_PORT_ADDR>
 void RotaryEncoder<GPIO_PIN_A, GPIO_PIN_B, GPIO_PORT_ADDR>::clear()
 {
-    __disable_irq();
     position = 0;
     acceleration = 0;
-    __enable_irq();
 }
 
 template <uint8_t GPIO_PIN_A, uint8_t GPIO_PIN_B, uint32_t GPIO_PORT_ADDR>
@@ -133,9 +131,6 @@ void RotaryEncoder<GPIO_PIN_A, GPIO_PIN_B, GPIO_PORT_ADDR>::isr()
         // apply movement
         position -= value;
     }
-
-    // __enable_irq();
-    //  DEBUG_PRINT(DEBUG_DEBUG, "cnt=%d a=%d p=%d", value, acceleration, position);
 }
 
 template struct RotaryEncoder<ROTARY_ENCODER_PIN_A, ROTARY_ENCODER_PIN_B, digitalPinToGPIOBase<ROTARY_ENCODER_PIN_A>()>;

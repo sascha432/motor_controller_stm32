@@ -421,6 +421,10 @@ struct PidController
         faults.count = 0;
     }
 
+    void motorOn();
+    void motorOff();
+    bool motorToggle();
+
     void debugPrintFaults() const 
     {
         DEBUG_PRINT(DEBUG_DEBUG, "FAULT=%d OCP=%d SNSOUT=%d COUNT=%d", faults.drv8701Fault, faults.ocpFault, faults.snsoutFault, faults.count);

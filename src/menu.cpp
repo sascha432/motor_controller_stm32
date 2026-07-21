@@ -112,6 +112,7 @@ void Menu::saveEEPROMChanges()
 void Menu::handleButtonPress()
 {
     DEBUG_PRINT(DEBUG_DEBUG, "enter screen=%p id=%d value=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), getValue());
+    Screen *screen;
     // Handle button press based on the current screen
     switch(screenFlow->getId()) {
         // === start screen ===
@@ -230,25 +231,29 @@ void Menu::handleButtonPress()
         case Screen::Type::CURRENT_LIMITS:
             switch(getValue()) {
                 case 0: // Input Current Limit
-                    screenFlow.next(new SliderScreen(
+                    screen = new SliderScreen(
                         Screen::Type::INPUT_CURRENT_LIMIT, 
                         "Input Current Limit", 
                         eeprom.kCurrentToUint16(UIConstants::kMinInputCurrent), 
                         eeprom.kCurrentToUint16(UIConstants::kMaxInputCurrent), 
                         "A", 
                         current_slider_format_callback
-                    ));
+                    );
+                    screen->setSteps(500 * UIConstants::kStepInputCurrent);
+                    screenFlow.next(screen);
                     setValue(eeprom.getInputCurrentLimit());
                     break;
                 case 1: // Motor Current Limit
-                    screenFlow.next(new SliderScreen(
+                    screen = new SliderScreen(
                         Screen::Type::MOTOR_CURRENT_LIMIT, 
                         "Motor Current Limit", 
                         eeprom.kCurrentToUint16(UIConstants::kMinMotorCurrent), 
                         eeprom.kCurrentToUint16(UIConstants::kMaxMotorCurrent), 
                         "A", 
                         current_slider_format_callback
-                    ));
+                    );
+                    screen->setSteps(500 * UIConstants::kStepMotorCurrent);
+                    screenFlow.next(screen);
                     setValue(eeprom.getMotorCurrentLimit());
                     break;
                 case 2: // Back
@@ -438,8 +443,6 @@ void Menu::handleBackButtonPress()
     DEBUG_PRINT(DEBUG_DEBUG, "leave screen=%p id=%d value=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), getValue());
 }
 
-bool toggleMotor();//TODO remove
-
 /**
  * @brief Handle start button press
  */
@@ -449,7 +452,7 @@ void Menu::handleStartButtonPress()
     switch(screenFlow->getId()) {
         case Screen::Type::START:
         case Screen::Type::DASHBOARD:
-            if (toggleMotor()) {
+            if (pid.motorToggle()) {
                 loadDashboardScreen();
             }
             else {
@@ -547,13 +550,7 @@ void Menu::loadDashboardScreen()
  */
 int32_t Menu::updateRotaryValue(int32_t value)
 {
-    int32_t steps = screenFlow->getSteps();
-    screenFlow->setValue(
-        // add steps as multiplier to the Screen value independent of the rotary encoder acceleration
-        (steps == 1 || steps == 0) ? 
-            value : 
-            (screenFlow->getValue() + static_cast<int32_t>(value - screenFlow->getValue()) * steps)
-    );
+    screenFlow->setValue(screenFlow->getValue() + (value * screenFlow->getSteps()));
     switch(screenFlow->getId()) {
         case Screen::Type::TFT_BRIGHTNESS:
             eeprom.setTFTBrightness(getValue());

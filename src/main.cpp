@@ -14,8 +14,6 @@
 #include "eeprom.h"
 #include "stats.h"
 
-MotorEncoder motorEncoder;
-
 static void button_isr() {
     #if defined(STM32F107xC)
         uint32_t idrD = ((GPIO_TypeDef *)GPIOD_BASE)->IDR;
@@ -114,53 +112,6 @@ void setup()
     menu.loadStartScreen();
 }
 
-void motorOff()
-{
-    PID_WRITE_MOTOR_PWM_OFF();
-    __disable_irq();
-    if (pid.running) {
-        pid.running = false;
-        __enable_irq();
-        Serial.println("STOP");
-        DEBUG_PRINT(DEBUG_DEBUG, "STOP");
-    }
-    else {
-        __enable_irq();
-        Serial.println("ERR=NOT_RUNNING");
-        DEBUG_PRINT(DEBUG_ERROR, "MOTOR NOT RUNNING");
-    }
-}
-
-void motorOn()
-{
-    __disable_irq();
-    if (!pid.running) {
-        pid.running = true;
-        __enable_irq();
-        pid.reset();
-        pid.setRPM(eeprom.getSpeed());
-        Serial.println("START");
-        DEBUG_PRINT(DEBUG_DEBUG, "START: rpm=%d", pid.getRPM());
-    }
-    else {
-        __enable_irq();
-        Serial.println("ERR=RUNNING");
-        DEBUG_PRINT(DEBUG_ERROR, "MOTOR RUNNING");
-    }
-}
-
-bool toggleMotor()
-{
-    if (pid.running) {
-        motorOff();
-        return false;
-    }
-    else {
-        motorOn();
-        return true;
-    }
-}
-
 void loop()
 {
     // handle buttons
@@ -198,7 +149,7 @@ void loop()
         int32_t newPosition;
         int32_t delta = knob.getDeltaPosition();
         if (delta) {
-            newPosition = menu.updateRotaryValue(menu.getValue() + delta);
+            newPosition = menu.updateRotaryValue(delta);
             // DEBUG_PRINT(DEBUG_DEBUG, "menu=%d delta=%d", newPosition, delta);
         }
         // handle LVGL updates
@@ -236,7 +187,7 @@ void loop()
             auto adcValues = adc.readAll();
             triggered = true;
             if (pid.running) {
-                motorOff();
+                pid.motorOff();
             }
             // DEBUG_PRINT(DEBUG_ERROR, "OVER TEMPERATURE: flag=%02x motor=%d mosfet=%d", overTemperature, (int32_t)adcValues.getMotorTemperature(), (int32_t)adcValues.getMosfetTemperature());
         }

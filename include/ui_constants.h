@@ -20,8 +20,8 @@ struct UIConstants
     static constexpr float kStepInputCurrent = 0.5f;                    // input current step in A
     static constexpr float kMinInputCurrent = kStepInputCurrent * 2;    // min. input current in A
     static constexpr float kMaxInputCurrent = 40.0f;                    // max. input current in A
-    static constexpr float kMotorCurrentStep = 0.5f;                    // motor current step in A
-    static constexpr float kMinMotorCurrent = kMotorCurrentStep * 2;    // min. peak motor current in A
+    static constexpr float kStepMotorCurrent = 0.5f;                    // motor current step in A
+    static constexpr float kMinMotorCurrent = kStepMotorCurrent * 2;    // min. peak motor current in A
     static constexpr float kMaxMotorCurrent = 40.0f;                    // max. peak motor current in A
     static constexpr uint16_t kStepMotorRPM = 10;                       // Motor RPM step
     static constexpr uint16_t kMinRPM = kStepMotorRPM * 2;              // Min. Motor RPM
@@ -34,9 +34,9 @@ struct UIConstants
     static constexpr uint32_t kMaxMotorStallTimeout = 10000;            // Motor stall time in milliseconds
     static constexpr int32_t kStepMotorStallTimeout = 100;              // Motor stall time step in milliseconds
     static constexpr uint8_t kMinMosfetTemperature = 50;                // Min. MOSFET temperature in °C
-    static constexpr uint8_t kMaxMosfetTemperature = 175;               // Max. MOSFET temperature in °C
+    static constexpr uint8_t kMaxMosfetTemperature = 125;               // Max. MOSFET temperature in °C
     static constexpr uint8_t kMinMotorTemperature = 30;                 // Min. Motor temperature in °C
-    static constexpr uint8_t kMaxMotorTemperature = 105;                // Max. Motor temperature in °C
+    static constexpr uint8_t kMaxMotorTemperature = 85;                 // Max. Motor temperature in °C
 
     // eeprom default values
     static constexpr uint8_t kDefaultTFTBrightness = 90;                // Default TFT Brightness
@@ -47,8 +47,8 @@ struct UIConstants
     static constexpr uint16_t kDefaultMotorStallTimeout = 1500;         // Default motor stall time in milliseconds
     static constexpr uint16_t kDefaultMinRPM = 10;                      // Default min. motor RPM
     static constexpr uint16_t kDefaultMaxRPM = 15000;                   // Default max. motor RPM
-    static constexpr uint8_t kDefaultMosfetTemperatureLimit = 85;       // Default MOSFET temperature limit in °C
-    static constexpr uint8_t kDefaultMotorTemperatureLimit = 50;        // Default motor temperature limit in °C
+    static constexpr uint8_t kDefaultMosfetTemperatureLimit = 95;       // Default MOSFET temperature limit in °C
+    static constexpr uint8_t kDefaultMotorTemperatureLimit = 55;        // Default motor temperature limit in °C
     static constexpr uint8_t kDefaultMaxPWM = 100;                      // Max. PWM value in percentage (0-100)
     static constexpr uint8_t kDefaultMotorPWM = 20;                     // Default motor PWM value in percentage (0-100)
     static constexpr uint16_t kDefaultMotorRPM = 250;                   // Default motor RPM value in RPM
