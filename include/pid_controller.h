@@ -503,17 +503,17 @@ public:
             uint32_t loop;                  // number of times the PID loop has been called
             int32_t pulse;                  // number of pulses received from the A/B motor encoder
         } counter;
-        struct {
-            uint32_t rpmCounter;            // last value of the RPM counter
+        // struct {
+        //     uint32_t rpmCounter;            // last value of the RPM counter
             // uint32_t analogRpmMeasured;     // last measured RPM value based on the analog encoder pulses
-        } lastValue;
+        // } lastValue;
 
         void reset(uint32_t rpmCounter) {
             rpm.reset();
             pwm.reset();
             counter.loop = 0;
             counter.pulse = 0;
-            lastValue.rpmCounter = rpmCounter;
+            // lastValue.rpmCounter = rpmCounter;
             // lastValue.analogRpmMeasured = 0;
         }
     };
