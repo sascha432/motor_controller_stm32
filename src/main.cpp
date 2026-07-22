@@ -13,6 +13,130 @@
 #include "menu.h"
 #include "eeprom.h"
 #include "stats.h"
+#include "debug.h"
+
+#if defined(USB_LEGACY_BRINGUP)
+
+#if defined(USBCON) && defined(USBD_USE_CDC)
+    #include <USBSerial.h>
+    #include <usbd_if.h>
+    #include <usbd_cdc_if.h>
+    extern USBD_HandleTypeDef hUSBD_Device_CDC;
+#else
+    #error USB CDC library support is required (USBCON + USBD_USE_CDC)
+#endif
+
+static inline USB_OTG_DeviceTypeDef *usb_otg_fs_dev_regs()
+{
+    return (USB_OTG_DeviceTypeDef *)((uint32_t)USB_OTG_FS + USB_OTG_DEVICE_BASE);
+}
+
+#if defined(STM32F107xC)
+static void usb_force_pinmux_f107()
+{
+    // Ensure USB-related control pins are in expected states before CDC init.
+    RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_AFIOEN;
+
+    // PA9 (VBUS sense): input floating to avoid loading external sense network.
+    GPIOA->CRH &= ~(0xFUL << ((9U - 8U) * 4U));
+    GPIOA->CRH |=  (0x4UL << ((9U - 8U) * 4U));
+
+    // PA10 (ID): input with pull-up
+    GPIOA->CRH &= ~(0xFUL << ((10U - 8U) * 4U));
+    GPIOA->CRH |=  (0x8UL << ((10U - 8U) * 4U));
+    GPIOA->ODR |= (1UL << 10U);
+}
+#endif
+
+extern "C" void usb_legacy_init(void)
+{
+#if defined(STM32F107xC)
+    usb_force_pinmux_f107();
+
+    // Prefer B-device VBUS sensing on PA9 when NOVBUSSENS is not available.
+#if defined(USB_OTG_GCCFG_NOVBUSSENS)
+    USB_OTG_FS->GCCFG &= ~(USB_OTG_GCCFG_VBUSASEN | USB_OTG_GCCFG_VBUSBSEN);
+    USB_OTG_FS->GCCFG |= USB_OTG_GCCFG_NOVBUSSENS;
+#else
+    USB_OTG_FS->GCCFG &= ~USB_OTG_GCCFG_VBUSASEN;
+    USB_OTG_FS->GCCFG |= USB_OTG_GCCFG_VBUSBSEN;
+#endif
+#endif
+
+    // Force peripheral mode in case OTG ID pin state keeps the core in host mode.
+    USB_OTG_FS->GUSBCFG &= ~USB_OTG_GUSBCFG_FHMOD;
+    USB_OTG_FS->GUSBCFG |= USB_OTG_GUSBCFG_FDMOD;
+    delay(5);
+
+    SerialUSB.begin();
+
+    // Trigger a fresh host re-enumeration pulse after CDC core init.
+    USBD_reenumerate();
+
+    // Request a B-device session in case session state machine did not start.
+    USB_OTG_FS->GOTGCTL |= USB_OTG_GOTGCTL_SRQ;
+
+    // Some OTG revisions allow software-valid override of session-valid bits.
+    // If these bits are read-only on this silicon, readback will remain unchanged.
+    USB_OTG_FS->GOTGCTL |= (USB_OTG_GOTGCTL_BSVLD | USB_OTG_GOTGCTL_ASVLD);
+
+    // Force one more disconnect/connect pulse at the OTG device level.
+    usb_otg_fs_dev_regs()->DCTL |= USB_OTG_DCTL_SDIS;
+    delay(5);
+    usb_otg_fs_dev_regs()->DCTL &= ~USB_OTG_DCTL_SDIS;
+}
+
+extern "C" void usb_legacy_poll(void)
+{
+    // Keep RX queue drained during setup-only test to avoid backpressure.
+    while (SerialUSB.available() > 0) {
+        (void)SerialUSB.read();
+    }
+}
+
+extern "C" void usb_legacy_write_line(const char *line)
+{
+    if (!line) {
+        return;
+    }
+    SerialUSB.println(line);
+}
+
+static void usb_setup_only_init()
+{
+    DEBUG_PRINT(DEBUG_NOTICE, "USB setup-only bring-up start");
+
+#if defined(STM32F107xC)
+    // Configure OTG FS VBUS/session sensing for device mode.
+    RCC->AHBENR |= RCC_AHBENR_OTGFSEN;
+    
+#if defined(USB_OTG_GCCFG_NOVBUSSENS)
+    USB_OTG_FS->GCCFG &= ~(USB_OTG_GCCFG_VBUSASEN | USB_OTG_GCCFG_VBUSBSEN);
+    USB_OTG_FS->GCCFG |= USB_OTG_GCCFG_NOVBUSSENS;
+#else
+    USB_OTG_FS->GCCFG &= ~USB_OTG_GCCFG_VBUSASEN;
+    USB_OTG_FS->GCCFG |= USB_OTG_GCCFG_VBUSBSEN;
+#endif
+    USB_OTG_FS->GUSBCFG &= ~USB_OTG_GUSBCFG_FHMOD;
+    USB_OTG_FS->GUSBCFG |= USB_OTG_GUSBCFG_FDMOD;
+    usb_force_pinmux_f107();
+
+    DEBUG_PRINT(DEBUG_NOTICE, "USB OTG pre-init GCCFG=0x%08lx GUSBCFG=0x%08lx GOTGCTL=0x%08lx", USB_OTG_FS->GCCFG, USB_OTG_FS->GUSBCFG, USB_OTG_FS->GOTGCTL);
+#endif
+
+    // Initialize legacy USB device stack (weak symbol until library is linked).
+    usb_legacy_init();
+    delay(20);
+
+    const uint32_t gotgctl = USB_OTG_FS->GOTGCTL;
+    const uint32_t gintsts = USB_OTG_FS->GINTSTS;
+
+    DEBUG_PRINT(DEBUG_NOTICE, "USB init st=%u old=%u cfg=%lu addr=%u ep0=%lu conn=%u dtr=%u", hUSBD_Device_CDC.dev_state, hUSBD_Device_CDC.dev_old_state, hUSBD_Device_CDC.dev_config, hUSBD_Device_CDC.dev_address, hUSBD_Device_CDC.ep0_state, CDC_connected() ? 1u : 0u, SerialUSB.dtr() ? 1u : 0u);
+    DEBUG_PRINT(DEBUG_NOTICE, "USB regs GCCFG=%08lx GUSBCFG=%08lx GOTGCTL=%08lx GAHBCFG=%08lx GINTMSK=%08lx GINTSTS=%08lx DCFG=%08lx DCTL=%08lx DSTS=%08lx", USB_OTG_FS->GCCFG, USB_OTG_FS->GUSBCFG, gotgctl, USB_OTG_FS->GAHBCFG, USB_OTG_FS->GINTMSK, gintsts, usb_otg_fs_dev_regs()->DCFG, usb_otg_fs_dev_regs()->DCTL, usb_otg_fs_dev_regs()->DSTS);
+    DEBUG_PRINT(DEBUG_NOTICE, "USB bits CIDSTS=%u BSVLD=%u SRQ=%u SRQINT=%u USBRST=%u ENUMDNE=%u RXFLVL=%u PA9=%u", (gotgctl & USB_OTG_GOTGCTL_CIDSTS) ? 1u : 0u, (gotgctl & USB_OTG_GOTGCTL_BSVLD) ? 1u : 0u, (gotgctl & USB_OTG_GOTGCTL_SRQ) ? 1u : 0u, (gintsts & USB_OTG_GINTSTS_SRQINT) ? 1u : 0u, (gintsts & USB_OTG_GINTSTS_USBRST) ? 1u : 0u, (gintsts & USB_OTG_GINTSTS_ENUMDNE) ? 1u : 0u, (gintsts & USB_OTG_GINTSTS_RXFLVL) ? 1u : 0u, (GPIOA->IDR >> 9U) & 1U);
+}
+
+#endif
 
 static void button_isr() 
 {
@@ -48,11 +172,27 @@ static void pid_fault_isr()
     pid.fault_isr();
 }
 
-#include "stm32f107xc.h"
-
 void setup()
 {
     debug_init();
+
+#if defined(USB_LEGACY_BRINGUP)
+    usb_setup_only_init();
+
+    for(;;) {
+        delay(1000);
+        usb_legacy_poll();
+        const uint32_t gotgctl = USB_OTG_FS->GOTGCTL;
+        const uint32_t gintsts = USB_OTG_FS->GINTSTS;
+        DEBUG_PRINT(DEBUG_DEBUG, "USB hb t=%lu st=%u old=%u cfg=%lu addr=%u ep0=%lu conn=%u dtr=%u", millis(), hUSBD_Device_CDC.dev_state, hUSBD_Device_CDC.dev_old_state, hUSBD_Device_CDC.dev_config, hUSBD_Device_CDC.dev_address, hUSBD_Device_CDC.ep0_state, CDC_connected() ? 1u : 0u, SerialUSB.dtr() ? 1u : 0u);
+        DEBUG_PRINT(DEBUG_DEBUG, "USB hb regs GOTGCTL=%08lx GAHBCFG=%08lx GINTMSK=%08lx GINTSTS=%08lx DCFG=%08lx DCTL=%08lx DSTS=%08lx", gotgctl, USB_OTG_FS->GAHBCFG, USB_OTG_FS->GINTMSK, gintsts, usb_otg_fs_dev_regs()->DCFG, usb_otg_fs_dev_regs()->DCTL, usb_otg_fs_dev_regs()->DSTS);
+        DEBUG_PRINT(DEBUG_DEBUG, "USB hb bits CIDSTS=%u BSVLD=%u SRQ=%u SRQINT=%u USBRST=%u ENUMDNE=%u RXFLVL=%u PA9=%u", (gotgctl & USB_OTG_GOTGCTL_CIDSTS) ? 1u : 0u, (gotgctl & USB_OTG_GOTGCTL_BSVLD) ? 1u : 0u, (gotgctl & USB_OTG_GOTGCTL_SRQ) ? 1u : 0u, (gintsts & USB_OTG_GINTSTS_SRQINT) ? 1u : 0u, (gintsts & USB_OTG_GINTSTS_USBRST) ? 1u : 0u, (gintsts & USB_OTG_GINTSTS_ENUMDNE) ? 1u : 0u, (gintsts & USB_OTG_GINTSTS_RXFLVL) ? 1u : 0u, (GPIOA->IDR >> 9U) & 1U);
+
+        char usbLine[96];
+        snprintf(usbLine, sizeof(usbLine), "[USB-SETUP] t=%lu GCCFG=0x%08lx", millis(), (unsigned long)USB_OTG_FS->GCCFG);
+        usb_legacy_write_line(usbLine);
+    }
+#endif
 
     // Initialize and read EEPROM on I2C1 on PB8/9
     eeprom.init();

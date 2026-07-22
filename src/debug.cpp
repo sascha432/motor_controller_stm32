@@ -88,7 +88,7 @@ void debug_init(void)
 {
     #if DEBUG_OUTPUT == DEBUG_OUTPUT_SWD
         debug_swd_init();
-    #elif DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL
+    #elif DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL || DEBUG_OUTPUT == DEBUG_OUTPUT_USB
         Serial.begin(115200);
     #elif DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL4
         Serial4.begin(115200);
