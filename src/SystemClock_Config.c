@@ -5,6 +5,7 @@
 */
 
 #include <stm32f1xx.h>
+#include <stm32f1xx_hal_rcc_ex.h>
 
 #if defined(STM32F107xC) 
 
@@ -81,6 +82,10 @@ void SystemClock_Config(void)
 
     // PLL multiplier x9
     RCC->CFGR |= RCC_CFGR_PLLMULL9;
+
+    // STM32F107 OTG FS needs a 48 MHz clock source.
+    // For this clock tree, select PLL/3 for USB.
+    RCC->CFGR &= ~RCC_CFGR_OTGFSPRE;
 
     /*
      * Enable PLL and wait until it locks.

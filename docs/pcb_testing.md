@@ -24,11 +24,7 @@
 - motor is running with PWM
 - PID controller is regulating
 - DRV8701 current limit and INA OCP working
-- USB not detecting any device: TODO USB-C CC resistors: both CC1 and CC2 need 5.1k to GND for a device-only port.
-D+ and D- continuity from connector to PA12 and PA11.
-VBUS presence at the MCU board when connected to PC.
-Data-capable cable and direct PC port (no hub).
-D+ and D- not swapped.
+- USB not detecting any device - CC1/CC2 resistors working, D+/- connected to MCU DP DN, tvs diode right direction
 - MT6701 analog sensor working as counter to check if the motor turns
 
 ### Rev 1.1

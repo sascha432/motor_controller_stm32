@@ -48,16 +48,10 @@ static void pid_fault_isr()
     pid.fault_isr();
 }
 
+#include "stm32f107xc.h"
+
 void setup()
 {
-    #ifdef PIO_FRAMEWORK_ARDUINO_ENABLE_CDC
-    #if defined(STM32F107xC)
-    // STM32F107 USB clock must be 48 MHz for FS enumeration.
-    // With PLLCLK=72 MHz this requires OTGFSPRE = /3.
-    RCC->CFGR &= ~RCC_CFGR_OTGFSPRE;
-    #endif
-    Serial.begin(115200);
-    #endif
     debug_init();
 
     // Initialize and read EEPROM on I2C1 on PB8/9
@@ -86,7 +80,6 @@ void setup()
     adc.init();
     // DAC
     adc.initDAC();
-
     // PID controller
     pid.init(pid_timer_isr, pid_fault_isr);
 
