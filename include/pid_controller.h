@@ -8,11 +8,12 @@
 #include "helpers.h"
 #include "pins.h"
 #include "eeprom.h"
+#include "stats.h"
 
 struct PidController
 {
-    static constexpr float kKpDefault = 0.12f;
-    static constexpr float kKiDefault = 0.8f;
+    static constexpr float kKpDefault = 0.3f;
+    static constexpr float kKiDefault = 0.5f;
     static constexpr float kKdDefault = 0.0f;
     static constexpr uint16_t kMaxPWMLevel = kPWMFrequencyToARR<20000>();   // Motor PWM 20Khz
     static constexpr uint16_t kPPR = 1024;                                  // MT6701 PPR
@@ -29,6 +30,7 @@ struct PidController
             (1800.0f / kMaxPWMLevel) *
             (18.0f / kPWMScaleMultiplier)
         );
+    static constexpr bool kProgramPPR = false;                              // set to true to program the MT6701 encoder during boot over i2c
 
     /*
         the kScaleFactor calculation gives the following range for tuning PID values (Kp, Ki, Kd)
@@ -54,6 +56,7 @@ struct PidController
         NONE = 0,
         STALL,
         SENSOR,
+        SENSOR_REVERSE,
         MOTOR_OVER_TEMPERATURE,
         MOSFET_OVER_TEMPERATURE,
         FAULT,
@@ -61,9 +64,47 @@ struct PidController
         SNSOUT,
     };
 
+    struct DebugProtocol {
+
+        enum class PacketType : uint8_t {
+            START,
+            STOP,
+            ERROR,
+            PID,
+            ADC
+        };
+
+        struct HeaderType {
+            uint16_t crc;
+            uint16_t length;
+            PacketType type;
+        };
+
+        struct ErrorType {
+            ErrorCodeType errorCode;
+            uint32_t timestamp;
+            int32_t value;
+        };
+
+        struct PidLoopType {
+            uint32_t sequence;
+            uint16_t rpm;
+            uint16_t pwmLevel;
+        };
+
+        struct ADCType {
+            uint16_t voltage;
+            uint16_t current;
+            int8_t motorTemperature;
+            int8_t mosfetTemperature;
+        };
+
+    };
+
     PidController() :
         timer(TIM2),
         rpm(0),
+        motorDirection(EEPROM::kMotorDirectionForward),
         integralTimeLimit(kIntegralTimeLimit),
         antiWindupReduction(kAntiWindupReduction),
         running(false)
@@ -149,6 +190,11 @@ struct PidController
         return std::clamp<int32_t>(value, 0, kMaxPWMLevel);
     }
 
+    /**
+     * @brief Set target RPM and update limits
+     * 
+     * @param value 
+     */
     inline void setRPM(uint32_t value) 
     {
         // rev. per minute
@@ -159,17 +205,62 @@ struct PidController
         cpiIntegralLimit = cpi * integralTimeLimit / kPIDInterval;
     }
 
+    /**
+     * @brief Get target RPM
+     * 
+     * @return uint32_t 
+     */
     inline uint32_t getRPM() const 
     {
         return rpm;
     }
 
+    /**
+     * @brief Set the motor direction
+     * 
+     * @param forward 
+     */
+    void setMotorDirection(bool forward) 
+    {
+        motorDirection = forward ? EEPROM::kMotorDirectionForward : EEPROM::kMotorDirectionReverse;
+    }
+
+    /**
+     * @brief Return true if the motor direction is forward, false otherwise
+     * 
+     * @return true 
+     * @return false 
+     */
+    bool isForwardMotorDirection() const 
+    {
+        return motorDirection == EEPROM::kMotorDirectionForward;
+    }
+
+    /**
+     * @brief Toggle the motor direction
+     */
+    void toggleMotorDirection() 
+    {
+        motorDirection = (motorDirection == EEPROM::kMotorDirectionForward) ? EEPROM::kMotorDirectionReverse : EEPROM::kMotorDirectionForward;
+    }
+
+    /**
+     * @brief Clamp RPM
+     * 
+     * @param value 
+     * @return uint32_t 
+     */
     inline uint32_t clampRPM(int32_t value) const 
     {
         return std::clamp<int32_t>(value, 0, 55000);
     }
 
-    // get delta since last call, counter is 16bit only
+    /**
+     * @brief Get delta since last call, counter is 16bit only
+     * 
+     * @param counter 
+     * @return int32_t 
+     */
     inline int32_t getDelta(uint32_t counter) 
     {
         int16_t delta = (int16_t)counter - (int16_t)lastCounter;
@@ -177,16 +268,31 @@ struct PidController
         return delta;
     }
 
+    /**
+     * @brief Read the encoder counter (TIM4->CNT)
+     * 
+     * @return uint16_t 
+     */
     inline uint16_t readEncoderCounter() const 
     {
         return TIM4->CNT;
     }
+
+    /**
+     * @brief Read the analog signal RPM counter (TIM5->CNT)
+     * 
+     * @return uint16_t 
+     */
 
     inline uint16_t readRpmCounter() const 
     {
         return TIM5->CNT;
     }
 
+    /**
+     * @brief Reset controller
+     * 
+     */
     void reset();
 
     void setIntegral(int32_t value) {
@@ -230,8 +336,6 @@ struct PidController
         return cpi;
     }
 
-    void printDebug(Stream &stream) const;
-
     /**
      * @brief Interrupt service routine for the PID controller.
      * 
@@ -258,10 +362,33 @@ struct PidController
         faults.count = 0;
     }
 
+    /**
+     * @brief Turn motor on in the specified direction
+     * 
+     * @param direction 
+     */
     void motorOn();
+
+    /**
+     * @brief Turn motor off
+     * 
+     */
     void motorOff();
+
+    /**
+     * @brief Toggle motor state. If the motor is running, it will be turned off. If the motor is off, it will be turned on in the specified direction
+     * 
+     * @param direction 
+     * @return true the motor is running after the call
+     * @return false the motor is not running after the call
+     */
     bool motorToggle();
 
+    /**
+     * @brief Set the Error Code and stop PID controller
+     * 
+     * @param code 
+     */
     void setErrorCode(ErrorCodeType code) 
     {
         PID_WRITE_MOTOR_PWM_OFF();
@@ -269,9 +396,59 @@ struct PidController
         errorCode = code;
     }
 
+    /**
+     * @brief Get the Error Code
+     * 
+     * @return ErrorCodeType 
+     */
     ErrorCodeType getErrorCode() const 
     {
         return errorCode;
+    }
+
+    /**
+     * @brief Return true if an error code is set, false otherwise
+     * 
+     * @return true 
+     * @return false 
+     */
+    bool hasErrorCode() const 
+    {
+        return errorCode != ErrorCodeType::NONE;
+    }
+
+    /**
+     * @brief Print the current error code as a string into the provided buffer.
+     * 
+     * @param buf Buffer to store the error string.
+     * @param bufSize Size of the buffer.
+     * @return size_t Number of characters written.
+     */
+    size_t errorPrintf(char *buf, size_t bufSize) const 
+    {
+        switch(errorCode) {
+            case ErrorCodeType::NONE:
+                return snprintf(buf, bufSize, "NONE");
+            case ErrorCodeType::STALL:
+                return snprintf(buf, bufSize, "STALL");
+            case ErrorCodeType::SENSOR:
+                return snprintf(buf, bufSize, "SENSOR");
+            case ErrorCodeType::SENSOR_REVERSE:
+                return snprintf(buf, bufSize, "SENSOR REVERSE");
+            case ErrorCodeType::MOTOR_OVER_TEMPERATURE:
+                return snprintf(buf, bufSize, "MOTOR %d" "\xC2\xB0" "C", ::stats.motorTemp);
+            case ErrorCodeType::MOSFET_OVER_TEMPERATURE:
+                return snprintf(buf, bufSize, "MOSFET %d" "\xC2\xB0" "C", ::stats.mosfetTemp);
+            default:
+                break;
+            // case ErrorCodeType::FAULT:
+            //     return snprintf(buf, bufSize, "FAULT");
+            // case ErrorCodeType::OCP:
+            //     return snprintf(buf, bufSize, "OCP");
+            // case ErrorCodeType::SNSOUT:
+            //     return snprintf(buf, bufSize, "MOTOR OCP");
+        }
+        return snprintf(buf, bufSize, "ERROR #%d", static_cast<int>(errorCode));
     }
 
     void debugPrintFaults() const 
@@ -298,16 +475,17 @@ public:
     };
 
 public:
-    HardwareTimer timer;
+    HardwareTimer timer;                // timer for the PID loop
 
-    float Kp;
+    float Kp;                           // P, I, D ...
     float Ki;
     float Kd;
-    uint32_t rpm;
+    uint32_t rpm;                       // target RPM
+    uint32_t motorDirection;            // motor direction
     uint16_t integralTimeLimit;
     uint16_t antiWindupReduction;
 
-    uint32_t lastCounter;
+    uint32_t lastCounter;               // last encoder counter value
     int32_t integral;
     int32_t lastError;
     int32_t lastDerivative;
@@ -318,45 +496,33 @@ public:
     int32_t cpi;
     int32_t cpiIntegralLimit;
 
-    struct Average {
-        uint32_t sum;
-        uint32_t count;
+    struct StatsType {
+        Helpers::LowPass<16> rpm;
+        Helpers::LowPass<16> pwm;
+        struct {
+            uint32_t loop;                  // number of times the PID loop has been called
+            int32_t pulse;                  // number of pulses received from the A/B motor encoder
+        } counter;
+        struct {
+            uint32_t rpmCounter;            // last value of the RPM counter
+            // uint32_t analogRpmMeasured;     // last measured RPM value based on the analog encoder pulses
+        } lastValue;
 
-        Average() : sum(0), count(0) {}
-
-        void reset() {
-            *this = Average();
-        }
-
-        void add(uint32_t value) {
-            sum += value;
-            if (++count > 1000 / kPIDInterval) { // rolling average over 1 second
-                sum -= sum / 16;
-                count -= count / 16;
-            }
-        }
-
-        uint32_t avg() const {
-            return count ? sum / count : 0;
+        void reset(uint32_t rpmCounter) {
+            rpm.reset();
+            pwm.reset();
+            counter.loop = 0;
+            counter.pulse = 0;
+            lastValue.rpmCounter = rpmCounter;
+            // lastValue.analogRpmMeasured = 0;
         }
     };
 
-    struct {
-        Average rpm;
-        Average pwm;
-    } stats;
+    StatsType stats;
+    FaultStates faults;             // DRV8701 and ocp faults
+    ErrorCodeType errorCode;        // last error
 
-    bool running;
-    FaultStates faults;
-    uint32_t loopCounter;
-    uint32_t pulseCounter;
-    ErrorCodeType errorCode;
-
-    #if HAVE_DEBUG_PID_CONTROLLER
-        volatile uint32_t lastRpmMeasured;
-        volatile uint32_t lastPwmLevel;
-        volatile bool lastDebugNewData = false;
-    #endif
+    volatile bool running;          // true if the PID controller is running
 };
 
 extern PidController pid;

@@ -11,7 +11,7 @@
 #define VERSION_PATCH           0
 
 #define PCB_REV_MAJOR           1
-#define PCB_REV_MINOR           1
+#define PCB_REV_MINOR           0
 
 // === UI constants ===
 struct UIConstants 
@@ -25,7 +25,7 @@ struct UIConstants
     static constexpr float kMaxMotorCurrent = 40.0f;                    // max. peak motor current in A
     static constexpr uint16_t kStepMotorRPM = 10;                       // Motor RPM step
     static constexpr uint16_t kMinRPM = kStepMotorRPM * 2;              // Min. Motor RPM
-    static constexpr uint16_t kMaxRPM = 15000;                          // Max. Motor RPM
+    static constexpr uint16_t kMaxRPM = 55000;                          // Max. Motor RPM
     static constexpr uint8_t kMinTFTBrightness = 5;                     // Min. TFT Brightness
     static constexpr uint8_t kMaxTFTBrightness = 100;                   // Max. TFT Brightness
     static constexpr uint8_t kMinLEDBrightness = 0;                     // Min. LED Brightness
@@ -33,16 +33,16 @@ struct UIConstants
     static constexpr uint32_t kMinMotorStallTimeout = 100;              // Motor stall time in milliseconds
     static constexpr uint32_t kMaxMotorStallTimeout = 10000;            // Motor stall time in milliseconds
     static constexpr int32_t kStepMotorStallTimeout = 100;              // Motor stall time step in milliseconds
-    static constexpr uint8_t kMinMosfetTemperature = 50;                // Min. MOSFET temperature in °C
+    static constexpr uint8_t kMinMosfetTemperature = 25;                // Min. MOSFET temperature in °C
     static constexpr uint8_t kMaxMosfetTemperature = 125;               // Max. MOSFET temperature in °C
-    static constexpr uint8_t kMinMotorTemperature = 30;                 // Min. Motor temperature in °C
+    static constexpr uint8_t kMinMotorTemperature = 25;                 // Min. Motor temperature in °C
     static constexpr uint8_t kMaxMotorTemperature = 85;                 // Max. Motor temperature in °C
 
     // eeprom default values
     static constexpr uint8_t kDefaultTFTBrightness = 90;                // Default TFT Brightness
     static constexpr uint8_t kDefaultLEDBrightness = 25;                // Default LED Brightness
-    static constexpr float kDefaultInputCurrent = 10.0f;                // Default input current in A
-    static constexpr float kDefaultMotorCurrent = 40.0f;                // Default peak motor current in A
+    static constexpr float kDefaultInputCurrent = 5.0f;                 // Default input current in A
+    static constexpr float kDefaultMotorCurrent = 20.0f;                // Default peak motor current in A
     static constexpr uint8_t kDefaultMotorBrake = 50;                   // Default motor brake in percentage (0-100)
     static constexpr uint16_t kDefaultMotorStallTimeout = 1500;         // Default motor stall time in milliseconds
     static constexpr uint16_t kDefaultMinRPM = 10;                      // Default min. motor RPM

@@ -5,7 +5,7 @@ learn how the stm32 works...
 
 ## Features
 
-- 12-36V, 20A continuous, 40A peak
+- 8-36V, 20A continuous, 40A peak
 - Adjustable cycle by cycle motor current limit (0.5-40A)
 - Adjustable max. current with signal LED (0.5-40A)
 - 1.14" 135x240 TFT display, rotary encoder and 3 buttons for easy navigation

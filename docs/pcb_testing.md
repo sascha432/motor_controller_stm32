@@ -29,6 +29,7 @@ D+ and D- continuity from connector to PA12 and PA11.
 VBUS presence at the MCU board when connected to PC.
 Data-capable cable and direct PC port (no hub).
 D+ and D- not swapped.
+- MT6701 analog sensor working as counter to check if the motor turns
 
 ### Rev 1.1
 

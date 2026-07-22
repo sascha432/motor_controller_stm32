@@ -110,8 +110,12 @@ void InfoScreen::load()
 {
     DEBUG_PRINT(DEBUG_NOTICE, "message=%s", message ? message : "<NULL>");
     Screen::load();
-    lv_obj_t *label = lv_label_create(screen);
-    lv_label_set_text(label, message);
+    label = lv_label_create(screen);
+    if (message) {
+        lv_label_set_text(label, message);
+        free(message);
+        message = nullptr;
+    }
     lv_obj_set_style_text_color(label, lv_color_white(), LV_PART_MAIN);
     lv_obj_set_style_text_font(label, font, LV_PART_MAIN);
     lv_obj_center(label);
@@ -444,10 +448,10 @@ void DiagnosticsScreen::_refreshVisuals()
     );
     lv_label_set_text(mosfetTempLabel, buf);
 
-    snprintf(buf, sizeof(buf) - 1, "RPM %u/%u #%u", 
-        pid.stats.rpm.avg(), 
-        pid.getRPM(), 
-        pid.readRpmCounter()
+    snprintf(buf, sizeof(buf) - 1, "RPM %u/%u PWM %u%%", 
+        pid.stats.rpm.get(), 
+        pid.getRPM(),
+        pid.stats.pwm.get()
     );
     lv_label_set_text(rpmPwmLabel, buf);
 }
@@ -537,7 +541,7 @@ void DashboardScreen::_refreshVisuals()
 {
     char buf[32];
 
-    uint32_t pwmPercent = pid.stats.pwm.avg() * 100 / pid.kMaxPWMLevel;
+    uint32_t pwmPercent = pid.stats.pwm.get() * 100 / pid.kMaxPWMLevel;
     snprintf(buf, sizeof(buf) - 1, "%u.%uV (%u.%uV)", CONVERT_TO_FP1(stats.vcc), CONVERT_TO_FP1(stats.max.vcc));
     lv_label_set_text(voltageLabel, buf);
 
@@ -550,33 +554,28 @@ void DashboardScreen::_refreshVisuals()
     snprintf(buf, sizeof(buf) - 1, "%d" "\xC2\xB0" "C", stats.mosfetTemp);
     lv_label_set_text(mosfetTempLabel, buf);
 
-    if (pid.errorCode != PidController::ErrorCodeType::NONE) {
-        switch(pid.errorCode) {
-            case PidController::ErrorCodeType::MOTOR_OVER_TEMPERATURE:
-                snprintf(buf, sizeof(buf) - 1, "MOTOR %d" "\xC2\xB0" "C", stats.motorTemp);
-                break;
-            case PidController::ErrorCodeType::MOSFET_OVER_TEMPERATURE:
-                snprintf(buf, sizeof(buf) - 1, "MOSFET %d" "\xC2\xB0" "C", stats.mosfetTemp);
-                break;
-            default:
-                snprintf(buf, sizeof(buf) - 1, "ERROR #%u", static_cast<uint32_t>(pid.getErrorCode()));
-                break;
-        }
+    if (pid.hasErrorCode()) {
+        pid.errorPrintf(buf, sizeof(buf) - 1);
+    }
+    else if (eeprom.isPIDMode()) {
+        snprintf(buf, sizeof(buf) - 1, "%u RPM (%u)", pid.clampPWMLevel(pid.stats.rpm.get()), pid.getRPM());
     }
     else {
-        if (eeprom.isPIDMode()) {
-            snprintf(buf, sizeof(buf) - 1, "%u RPM (%u)", pid.clampPWMLevel(pid.stats.rpm.avg()), pid.getRPM());
-        }
-        else {
-            snprintf(buf, sizeof(buf) - 1, "%u RPM", pid.clampPWMLevel(pid.stats.rpm.avg()));
-        }
+        snprintf(buf, sizeof(buf) - 1, "%u RPM", pid.clampPWMLevel(pid.stats.rpm.get()));
     }
-
-    // snprintf(buf, sizeof(buf) - 1, "c=%u f=%u ocp=%u sns=%u", pid.faults.count, pid.faults.drv8701Fault, pid.faults.ocpFault, pid.faults.snsoutFault);
     lv_label_set_text(rpmLabel, buf);
 
     lv_label_set_text_fmt(pwmLabel, "PWM %u%%", pwmPercent);
 
-    const lv_coord_t fillWidth = static_cast<lv_coord_t>((kDashboardScreenContainerWidth * pid.stats.pwm.avg()) / pid.kMaxPWMLevel);
+    const lv_coord_t fillWidth = static_cast<lv_coord_t>((kDashboardScreenContainerWidth * pid.stats.pwm.get()) / pid.kMaxPWMLevel);
     lv_obj_set_size(pwmBarFill, fillWidth, 16);
+}
+
+// === Start Screen ===
+
+void StartScreen::update() 
+{
+    pid.isForwardMotorDirection() ?
+        setMessage("START FORWARD") :
+        setMessage("START REVERSE");        
 }

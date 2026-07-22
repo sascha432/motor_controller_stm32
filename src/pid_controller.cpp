@@ -14,11 +14,7 @@ void PidController::reset()
     lastError = 0;
     lastDerivative = 0;
     integral = 0;
-    stats.rpm.reset();
-    stats.pwm.reset();
-    TIM5->CNT = 0; // RPM counter
-    pulseCounter = 0;
-    loopCounter = 0;
+    stats.reset(readRpmCounter());
     errorCode = ErrorCodeType::NONE;
     faults.reset();
     readFaults();
@@ -33,14 +29,6 @@ void PidController::disable()
     detachInterrupt(digitalPinToInterrupt(DRV_SNSOUT_PIN));
 }
 
-// volatile uint32_t rpm_counter = 0;
-
-// static void counter_callback()
-// {
-//     rpm_counter++;
-//     // pid.rpm_isr();
-// }
-
 void PidController::enable(InterruptCallbackType callback)
 {
     TIM4->CR1 |= TIM_CR1_CEN;
@@ -48,7 +36,6 @@ void PidController::enable(InterruptCallbackType callback)
     attachInterrupt(digitalPinToInterrupt(DRV8701_FAULT_PIN), callback, FALLING);
     attachInterrupt(digitalPinToInterrupt(OCP_INT_PIN), callback, FALLING);
     attachInterrupt(digitalPinToInterrupt(DRV_SNSOUT_PIN), callback, FALLING);
-    // attachInterrupt(digitalPinToInterrupt(ENC1_ANALOG_PIN), counter_callback, FALLING);
     timer.resume();
     // update faults
     readFaults();
@@ -155,58 +142,18 @@ void PidController::init(InterruptCallbackType callback, InterruptCallbackType f
     enable(faultCallback);
 }
 
-void PidController::printDebug(Stream &stream) const
-{
-    stream.println("=== PID DEBUG START ===");
-    stream.print("RPM=");
-    stream.print(rpm);
-    stream.print(" Kp=");
-    stream.print(Kp, 2);
-    stream.print(" Ki=");
-    stream.print(Ki, 2);
-    stream.print(" Kd=");
-    stream.println(Kd, 2);
-    stream.print("KpPreCalc=");
-    stream.print(KpPreCalc);
-    stream.print(" KiPreCalc=");
-    stream.print(KiPreCalc);
-    stream.print(" KdPreCalc=");
-    stream.println(KdPreCalc);
-    stream.print("cpi=");
-    stream.print(cpi);
-    stream.print(" cpiIntegralLimit=");
-    stream.print(cpiIntegralLimit);
-    stream.print(" antiWindupReduction=");
-    stream.print(antiWindupReduction);
-    stream.print(" integralTimeLimit=");
-    stream.println(integralTimeLimit);
-    stream.print("integral=");
-    stream.print(integral);
-    stream.print(" lastError=");
-    stream.print(static_cast<uint32_t>(lastError));
-    stream.print(" lastDerivative=");
-    stream.println(lastDerivative);
-    stream.print("encoderCounter=");
-    stream.println(readEncoderCounter());
-    stream.println("=== PID DEBUG END ===");
-}
-
 void PidController::motorOn()
 {
     __disable_irq();
-    if (!running)
-    {
+    if (!running) {
         running = true;
         __enable_irq();
         reset();
-        setRPM(eeprom.getSpeed());
-        Serial.println("START");
+        setRPM(eeprom.getMotorRPM());
         DEBUG_PRINT(DEBUG_DEBUG, "START: rpm=%d", getRPM());
     }
-    else
-    {
+    else {
         __enable_irq();
-        Serial.println("ERR=RUNNING");
         DEBUG_PRINT(DEBUG_ERROR, "MOTOR RUNNING");
     }
 }
@@ -215,30 +162,24 @@ void PidController::motorOff()
 {
     PID_WRITE_MOTOR_PWM_OFF();
     __disable_irq();
-    if (running)
-    {
+    if (running) {
         running = false;
         __enable_irq();
-        Serial.println("STOP");
         DEBUG_PRINT(DEBUG_DEBUG, "STOP");
     }
-    else
-    {
+    else {
         __enable_irq();
-        Serial.println("ERR=NOT_RUNNING");
         DEBUG_PRINT(DEBUG_ERROR, "MOTOR NOT RUNNING");
     }
 }
 
 bool PidController::motorToggle()
 {
-    if (running)
-    {
+    if (running) {
         motorOff();
         return false;
     }
-    else
-    {
+    else {
         motorOn();
         return true;
     }
@@ -249,12 +190,16 @@ void PidController::isr()
 {
     // most timers are 16bit counters only
     int32_t delta = getDelta(readEncoderCounter());
-    pulseCounter += delta;
-    // invert if sensor and motor direction are different
-    if (eeprom.getMotorDirection() != eeprom.getSensorDirection())
-    {
+    // apply fixed sensor, motor and selected motor direction to delta
+    if (
+        eeprom.isForwardMotorDirection() ? 
+            (eeprom.getSensorDirection() != motorDirection) : 
+            (eeprom.getSensorDirection() == motorDirection)
+    ) {
         delta = -delta;
     }
+
+    stats.counter.pulse += delta;
 
     int32_t pwmLevel;
 
@@ -280,57 +225,60 @@ void PidController::isr()
         pwmLevel = eeprom.getMotorPWM() * kMaxPWMLevel / 100;
     }
 
-    auto clampedPwmLevel = clampPWMLevel(pwmLevel);
+    // update pwm stats
+    int32_t clampedPwmLevel = clampPWMLevel(pwmLevel);
+    stats.pwm.update(clampedPwmLevel);
 
     // apply new PWM level if motor is running
     if (running)
     {
-        PID_WRITE_MOTOR_PWM_ON(clampedPwmLevel, eeprom.isReverseDirection());
-    }
+        PID_WRITE_MOTOR_PWM_ON(clampedPwmLevel, motorDirection);
 
-    if (eeprom.isPIDMode())
-    {
-        if (antiWindupReduction)
-        {
-            if (pwmLevel < -kMaxPWMLevel || pwmLevel > (kMaxPWMLevel * 2))
-            {
-                setIntegral(getIntegral() * antiWindupReduction / 100);
+        if (eeprom.isPIDMode()) {
+            if (antiWindupReduction) {
+                if (pwmLevel < -kMaxPWMLevel || pwmLevel > (kMaxPWMLevel * 2)) {
+                    setIntegral(getIntegral() * antiWindupReduction / 100);
+                }
             }
         }
     }
 
-    // uint32_t rpm = delta > 0 ? kIntCountsToRPM(delta) : 0;
-    uint32_t deltaRPM = kIntCountsToRPM(delta & ~(delta >> 31));
-
-    stats.rpm.add(deltaRPM);
-    stats.pwm.add(clampedPwmLevel);
+    // update rpm stats
+    int32_t deltaRPM = kIntCountsToRPM(delta);
+    stats.rpm.update(deltaRPM);
 
     if (running) {
-
-        loopCounter++;
-        if (loopCounter == (500 / kPIDInterval)) { // 500ms
-            if (readRpmCounter() >= 1 && pulseCounter < 10) { // we have 1 rotation but less than 10 pulses, something is wrong with the sensor
-                setErrorCode(ErrorCodeType::SENSOR);
-                // __enable_irq();
-                // DEBUG_PRINT(DEBUG_ERROR, "SENSOR ERROR r=%u, p=%u d=%d", readRpmCounter(), pulseCounter, delta);
+        // initial stall and sensor check after 500ms
+        if (stats.counter.loop == (500 / kPIDInterval)) {
+            if (stats.counter.pulse < -10) { // sensor counts backwards, wrong direction set
+                setErrorCode(ErrorCodeType::SENSOR_REVERSE);
             }
-            else if (pulseCounter < (kCPR / 4)) { // quarter of a rotation or less, motor has stalled
+            else if (readRpmCounter() >= 1 && stats.counter.pulse < 10) { // we have 1 rotation but less than 10 pulses, something is wrong with the sensor
+                setErrorCode(ErrorCodeType::SENSOR);
+            }
+            else if (stats.counter.pulse < (kCPR / 4)) { // quarter of a rotation or less, motor has stalled
                 setErrorCode(ErrorCodeType::STALL);
-                // __enable_irq();
-                // DEBUG_PRINT(DEBUG_ERROR, "MOTOR STALL r=%u, p=%u d=%d", readRpmCounter(), pulseCounter, delta);
             }
         }
-        // if (loopCounter<1000 && (loopCounter%10)==9) {
-        //     __enable_irq();
-        //     DEBUG_PRINT(DEBUG_DEBUG, "STARTUP r=%u, p=%u d=%d", readRpmCounter(), pulseCounter, delta);
-        // }
     }
 
-#if HAVE_DEBUG_PID_CONTROLLER
-    lastPwmLevel = pwmLevel;
-    lastRpmMeasured = deltaRPM;
-    lastDebugNewData = true;
-#endif
+    if ((stats.counter.loop%200)==0) {
+        __enable_irq();
+        DEBUG_PRINT(DEBUG_DEBUG, "rc=%u ra=%d p=%d d=%d", readRpmCounter(), 0,/*stats.rpmAnalog.get(),*/ stats.counter.pulse, delta);
+    }
+
+    // // use analog sensor signal to calculate RPM
+    // // this is independent of the direction
+    // if ((stats.counter.loop & 0x1f) == 0x1f) {
+    //     static constexpr uint32_t kRPMInterval = kPIDInterval * (0x1f + 1);
+    //     uint32_t rpmCounter = readRpmCounter();
+    //     uint32_t diff = rpmCounter - stats.lastValue.rpmCounter;
+    //     stats.lastValue.rpmCounter = rpmCounter;
+    //     stats.lastValue.analogRpmMeasured = diff * (60000 / kRPMInterval);
+    //     stats.rpmAnalog.update(stats.lastValue.analogRpmMeasured);
+    // }
+
+    stats.counter.loop++;
 }
 
 void PidController::fault_isr()

@@ -14,7 +14,8 @@
 #include "eeprom.h"
 #include "stats.h"
 
-static void button_isr() {
+static void button_isr() 
+{
     #if defined(STM32F107xC)
         uint32_t idrD = ((GPIO_TypeDef *)GPIOD_BASE)->IDR;
         knobButton.isr(idrD);
@@ -68,7 +69,7 @@ void setup()
 
     // motor encoder
     motorEncoder.init();
-    if (0) {
+    if (PidController::kProgramPPR) {
         motorEncoder.programPPR(i2c, PidController::kPPR);
     }
 
@@ -171,9 +172,7 @@ void loop()
             default:
                 break;
         }
-        lv_timer_handler();
-
-        // check NTC sensors
+        // check NTC sensors, not time critical and a couple times per seconds is enough
         if (adc.getMotorNTCValue() < eeprom.getMotorTemperatureLimitADC()) {
             if (pid.running) {
                 pid.setErrorCode(PidController::ErrorCodeType::MOTOR_OVER_TEMPERATURE);
@@ -184,6 +183,9 @@ void loop()
                 pid.setErrorCode(PidController::ErrorCodeType::MOSFET_OVER_TEMPERATURE);
             }
         }
+        
+        // update UI
+        lv_timer_handler();
         lastLvHandler = millis();
     }
 
@@ -208,133 +210,4 @@ void loop()
             }
         }
     }
-
-    if (false) { // print RPM and encoder count
-        static uint32_t lastTime6 = 0;
-        if (millis() - lastTime6 >= 100) {
-            uint32_t idrB = GPIOB->IDR;
-            DEBUG_PRINT(DEBUG_DEBUG, "RPM=%d ENCODER=%u A=%u B=%u", pid.lastRpmMeasured, TIM4->CNT, (idrB >> 6) & 1U, (idrB >> 7) & 1U);
-            lastTime6 = millis();
-        }
-    }
-
-    if (false) {
-        static uint32_t lastTime5 = 0;
-        if (pid.running && millis() - lastTime5 >= 250) {
-            if (pid.lastDebugNewData) {
-                auto tmpLastRpmMeasured = pid.lastRpmMeasured;
-                auto tmpLastPwmLevel = pid.lastPwmLevel;
-                pid.lastDebugNewData = false;
-                static uint32_t debugStep = 0;
-                DEBUG_PRINT(DEBUG_DEBUG, "%lu,%d,%d,%u,%u,%u.%u,%u.%u",
-                    debugStep++,
-                    tmpLastRpmMeasured,
-                    pid.clampPWMLevel(tmpLastPwmLevel),
-                    stats.vcc,
-                    stats.current,
-                    CONVERT_TO_FP1(stats.motorTemp),
-                    CONVERT_TO_FP1(stats.mosfetTemp)
-                );
-                // D,debugStep,lastRpmMeasured,lastPwmLevel,lastCurrent(mA)
-                // Serial.print("D,");
-                // Serial.print(debugStep++);
-                // Serial.print(',');
-                // Serial.print(tmpLastRpmMeasured);
-                // Serial.print(',');
-                // Serial.print(pid.clampPWMLevel(tmpLastPwmLevel));
-                // Serial.print(',');
-                // Serial.print((uint32_t)((adc.readAll().isense / 4095.0f) * 3300.0f));
-                // Serial.println();
-                lastTime5 = millis();
-            }
-
-        }
-    }
 }
-
-#if 0
-void loop()
-{
-    #if DEBUG_HUMAN == 0
-        if (pid.lastDebugNewData) {
-            auto tmpLastRpmMeasured = pid.lastRpmMeasured;
-            auto tmpLastPwmLevel = pid.lastPwmLevel;
-            pid.lastDebugNewData = false;
-            if (debugStep != -1) {
-                // D,debugStep,lastRpmMeasured,lastPwmLevel,lastCurrent(mA)
-                Serial.print("D,");
-                Serial.print(debugStep++);
-                Serial.print(',');
-                Serial.print(tmpLastRpmMeasured);
-                Serial.print(',');
-                Serial.print(pid.clampPWMLevel(tmpLastPwmLevel));
-                Serial.print(',');
-                Serial.print((uint32_t)((adc.readAll().isense / 4095.0f) * 3300.0f));
-                // Serial.print(',');
-                // Serial.print(pid.getLastError());
-                // Serial.print(',');
-                // Serial.print(pid.getIntegral());
-                // Serial.print(',');
-                // Serial.print(pid.getLastError());
-                // Serial.print(',');
-                // Serial.print(pid.getLastDerivative());
-                Serial.println();
-            }
-        }
-    #endif
-    static uint32_t lastTime = 0;
-    if (millis() - lastTime >= 100) {
-
-        auto knobDelta = knob.getDeltaPositionAndMultiplier();
-        if (knobDelta.hasPosition()) {
-            pid.setRPM(pid.clampRPM(pid.getRPM() + knobDelta.getPosition()));
-            Serial.print("R,");
-            Serial.println(pid.getRPM());
-        }
-
-        #if DEBUG_HUMAN != 0
-
-            //DEBUG
-            static uint32_t lastTime3 = 0;
-            if (millis() - lastTime3 >= debugSpeed)
-            // if(1)
-            {
-
-                Serial.print("PID(");
-                Serial.print(cType);
-                Serial.print(") ");
-
-                // PID
-                Serial.print(pid.Kp, 2);
-                Serial.print('(');
-                Serial.print(pid.KpPreCalc);
-                Serial.print(')');
-                Serial.print(' ');
-                Serial.print(pid.Ki, 2);
-                Serial.print('(');
-                Serial.print(pid.KiPreCalc);
-                Serial.print(')');
-                Serial.print(' ');
-                Serial.print(pid.Kd, 2);
-                Serial.print('(');
-                Serial.print(pid.KdPreCalc);
-                Serial.print(')');
-                Serial.print(" PV ");
-                Serial.print(pid.getLastError());
-                Serial.print(' ');
-                Serial.print(pid.getIntegral());
-                Serial.print(' ');
-                Serial.print(pid.getLastDerivative());
-                // PLANT
-                Serial.print(" RPM ");
-                Serial.print(pid.getRPM());
-                Serial.print('/');
-                Serial.println(pid.avgRPM);
-
-                lastTime3 = millis();
-            }
-
-        #endif
-    }
-}
-#endif

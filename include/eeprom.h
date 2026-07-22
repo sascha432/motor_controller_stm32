@@ -29,8 +29,8 @@ struct EEPROM
     static constexpr uint8_t kMotorDirectionForward = 0;
     static constexpr uint8_t kMotorDirectionReverse = 1;
 
-    static constexpr uint8_t kSensorDirectionForward = 0;
-    static constexpr uint8_t kSensorDirectionReverse = 1;
+    static constexpr uint8_t kSensorDirectionForward = kMotorDirectionForward;
+    static constexpr uint8_t kSensorDirectionReverse = kMotorDirectionReverse;
 
     struct Data {
         uint32_t magic;
@@ -197,9 +197,24 @@ struct EEPROM
         data.motor_direction = value;
     }
 
-    bool isReverseDirection() const
+    bool isForwardMotorDirection() const
+    {
+        return data.motor_direction == kMotorDirectionForward;
+    }
+
+    bool isReverseMotorDirection() const
     {
         return data.motor_direction == kMotorDirectionReverse;
+    }
+
+    bool isReverseSensorDirection() const
+    {
+        return data.sensor_direction == kSensorDirectionReverse;
+    }
+
+    bool isMotorAndSensorDirectionDifferent() const
+    {
+        return data.motor_direction != data.sensor_direction;
     }
 
     uint8_t getMotorBrake() const

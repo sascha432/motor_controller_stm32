@@ -18,8 +18,6 @@
 
 #define SPRINTF_FP1_FMT                     "%d.%u"
 #define SPRINTF_FP2_FMT                     "%d.%02u"
-#define DEBUG_HUMAN 0
-#define HAVE_DEBUG_PID_CONTROLLER 1
 
 #define sizeof_array(arr)                   (sizeof(arr) / sizeof(arr[0]))
 

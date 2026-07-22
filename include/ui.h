@@ -49,7 +49,7 @@ struct Screen
     };
 
     // welcome screen style constants
-    static constexpr const lv_font_t *kWelcomeScreenLabelFont = &lv_font_montserrat_18;
+    static constexpr const lv_font_t *kWelcomeScreenLabelFont = &lv_font_montserrat_24;
 
     // info screen style constants    
     static constexpr const lv_font_t *kInfoScreenLabelFont = &lv_font_montserrat_24;
@@ -162,10 +162,17 @@ struct InfoScreen : public Screen
     }
 
     virtual void load() override;
+    void setMessage(const char *message) 
+    {
+        if (message) {
+            lv_label_set_text(label, message);
+        }
+    }
 
 protected:
     char *message;
     const lv_font_t *font;
+    lv_obj_t *label;
 };
 
 // === Welcome Screen ===
@@ -315,7 +322,16 @@ protected:
 
 struct StartScreen : public InfoScreen
 {
-    StartScreen() : InfoScreen(Screen::Type::START, "Start") {}
+    StartScreen() : InfoScreen(Screen::Type::START) {
+    }
+
+    virtual void load() override 
+    {
+        InfoScreen::load();
+        update();
+    }
+
+    virtual void update() override;
 };
 
 // === Screen Flow Manager ===

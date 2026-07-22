@@ -101,7 +101,7 @@ namespace Helpers {
 
     // FILTER_TIME should be a power of 2 so the compiler can optimize multiply/divide operations into bit shifts
     template<uint32_t FILTER_TIME = 256>
-    class LowPass
+    struct LowPass
     {
         static constexpr int32_t kFactor = 1024;
         static_assert(FILTER_TIME < 120000, "FILTER_TIME must be less than 120000ms");
@@ -148,12 +148,36 @@ namespace Helpers {
         int32_t output;   // fixed point: real value * kFactor
     };
 
+    template <uint32_t MAX_COUNT, uint32_t DECAY_DIVIDER>
+    struct Average {
+        Average() : sum(0), count(0) {}
+
+        void reset() {
+            *this = Average();
+        }
+
+        void update(int32_t value) {
+            sum += value;
+            if (++count > MAX_COUNT) { 
+                sum -= sum / DECAY_DIVIDER;
+                count -= count / DECAY_DIVIDER;
+            }
+        }
+
+        int32_t get() const {
+            return count ? sum / count : 0;
+        }
+
+        int32_t sum;
+        uint32_t count;
+    };
+
     struct Raw {
 
         Raw() : value(0) 
         {}
 
-        void update(int16_t value) 
+        void update(int32_t value) 
         {
             this->value = value;
         }
@@ -163,7 +187,7 @@ namespace Helpers {
             return value;
         }
 
-        int16_t value;
+        int32_t value;
     };
 
 };
