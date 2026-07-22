@@ -146,6 +146,7 @@ void PidController::motorOn()
 {
     __disable_irq();
     if (!running) {
+        PID_WRITE_MOTOR_PWM_OFF();
         running = true;
         __enable_irq();
         reset();
@@ -160,12 +161,15 @@ void PidController::motorOn()
 
 void PidController::motorOff()
 {
-    PID_WRITE_MOTOR_PWM_OFF();
     __disable_irq();
+    PID_WRITE_MOTOR_PWM_OFF();
     if (running) {
         running = false;
+        uint32_t level = clampPWMLevel(eeprom.getMotorBrake() * kMaxPWMLevel / 100);
+        PID_WRITE_MOTOR_PWM_BREAK(level);
         __enable_irq();
-        DEBUG_PRINT(DEBUG_DEBUG, "STOP");
+        // DEBUG_PRINT(DEBUG_DEBUG, "STOP");
+        DEBUG_PRINT(DEBUG_DEBUG, "BRAKE %u/%u", level, kMaxPWMLevel);
     }
     else {
         __enable_irq();
