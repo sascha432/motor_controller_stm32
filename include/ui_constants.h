@@ -43,7 +43,7 @@ struct UIConstants
     static constexpr uint8_t kDefaultLEDBrightness = 25;                // Default LED Brightness
     static constexpr float kDefaultInputCurrent = 5.0f;                 // Default input current in A
     static constexpr float kDefaultMotorCurrent = 20.0f;                // Default peak motor current in A
-    static constexpr uint8_t kDefaultMotorBrake = 50;                   // Default motor brake in percentage (0-100)
+    static constexpr uint8_t kDefaultMotorBrake = 100;                  // Default motor brake in percentage (0-100)
     static constexpr uint16_t kDefaultMotorStallTimeout = 1500;         // Default motor stall time in milliseconds
     static constexpr uint16_t kDefaultMinRPM = 10;                      // Default min. motor RPM
     static constexpr uint16_t kDefaultMaxRPM = 15000;                   // Default max. motor RPM

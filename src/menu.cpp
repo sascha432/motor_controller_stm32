@@ -521,9 +521,12 @@ int32_t Menu::updateRotaryValue(int32_t value)
     screenFlow->setValue(screenFlow->getValue() + (value * screenFlow->getSteps()));
     switch(screenFlow->getId()) {
         case Screen::Type::DASHBOARD:
-            eeprom.setSpeed(getValue());
             if (eeprom.isPIDMode()) {
-                // in PID mode, update the PID controller with the new RPM value
+                eeprom.setSpeed(std::clamp<int32_t>(getValue(), eeprom.getMinRPM(), eeprom.getMaxRPM()));
+                pid.setRPM(eeprom.getSpeed());
+            }
+            else {
+                eeprom.setSpeed(std::clamp<int32_t>(getValue(), 0, eeprom.getMaxPWM() * pid.kMaxPWMLevel / 100));
                 pid.setRPM(eeprom.getSpeed());
             }
             break;
