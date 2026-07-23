@@ -53,11 +53,6 @@ static uint8_t g_tft_pixel_chunk[TFT_DMA_TX_CHUNK_PIXELS * 2];
 static void set_column(uint16_t x0, uint16_t x1);
 static void set_row(uint16_t y0, uint16_t y1);
 
-inline void tft_driver_delay() 
-{
-    __NOP();
-}
-
 /**
  * Write repeated RGB565 color pixels using chunked DMA transfers.
  */

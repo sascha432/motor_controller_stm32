@@ -297,7 +297,7 @@ private:
 
     inline bool isTimeout(uint32_t &counter) 
     {
-        delay_us(1);
+        __NOP();
         return --counter == 0;
     }
 };

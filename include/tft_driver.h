@@ -31,6 +31,11 @@ extern lv_disp_draw_buf_t s_lvgl_draw_buf;
 extern lv_color_t s_lvgl_buf_1[TFT_BUFFER_SIZE];
 extern lv_disp_drv_t s_lvgl_disp_drv;
 
+inline void tft_driver_delay() 
+{
+    __NOP();
+}
+
 void tft_backlight_pwm_set_raw(uint16_t value);
 void tft_backlight_pwm_set(uint8_t value);
 

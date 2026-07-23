@@ -17,6 +17,7 @@
 
 static void button_isr() 
 {
+#if ARDUINO
     #if defined(STM32F107xC)
         uint32_t idrD = ((GPIO_TypeDef *)GPIOD_BASE)->IDR;
         knobButton.isr(idrD);
@@ -32,6 +33,7 @@ static void button_isr()
     #else
         #error missing ISR implementation for this MCU
     #endif
+#endif
 }
 
 static void pid_timer_isr()
