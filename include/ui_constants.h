@@ -23,8 +23,7 @@ struct UIConstants
     static constexpr float kStepMotorCurrent = 0.5f;                    // motor current step in A
     static constexpr float kMinMotorCurrent = kStepMotorCurrent * 2;    // min. peak motor current in A
     static constexpr float kMaxMotorCurrent = 40.0f;                    // max. peak motor current in A
-    static constexpr uint16_t kStepMotorRPM = 10;                       // Motor RPM step
-    static constexpr uint16_t kMinRPM = kStepMotorRPM * 2;              // Min. Motor RPM
+    static constexpr uint16_t kMinRPM = 10;                             // Min. Motor RPM
     static constexpr uint16_t kMaxRPM = 55000;                          // Max. Motor RPM
     static constexpr uint8_t kMinTFTBrightness = 5;                     // Min. TFT Brightness
     static constexpr uint8_t kMaxTFTBrightness = 100;                   // Max. TFT Brightness
@@ -42,7 +41,7 @@ struct UIConstants
     static constexpr uint8_t kDefaultTFTBrightness = 90;                // Default TFT Brightness
     static constexpr uint8_t kDefaultLEDBrightness = 25;                // Default LED Brightness
     static constexpr float kDefaultInputCurrent = 5.0f;                 // Default input current in A
-    static constexpr float kDefaultMotorCurrent = 20.0f;                // Default peak motor current in A
+    static constexpr float kDefaultMotorCurrent = 10.0f;                // Default peak motor current in A
     static constexpr uint8_t kDefaultMotorBrake = 100;                  // Default motor brake in percentage (0-100)
     static constexpr uint16_t kDefaultMotorStallTimeout = 1500;         // Default motor stall time in milliseconds
     static constexpr uint16_t kDefaultMinRPM = 10;                      // Default min. motor RPM

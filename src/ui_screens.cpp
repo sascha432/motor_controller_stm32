@@ -548,10 +548,10 @@ void DashboardScreen::_refreshVisuals()
     snprintf(buf, sizeof(buf) - 1, "%u.%uA (%u.%uA)", CONVERT_TO_FP1(stats.current), CONVERT_TO_FP1(stats.max.current));
     lv_label_set_text(currentLabel, buf);
 
-    snprintf(buf, sizeof(buf) - 1, "%d" "\xC2\xB0" "C", stats.motorTemp);
+    snprintf(buf, sizeof(buf) - 1, "%d" DEGREE_UTF8 "C", stats.motorTemp);
     lv_label_set_text(motorTempLabel, buf);
 
-    snprintf(buf, sizeof(buf) - 1, "%d" "\xC2\xB0" "C", stats.mosfetTemp);
+    snprintf(buf, sizeof(buf) - 1, "%d" DEGREE_UTF8 "C", stats.mosfetTemp);
     lv_label_set_text(mosfetTempLabel, buf);
 
     if (pid.hasErrorCode()) {

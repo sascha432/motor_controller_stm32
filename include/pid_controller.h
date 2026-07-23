@@ -436,9 +436,9 @@ struct PidController
             case ErrorCodeType::SENSOR_REVERSE:
                 return snprintf(buf, bufSize, "SENSOR REVERSE");
             case ErrorCodeType::MOTOR_OVER_TEMPERATURE:
-                return snprintf(buf, bufSize, "MOTOR %d" "\xC2\xB0" "C", ::stats.motorTemp);
+                return snprintf(buf, bufSize, "MOTOR %d" DEGREE_UTF8 "C", ::stats.motorTemp);
             case ErrorCodeType::MOSFET_OVER_TEMPERATURE:
-                return snprintf(buf, bufSize, "MOSFET %d" "\xC2\xB0" "C", ::stats.mosfetTemp);
+                return snprintf(buf, bufSize, "MOSFET %d" DEGREE_UTF8 "C", ::stats.mosfetTemp);
             default:
                 break;
             // case ErrorCodeType::FAULT:

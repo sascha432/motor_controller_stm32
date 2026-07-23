@@ -119,5 +119,5 @@ th:nth-child(4), td:nth-child(4) { width: 46%; }
 
 | Signal | STM32 pin | Type | Notes |
 |---|---|---|---|
-| PAD_TX4 | PC10 | SERIAL | UART4_TX exposed on a PAD for debugging |
-| PAD_RX4 | PC11 | SERIAL | UART4_RX |
+| TX4 | PC10 | SERIAL | UART4 TX |
+| RX4 | PC11 | SERIAL | UART4 RX |

@@ -47,7 +47,14 @@ void debug_init(void);
 
     #define DEBUG_PRINT(level, msg, ...) do {} while(0)
 
-#elif DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL || DEBUG_OUTPUT == DEBUG_OUTPUT_USB
+#elif DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL
+
+    #define DEBUG_PRINT_MSG(level, msg, ...) \
+        do { \
+            if (level <= DEBUG_LEVEL) { \
+                Serial.printf(msg "\n", ##__VA_ARGS__); \
+            } \
+        } while(0)
 
     #define DEBUG_PRINT(level, msg, ...) \
         do { \
@@ -58,6 +65,13 @@ void debug_init(void);
         } while(0)
 
 #elif DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL4
+
+    #define DEBUG_PRINT_MSG(level, msg, ...) \
+        do { \
+            if (level <= DEBUG_LEVEL) { \
+                Serial4.printf(msg "\n", ##__VA_ARGS__); \
+            } \
+        } while(0)
 
     #define DEBUG_PRINT(level, msg, ...) \
         do { \
@@ -70,6 +84,13 @@ void debug_init(void);
 #elif DEBUG_OUTPUT == DEBUG_OUTPUT_SWD
 
     void debug_swd_printf(const char *fmt, ...);
+
+    #define DEBUG_PRINT_MSG(level, msg, ...) \
+        do { \
+            if (level <= DEBUG_LEVEL) { \
+                debug_swd_printf(msg "\n", ##__VA_ARGS__); \
+            } \
+        } while(0)
 
     #define DEBUG_PRINT(level, msg, ...) \
         do { \

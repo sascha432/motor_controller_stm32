@@ -266,7 +266,7 @@ void Menu::handleButtonPress()
                         "MOSFET Temperature Limit", 
                         UIConstants::kMinMosfetTemperature,
                         UIConstants::kMaxMosfetTemperature,
-                        "\xC2\xB0" "C"
+                        DEGREE_UTF8 "C"
                     ));
                     setValue(eeprom.getMosfetTemperatureLimit());
                     break;
@@ -276,7 +276,7 @@ void Menu::handleButtonPress()
                         "Motor Temperature Limit", 
                         UIConstants::kMinMotorTemperature,
                         UIConstants::kMaxMotorTemperature,
-                        "\xC2\xB0" "C"
+                        DEGREE_UTF8 "C"
                     ));
                     setValue(eeprom.getMotorTemperatureLimit());
                     break;
