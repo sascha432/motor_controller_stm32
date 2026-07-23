@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include "helpers.h"
 #include "pins.h"
 

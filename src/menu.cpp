@@ -4,7 +4,9 @@
   Menu implementation for the UI
 */
 
+#if ARDUINO
 #include <Arduino.h>
+#endif
 #include <stdio.h>
 #include "menu.h"
 #include "ui.h"
@@ -447,13 +449,13 @@ void Menu::showWelcomeScreen()
 
     if (UIConstants::kEnableIlluminationLEDFading) {
         // gradually increase LED brightness to target value
-        uint32_t start = millis();
+        uint32_t start = HAL_GetTick();
         uint8_t targetBrightness = eeprom.getLEDBrightness();
         float currentBrightness = 0;
         float step = targetBrightness / (UIConstants::kWelcomeScreenTimeout / 8.0f);
         targetBrightness -= step;
         for(;;) {
-            uint32_t elapsed = millis() - start;
+            uint32_t elapsed = HAL_GetTick() - start;
             if (elapsed >= UIConstants::kWelcomeScreenTimeout) {
                 break;
             }
@@ -463,12 +465,12 @@ void Menu::showWelcomeScreen()
             LEDs::illuminationLedSetPWM(currentBrightness);
             // blink motor LEDs
             ((elapsed / 500) & 0x01) ? LEDs::onLED1() : LEDs::onLED2();
-            delay(8);
+            HAL_Delay(8);
         }   
         LEDs::offLED1and2();
     } 
     else {
-        delay(UIConstants::kWelcomeScreenTimeout);
+        HAL_Delay(UIConstants::kWelcomeScreenTimeout);
     }
 
     clearUserInput();
@@ -612,8 +614,8 @@ ScreenFlow &Menu::getScreenFlow()
 
 void Menu::abortableDelay(uint32_t ms)
 {
-    uint32_t start = millis();
-    while (millis() - start < ms) {
+    uint32_t start = HAL_GetTick();
+    while (HAL_GetTick() - start < ms) {
         if (isAnyButtonDown()) {
             clearUserInput();
             break;

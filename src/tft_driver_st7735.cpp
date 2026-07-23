@@ -4,7 +4,9 @@
   Baremetal SPI driver for ST7735 - DMA TX based
 */
 
+#if ARDUINO
 #include <Arduino.h>
+#endif
 #include <stm32f1xx.h>
 #include "tft_driver.h"
 
@@ -47,6 +49,11 @@ static uint8_t g_tft_pixel_chunk[TFT_DMA_TX_CHUNK_PIXELS * 2];
 static void set_column(uint16_t x0, uint16_t x1);
 static void set_row(uint16_t y0, uint16_t y1);
 
+inline void tft_driver_delay() 
+{
+    __NOP();
+}
+
 /**
  * Write repeated RGB565 color pixels using chunked DMA transfers.
  */
@@ -62,7 +69,7 @@ static void write_color_pixels(uint16_t color, uint32_t pixels)
 
     TFT_PIN_RS_HIGH();
     TFT_PIN_CS_LOW();
-    delayMicroseconds(1);
+    tft_driver_delay();
 
     while (pixels > 0) {
         uint16_t chunk_pixels = (pixels > TFT_DMA_TX_CHUNK_PIXELS) ? TFT_DMA_TX_CHUNK_PIXELS : (uint16_t)pixels;
@@ -70,7 +77,7 @@ static void write_color_pixels(uint16_t color, uint32_t pixels)
         pixels -= chunk_pixels;
     }
 
-    delayMicroseconds(1);
+    tft_driver_delay();
     TFT_PIN_CS_HIGH();
 }
 
@@ -85,7 +92,7 @@ static void write_pixel_buffer_rgb565(const uint16_t *pixels, uint32_t pixel_cou
 
     TFT_PIN_RS_HIGH();
     TFT_PIN_CS_LOW();
-    delayMicroseconds(1);
+    tft_driver_delay();
 
     uint32_t offset = 0;
     while (offset < pixel_count) {
@@ -103,7 +110,7 @@ static void write_pixel_buffer_rgb565(const uint16_t *pixels, uint32_t pixel_cou
         offset += chunk_pixels;
     }
 
-    delayMicroseconds(1);
+    tft_driver_delay();
     TFT_PIN_CS_HIGH();
 }
 
@@ -144,23 +151,23 @@ static void st7735_init(void)
 {
     /* Hardware reset */
     TFT_PIN_RST_LOW();
-    delay(50);
+    HAL_Delay(25);
     TFT_PIN_RST_HIGH();
-    delay(120);
+    HAL_Delay(60);
 
     /* Software reset */
     tft_driver_send_command(ST7735_SWRESET);
-    delay(150);
+    HAL_Delay(75);
 
     /* Exit sleep mode */
     tft_driver_send_command(ST7735_SLPOUT);
-    delay(120);
+    HAL_Delay(60);
 
     /* Frame rate control */
     tft_driver_send_command(ST7735_FRMCTR1);
     uint8_t frmctr[] = {0x01, 0x2C, 0x2D};
     tft_driver_send_data(frmctr, 3);
-    delay(10);
+    HAL_Delay(5);
 
     /* Memory access control */
     tft_driver_send_command(ST7735_MADCTL);
@@ -171,7 +178,7 @@ static void st7735_init(void)
     tft_driver_send_command(ST7735_COLMOD);
     uint8_t colmod[] = {0x05};
     tft_driver_send_data(colmod, 1);
-    delay(10);
+    HAL_Delay(5);
 
     /* Power control */
     tft_driver_send_command(ST7735_PWCTR1);
@@ -189,7 +196,7 @@ static void st7735_init(void)
     tft_driver_send_command(ST7735_VMCTR1);
     uint8_t vmctr1[] = {0x0E};
     tft_driver_send_data(vmctr1, 1);
-    delay(10);
+    HAL_Delay(5);
 
     /* Gamma */
     tft_driver_send_command(ST7735_GMCTRP1);
@@ -199,15 +206,15 @@ static void st7735_init(void)
     tft_driver_send_command(ST7735_GMCTRN1);
     uint8_t gn[] = {0x10, 0x0E, 0x03, 0x03, 0x0F, 0x06, 0x02, 0x08, 0x0A, 0x13, 0x26, 0x36, 0x00, 0x0D, 0x0E, 0x10};
     tft_driver_send_data(gn, 16);
-    delay(10);
+    HAL_Delay(5);
 
     /* Exit invert */
     tft_driver_send_command(ST7735_INVOFF);
-    delay(10);
+    HAL_Delay(5);
 
     /* Display on */
     tft_driver_send_command(ST7735_DISPON);
-    delay(100);
+    HAL_Delay(50);
 }
 
 /**

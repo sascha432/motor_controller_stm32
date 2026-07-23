@@ -4,7 +4,16 @@
 
 #pragma once
 
+#if ARDUINO
 #include <Arduino.h>
+#define IF_ARDUINO(...) __VA_ARGS__
+#define IFN_ARDUINO(...)
+#else
+#define IF_ARDUINO(...)
+#define IFN_ARDUINO(...) __VA_ARGS__
+#endif
+#include <stdint.h>
+#include <stm32f1xx.h>
 
 /**
  * @brief Float printf converters
@@ -13,8 +22,8 @@
  * printf("123.45=" SPRINTF_FP2_FMT "\n", CONVERT_TO_FP2(123.56))
  * 
  */
-#define CONVERT_TO_FP1(value)               (int32_t)(value / 1000), ((uint32_t)(value / 100) % 10)
-#define CONVERT_TO_FP2(value)               (int32_t)(value / 1000), ((uint32_t)(value / 10) % 100)
+#define CONVERT_TO_FP1(value)               (int)(value / 1000), ((unsigned)(value / 100) % 10)
+#define CONVERT_TO_FP2(value)               (int)(value / 1000), ((unsigned)(value / 10) % 100)
 
 #define DEGREE_UTF8                         "\xC2\xB0"
 
@@ -356,3 +365,24 @@ static constexpr uint16_t kPWMFrequencyToARR()
     return tmp;
 }
 
+/**
+ * @brief Delay microseconds
+ * 
+ * @param us 
+ */
+inline void delay_us(uint32_t us) 
+{
+#if ARDUINO
+    delayMicroseconds(us);
+#else
+    extern TIM_HandleTypeDef tim7;
+    if (us > 1000) {
+        HAL_Delay(us / 1000);
+        us %= 1000;
+    }
+    uint16_t start = __HAL_TIM_GET_COUNTER(&tim7);
+    while ((uint16_t)(__HAL_TIM_GET_COUNTER(&tim7) - start) < us) {
+        __NOP();
+    }
+#endif
+}

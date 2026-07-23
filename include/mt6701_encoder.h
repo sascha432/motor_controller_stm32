@@ -68,12 +68,12 @@ struct MT6701Config {
         if (!writeRegister(REG_ABZ_RES_HIGH, high)) {
             return false;
         }
-        delayMicroseconds(10000);
+        delay_us(10000);
 
         if (!writeRegister(REG_ABZ_RES_LOW, low)) {
             return false;
         }
-        delayMicroseconds(10000);
+        delay_us(10000);
 
         return (getPPR() == ppr);
     }
@@ -90,12 +90,12 @@ struct MT6701Config {
         if (!writeRegister(REG_PROG_KEY, CMD_UNLOCK)) {
             return false;
         }
-        delayMicroseconds(10000);
+        delay_us(10000);
 
         if (!writeRegister(REG_PROG_CMD, CMD_COMMIT)) {
             return false;
         }
-        delayMicroseconds(800000);  // EEPROM write time
+        delay_us(800000);  // EEPROM write time
         return true;
     }
 
@@ -141,7 +141,7 @@ struct MT6701Encoder {
             (getGPIOPort()->BRR  = (1 << digitalPinToBit(GPIO_PIN)))
         ;
         // wait for the encoder to change state
-        delayMicroseconds(10);
+        delay_us(10);
     }
 
     /**

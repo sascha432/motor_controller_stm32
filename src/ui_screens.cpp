@@ -4,7 +4,9 @@
   UI implementation using LVGL library
 */
 
+#if ARDUINO
 #include <Arduino.h>
+#endif
 #include "ui.h"
 #include "adc.h"
 #include "pid_controller.h"
@@ -76,10 +78,7 @@ void Screen::_fatal_error(const char *msg)
 {
     uint32_t num = 0;
     while (true) {
-        digitalWrite(PE5, HIGH);
-        delay(100);
-        digitalWrite(PE5, LOW);
-        delay(100);
+        HAL_Delay(100);
         if (num++ % 10 == 0) {
             DEBUG_PRINT(DEBUG_ERROR, "UI ERROR: %s", msg);
         }
@@ -254,7 +253,7 @@ void SliderScreen::_refreshVisuals()
         lv_label_set_text(valueLabel, formatCallback(clampedValue, buf, sizeof(buf) - 1));
     }
     else {
-        lv_label_set_text_fmt(valueLabel, "%lu%s", static_cast<unsigned long>(clampedValue), unit);
+        lv_label_set_text_fmt(valueLabel, "%u%s", static_cast<unsigned>(clampedValue), unit);
     }
     
 }
@@ -449,9 +448,9 @@ void DiagnosticsScreen::_refreshVisuals()
     lv_label_set_text(mosfetTempLabel, buf);
 
     snprintf(buf, sizeof(buf) - 1, "RPM %u/%u PWM %u%%", 
-        pid.stats.rpm.get(), 
-        pid.getRPM(),
-        pid.stats.pwm.get()
+        (unsigned)pid.stats.rpm.get(), 
+        (unsigned)pid.getRPM(),
+        (unsigned)pid.stats.pwm.get()
     );
     lv_label_set_text(rpmPwmLabel, buf);
 }
@@ -558,14 +557,14 @@ void DashboardScreen::_refreshVisuals()
         pid.errorPrintf(buf, sizeof(buf) - 1);
     }
     else if (eeprom.isPIDMode()) {
-        snprintf(buf, sizeof(buf) - 1, "%u RPM (%u)", pid.clampPWMLevel(pid.stats.rpm.get()), pid.getRPM());
+        snprintf(buf, sizeof(buf) - 1, "%u RPM (%u)", (unsigned)pid.clampPWMLevel(pid.stats.rpm.get()), (unsigned)pid.getRPM());
     }
     else {
-        snprintf(buf, sizeof(buf) - 1, "%u RPM", pid.clampPWMLevel(pid.stats.rpm.get()));
+        snprintf(buf, sizeof(buf) - 1, "%u RPM", (unsigned)pid.clampPWMLevel(pid.stats.rpm.get()));
     }
     lv_label_set_text(rpmLabel, buf);
 
-    lv_label_set_text_fmt(pwmLabel, "PWM %u%%", pwmPercent);
+    lv_label_set_text_fmt(pwmLabel, "PWM %u%%", (unsigned)pwmPercent);
 
     const lv_coord_t fillWidth = static_cast<lv_coord_t>((kDashboardScreenContainerWidth * pid.stats.pwm.get()) / pid.kMaxPWMLevel);
     lv_obj_set_size(pwmBarFill, fillWidth, 16);

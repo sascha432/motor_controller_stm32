@@ -4,7 +4,9 @@
 
 #pragma once
 
+#if ARDUINO
 #include <HardwareTimer.h>
+#endif
 #include "helpers.h"
 #include "pins.h"
 #include "eeprom.h"
@@ -102,7 +104,7 @@ struct PidController
     };
 
     PidController() :
-        timer(TIM2),
+        IF_ARDUINO(timer(TIM2),)
         rpm(0),
         motorDirection(EEPROM::kMotorDirectionForward),
         integralTimeLimit(kIntegralTimeLimit),
@@ -345,10 +347,12 @@ struct PidController
      */
     void isr();
 
+    #if ARDUINO
     /**
      * @brief Interrupt service routine for handling motor controller faults
      */
     void fault_isr();
+    #endif
 
     /**
      * @brief Update internal fault states
@@ -475,7 +479,11 @@ public:
     };
 
 public:
+    #if ARDUINO
     HardwareTimer timer;                // timer for the PID loop
+    #else
+    TIM_HandleTypeDef timer;            // timer for the PID loop
+    #endif
 
     float Kp;                           // P, I, D ...
     float Ki;

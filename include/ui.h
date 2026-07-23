@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <math.h>
 #include <stdlib.h>
 #include "ui_constants.h"
 #include "lvgl.h"

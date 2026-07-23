@@ -82,7 +82,7 @@ struct I2CHelper {
         // Optional: disable peripheral clock if no longer needed
         RCC->APB1ENR &= ~RCC_APB1ENR_I2C1EN;
 
-        delayMicroseconds(10);
+        delay_us(10);
     }
 
     /**
@@ -285,7 +285,7 @@ private:
         // Enable I2C
         I2C1->CR1 = I2C_CR1_PE;
 
-        delayMicroseconds(10);
+        delay_us(10);
     }
 
     inline bool I2CError() 
@@ -297,7 +297,7 @@ private:
 
     inline bool isTimeout(uint32_t &counter) 
     {
-        delayMicroseconds(1);
+        delay_us(1);
         return --counter == 0;
     }
 };

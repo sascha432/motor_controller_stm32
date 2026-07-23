@@ -22,15 +22,9 @@
 #define ROTARY_ENCODER_PIN_B        PA7             // B
 
 // Button pins
-#if defined(STM32F107xC)
 #define KNOB_BUTTON_PIN             PD8             // BTN_1 knob button pin
 #define BACK_BUTTON_PIN             PD9             // BTN_2 back button pin
 #define START_BUTTON_PIN            PD10            // BTN_3 start button pin
-#else
-#define KNOB_BUTTON_PIN             PD8             // knob button pin
-#define BACK_BUTTON_PIN             PD9             // back button pin
-#define START_BUTTON_PIN            PD10            // start button pin
-#endif
 
 #define DRV8701_FAULT_PIN           PB14            // DRV8701 nFAULT pin
 #define OCP_INT_PIN                 PB12            // INA381 ALERT#

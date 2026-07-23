@@ -15,8 +15,8 @@
 
 /* Timing */
 #define LV_TICK_CUSTOM 1
-#define LV_TICK_CUSTOM_INCLUDE "Arduino.h"
-#define LV_TICK_CUSTOM_SYS_TIME_EXPR (millis())
+#define LV_TICK_CUSTOM_INCLUDE "stm32f1xx.h"
+#define LV_TICK_CUSTOM_SYS_TIME_EXPR (HAL_GetTick())
 #define LV_DISP_DEF_REFR_PERIOD 30
 
 /* Keep drawing simple on STM32F103 */

@@ -4,7 +4,9 @@
   Baremetal SPI DMA driver
 */
 
+#if ARDUINO
 #include <Arduino.h>
+#endif
 #include <stm32f1xx.h>
 #include "tft_driver.h"
 
@@ -172,7 +174,7 @@ void tft_driver_spi_send_buffer_dma_raw(const uint8_t *data, uint16_t len)
 
     int timeout = 200000;
     while (!(DMA1->ISR & DMA_ISR_TCIF5) && timeout--) {
-        delay(0);
+        HAL_Delay(0);
     }
 
     TFT_DMA_CH->CCR &= ~DMA_CCR_EN;
@@ -181,12 +183,12 @@ void tft_driver_spi_send_buffer_dma_raw(const uint8_t *data, uint16_t len)
 
     timeout = 200000;
     while (((SPI2->SR & SPI_SR_TXE) == 0U) && timeout--) {
-        delay(0);
+        HAL_Delay(0);
     }
 
     timeout = 200000;
     while ((SPI2->SR & SPI_SR_BSY) && timeout--) {
-        delay(0);
+        HAL_Delay(0);
     }
 
     while (SPI2->SR & SPI_SR_RXNE) {
@@ -202,12 +204,12 @@ void tft_driver_spi_send_byte(uint8_t byte)
 {
     /* Pull CS low before transfer */
     TFT_PIN_CS_LOW();
-    delayMicroseconds(1);
+    delay_us(1);
 
     tft_driver_spi_send_buffer_dma_raw(&byte, 1);
 
     /* Pull CS high after transfer */
-    delayMicroseconds(1);
+    delay_us(1);
     TFT_PIN_CS_HIGH();
 }
 
@@ -217,9 +219,9 @@ void tft_driver_spi_send_byte(uint8_t byte)
 void tft_driver_spi_send_buffer(const uint8_t *data, uint16_t len) 
 {
     TFT_PIN_CS_LOW();
-    delayMicroseconds(1);
+    delay_us(1);
     tft_driver_spi_send_buffer_dma_raw(data, len);
-    delayMicroseconds(1);
+    delay_us(1);
     TFT_PIN_CS_HIGH();
 }
 
@@ -229,9 +231,9 @@ void tft_driver_spi_send_buffer(const uint8_t *data, uint16_t len)
 void tft_driver_send_command(uint8_t cmd) 
 {
     TFT_PIN_RS_LOW();
-    delayMicroseconds(5);
+    delay_us(5);
     tft_driver_spi_send_byte(cmd);
-    delayMicroseconds(5);
+    delay_us(5);
     TFT_PIN_RS_HIGH();
 }
 

@@ -125,7 +125,7 @@ struct RotaryEncoder {
     }
 
     RotaryEncoder() : 
-        timer(TIM6),
+        IF_ARDUINO(timer(TIM6),)
         maxAcceleration(1),
         position(0)
     {}
@@ -133,7 +133,7 @@ struct RotaryEncoder {
     void init();
     void clear();
 
-    void enable(InterruptCallbackType callback);
+    void enable();
     void disable();
 
     void isr();
@@ -161,7 +161,9 @@ struct RotaryEncoder {
         maxAcceleration = acceleration + 1;
     }
 
+    #if ARDUINO
     HardwareTimer timer;
+    #endif
     uint32_t maxAcceleration;
     volatile int32_t position;
     volatile int32_t acceleration;

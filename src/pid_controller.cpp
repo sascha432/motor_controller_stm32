@@ -23,20 +23,24 @@ void PidController::reset()
 void PidController::disable()
 {
     TIM4->CR1 &= ~TIM_CR1_CEN;
+    #if ARDUINO
     timer.pause();
     detachInterrupt(digitalPinToInterrupt(DRV8701_FAULT_PIN));
     detachInterrupt(digitalPinToInterrupt(OCP_INT_PIN));
     detachInterrupt(digitalPinToInterrupt(DRV_SNSOUT_PIN));
+    #endif
 }
 
 void PidController::enable(InterruptCallbackType callback)
 {
     TIM4->CR1 |= TIM_CR1_CEN;
+    #if ARDUINO
     // all faults are active low
     attachInterrupt(digitalPinToInterrupt(DRV8701_FAULT_PIN), callback, FALLING);
     attachInterrupt(digitalPinToInterrupt(OCP_INT_PIN), callback, FALLING);
     attachInterrupt(digitalPinToInterrupt(DRV_SNSOUT_PIN), callback, FALLING);
     timer.resume();
+    #endif
     // update faults
     readFaults();
 }
@@ -137,8 +141,10 @@ void PidController::init(InterruptCallbackType callback, InterruptCallbackType f
     digitalPinToGPIO<DRV_SNSOUT_PIN>()->ODR |= (1 << digitalPinToBit(DRV_SNSOUT_PIN));
 
     // PID loop, call ISR every 5 ms
+    #if ARDUINO
     timer.setOverflow(kPIDInterval * 1000, MICROSEC_FORMAT);
     timer.attachInterrupt(callback);
+    #endif
     enable(faultCallback);
 }
 
@@ -285,28 +291,25 @@ void PidController::isr()
     stats.counter.loop++;
 }
 
+#if ARDUINO
+
 void PidController::fault_isr()
 {
     if ((digitalPinToGPIO<DRV8701_FAULT_PIN>()->IDR & (1 << digitalPinToBit(DRV8701_FAULT_PIN))) == 0)
     {
         faults.drv8701Fault = true;
-#if DEBUG
         faults.count++;
-#endif
     }
     if ((digitalPinToGPIO<OCP_INT_PIN>()->IDR & (1 << digitalPinToBit(OCP_INT_PIN))) == 0)
     {
         faults.ocpFault = true;
-#if DEBUG
         faults.count++;
-#endif
     }
     if ((digitalPinToGPIO<DRV_SNSOUT_PIN>()->IDR & (1 << digitalPinToBit(DRV_SNSOUT_PIN))) == 0)
     {
         faults.snsoutFault = true;
-#if DEBUG
         faults.count++;
-#endif
     }
-    // TODO add emergency stop and fault handling
 }
+
+#endif

@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include "adc_converters.h"
 
 /**

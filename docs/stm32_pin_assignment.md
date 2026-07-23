@@ -101,17 +101,17 @@ th:nth-child(4), td:nth-child(4) { width: 46%; }
 
 | Signal | STM32 pin | Type | Notes |
 |---|---|---|---|
-| DRV_SNSOUT | PD11 | DIN IRQ | Current sense output |
-| DRV_FAULT# | PB14 | DIN IRQ | Active-low - DRV8701 fault |
-| OCP_INT# | PB12 | DIN IRQ | Active-low - INA381 ALERT# |
+| DRV_SNSOUT | PD11 | DIN IRQ | Current sense output, falling |
+| DRV_FAULT# | PB14 | DIN IRQ | Active-low - DRV8701 fault, falling |
+| OCP_INT# | PB12 | DIN IRQ | Active-low - INA381 ALERT#, falling |
 
 ## Digital input - interrupt
 
 | Signal | STM32 pin | Type | Notes |
 |---|---|---|---|
-| BTN_3 | PD10 | DIN IRQ | Start Button, 100 nF debounce cap |
-| BTN_2 | PD9 | DIN IRQ | Back Button, 100 nF debounce cap |
-| BTN_1 | PD8 | DIN IRQ | Rotary Knob, 100 nF debounce cap |
+| BTN_3 | PD10 | DIN IRQ | Start Button, 100 nF debounce cap, rising/falling |
+| BTN_2 | PD9 | DIN IRQ | Back Button, 100 nF debounce cap, rising/falling |
+| BTN_1 | PD8 | DIN IRQ | Rotary Knob, 100 nF debounce cap, rising/falling |
 
 ## Revision: PCB Rev1.1 only
 

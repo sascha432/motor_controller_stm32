@@ -23,8 +23,10 @@ void Button<GPIO_PIN, ACTIVE_STATE, kDebounceTimeMs, GPIO_PORT_ADDR>::init(Inter
     // Select pull-up (ODR bit = 1)
     getGPIOPort()->ODR |= (1 << digitalPinToBit(GPIO_PIN));
 
+    #if ARDUINO
     // --- interrupt — use Arduino attachInterrupt only
     attachInterrupt(digitalPinToInterrupt(GPIO_PIN), callback, CHANGE);
+    #endif
 
     lastDebounceTime = 0;
     state = getGPIOPort()->IDR & (1 << digitalPinToBit(GPIO_PIN));
@@ -94,18 +96,24 @@ void RotaryEncoder<GPIO_PIN_A, GPIO_PIN_B, GPIO_PORT_ADDR>::clear()
 }
 
 template <uint8_t GPIO_PIN_A, uint8_t GPIO_PIN_B, uint32_t GPIO_PORT_ADDR>
-void RotaryEncoder<GPIO_PIN_A, GPIO_PIN_B, GPIO_PORT_ADDR>::enable(InterruptCallbackType callback)
+void RotaryEncoder<GPIO_PIN_A, GPIO_PIN_B, GPIO_PORT_ADDR>::enable()
 {
+    #if ARDUINO
     timer.setOverflow(25000, MICROSEC_FORMAT);
-    timer.attachInterrupt(callback);
+    timer.attachInterrupt([]() {
+        knob.isr();
+    });
     timer.resume();
+    #endif
 }
 
 template <uint8_t GPIO_PIN_A, uint8_t GPIO_PIN_B, uint32_t GPIO_PORT_ADDR>
 void RotaryEncoder<GPIO_PIN_A, GPIO_PIN_B, GPIO_PORT_ADDR>::disable()
 {
+    #if ARDUINO
     timer.pause();
     timer.detachInterrupt();
+    #endif
 }
 
 template <uint8_t GPIO_PIN_A, uint8_t GPIO_PIN_B, uint32_t GPIO_PORT_ADDR>
@@ -123,7 +131,7 @@ void RotaryEncoder<GPIO_PIN_A, GPIO_PIN_B, GPIO_PORT_ADDR>::isr()
         TIM3->CNT = 0;
         // acceleration
         acceleration += value * value * 2; 
-        if (acceleration > maxAcceleration) {
+        if (acceleration > static_cast<int32_t>(maxAcceleration)) {
             acceleration = maxAcceleration;
         }
         value *= (acceleration - 1);

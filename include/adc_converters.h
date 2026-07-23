@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <math.h>
 #include "helpers.h"
 #include "debug.h"
 

@@ -60,7 +60,7 @@ void debug_init(void);
         do { \
             if (level <= DEBUG_LEVEL) { \
                 char _debug_function[96]; \
-                Serial.printf("[%06lu] %s " msg "\n", millis(), debug_function_name(DEBUG_FUNCTION_SIG, _debug_function, sizeof(_debug_function)), ##__VA_ARGS__); \
+                Serial.printf("[%06lu] %s " msg "\n", HAL_GetTick(), debug_function_name(DEBUG_FUNCTION_SIG, _debug_function, sizeof(_debug_function)), ##__VA_ARGS__); \
             } \
         } while(0)
 
@@ -77,7 +77,7 @@ void debug_init(void);
         do { \
             if (level <= DEBUG_LEVEL) { \
                 char _debug_function[96]; \
-                Serial4.printf("[%06lu] %s " msg "\n", millis(), debug_function_name(DEBUG_FUNCTION_SIG, _debug_function, sizeof(_debug_function)), ##__VA_ARGS__); \
+                Serial4.printf("[%06lu] %s " msg "\n", HAL_GetTick(), debug_function_name(DEBUG_FUNCTION_SIG, _debug_function, sizeof(_debug_function)), ##__VA_ARGS__); \
             } \
         } while(0)
 
@@ -96,7 +96,7 @@ void debug_init(void);
         do { \
             if (level <= DEBUG_LEVEL) { \
                 char _debug_function[96]; \
-                debug_swd_printf("[%06lu] %s " msg "\n", millis(), debug_function_name(DEBUG_FUNCTION_SIG, _debug_function, sizeof(_debug_function)), ##__VA_ARGS__); \
+                debug_swd_printf("[%06lu] %s " msg "\n", HAL_GetTick(), debug_function_name(DEBUG_FUNCTION_SIG, _debug_function, sizeof(_debug_function)), ##__VA_ARGS__); \
             } \
         } while(0)
 
