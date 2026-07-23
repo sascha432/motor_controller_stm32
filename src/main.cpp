@@ -50,7 +50,7 @@ static void pid_fault_isr()
 
 #ifndef ARDUINO
 
-void EXTI_init();
+void EXTI_Config();
 
 TIM_HandleTypeDef tim6;
 TIM_HandleTypeDef tim7;
@@ -89,14 +89,6 @@ void setup()
     adc.initDAC();
     // PID controller
     pid.init(pid_timer_isr, pid_fault_isr);
-
-    #ifndef ARDUINO
-    // Start TIM6 for periodic interrupt
-    HAL_TIM_Base_Start_IT(&tim6);
-
-    // Initialize external interrupts for buttons and fault handling
-    EXTI_init();
-    #endif
 
     // Initialize display driver
     tft_driver_init();
@@ -284,7 +276,7 @@ extern "C" void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     }
 }
 
-void EXTI_init()
+void EXTI_Config()
 {
     // EXTI8-11 -> Port D
     AFIO->EXTICR[2] =
@@ -368,6 +360,8 @@ int main(void)
     SystemClock_Config();
     Timer_Config();
     setup();
+    EXTI_Config();
+    HAL_TIM_Base_Start_IT(&tim6);
 
     while (1) {
         loop();
