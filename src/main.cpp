@@ -15,47 +15,8 @@
 #include "stats.h"
 #include "debug.h"
 
-static void button_isr() 
-{
-#if ARDUINO
-    #if defined(STM32F107xC)
-        uint32_t idrD = ((GPIO_TypeDef *)GPIOD_BASE)->IDR;
-        knobButton.isr(idrD);
-        backButton.isr(idrD);
-        startButton.isr(idrD);
-    #elif defined(STM32F103xC)
-        uint32_t idrB = ((GPIO_TypeDef *)GPIOB_BASE)->IDR;
-        startButton.isr(idrB);
-        uint32_t idrA = ((GPIO_TypeDef *)GPIOA_BASE)->IDR;
-        knobButton.isr(idrA);
-        backButton.isr(idrA);
-        TODO pin macros need to be  chagned and isr too
-    #else
-        #error missing ISR implementation for this MCU
-    #endif
-#endif
-}
-
-static void pid_timer_isr()
-{
-    pid.isr();
-}
-
-static void pid_fault_isr()
-{
-#if ARDUINO
-    pid.fault_isr();
-#endif
-}
-
-#ifndef ARDUINO
-
-void EXTI_Config();
-
 TIM_HandleTypeDef tim6;
 TIM_HandleTypeDef tim7;
-
-#endif
 
 void setup()
 {
@@ -75,20 +36,19 @@ void setup()
     }
 
     // buttons
-    knobButton.init(button_isr);
-    backButton.init(button_isr);
-    startButton.init(button_isr);
+    knobButton.init();
+    backButton.init();
+    startButton.init();
 
     // rotary encoder knob
     knob.init();
-    knob.enable();
 
     // ADC with DMA
     adc.init();
     // DAC
     adc.initDAC();
     // PID controller
-    pid.init(pid_timer_isr, pid_fault_isr);
+    pid.init();
 
     // Initialize display driver
     tft_driver_init();
@@ -212,8 +172,6 @@ void loop()
     }
 }
 
-#ifndef ARDUINO
-
 extern "C" void SysTick_Handler(void)
 {
     HAL_IncTick();
@@ -223,6 +181,19 @@ extern "C" void TIM6_IRQHandler(void)
 {
     HAL_TIM_IRQHandler(&tim6);
 }
+
+extern "C" void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+    if (htim->Instance == TIM6) { // every 5ms
+        static uint32_t timer6Counter = 0;
+        if (++timer6Counter >= 5) { 
+            timer6Counter = 0;
+            knob.isr(); // every 25ms
+        }
+        pid.isr(); 
+    }
+}
+
 
 extern "C" void EXTI9_5_IRQHandler(void)
 {
@@ -260,19 +231,6 @@ extern "C" void EXTI15_10_IRQHandler(void)
         // DRV8701_FAULT_PIN/PB14 changed
         pid.faults.drv8701Fault = true;
         pid.faults.count++;
-    }
-}
-
-static uint32_t timer6Counter = 0;
-
-extern "C" void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
-{
-    if (htim->Instance == TIM6) { // every 5ms
-        if (timer6Counter++ >= 5) { 
-            timer6Counter = 0;
-            knob.isr(); // every 25ms
-        }
-        pid.isr(); 
     }
 }
 
@@ -352,25 +310,6 @@ void Timer_Config()
     HAL_NVIC_EnableIRQ(TIM6_IRQn);
 }
 
-extern "C" void SystemClock_Config(void);
-
-int main(void)
-{
-    HAL_Init();
-    SystemClock_Config();
-    Timer_Config();
-    setup();
-    EXTI_Config();
-    HAL_TIM_Base_Start_IT(&tim6);
-
-    while (1) {
-        loop();
-        // TODO feed WDT?
-    }
-}
-
-#endif
-
 /*
     * STM32F107 clock configuration
     *
@@ -384,6 +323,9 @@ int main(void)
     *   AHB  = 72 MHz
     *   APB2 = 72 MHz
     *   APB1 = 36 MHz (maximum allowed for STM32F1)
+    * 
+    * USB clock:
+    *  TODO
     *
     * SPI2 clock:
     *   SPI2 is connected to APB1
@@ -446,7 +388,7 @@ extern "C" void SystemClock_Config(void)
     RCC->CFGR |= RCC_CFGR_PLLMULL9;
 
     // STM32F107 OTG FS needs a 48 MHz clock source.
-    // For this clock tree, select PLL/3 for USB.
+    // For this clock tree, PLL/1.5 for USB
     RCC->CFGR &= ~RCC_CFGR_OTGFSPRE;
 
     /*
@@ -484,4 +426,19 @@ extern "C" void SystemClock_Config(void)
     * HAL_Delay() depends on this.
     */
     SysTick_Config(SystemCoreClock / 1000);    
+}
+
+int main(void)
+{
+    HAL_Init();
+    SystemClock_Config();
+    Timer_Config();
+    setup();
+    EXTI_Config();
+    HAL_TIM_Base_Start_IT(&tim6);
+
+    while (1) {
+        loop();
+        // TODO feed WDT?
+    }
 }

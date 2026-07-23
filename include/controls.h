@@ -20,7 +20,7 @@ struct Button
 {
     inline GPIO_TypeDef *getGPIOPort() const { return (GPIO_TypeDef *)GPIO_PORT_ADDR; }
 
-    void init(InterruptCallbackType callback);
+    void init();
 
     /**
      * @brief remove pressed state
@@ -125,16 +125,12 @@ struct RotaryEncoder {
     }
 
     RotaryEncoder() : 
-        IF_ARDUINO(timer(TIM6),)
         maxAcceleration(1),
         position(0)
     {}
 
     void init();
     void clear();
-
-    void enable();
-    void disable();
 
     void isr();
 
@@ -161,9 +157,6 @@ struct RotaryEncoder {
         maxAcceleration = acceleration + 1;
     }
 
-    #if ARDUINO
-    HardwareTimer timer;
-    #endif
     uint32_t maxAcceleration;
     volatile int32_t position;
     volatile int32_t acceleration;

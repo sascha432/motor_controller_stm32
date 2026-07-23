@@ -4,9 +4,6 @@
   Baremetal SPI driver for ST7789 - DMA TX based
 */
 
-#if ARDUINO
-#include <Arduino.h>
-#endif
 #include <stm32f1xx.h>
 #include "tft_driver.h"
 

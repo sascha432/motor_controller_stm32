@@ -4,14 +4,6 @@
 
 #pragma once
 
-#if ARDUINO
-#include <Arduino.h>
-#define IF_ARDUINO(...) __VA_ARGS__
-#define IFN_ARDUINO(...)
-#else
-#define IF_ARDUINO(...)
-#define IFN_ARDUINO(...) __VA_ARGS__
-#endif
 #include <stdint.h>
 #include <stm32f1xx.h>
 
@@ -123,8 +115,6 @@
 #error pins undefined for this platform
 #endif
 #endif
-
-using InterruptCallbackType = void (*)();
 
 /**
  * @brief translate arduino digital pin number to GPIO pin number
@@ -372,9 +362,6 @@ static constexpr uint16_t kPWMFrequencyToARR()
  */
 inline void delay_us(uint32_t us) 
 {
-#if ARDUINO
-    delayMicroseconds(us);
-#else
     extern TIM_HandleTypeDef tim7;
     if (us > 1000) {
         HAL_Delay(us / 1000);
@@ -384,5 +371,4 @@ inline void delay_us(uint32_t us)
     while ((uint16_t)(__HAL_TIM_GET_COUNTER(&tim7) - start) < us) {
         __NOP();
     }
-#endif
 }

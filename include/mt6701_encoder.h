@@ -10,8 +10,6 @@
 /**
  * @brief MT6701 magnetic encoder I2C configuration
  * 
- * Arduino Wire library is used for I2C communication
- * 
  */
 struct MT6701Config {
 

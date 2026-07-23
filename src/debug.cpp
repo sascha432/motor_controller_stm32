@@ -2,9 +2,6 @@
   Author: sascha_lammers@gmx.de
 */
 
-#if ARDUINO
-#include <Arduino.h>
-#endif
 #include "debug.h"
 
 const char *debug_function_name(const char *signature, char *out, size_t outSize)

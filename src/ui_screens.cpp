@@ -4,9 +4,6 @@
   UI implementation using LVGL library
 */
 
-#if ARDUINO
-#include <Arduino.h>
-#endif
 #include "ui.h"
 #include "adc.h"
 #include "pid_controller.h"

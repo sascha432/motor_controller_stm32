@@ -4,9 +4,6 @@
   Menu implementation for the UI
 */
 
-#if ARDUINO
-#include <Arduino.h>
-#endif
 #include <stdio.h>
 #include "menu.h"
 #include "ui.h"
@@ -578,7 +575,22 @@ int32_t Menu::updateRotaryValue(int32_t value)
         case Screen::Type::MOTOR_STALL_TIMEOUT:
             eeprom.setMotorStallTimeout(getValue());
             break;
+        case Screen::Type::WELCOME:
+        case Screen::Type::START:
+        case Screen::Type::EEPROM_SAVED:
+        case Screen::Type::MAIN_MENU:
+        case Screen::Type::ADVANCED_MENU:
+        case Screen::Type::MOTOR_RPM_SETTINGS:
+        case Screen::Type::CURRENT_LIMITS:
+        case Screen::Type::CONTROL_MODE_PWM:
+        case Screen::Type::CONTROL_MODE_PID:
+        case Screen::Type::RESTORE_DEFAULTS_CONFIRMATION:
+        case Screen::Type::EEPROM_RESTORED:
+        case Screen::Type::DIAGNOSTICS:
+        default:
+            break;
     }   
+
     return getValue();
 }
 
