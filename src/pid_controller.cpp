@@ -17,6 +17,7 @@ void PidController::reset()
     stats.reset(readRpmCounter());
     errorCode = ErrorCodeType::NONE;
     faults.reset();
+    faults.isenseMax = ADC::_currentLimitValueToDAC(eeprom.getInputCurrentLimit());
     readFaults();
 }
 
@@ -210,7 +211,12 @@ void PidController::isr()
     // apply new PWM level if motor is running
     if (running)
     {
-        PID_WRITE_MOTOR_PWM_ON(clampedPwmLevel, motorDirection);
+        if (pid.faults.ocpFault && adc.getISenseValue() > pid.faults.isenseMax) {
+            PID_WRITE_MOTOR_PWM_OFF(); // keep PWM off until current drops below the limit
+        } 
+        else {
+            PID_WRITE_MOTOR_PWM_ON(clampedPwmLevel, motorDirection);
+        }
 
         if (eeprom.isPIDMode()) {
             if (antiWindupReduction) {

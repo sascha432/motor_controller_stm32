@@ -226,6 +226,10 @@ extern "C" void EXTI15_10_IRQHandler(void)
         // OCP_INT_PIN/PB12 changed
         pid.faults.ocpFault = true;
         pid.faults.count++;
+        if (adc.getISenseValue() > pid.faults.isenseMax) {
+            // disable PWM until the PID loop turns it on again
+            PID_WRITE_MOTOR_PWM_OFF();
+        }
     }
     if (pending & (1 << 14)) {
         // DRV8701_FAULT_PIN/PB14 changed

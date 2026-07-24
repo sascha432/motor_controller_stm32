@@ -439,7 +439,8 @@ struct PidController
 
 public:
     struct FaultStates {
-        FaultStates() : count(0), drv8701Fault(false), ocpFault(false), snsoutFault(false) {}
+        FaultStates() : isenseMax(0), count(0), drv8701Fault(false), ocpFault(false), snsoutFault(false) {}
+        uint32_t isenseMax;
         volatile uint32_t count;
         volatile bool drv8701Fault : 1;
         volatile bool ocpFault : 1;
