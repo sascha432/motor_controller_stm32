@@ -15,10 +15,10 @@
 #include "stats.h"
 #include "debug.h"
 
-void setup()
-{
-    debug_init();
+// === core setup ===
 
+static void setup()
+{
     // Initialize and read EEPROM on I2C1 on PB8/9
     eeprom.init();
     eeprom.read();
@@ -28,9 +28,6 @@ void setup()
 
     // motor encoder
     motorEncoder.init();
-    if (PidController::kProgramPPR) {
-        motorEncoder.programPPR(i2c, PidController::kPPR);
-    }
 
     // buttons
     knobButton.init();
@@ -47,6 +44,15 @@ void setup()
     // PID controller
     pid.init();
 
+    // Initialize display gpio and SPI
+    tft_driver_gpio_init();
+    tft_driver_spi_init();
+}
+
+// === user setup runs after core setup ===
+
+static void user_setup() 
+{
     // Initialize display driver
     tft_driver_init();
     tft_clear_display();
@@ -55,30 +61,22 @@ void setup()
     lv_init();
     tft_driver_lvgl_init();
 
-#if 0
-    // color flashing test loop
-    tft_backlight_pwm_set(100);
-    uint16_t colors[] = {0xF800, 0x07E0, 0x001F, 0xFFFF};// Red, Green, Blue, White
-    int c = 0;
-
-    for(;;) {
-        uint32_t start = HAL_GetTick();
-        tft_clear_display(colors[c++%4]);
-        uint32_t dur = HAL_GetTick() - start;
-        DEBUG_PRINT(DEBUG_DEBUG, "Clear display took %lu ms", dur);
-        HAL_Delay(250);
-    }
-#endif
-
     // Show welcome screen and load main menu
     menu.showWelcomeScreen();
     // Apply settings after welcome screen since it turns the backlight on
     menu.applyEEPROMSettings();
 
+    // program MT6701 PPR via I2C
+    if (PidController::kProgramPPR) {
+        motorEncoder.programPPR(i2c, PidController::kPPR);
+    }
+
     menu.loadStartScreen();
 }
 
-void loop()
+// === main loop ===
+
+static void loop()
 {
     // handle buttons
     if (knobButton.isPressed()) {
@@ -169,10 +167,7 @@ void loop()
     }
 }
 
-extern "C" void SysTick_Handler(void)
-{
-    HAL_IncTick();
-}
+// === interrupt handlers ===
 
 static TIM_HandleTypeDef tim6;
 
@@ -236,7 +231,9 @@ extern "C" void EXTI15_10_IRQHandler(void)
     }
 }
 
-void EXTI_Config()
+// === interrupt handlers initialization ===
+
+static void EXTI_Init()
 {
     // EXTI8-11 -> Port D
     AFIO->EXTICR[2] =
@@ -288,7 +285,7 @@ void EXTI_Config()
     NVIC_EnableIRQ(EXTI15_10_IRQn);
 }
 
-void Timer_Config() 
+static void TIM7_TIM6_Init() 
 {
     // TIM7 for microsecond delay
     TIM_HandleTypeDef tim7;
@@ -309,139 +306,243 @@ void Timer_Config()
     tim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
     __HAL_RCC_TIM6_CLK_ENABLE();
     HAL_TIM_Base_Init(&tim6);
+    HAL_TIM_Base_Start_IT(&tim6);
     HAL_NVIC_SetPriority(TIM6_IRQn, 1, 0);
     HAL_NVIC_EnableIRQ(TIM6_IRQn);
+   
 }
 
-/*
-    * STM32F107 clock configuration
-    *
-    * External crystal:
-    *   HSE = 8 MHz
-    *
-    * PLL:
-    *   8 MHz * 9 = 72 MHz SYSCLK
-    *
-    * Bus clocks:
-    *   AHB  = 72 MHz
-    *   APB2 = 72 MHz
-    *   APB1 = 36 MHz (maximum allowed for STM32F1)
-    * 
-    * USB clock:
-    *  TODO
-    *
-    * SPI2 clock:
-    *   SPI2 is connected to APB1
-    *   APB1 = 36 MHz
-    *   SPI prescaler BR=0 => divide by 2
-    *   SPI2 = max. 18 MHz
-    */
+// === interrupt handlers ===
+
+/**
+  * @brief This function handles System tick timer.
+  */
+extern "C" void SysTick_Handler(void)
+{
+    HAL_IncTick();
+}
+
+/**
+  * @brief  This function is executed in case of error occurrence.
+  * @retval None
+  */
+extern "C" void Error_Handler(void)
+{
+    /* USER CODE BEGIN Error_Handler_Debug */
+    /* User can add his own implementation to report the HAL error return state */
+    __disable_irq();
+    PID_WRITE_MOTOR_PWM_OFF();
+    while (1) {
+    }
+    /* USER CODE END Error_Handler_Debug */
+}
+
+/**
+  * @brief This function handles Non maskable interrupt.
+  */
+extern "C" void NMI_Handler(void)
+{
+    Error_Handler();
+}
+
+/**
+  * @brief This function handles Hard fault interrupt.
+  */
+extern "C" void HardFault_Handler(void)
+{
+    Error_Handler();
+}
+
+/**
+  * @brief This function handles Memory management fault.
+  */
+extern "C" void MemManage_Handler(void)
+{
+  /* USER CODE BEGIN MemoryManagement_IRQn 0 */
+
+  /* USER CODE END MemoryManagement_IRQn 0 */
+  while (1)
+  {
+    /* USER CODE BEGIN W1_MemoryManagement_IRQn 0 */
+    /* USER CODE END W1_MemoryManagement_IRQn 0 */
+  }
+}
+
+/**
+  * @brief This function handles Prefetch fault, memory access fault.
+  */
+extern "C" void BusFault_Handler(void)
+{
+    Error_Handler();
+}
+
+/**
+  * @brief This function handles Undefined instruction or illegal state.
+  */
+extern "C" void UsageFault_Handler(void)
+{
+    Error_Handler();
+}
+
+// === core clock configuration ===
+
+/**
+  * @brief System Clock Configuration
+  * @retval None
+  */
 extern "C" void SystemClock_Config(void)
 {
-    /*
-     * Enable external high-speed oscillator (HSE).
-     * The MCU starts from HSI after reset, so switch to HSE+PLL.
-     */
-    RCC->CR |= RCC_CR_HSEON;
+  RCC_OscInitTypeDef RCC_OscInitStruct = {};
+  RCC_ClkInitTypeDef RCC_ClkInitStruct = {};
+  RCC_PeriphCLKInitTypeDef PeriphClkInit = {};
 
-    // Wait until HSE oscillator is stable
-    while (!(RCC->CR & RCC_CR_HSERDY)) {
-    }
+  /** Initializes the RCC Oscillators according to the specified parameters
+  * in the RCC_OscInitTypeDef structure.
+  */
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
+  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+  RCC_OscInitStruct.Prediv1Source = RCC_PREDIV1_SOURCE_HSE;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
+  RCC_OscInitStruct.PLL2.PLL2State = RCC_PLL_NONE;
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+  {
+    Error_Handler();
+  }
 
-    /*
-     * Configure Flash access for 72 MHz operation.
-     *
-     * Prefetch improves performance.
-     * Two wait states are required above 48 MHz on STM32F1.
-     */
-    FLASH->ACR |= FLASH_ACR_PRFTBE;
-    FLASH->ACR &= ~FLASH_ACR_LATENCY;
-    FLASH->ACR |= FLASH_ACR_LATENCY_2;
+  /** Initializes the CPU, AHB and APB buses clocks
+  */
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-    /*
-     * Configure AHB/APB prescalers:
-     *
-     * HCLK  = SYSCLK / 1  = 72 MHz
-     * APB2  = HCLK   / 1  = 72 MHz
-     * APB1  = HCLK   / 2  = 36 MHz
-     *
-     * APB1 must not exceed 36 MHz on STM32F1.
-     */
-    RCC->CFGR &= ~(RCC_CFGR_HPRE | RCC_CFGR_PPRE1 | RCC_CFGR_PPRE2);
-    RCC->CFGR |= RCC_CFGR_PPRE1_DIV2;
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_ADC|RCC_PERIPHCLK_USB;
+  PeriphClkInit.AdcClockSelection = RCC_ADCPCLK2_DIV6;
+  PeriphClkInit.UsbClockSelection = RCC_USBCLKSOURCE_PLL_DIV3;
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
+  {
+    Error_Handler();
+  }
 
-    /*
-     * Configure PLL:
-     *
-     * PLL input:
-     *   HSE = 8 MHz
-     *
-     * PLL multiplier:
-     *   x9
-     *
-     * Result:
-     *   8 MHz * 9 = 72 MHz
-     */
-    RCC->CFGR &= ~(RCC_CFGR_PLLSRC | RCC_CFGR_PLLXTPRE | RCC_CFGR_PLLMULL);
-
-    // Use HSE as PLL source
-    RCC->CFGR |= RCC_CFGR_PLLSRC;
-
-    // PLL multiplier x9
-    RCC->CFGR |= RCC_CFGR_PLLMULL9;
-
-    // STM32F107 OTG FS needs a 48 MHz clock source.
-    // For this clock tree, PLL/1.5 for USB
-    RCC->CFGR &= ~RCC_CFGR_OTGFSPRE;
-
-    /*
-     * Enable PLL and wait until it locks.
-     */
-    RCC->CR |= RCC_CR_PLLON;
-    while (!(RCC->CR & RCC_CR_PLLRDY)) {
-    }
-
-    /*
-     * Switch system clock source from HSI to PLL.
-     *
-     * After this:
-     *   SYSCLK = 72 MHz
-     */
-    RCC->CFGR &= ~RCC_CFGR_SW;
-    RCC->CFGR |= RCC_CFGR_SW_PLL;
-
-    // Wait until PLL is selected as system clock
-    while ((RCC->CFGR & RCC_CFGR_SWS) != RCC_CFGR_SWS_PLL) {
-    }
-
-    /*
-     * Update CMSIS global clock variable.
-     *
-     * Used by:
-     *   - HAL_Delay functions
-     *   - SysTick
-     *   - peripheral clock calculations
-     */
-    SystemCoreClock = 72000000;
-
-    /*
-    * Reconfigure SysTick for the new clock.
-    * HAL_Delay() depends on this.
-    */
-    SysTick_Config(SystemCoreClock / 1000);    
+  /** Configure the Systick interrupt time
+  */
+  __HAL_RCC_PLLI2S_ENABLE();
 }
+
+// === USB initialization ===
+
+#define INIT_USB 0
+
+#if INIT_USB
+
+PCD_HandleTypeDef hpcd_USB_OTG_FS;
+
+/**
+  * @brief USB_OTG_FS Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USB_OTG_FS_PCD_Init(void)
+{
+
+  /* USER CODE BEGIN USB_OTG_FS_Init 0 */
+
+  /* USER CODE END USB_OTG_FS_Init 0 */
+
+  /* USER CODE BEGIN USB_OTG_FS_Init 1 */
+
+  /* USER CODE END USB_OTG_FS_Init 1 */
+  hpcd_USB_OTG_FS.Instance = USB_OTG_FS;
+  hpcd_USB_OTG_FS.Init.dev_endpoints = 4;
+  hpcd_USB_OTG_FS.Init.speed = PCD_SPEED_FULL;
+  hpcd_USB_OTG_FS.Init.phy_itface = PCD_PHY_EMBEDDED;
+  hpcd_USB_OTG_FS.Init.Sof_enable = DISABLE;
+  hpcd_USB_OTG_FS.Init.low_power_enable = DISABLE;
+  hpcd_USB_OTG_FS.Init.vbus_sensing_enable = DISABLE;
+  if (HAL_PCD_Init(&hpcd_USB_OTG_FS) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USB_OTG_FS_Init 2 */
+
+  /* USER CODE END USB_OTG_FS_Init 2 */
+
+}
+
+/**
+  * @brief PCD MSP Initialization
+  * This function configures the hardware resources used in this example
+  * @param hpcd: PCD handle pointer
+  * @retval None
+  */
+extern "C" void HAL_PCD_MspInit(PCD_HandleTypeDef* hpcd)
+{
+  if(hpcd->Instance==USB_OTG_FS)
+  {
+    /* USER CODE BEGIN USB_OTG_FS_MspInit 0 */
+
+    /* USER CODE END USB_OTG_FS_MspInit 0 */
+    /* Peripheral clock enable */
+    __HAL_RCC_USB_OTG_FS_CLK_ENABLE();
+    /* USB_OTG_FS interrupt Init */
+    HAL_NVIC_SetPriority(OTG_FS_IRQn, 0, 0);
+    HAL_NVIC_EnableIRQ(OTG_FS_IRQn);
+    /* USER CODE BEGIN USB_OTG_FS_MspInit 1 */
+
+    /* USER CODE END USB_OTG_FS_MspInit 1 */
+
+  }
+
+}
+
+/**
+  * @brief This function handles USB OTG FS global interrupt.
+  */
+extern "C" void OTG_FS_IRQHandler(void)
+{
+  /* USER CODE BEGIN OTG_FS_IRQn 0 */
+
+  /* USER CODE END OTG_FS_IRQn 0 */
+  HAL_PCD_IRQHandler(&hpcd_USB_OTG_FS);
+  /* USER CODE BEGIN OTG_FS_IRQn 1 */
+
+  /* USER CODE END OTG_FS_IRQn 1 */
+}
+
+#endif
+
+// === main ===
 
 int main(void)
 {
+    // system init
     HAL_Init();
     SystemClock_Config();
-    Timer_Config();
+    TIM7_TIM6_Init();
+    debug_init();
+    #if INIT_USB
+        MX_USB_OTG_FS_PCD_Init();
+    #endif
     setup();
-    EXTI_Config();
-    HAL_TIM_Base_Start_IT(&tim6);
+    EXTI_Init();
 
+    // user init
+    user_setup() ;
+
+    // main loop
     while (1) {
         loop();
-        // TODO feed WDT?
     }
 }
+
+// EOF

@@ -214,12 +214,6 @@ static void st7735_init(void)
  */
 void tft_driver_init(void) 
 {
-    // === init GPIO pins ===
-    tft_driver_gpio_init();
-
-    // === SPI setup ===
-    tft_driver_spi_init();
-
     // === Display setup ===
     st7735_init();
 }

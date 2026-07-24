@@ -272,15 +272,15 @@ void PidController::isr()
         }
     }
 
-    if ((stats.counter.loop%20)==0) {
-        __enable_irq();
-        DEBUG_PRINT(DEBUG_DEBUG, "max=%u ocp=%u avg=%u fault=%d", 
-            ADCConverter::Current::convert(faults.isenseMax), 
-            ADCConverter::Current::convert(adc.getISenseOcpAverageValue()), 
-            ADCConverter::Current::convert(adc.getISenseAverageValue()), 
-            pid.faults.ocpFault
-        );
-    }
+    // if ((stats.counter.loop%20)==0) {
+    //     __enable_irq();
+    //     DEBUG_PRINT(DEBUG_DEBUG, "max=%u ocp=%u avg=%u fault=%d", 
+    //         ADCConverter::Current::convert(faults.isenseMax), 
+    //         ADCConverter::Current::convert(adc.getISenseOcpAverageValue()), 
+    //         ADCConverter::Current::convert(adc.getISenseAverageValue()), 
+    //         pid.faults.ocpFault
+    //     );
+    // }
     // if ((stats.counter.loop%200)==0) {
     //     __enable_irq();
     //     DEBUG_PRINT(DEBUG_DEBUG, "rc=%u ra=%d p=%d d=%d", readRpmCounter(), 0,/*stats.rpmAnalog.get(),*/ stats.counter.pulse, delta);

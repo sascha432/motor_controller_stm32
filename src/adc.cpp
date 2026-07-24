@@ -3,6 +3,7 @@
 */
 
 #include "adc.h"
+#include "pins.h"
 
 ADC adc;
 
@@ -88,15 +89,17 @@ void ADC::init()
 
 void ADC::initDAC()
 {
-    // Enable GPIOA clock
-    RCC->APB2ENR |= RCC_APB2ENR_IOPAEN;
-    // Enable DAC clock
-    RCC->APB1ENR |= RCC_APB1ENR_DACEN;
-
-    // Configure PA4 and PA5 as analog input mode GPIO CRL: MODE[1:0] = 00 CNF[1:0] = 00
-    GPIOA->CRL &= ~(0xf << (4 * 4));   // clear PA4
-    GPIOA->CRL &= ~(0xf << (5 * 4));   // clear PA5
-
+    __HAL_RCC_DAC_CLK_ENABLE();
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+    /** DAC GPIO Configuration
+    PA4     ------> DAC_OUT1
+    PA5     ------> DAC_OUT2
+    */
+   GPIO_InitTypeDef GPIO_InitStruct = {};
+   GPIO_InitStruct.Pin = digitalPinToHAL<DRVOCP_VREF_DAC_PIN>()|digitalPinToHAL<OCP_VREF_DAC_PIN>();
+   GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);    
+        
     // Enable DAC channel 1 and channel 2
     DAC->CR |= DAC_CR_EN1 | DAC_CR_EN2;
 }
