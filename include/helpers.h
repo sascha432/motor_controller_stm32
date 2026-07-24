@@ -278,31 +278,56 @@ inline uint32_t digitalPinToGPIOBase(PIN_TYPE pin)
  * @param bits Defaults to 4, number of bits per pin in the configuration register
  * @return constexpr uint32_t 0-7 * bits
  */
-constexpr uint32_t digitalPinShift(uint32_t pin, uint32_t bits = 4)
+inline constexpr uint32_t digitalPinShift(uint32_t pin, uint32_t bits = 4)
 {
     return (digitalPinToBit(pin) & 7u) * bits;
 }
 
 /**
- * @brief translate GPIO port address to RCC_APB2ENR_IOPxEN bits
+ * @brief Translate all arduino pins to HAL gpio pins
  * 
- * @param GPIO_PORT_ADDR GPIOx_BASE address
- * @return bit mask for APB2ENR
+ * @tparam PIN 
+ * @return constexpr uint32_t 
  */
-constexpr uint32_t RCC_APB2ENR_IOPxEN(uint32_t GPIO_PORT_ADDR) 
+template<uint8_t PIN>
+inline constexpr uint32_t digitalPinToHAL()
 {
-    return (1U << ((GPIO_PORT_ADDR >> 10U) & 0x0f));
+    switch(PIN) {
+        case PA0: case PB0: case PC0: case PD0: case PE0: return GPIO_PIN_0;
+        case PA1: case PB1: case PC1: case PD1: case PE1: return GPIO_PIN_1;
+        case PA2: case PB2: case PC2: case PD2: case PE2: return GPIO_PIN_2;
+        case PA3: case PB3: case PC3: case PD3: case PE3: return GPIO_PIN_3;
+        case PA4: case PB4: case PC4: case PD4: case PE4: return GPIO_PIN_4;
+        case PA5: case PB5: case PC5: case PD5: case PE5: return GPIO_PIN_5;
+        case PA6: case PB6: case PC6: case PD6: case PE6: return GPIO_PIN_6;
+        case PA7: case PB7: case PC7: case PD7: case PE7: return GPIO_PIN_7;
+        case PA8: case PB8: case PC8: case PD8: case PE8: return GPIO_PIN_8;
+        case PA9: case PB9: case PC9: case PD9: case PE9: return GPIO_PIN_9;
+        case PA10: case PB10: case PC10: case PD10: case PE10: return GPIO_PIN_10;
+        case PA11: case PB11: case PC11: case PD11: case PE11: return GPIO_PIN_11;
+        case PA12: case PB12: case PC12: case PD12: case PE12: return GPIO_PIN_12;
+        case PA13: case PB13: case PC13: case PD13: case PE13: return GPIO_PIN_13;
+        case PA14: case PB14: case PC14: case PD14: case PE14: return GPIO_PIN_14;
+        case PA15: case PB15: case PC15: case PD15: case PE15: return GPIO_PIN_15;
+    }
+    return 0;
 }
 
 /**
- * @brief translate GPIO port address to RCC_APB2ENR_IOPxEN bits
+ * @brief Enable the GPIO clock for the specified Arduino digital pin
  * 
- * @param gpio_port GPIO_TypeDef pointer
- * @return bit mask for APB2ENR
+ * @tparam PIN 
  */
-constexpr uint32_t RCC_APB2ENR_IOPxEN(GPIO_TypeDef *gpio_port) 
+template<uint8_t PIN>
+inline void __HAL_RCC_GPIOx_CLK_ENABLE()
 {
-    return (1U << (((uint32_t)gpio_port >> 10U) & 0x0f));
+    switch (PIN >> 4) {
+        case 0: __HAL_RCC_GPIOA_CLK_ENABLE(); break;
+        case 1: __HAL_RCC_GPIOB_CLK_ENABLE(); break;
+        case 2: __HAL_RCC_GPIOC_CLK_ENABLE(); break;
+        case 3: __HAL_RCC_GPIOD_CLK_ENABLE(); break;
+        case 4: __HAL_RCC_GPIOE_CLK_ENABLE(); break;
+    }
 }
 
 /**
@@ -362,13 +387,63 @@ static constexpr uint16_t kPWMFrequencyToARR()
  */
 inline void delay_us(uint32_t us) 
 {
-    extern TIM_HandleTypeDef tim7;
     if (us > 1000) {
         HAL_Delay(us / 1000);
         us %= 1000;
     }
-    uint16_t start = __HAL_TIM_GET_COUNTER(&tim7);
-    while ((uint16_t)(__HAL_TIM_GET_COUNTER(&tim7) - start) < us) {
-        __NOP();
+    uint16_t start = TIM7->CNT;
+    while ((uint16_t)(TIM7->CNT - start) < us) {
     }
 }
+
+template<typename T, size_t SIZE>
+class RingBuffer {
+public:
+    bool push(const T& item)
+    {
+        size_t next = (head + 1) % SIZE;
+
+        if (next == tail)
+            return false; // full
+
+        buffer[head] = item;
+        head = next;
+
+        return true;
+    }
+
+    bool pop(T& item)
+    {
+        if (head == tail)
+            return false; // empty
+
+        item = buffer[tail];
+        tail = (tail + 1) % SIZE;
+
+        return true;
+    }
+
+    bool empty() const
+    {
+        return head == tail;
+    }
+
+    bool full() const
+    {
+        return ((head + 1) % SIZE) == tail;
+    }
+
+    size_t available() const
+    {
+        if (head >= tail)
+            return head - tail;
+
+        return SIZE - tail + head;
+    }
+
+private:
+    T buffer[SIZE];
+
+    volatile size_t head = 0;
+    volatile size_t tail = 0;
+};

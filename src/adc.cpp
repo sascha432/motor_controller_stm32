@@ -110,16 +110,18 @@ extern "C" void DMA1_Channel1_IRQHandler()
         DMA1->IFCR = DMA_IFCR_CTCIF1;  
 
         auto value = adc.getISenseValue();
-        // store peak for OCP and fault handling
-        if (value > adc.isensePeak) {
-            adc.isensePeak = value;
-        }
         // store average for display
         adc.isenseSum += value;
         if (++adc.isenseCount >= ADC::kISenseCountMax) {
             // reduce by 6.5% to avoid overflow in rolling average
             adc.isenseSum -= adc.isenseSum >> 4;    
             adc.isenseCount -= adc.isenseCount >> 4;
+        }
+        // store average for OCP
+        adc.isenseOcpSum += value;
+        if (++adc.isenseOcpCount >= 100) { // IMPORTANT as few as possible to get a fast response to OCP faults
+            adc.isenseOcpSum -= adc.isenseOcpSum >> 3;
+            adc.isenseOcpCount -= adc.isenseOcpCount >> 3;
         }
     }
 }

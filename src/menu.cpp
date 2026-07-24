@@ -390,12 +390,16 @@ void Menu::handleBackButtonPress()
 {
     DEBUG_PRINT(DEBUG_DEBUG, "enter screen=%p id=%d value=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), getValue());
     switch(screenFlow->getId()) {
+        case Screen::Type::DASHBOARD:
+            pid.motorOff();
+            loadStartScreen();
+            break;
         case Screen::Type::START:
             pid.toggleMotorDirection();
             screenFlow->update();
             break;
         case Screen::Type::WELCOME:
-        case Screen::Type::DASHBOARD:
+        // case Screen::Type::DASHBOARD:
             // no back button available
             break;
         case Screen::Type::MAIN_MENU:

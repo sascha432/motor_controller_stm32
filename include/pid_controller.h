@@ -11,8 +11,8 @@
 
 struct PidController
 {
-    static constexpr float kKpDefault = 0.3f;
-    static constexpr float kKiDefault = 0.5f;
+    static constexpr float kKpDefault = 0.15f;
+    static constexpr float kKiDefault = 0.4f;
     static constexpr float kKdDefault = 0.0f;
     static constexpr uint16_t kMaxPWMLevel = kPWMFrequencyToARR<20000>();   // Motor PWM 20Khz
     static constexpr uint16_t kPPR = 1024;                                  // MT6701 PPR
@@ -483,24 +483,35 @@ public:
             uint32_t loop;                  // number of times the PID loop has been called
             int32_t pulse;                  // number of pulses received from the A/B motor encoder
         } counter;
-        // struct {
-        //     uint32_t rpmCounter;            // last value of the RPM counter
-            // uint32_t analogRpmMeasured;     // last measured RPM value based on the analog encoder pulses
-        // } lastValue;
 
         void reset(uint32_t rpmCounter) {
             rpm.reset();
             pwm.reset();
             counter.loop = 0;
             counter.pulse = 0;
-            // lastValue.rpmCounter = rpmCounter;
-            // lastValue.analogRpmMeasured = 0;
         }
     };
+
+    struct PidLoopType {
+        uint32_t sequence;
+        uint16_t rpm;
+        uint16_t pwmLevel;
+        uint16_t voltage;
+        uint16_t currentOcp;
+        uint16_t currentAverage;
+        uint16_t motorTemperature;
+        uint16_t mosfetTemperature;
+        uint32_t errorCount: 16;
+        uint32_t drv8701Fault : 1;
+        uint32_t ocpFault : 1;
+        uint32_t snsoutFault : 1;
+    };
+    static constexpr size_t kPidLoopTypeSize = sizeof(PidLoopType);
 
     StatsType stats;
     FaultStates faults;             // DRV8701 and ocp faults
     ErrorCodeType errorCode;        // last error
+    RingBuffer<PidLoopType, 8> pidLoopBuffer;
 
     volatile bool running;          // true if the PID controller is running
 };

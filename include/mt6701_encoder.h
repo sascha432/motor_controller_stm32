@@ -66,12 +66,12 @@ struct MT6701Config {
         if (!writeRegister(REG_ABZ_RES_HIGH, high)) {
             return false;
         }
-        delay_us(10000);
+        HAL_Delay(10);
 
         if (!writeRegister(REG_ABZ_RES_LOW, low)) {
             return false;
         }
-        delay_us(10000);
+        HAL_Delay(10);
 
         return (getPPR() == ppr);
     }
@@ -88,12 +88,12 @@ struct MT6701Config {
         if (!writeRegister(REG_PROG_KEY, CMD_UNLOCK)) {
             return false;
         }
-        delay_us(10000);
+        HAL_Delay(10);
 
         if (!writeRegister(REG_PROG_CMD, CMD_COMMIT)) {
             return false;
         }
-        delay_us(800000);  // EEPROM write time
+        HAL_Delay(800);  // EEPROM write time
         return true;
     }
 
@@ -122,10 +122,10 @@ private:
  * @tparam GPIO_PORT_ADDR GPIO port address for I2C enable
  * @tparam ACTIVE_LOW_I2C true if I2C enable is active low, false if active high
  */
-template<uint8_t GPIO_PIN, bool ACTIVE_LOW_I2C, uint32_t GPIO_PORT_ADDR = digitalPinToGPIOBase<GPIO_PIN>()>
+template<uint8_t GPIO_PIN, bool ACTIVE_LOW_I2C>
 struct MT6701Encoder {
 
-    inline GPIO_TypeDef *getGPIOPort() const { return (GPIO_TypeDef *)GPIO_PORT_ADDR; }
+    inline GPIO_TypeDef *getGPIOPort() const { return digitalPinToGPIO<GPIO_PIN>(); }
 
     /**
      * @brief select encoder mode
@@ -135,11 +135,11 @@ struct MT6701Encoder {
     void setI2CEnablePin(bool state) 
     {
         (ACTIVE_LOW_I2C ? !state : state) ?
-            (getGPIOPort()->BSRR = (1 << digitalPinToBit(GPIO_PIN))) : 
-            (getGPIOPort()->BRR  = (1 << digitalPinToBit(GPIO_PIN)))
+            (getGPIOPort()->BSRR = (1 << digitalPinToBit<GPIO_PIN>())) : 
+            (getGPIOPort()->BRR  = (1 << digitalPinToBit<GPIO_PIN>()))
         ;
         // wait for the encoder to change state
-        delay_us(10);
+        HAL_Delay(1);
     }
 
     /**
@@ -148,11 +148,14 @@ struct MT6701Encoder {
     void init() 
     {
         // Enable GPIOx clock
-        RCC->APB2ENR |= RCC_APB2ENR_IOPxEN(GPIO_PORT_ADDR); 
+        __HAL_RCC_GPIOx_CLK_ENABLE<GPIO_PIN>();
 
-        // PB0 = General-purpose push-pull output, 50 MHz
-        GPIO_CRx_REG(GPIO_PORT_ADDR, GPIO_PIN) &= ~(0xF << digitalPinShift(GPIO_PIN));  // Clear MODE0/CNF0
-        GPIO_CRx_REG(GPIO_PORT_ADDR, GPIO_PIN) |=  (0x3 << digitalPinShift(GPIO_PIN));  // MODE=11 (50MHz), CNF=00 (push-pull)
+        GPIO_InitTypeDef GPIO_InitStruct = {};
+        GPIO_InitStruct.Pin = digitalPinToHAL<GPIO_PIN>();
+        GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+        GPIO_InitStruct.Pull = GPIO_NOPULL;
+        GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+        HAL_GPIO_Init(digitalPinToGPIO<GPIO_PIN>(), &GPIO_InitStruct);
 
         // turn off
         setI2CEnablePin(ACTIVE_LOW_I2C);

@@ -15,9 +15,6 @@
 #include "stats.h"
 #include "debug.h"
 
-TIM_HandleTypeDef tim6;
-TIM_HandleTypeDef tim7;
-
 void setup()
 {
     debug_init();
@@ -177,6 +174,8 @@ extern "C" void SysTick_Handler(void)
     HAL_IncTick();
 }
 
+static TIM_HandleTypeDef tim6;
+
 extern "C" void TIM6_IRQHandler(void)
 {
     HAL_TIM_IRQHandler(&tim6);
@@ -190,10 +189,9 @@ extern "C" void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
             timer6Counter = 0;
             knob.isr(); // every 25ms
         }
-        pid.isr(); 
+        pid.isr();
     }
 }
-
 
 extern "C" void EXTI9_5_IRQHandler(void)
 {
@@ -224,9 +222,9 @@ extern "C" void EXTI15_10_IRQHandler(void)
     }
     if (pending & (1 << 12)) {
         // OCP_INT_PIN/PB12 changed
-        pid.faults.ocpFault = true;
-        pid.faults.count++;
-        if (adc.getISenseValue() > pid.faults.isenseMax) {
+        if (adc.getISenseOcpAverageValue() > pid.faults.isenseMax) {
+            pid.faults.ocpFault = true;
+            pid.faults.count++;
             // disable PWM until the PID loop turns it on again
             PID_WRITE_MOTOR_PWM_OFF();
         }
@@ -293,6 +291,7 @@ void EXTI_Config()
 void Timer_Config() 
 {
     // TIM7 for microsecond delay
+    TIM_HandleTypeDef tim7;
     tim7.Instance = TIM7;
     tim7.Init.Prescaler = 71; // 72 MHz / 72 = 1 MHz (1 us tick)
     tim7.Init.CounterMode = TIM_COUNTERMODE_UP;

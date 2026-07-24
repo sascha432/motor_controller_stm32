@@ -18,7 +18,8 @@ struct LEDs_T {
     static void init() 
     {
         // Enable GPIO port clock
-        RCC->APB2ENR |= RCC_APB2ENR_IOPxEN(GPIO_LEDS_PORT_ADDRESS) | RCC_APB2ENR_IOPxEN(GPIO_ILLUMINATION_PORT_ADDRESS);
+        __HAL_RCC_GPIOx_CLK_ENABLE<GPIO_LEDS_PIN>();
+        __HAL_RCC_GPIOx_CLK_ENABLE<GPIO_ILLUMINATION_LED_PIN>();
 
         // LED 1 & 2
         offLED1and2();

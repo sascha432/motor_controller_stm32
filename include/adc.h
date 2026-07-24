@@ -17,9 +17,9 @@ struct ADC {
     /**
      * 4 channels @ 12MHz ADC clock
      * 21µs per conversion, 47619 total conversions per second
-     * rolling average over ~1 second (+-3.25%)
+     * rolling average over ~0.5 second (+-3.25%)
      */
-    static constexpr uint16_t kISenseCountMax = (((47619 * 1.065) / kNumConversions) / (1<<4U)) * (1<<4); // round down to multiple of 16
+    static constexpr uint16_t kISenseCountMax = (((47619 * 1.065) / kNumConversions) / (1<<4U)) * (1<<4) / 2; // round down to multiple of 16
 
     /**
      * @brief struct to access the ADC buffer values
@@ -39,7 +39,8 @@ struct ADC {
     ADC() : 
         isenseSum(0), 
         isenseCount(0), 
-        isensePeak(0) 
+        isenseOcpSum(0),
+        isenseOcpCount(0)
     {
     }
 
@@ -93,7 +94,8 @@ struct ADC {
      * @param index 
      * @return uint16_t 
      */
-    uint16_t read(uint8_t index) const {
+    uint16_t read(uint8_t index) const 
+    {
         return adc_buffer[index];
     }
 
@@ -102,7 +104,8 @@ struct ADC {
      * 
      * @return BufferType 
      */
-    BufferType readAll() const {
+    BufferType readAll() const 
+    {
         return *(BufferType *)adc_buffer;
     }
 
@@ -110,17 +113,9 @@ struct ADC {
      * @brief Get the Input Current value in ADC units
      * 
      */
-    inline uint16_t getISenseValue() const {
+    inline uint16_t getISenseValue() const 
+    {
         return adc_buffer[0];
-    }
-
-    /**
-     * @brief Get the Input Current peak value in ADC units. Used for OCP protection and fault handling.
-     * 
-     * @return uint16_t 
-     */
-    inline uint16_t getISensePeakValue() const {
-        return isensePeak;
     }
 
     /**
@@ -128,15 +123,27 @@ struct ADC {
      * 
      * @return uint16_t 
      */
-    inline uint16_t getISenseAverageValue() const {
+    inline uint16_t getISenseAverageValue() const 
+    {
         return isenseCount ? (isenseSum / isenseCount) : 0;
+    }
+
+    /**
+     * @brief Get the Input Current average value for OCP in ADC units.
+     * 
+     * @return uint16_t 
+     */
+    inline uint16_t getISenseOcpAverageValue() const 
+    {
+        return isenseOcpCount ? (isenseOcpSum / isenseOcpCount) : 0;
     }
 
     /**
      * @brief Get the Input Voltage value in ADC units
      * 
      */
-    inline uint16_t getVSenseValue() const {
+    inline uint16_t getVSenseValue() const 
+    {
         return adc_buffer[1];
     }
 
@@ -145,7 +152,8 @@ struct ADC {
      * 
      * @return uint16_t 
      */
-    inline uint16_t getMotorNTCValue() const {
+    inline uint16_t getMotorNTCValue() const 
+    {
         return adc_buffer[2];
     }
 
@@ -154,14 +162,16 @@ struct ADC {
      * 
      * @return uint16_t 
      */
-    inline uint16_t getMosfetNTCValue() const {
+    inline uint16_t getMosfetNTCValue() const 
+    {
         return adc_buffer[3];
     }
 
     volatile uint16_t adc_buffer[kNumConversions];
     volatile uint32_t isenseSum;
     volatile uint16_t isenseCount;
-    volatile uint16_t isensePeak;
+    volatile uint32_t isenseOcpSum;
+    volatile uint16_t isenseOcpCount;
 };
 
 extern ADC adc;

@@ -20,54 +20,63 @@ lv_disp_drv_t s_lvgl_disp_drv;
 void tft_driver_gpio_init(void)
 {
     // Enable GPIOC and GPIOD clocks
-    RCC->APB2ENR |= RCC_APB2ENR_IOPCEN | RCC_APB2ENR_IOPDEN | RCC_APB2ENR_IOPBEN;
+    __HAL_RCC_GPIOC_CLK_ENABLE();
+    __HAL_RCC_GPIOD_CLK_ENABLE();
+    __HAL_RCC_GPIOB_CLK_ENABLE();
 
     // TFT_PIN_RST/PC6, TFT_PIN_RS/PC7 (CRL)
-    GPIOC->CRL &= ~((0xF << (6 * 4)) | (0xF << (7 * 4)));
-    GPIOC->CRL |=  ((0x2 << (6 * 4)) |   // PC6 output PP 2MHz
-                    (0x2 << (7 * 4)));   // PC7 output PP 2MHz
-
+    GPIO_InitTypeDef GPIO_InitStruct = {};
+    GPIO_InitStruct.Pin = GPIO_PIN_6 | GPIO_PIN_7;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
     // TFT_PIN_CS/PD15 (CRH)
-    GPIOD->CRH &= ~(0xF << ((15 - 8) * 4));
-    GPIOD->CRH |=  (0x3 << ((15 - 8) * 4)); // PD15 output PP 50MHz
+    GPIO_InitStruct = {};
+    GPIO_InitStruct.Pin = GPIO_PIN_15;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);    
 
     // set pins to default state
     TFT_PIN_CS_HIGH();
     TFT_PIN_RS_HIGH();
 
     // backlight PWM on TFT_PIN_LED/PB11
-    RCC->APB2ENR |= RCC_APB2ENR_AFIOEN | RCC_APB2ENR_IOPBEN;
-    RCC->APB1ENR |= RCC_APB1ENR_TIM2EN;
+    __HAL_RCC_AFIO_CLK_ENABLE();
+    __HAL_RCC_GPIOB_CLK_ENABLE();
+    __HAL_RCC_TIM2_CLK_ENABLE();
 
-    AFIO->MAPR &= ~AFIO_MAPR_TIM2_REMAP;
-    // TIM2 partial remap 2 routes CH4 to PB11.
-    AFIO->MAPR |= AFIO_MAPR_TIM2_REMAP_1;
+    __HAL_AFIO_REMAP_TIM2_PARTIAL_2();
 
     // TFT_PIN_LED/PB11 = Alternate Function Push-Pull, 50 MHz (CRH)
-    GPIOB->CRH &= ~(0xF << ((11 - 8) * 4));
-    GPIOB->CRH |=  (0xB << ((11 - 8) * 4));
+    GPIO_InitStruct = {};
+    GPIO_InitStruct.Pin = GPIO_PIN_11 | GPIO_PIN_10;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-    // LED_PWM/PB10 = Alternate Function Push-Pull, 50 MHz (CRH)
-    GPIOB->CRH &= ~(0xF << ((10 - 8) * 4));
-    GPIOB->CRH |=  (0xB << ((10 - 8) * 4));
+    // TIM2 setup
+    TIM_HandleTypeDef tim2 = {};
+    tim2.Instance = TIM2;
+    tim2.Init.Prescaler = 71;          // 72MHz / (71+1) = 1MHz timer clock
+    tim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+    tim2.Init.Period = 999;            // 1MHz / (999+1) = 1kHz PWM
+    tim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+    HAL_TIM_PWM_Init(&tim2);
 
-    TIM2->CR1 = 0;
-    TIM2->PSC = 71;      /* 72MHz / (71+1) = 1MHz timer clock */
-    TIM2->ARR = 999;     /* 1MHz / (999+1) = 1kHz PWM */
+    // PWM mode 1 CH3 + CH4
+    TIM_OC_InitTypeDef sConfigOC = {};
+    sConfigOC.OCMode = TIM_OCMODE_PWM1;
+    sConfigOC.Pulse = 0;
+    sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+    sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+    HAL_TIM_PWM_ConfigChannel(&tim2, &sConfigOC, TIM_CHANNEL_3);
+    HAL_TIM_PWM_ConfigChannel(&tim2, &sConfigOC, TIM_CHANNEL_4);
 
-    // Duty cycle 0
-    TIM2->CCR3 = 0;
-    TIM2->CCR4 = 0;
-
-    TIM2->CCMR2 &= ~(TIM_CCMR2_CC3S | TIM_CCMR2_OC3M | TIM_CCMR2_OC3PE | TIM_CCMR2_CC4S | TIM_CCMR2_OC4M | TIM_CCMR2_OC4PE);
-    TIM2->CCMR2 |= TIM_CCMR2_OC3M_1 | TIM_CCMR2_OC3M_2 | TIM_CCMR2_OC3PE | TIM_CCMR2_OC4M_1 | TIM_CCMR2_OC4M_2 | TIM_CCMR2_OC4PE;
-
-    // Enable TIM2 Channel 2 & 4 output on the pin
-    TIM2->CCER |= TIM_CCER_CC3E | TIM_CCER_CC4E;
-
-    TIM2->EGR = TIM_EGR_UG;
-    TIM2->CR1 |= TIM_CR1_ARPE | TIM_CR1_CEN;
+    // Start PWM outputs
+    HAL_TIM_PWM_Start(&tim2, TIM_CHANNEL_3);
+    HAL_TIM_PWM_Start(&tim2, TIM_CHANNEL_4);    
 }
 
 /**
@@ -89,32 +98,13 @@ void tft_driver_spi_init(void)
     /* Disable SPI first */
     SPI2->CR1 = 0;
 
-    #if defined(STM32F107xC)
-
-        /* Configure SPI2 - BR=0 gives ~18MHz on APB1=36MHz */
-        SPI2->CR1 = (0 << 3)          /* Baud rate: BR=0 (36MHz/2 = 18MHz) */
-                | SPI_CR1_MSTR      /* Master mode */
-                | SPI_CR1_SSM       /* Software slave management */
-                | SPI_CR1_SSI       /* Internal slave select */
-                | SPI_CR1_CPOL      /* Clock polarity = 1 */
-                | SPI_CR1_CPHA;     /* Clock phase = 1 */
-
-    #elif defined(STM32F103xC)
-
-        /* Configure SPI2 - BR=0 gives ~18MHz on APB1=36MHz */
-        SPI2->CR1 = (0 << 3)          /* Baud rate: BR=0 (36MHz/2 = 18MHz) */
-                | SPI_CR1_MSTR      /* Master mode */
-                | SPI_CR1_SSM       /* Software slave management */
-                | SPI_CR1_SSI       /* Internal slave select */
-                | SPI_CR1_CPOL      /* Clock polarity = 1 */
-                | SPI_CR1_CPHA;     /* Clock phase = 1 */
-
-    #else
-
-        #error "Unsupported STM32F1 series"
-
-    #endif
-
+    /* Configure SPI2 - BR=0 gives ~18MHz on APB1=36MHz */
+    SPI2->CR1 = (0 << 3)          /* Baud rate: BR=0 (36MHz/2 = 18MHz) */
+            | SPI_CR1_MSTR      /* Master mode */
+            | SPI_CR1_SSM       /* Software slave management */
+            | SPI_CR1_SSI       /* Internal slave select */
+            | SPI_CR1_CPOL      /* Clock polarity = 1 */
+            | SPI_CR1_CPHA;     /* Clock phase = 1 */
     SPI2->CR2 = 0;  /* DMA disabled by default, enabled per transfer */
 
     /* Enable SPI2 */

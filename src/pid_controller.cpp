@@ -25,49 +25,85 @@ void PidController::init()
 {
     running = false;
 
-    // === PWM on TIM1 CH1 (PA8, PA9) ===
-    // Enable AFIO and GPIOA for PA8/PA9
-    RCC->APB2ENR |= RCC_APB2ENR_AFIOEN | RCC_APB2ENR_IOPAEN;
-    // Enable TIM1 (APB2)
-    RCC->APB2ENR |= RCC_APB2ENR_TIM1EN;
+    // // === PWM on TIM1 CH1 (PA8, PA9) ===
+    // Enable clocks
+    __HAL_RCC_AFIO_CLK_ENABLE();
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+    __HAL_RCC_TIM1_CLK_ENABLE();
 
-    // PA8 AF push-pull (CRH: pin 8)
-    GPIOA->CRH &= ~(GPIO_CRH_MODE8 | GPIO_CRH_CNF8);
-    GPIOA->CRH |= (GPIO_CRH_MODE8 | GPIO_CRH_CNF8_1); // 50MHz, AF push-pull
+    // PA8 / PA9 AF push-pull
+    GPIO_InitTypeDef GPIO_InitStructPP = {};
+    GPIO_InitStructPP.Pin = GPIO_PIN_8 | GPIO_PIN_9;
+    GPIO_InitStructPP.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStructPP.Pull = GPIO_NOPULL;
+    GPIO_InitStructPP.Speed = GPIO_SPEED_FREQ_HIGH;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStructPP);
 
-    // PA9 AF push-pull (CRH: pin 9)
-    GPIOA->CRH &= ~(GPIO_CRH_MODE9 | GPIO_CRH_CNF9);
-    GPIOA->CRH |= (GPIO_CRH_MODE9 | GPIO_CRH_CNF9_1); // 50MHz, AF push-pull
+    // TIM1 PWM setup
+    TIM_HandleTypeDef tim1 = {};
+    tim1.Instance = TIM1;
+    tim1.Init.Prescaler = 0;
+    tim1.Init.CounterMode = TIM_COUNTERMODE_UP;
+    tim1.Init.Period = kMaxPWMLevel - 1;
+    tim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+    HAL_TIM_PWM_Init(&tim1);
 
-    // PWM setup on TIM1 CH1 and CH2
-    TIM1->PSC = 0;
-    TIM1->ARR = kMaxPWMLevel - 1;
-    PID_WRITE_MOTOR_PWM_OFF();
-    TIM1->CCMR1 |= (6 << TIM_CCMR1_OC1M_Pos) | (6 << TIM_CCMR1_OC2M_Pos); // PWM mode 1 on CH1 and CH2
-    TIM1->CCER |= TIM_CCER_CC1E | TIM_CCER_CC2E;
-    TIM1->BDTR |= TIM_BDTR_MOE; // main output enable for TIM1
-    TIM1->CR1 |= TIM_CR1_CEN;
+    // PWM mode 1 CH1 + CH2
+    TIM_OC_InitTypeDef sConfigOC = {};
+    sConfigOC.OCMode = TIM_OCMODE_PWM1;
+    sConfigOC.Pulse = 0;
+    sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+    sConfigOC.OCNPolarity = 0;
+    sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+    HAL_TIM_PWM_ConfigChannel(&tim1, &sConfigOC, TIM_CHANNEL_1);
+    HAL_TIM_PWM_ConfigChannel(&tim1, &sConfigOC, TIM_CHANNEL_2);
 
-    // TIM4 setup
-    RCC->APB2ENR |= RCC_APB2ENR_AFIOEN; // alternative function clock enable
-    RCC->APB1ENR |= RCC_APB1ENR_TIM4EN; // enable TIM4 clock
+    // TIM1 BDTR MOE
+    __HAL_TIM_MOE_ENABLE(&tim1);
 
-    // TIM4 Encoder Mode for MT6701
-    TIM4->CR1 = 0;
-    TIM4->SMCR = TIM_SMCR_SMS_0 | TIM_SMCR_SMS_1; // Encoder mode 3
-    TIM4->CCMR1 = TIM_CCMR1_CC1S_0 | TIM_CCMR1_CC2S_0;
-    TIM4->CCER = 0;
-    TIM4->ARR = 0xFFFF;
-    TIM4->CNT = 0;
+    // Start PWM
+    HAL_TIM_PWM_Start(&tim1, TIM_CHANNEL_1);
+    HAL_TIM_PWM_Start(&tim1, TIM_CHANNEL_2);
+
+    // TIM4 setup MT6701 encoder on PB6 PB7
+    __HAL_RCC_AFIO_CLK_ENABLE();
+    __HAL_RCC_TIM4_CLK_ENABLE();
+
+    TIM_HandleTypeDef tim4 = {};
+    tim4.Instance = TIM4;
+    tim4.Init.Prescaler = 0;
+    tim4.Init.CounterMode = TIM_COUNTERMODE_UP;
+    tim4.Init.Period = 0xFFFF;
+    tim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+
+    TIM_Encoder_InitTypeDef sEncoderConfig = {};
+    // 4x mode, count on both edges of both channels
+    sEncoderConfig.EncoderMode = TIM_ENCODERMODE_TI12;
+    // channel 1
+    sEncoderConfig.IC1Polarity = TIM_ICPOLARITY_RISING;
+    sEncoderConfig.IC1Selection = TIM_ICSELECTION_DIRECTTI;
+    sEncoderConfig.IC1Prescaler = TIM_ICPSC_DIV1;
+    sEncoderConfig.IC1Filter = 0;
+    // channel 2
+    sEncoderConfig.IC2Polarity = TIM_ICPOLARITY_RISING;
+    sEncoderConfig.IC2Selection = TIM_ICSELECTION_DIRECTTI;
+    sEncoderConfig.IC2Prescaler = TIM_ICPSC_DIV1;
+    sEncoderConfig.IC2Filter = 0;
+
+    HAL_TIM_Encoder_Init(&tim4, &sEncoderConfig);
+    __HAL_TIM_SET_COUNTER(&tim4, 0);
+    HAL_TIM_Encoder_Start(&tim4, TIM_CHANNEL_ALL);
 
     // TIM5 setup for RPM counter
-    // Enable GPIOA and TIM5 clocks
-    RCC->APB2ENR |= RCC_APB2ENR_IOPAEN;
-    RCC->APB1ENR |= RCC_APB1ENR_TIM5EN;
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+    __HAL_RCC_TIM5_CLK_ENABLE();
 
-    // PA1 input floating
-    GPIOA->CRL &= ~(GPIO_CRL_MODE1 | GPIO_CRL_CNF1);
-    GPIOA->CRL |= GPIO_CRL_CNF1_0;       // input floating
+    // PA1 (TIM5_CH2) input floating
+    GPIO_InitTypeDef GPIO_InitStructNpPullup = {};
+    GPIO_InitStructNpPullup.Pin = GPIO_PIN_1;
+    GPIO_InitStructNpPullup.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStructNpPullup.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStructNpPullup);
 
     // Reset TIM5
     TIM5->CR1 = 0;
@@ -76,45 +112,38 @@ void PidController::init()
     TIM5->DIER = 0;
     TIM5->CCMR1 = 0;
     TIM5->CCER = 0;
-
     // CH2 as input, mapped to TI2
     TIM5->CCMR1 |= TIM_CCMR1_CC2S_0;
-
     // Falling edge detection
     TIM5->CCER |= TIM_CCER_CC2P;
-
     // Select TI2FP2 as trigger input
     // TS = 110
     TIM5->SMCR |= (6 << TIM_SMCR_TS_Pos);
-
     // External clock mode 1
     // SMS = 111
     TIM5->SMCR |= (7 << TIM_SMCR_SMS_Pos);
-
     // 32-bit counter
     TIM5->ARR = 0xFFFFFFFF;
-
     // Start
     TIM5->CNT = 0;
     TIM5->CR1 |= TIM_CR1_CEN;
 
     // Fault interrupt pins DRV8701_FAULT_PIN, OCP_INT_PIN, DRV_SNSOUT_PIN
-    RCC->APB2ENR |= RCC_APB2ENR_IOPxEN(DRV8701_FAULT_PIN) | RCC_APB2ENR_IOPxEN(OCP_INT_PIN) | RCC_APB2ENR_IOPxEN(DRV_SNSOUT_PIN);
+    __HAL_RCC_GPIOx_CLK_ENABLE<DRV8701_FAULT_PIN>();
+    __HAL_RCC_GPIOx_CLK_ENABLE<OCP_INT_PIN>();
+    __HAL_RCC_GPIOx_CLK_ENABLE<DRV_SNSOUT_PIN>();
 
-    // clear conf
-    GPIO_CRx_REG<DRV8701_FAULT_PIN>() &= ~(0xf << digitalPinShift(DRV8701_FAULT_PIN));
-    GPIO_CRx_REG<OCP_INT_PIN>() &= ~(0xf << digitalPinShift(OCP_INT_PIN));
-    GPIO_CRx_REG<DRV_SNSOUT_PIN>() &= ~(0xf << digitalPinShift(DRV_SNSOUT_PIN));
+    GPIO_InitTypeDef GPIO_InitStruct = {};
+    GPIO_InitStruct.Pin = digitalPinToHAL<DRV8701_FAULT_PIN>();
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull = GPIO_PULLUP;
+    HAL_GPIO_Init(digitalPinToGPIO<DRV8701_FAULT_PIN>(), &GPIO_InitStruct);
 
-    // CNF=10, MODE=00
-    GPIO_CRx_REG<DRV8701_FAULT_PIN>() |= (0x8 << digitalPinShift(DRV8701_FAULT_PIN));
-    GPIO_CRx_REG<OCP_INT_PIN>() |= (0x8 << digitalPinShift(OCP_INT_PIN));
-    GPIO_CRx_REG<DRV_SNSOUT_PIN>() |= (0x8 << digitalPinShift(DRV_SNSOUT_PIN));
+    GPIO_InitStruct.Pin = digitalPinToHAL<OCP_INT_PIN>();
+    HAL_GPIO_Init(digitalPinToGPIO<OCP_INT_PIN>(), &GPIO_InitStruct);
 
-    // Select pull-up (ODR bit = 1)
-    digitalPinToGPIO<DRV8701_FAULT_PIN>()->ODR |= (1 << digitalPinToBit(DRV8701_FAULT_PIN));
-    digitalPinToGPIO<OCP_INT_PIN>()->ODR |= (1 << digitalPinToBit(OCP_INT_PIN));
-    digitalPinToGPIO<DRV_SNSOUT_PIN>()->ODR |= (1 << digitalPinToBit(DRV_SNSOUT_PIN));
+    GPIO_InitStruct.Pin = digitalPinToHAL<DRV_SNSOUT_PIN>();
+    HAL_GPIO_Init(digitalPinToGPIO<DRV_SNSOUT_PIN>(), &GPIO_InitStruct);
 }
 
 void PidController::motorOn()
@@ -126,7 +155,6 @@ void PidController::motorOn()
         __enable_irq();
         reset();
         setRPM(eeprom.getMotorRPM());
-        DEBUG_PRINT(DEBUG_DEBUG, "START: rpm=%d", getRPM());
     }
     else {
         __enable_irq();
@@ -143,8 +171,6 @@ void PidController::motorOff()
         uint32_t level = clampPWMLevel(eeprom.getMotorBrake() * kMaxPWMLevel / 100);
         PID_WRITE_MOTOR_PWM_BREAK(level);
         __enable_irq();
-        // DEBUG_PRINT(DEBUG_DEBUG, "STOP");
-        DEBUG_PRINT(DEBUG_DEBUG, "BRAKE %u/%u", level, kMaxPWMLevel);
     }
     else {
         __enable_irq();
@@ -211,7 +237,7 @@ void PidController::isr()
     // apply new PWM level if motor is running
     if (running)
     {
-        if (pid.faults.ocpFault && adc.getISenseValue() > pid.faults.isenseMax) {
+        if (pid.faults.ocpFault && adc.getISenseOcpAverageValue() > pid.faults.isenseMax) {
             PID_WRITE_MOTOR_PWM_OFF(); // keep PWM off until current drops below the limit
         } 
         else {
@@ -246,21 +272,33 @@ void PidController::isr()
         }
     }
 
-    if ((stats.counter.loop%200)==0) {
+    if ((stats.counter.loop%20)==0) {
         __enable_irq();
-        DEBUG_PRINT(DEBUG_DEBUG, "rc=%u ra=%d p=%d d=%d", readRpmCounter(), 0,/*stats.rpmAnalog.get(),*/ stats.counter.pulse, delta);
+        DEBUG_PRINT(DEBUG_DEBUG, "max=%u ocp=%u avg=%u fault=%d", 
+            ADCConverter::Current::convert(faults.isenseMax), 
+            ADCConverter::Current::convert(adc.getISenseOcpAverageValue()), 
+            ADCConverter::Current::convert(adc.getISenseAverageValue()), 
+            pid.faults.ocpFault
+        );
     }
-
-    // // use analog sensor signal to calculate RPM
-    // // this is independent of the direction
-    // if ((stats.counter.loop & 0x1f) == 0x1f) {
-    //     static constexpr uint32_t kRPMInterval = kPIDInterval * (0x1f + 1);
-    //     uint32_t rpmCounter = readRpmCounter();
-    //     uint32_t diff = rpmCounter - stats.lastValue.rpmCounter;
-    //     stats.lastValue.rpmCounter = rpmCounter;
-    //     stats.lastValue.analogRpmMeasured = diff * (60000 / kRPMInterval);
-    //     stats.rpmAnalog.update(stats.lastValue.analogRpmMeasured);
+    // if ((stats.counter.loop%200)==0) {
+    //     __enable_irq();
+    //     DEBUG_PRINT(DEBUG_DEBUG, "rc=%u ra=%d p=%d d=%d", readRpmCounter(), 0,/*stats.rpmAnalog.get(),*/ stats.counter.pulse, delta);
     // }
 
     stats.counter.loop++;
+    pidLoopBuffer.push({
+        .sequence = stats.counter.loop,
+        .rpm = (uint16_t)deltaRPM,
+        .pwmLevel = (uint16_t)pwmLevel,
+        .voltage = adc.getVSenseValue(),
+        .currentOcp = adc.getISenseOcpAverageValue(),
+        .currentAverage = adc.getISenseAverageValue(),
+        .motorTemperature = adc.getMotorNTCValue(),
+        .mosfetTemperature = adc.getMosfetNTCValue(),
+        .errorCount = faults.count,
+        .drv8701Fault = faults.drv8701Fault,
+        .ocpFault = faults.ocpFault,
+        .snsoutFault = faults.snsoutFault
+    });
 }

@@ -15,18 +15,16 @@
  * @tparam GPIO_PORT_ADDR GPIO port address, e.g. GPIOA_BASE, GPIOB_BASE, etc.
  * @tparam ACTIVE_STATE false for active low, true for active high
  */
-template<uint8_t GPIO_PIN, bool ACTIVE_STATE, uint32_t kDebounceTimeMs = 50, uint32_t GPIO_PORT_ADDR = digitalPinToGPIOBase<GPIO_PIN>()>
+template<uint8_t GPIO_PIN, bool ACTIVE_STATE, uint32_t kDebounceTimeMs = 50>
 struct Button 
 {
-    inline GPIO_TypeDef *getGPIOPort() const { return (GPIO_TypeDef *)GPIO_PORT_ADDR; }
-
     void init();
 
     /**
      * @brief remove pressed state
      * 
      */
-    void clear()
+    inline void clear()
     {
         isPressed();
     }
@@ -39,7 +37,8 @@ struct Button
      * @return true if the button has been released
      * @return false otherwise
      */
-    bool isReleased() {
+    inline bool isReleased() 
+    {
         __disable_irq();
         // check if the button has been pressed and released
         if (released && pressed) {
@@ -59,7 +58,8 @@ struct Button
      * @return true if the button has been pressed
      * @return false otherwise
      */
-    bool isPressed() {
+    inline bool isPressed() 
+    {
         __disable_irq();
         bool result = !released && pressed;
         if (result) {
@@ -75,14 +75,30 @@ struct Button
      * @return true if the button is down/pressed
      * @return false otherwise
      */
-    bool isDown() {
+    inline bool isDown() 
+    {
         __disable_irq();
         bool result = !released && pressed;
         __enable_irq();
         return result;
     }
 
+    inline constexpr GPIO_TypeDef *getGPIOPort() const 
+    { 
+        return digitalPinToGPIO<GPIO_PIN>(); 
+    }
+
+    inline bool readState() 
+    {
+        return getGPIOPort()->IDR & (1 << digitalPinToBit<GPIO_PIN>());
+    }
+
     void isr(uint32_t idr);
+
+    inline void isr() 
+    {
+        isr(getGPIOPort()->IDR);
+    }
 
     volatile uint32_t lastDebounceTime;
     volatile bool state;
@@ -97,32 +113,8 @@ struct Button
  * @tparam PIN_B bit for pin B in the GPIO IDR register
  * @tparam GPIO_PORT_ADDR address of the GPIO port, pin A and pin B must be on the same port
  */
-template<uint8_t GPIO_PIN_A, uint8_t GPIO_PIN_B, uint32_t GPIO_PORT_ADDR = digitalPinToGPIOBase<GPIO_PIN_A>()>
+template<uint8_t GPIO_PIN_A, uint8_t GPIO_PIN_B>
 struct RotaryEncoder {
-
-    inline GPIO_TypeDef *getGPIOPort() const { return (GPIO_TypeDef *)GPIO_PORT_ADDR; }
-
-    static constexpr uint32_t kResetAccelerationTime = 250;                 // reset acceleration if no movement in milliseconds
-    static constexpr uint32_t kDefaultAccelerationFactor = 0xffffff;        // speed multiplier constant - higher value = faster acceleration, lower value = slower acceleration
-
-    static constexpr uint32_t kAccelerationFactorMenu = 0;                 // acceleration factor for menu navigation
-    static constexpr uint32_t kAccelerationFactorSlow = 0xfffff;           // acceleration factor for values up to 1000
-    static constexpr uint32_t kAccelerationFactorFast = 0xffffff;          // acceleration factor for values up to 10000
-    static constexpr uint32_t kAccelerationFactorCurrent = 0x2fffff;       // acceleration factor for current values
-
-    /**
-     * @brief Helper to scale depending on the maximum value
-     * 
-     * @param maxValue 
-     * @return constexpr uint32_t 
-     */
-    static constexpr uint32_t kAccelerationHelper(uint32_t maxValue) 
-    {
-        if (maxValue < 500) {
-            return kAccelerationFactorMenu;
-        }
-        return (0xfffffULL * maxValue) / 2048;
-    }
 
     RotaryEncoder() : 
         maxAcceleration(1),
@@ -139,7 +131,8 @@ struct RotaryEncoder {
      * 
      * @return int32_t 
      */
-    int32_t getDeltaPosition() {
+    inline int32_t getDeltaPosition() 
+    {
         __disable_irq();
         int32_t tmpDelta = (position / 2); // full rotations only
         position -= tmpDelta * 2;
@@ -152,7 +145,7 @@ struct RotaryEncoder {
      * 
      * @param acceleration 
      */
-    void setMaxAcceleration(uint32_t acceleration) 
+    inline void setMaxAcceleration(uint32_t acceleration) 
     {
         maxAcceleration = acceleration + 1;
     }
