@@ -20,6 +20,16 @@ void PidController::reset()
     faults.isenseMax = ADC::_currentLimitValueToDAC(eeprom.getInputCurrentLimit());
     readFaults();
     applyPIDParams();
+    
+    #if DEBUG
+    char pBuf[32];
+    char iBuf[32];
+    char dBuf[32];
+    FloatToString::convertTrimmed(pBuf, sizeof(pBuf), Kp, 6);
+    FloatToString::convertTrimmed(iBuf, sizeof(iBuf), Ki, 6);
+    FloatToString::convertTrimmed(dBuf, sizeof(dBuf), Kd, 6);
+    DEBUG_PRINT(DEBUG_DEBUG, "Kp=%s Ki=%s Kd=%s RPM=%u antiWindupReduction=%u", pBuf, iBuf, dBuf, rpm, antiWindupReduction);
+    #endif
 }
 
 void PidController::init()

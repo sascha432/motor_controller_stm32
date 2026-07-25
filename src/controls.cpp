@@ -16,7 +16,7 @@ void Button<GPIO_PIN, ACTIVE_STATE, kDebounceTimeMs>::init()
     // Enable GPIO clock
     __HAL_RCC_GPIOx_CLK_ENABLE<GPIO_PIN>();
 
-    GPIO_InitTypeDef GPIO_InitStruct = { 0 };
+    GPIO_InitTypeDef GPIO_InitStruct = {};
     GPIO_InitStruct.Pin = digitalPinToHAL<GPIO_PIN>();
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_PULLUP;
@@ -65,21 +65,21 @@ void RotaryEncoder<GPIO_PIN_A, GPIO_PIN_B>::init()
     __HAL_RCC_TIM3_CLK_ENABLE();
 
     // PA6 / PA7 as TIM3_CH1 / TIM3_CH2
-    GPIO_InitTypeDef GPIO_InitStruct = { 0 };
+    GPIO_InitTypeDef GPIO_InitStruct = {};
     GPIO_InitStruct.Pin = GPIO_PIN_6 | GPIO_PIN_7;
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
     // TIM3 encoder init
-    TIM_HandleTypeDef tim3 = { 0 };
+    TIM_HandleTypeDef tim3 = {};
     tim3.Instance = TIM3;
     tim3.Init.Prescaler = 0;
     tim3.Init.CounterMode = TIM_COUNTERMODE_UP;
     tim3.Init.Period = 0xFFFF;
     tim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
 
-    TIM_Encoder_InitTypeDef sEncoderConfig = { 0 };
+    TIM_Encoder_InitTypeDef sEncoderConfig = {};
     sEncoderConfig.EncoderMode = TIM_ENCODERMODE_TI1;
     // channel 1
     sEncoderConfig.IC1Polarity = TIM_ICPOLARITY_RISING;

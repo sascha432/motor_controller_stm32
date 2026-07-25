@@ -263,9 +263,8 @@ struct PidSliderScreen : public SliderScreen
     PidSliderScreen(Type id, const char *label, uint32_t minValue, uint32_t maxValue, FormatCallbackType callback) : 
         SliderScreen(id, label, minValue, maxValue, "", callback)
     {
+        maxAcceleration = 100000;
     }
-
-    virtual void setValue(uint32_t value) override;
 };
 
 // === Diagnostics Screen ===
@@ -339,18 +338,31 @@ protected:
 
 // === Start Screen ===
 
-struct StartScreen : public InfoScreen
+struct StartScreen : public Screen
 {
-    StartScreen() : InfoScreen(Screen::Type::START) {
-    }
+    StartScreen() :
+        Screen(Screen::Type::START),
+        voltageLabel(nullptr),
+        currentLabel(nullptr),
+        motorTempLabel(nullptr),
+        mosfetTempLabel(nullptr),
+        directionLabel(nullptr),
+        speedLabel(nullptr)
+    {}
 
-    virtual void load() override 
-    {
-        InfoScreen::load();
-        update();
-    }
-
+    virtual void load() override;
     virtual void update() override;
+
+protected:
+    void _refreshVisuals();
+
+private:
+    lv_obj_t *voltageLabel;
+    lv_obj_t *currentLabel;
+    lv_obj_t *motorTempLabel;
+    lv_obj_t *mosfetTempLabel;
+    lv_obj_t *directionLabel;
+    lv_obj_t *speedLabel;
 };
 
 // === Screen Flow Manager ===

@@ -16,19 +16,19 @@ struct EEPROM
 
     // ~130A max.
     static constexpr uint16_t kCurrentToUint16(float current) {
-        return static_cast<uint16_t>(current * 500.0f);
+        return static_cast<uint16_t>(current * UIConstants::kCurrentToInt16Factor);
     }
 
     static constexpr float kUint16ToCurrent(uint16_t value) {
-        return static_cast<float>(value) / 500.0f;
+        return static_cast<float>(value) / UIConstants::kCurrentToInt16Factor;
     }
 
     static constexpr uint32_t kPIDParamToUint32(float value) {
-        return static_cast<uint32_t>(value * 1000000.0f);
+        return static_cast<uint32_t>(value * UIConstants::kPIDParamFactor);
     }
 
     static constexpr float kUint32ToPIDParam(uint32_t value) {
-        return value / 1000000.0f;
+        return value / UIConstants::kPIDParamFactor;
     }
 
     static constexpr uint8_t kControlModePWM = 0;

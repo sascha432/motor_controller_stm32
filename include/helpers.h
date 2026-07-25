@@ -16,11 +16,13 @@
  */
 #define CONVERT_TO_FP1(value)               (int)(value / 1000), ((unsigned)(value / 100) % 10)
 #define CONVERT_TO_FP2(value)               (int)(value / 1000), ((unsigned)(value / 10) % 100)
+#define CONVERT_TO_FP6(value)               (int)(value / 1000000), ((unsigned)(value / 100000) % 1000000)
 
 #define DEGREE_UTF8                         "\xC2\xB0"
 
 #define SPRINTF_FP1_FMT                     "%d.%u"
 #define SPRINTF_FP2_FMT                     "%d.%02u"
+#define SPRINTF_FP6_FMT                     "%d.%05u"
 
 #define sizeof_array(arr)                   (sizeof(arr) / sizeof(arr[0]))
 
@@ -394,6 +396,43 @@ inline void delay_us(uint32_t us)
     uint16_t start = TIM7->CNT;
     while ((uint16_t)(TIM7->CNT - start) < us) {
     }
+}
+
+/**
+ * @brief Convert float to string helper
+ */
+struct FloatToString
+{
+    static void convert(char *buffer, size_t size, float value, uint8_t precision = 6);
+    static void convertTrimmed(char *buffer, size_t size, float value, uint8_t precision = 6);
+};
+
+void float_to_string_convert(char *buffer, size_t size, float value, uint8_t precision = 6, bool trimTrailingZeros = false);
+
+/**
+ * @brief Convert float to string with specified precision
+ * 
+ * @param buffer Output buffer
+ * @param size Size of the output buffer
+ * @param value Float value to convert
+ * @param precision Number of decimal places
+ */
+inline void FloatToString::convert(char *buffer, size_t size, float value, uint8_t precision)
+{
+    float_to_string_convert(buffer, size, value, precision, false);
+}
+
+/**
+ * @brief Convert float to string with specified precision and trim trailing zeros
+ * 
+ * @param buffer Output buffer
+ * @param size Size of the output buffer
+ * @param value Float value to convert
+ * @param precision Number of decimal places
+ */
+inline void FloatToString::convertTrimmed(char *buffer, size_t size, float value, uint8_t precision)
+{
+    float_to_string_convert(buffer, size, value, precision, true);
 }
 
 template<typename T, size_t SIZE>

@@ -19,6 +19,9 @@
 
 static void setup()
 {
+    // Initialize debug output
+    debug_init();
+
     // Initialize and read EEPROM on I2C1 on PB8/9
     eeprom.init();
     eeprom.read();
@@ -119,6 +122,7 @@ static void loop()
         // handle LVGL updates
         auto &screenFlow = menu.getScreenFlow();
         switch(screenFlow->getId()) {
+            case Screen::Type::START:
             case Screen::Type::DASHBOARD:
             case Screen::Type::DIAGNOSTICS:
                 stats.update();
@@ -550,7 +554,6 @@ int main(void)
     HAL_Init();
     SystemClock_Config();
     TIM7_TIM6_Init();
-    debug_init();
     #if INIT_USB
         MX_USB_OTG_FS_PCD_Init();
     #endif

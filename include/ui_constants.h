@@ -16,7 +16,8 @@
 // === UI constants ===
 struct UIConstants 
 {
-    // ui slider min/max values
+    // ui slider min/max values^
+    static constexpr float kCurrentToInt16Factor = 500.0f;              // factor to convert current in A to uint16_t
     static constexpr float kStepInputCurrent = 0.5f;                    // input current step in A
     static constexpr float kMinInputCurrent = kStepInputCurrent * 2;    // min. input current in A
     static constexpr float kMaxInputCurrent = 40.0f;                    // max. input current in A
@@ -36,14 +37,16 @@ struct UIConstants
     static constexpr uint8_t kMaxMosfetTemperature = 125;               // Max. MOSFET temperature in °C
     static constexpr uint8_t kMinMotorTemperature = 25;                 // Min. Motor temperature in °C
     static constexpr uint8_t kMaxMotorTemperature = 85;                 // Max. Motor temperature in °C
+    static constexpr float kPIDParamFactor = 10000.0f;                  // PID parameter factor
     static constexpr uint32_t kMinKp = 0;                               // Min. PID Kp value
-    static constexpr uint32_t kMaxKp = 1000000;                         // Max. PID Kp value
+    static constexpr uint32_t kMaxKp = 1000 * kPIDParamFactor;          // Max. PID Kp value
     static constexpr uint32_t kMinKi = kMinKp;                          // Min. PID Ki value
     static constexpr uint32_t kMaxKi = kMaxKp;                          // Max. PID Ki value
     static constexpr uint32_t kMinKd = kMinKp;                          // Min. PID Kd value
     static constexpr uint32_t kMaxKd = kMaxKp;                          // Max. PID Kd value 
+    static constexpr uint32_t kMinAntiWindupFactor = 100;               // anti-windup factor
     static constexpr uint32_t kMinAntiWindupReduction = 0;              // Min. PID anti-windup reduction in percentage (0-100) * 100
-    static constexpr uint32_t kMaxAntiWindupReduction = 100 * 100;      // Max. PID anti-windup reduction in percentage (0-100) * 100
+    static constexpr uint32_t kMaxAntiWindupReduction = 100 * kMinAntiWindupFactor; // Max. PID anti-windup reduction in percentage (0-100) * kMinAntiWindupFactor
 
     // eeprom default values
     static constexpr uint8_t kDefaultTFTBrightness = 90;                // Default TFT Brightness
@@ -62,7 +65,7 @@ struct UIConstants
     static constexpr float kDefaultKp = 1.0f;                           // Default PID Kp value
     static constexpr float kDefaultKi = 0.5f;                           // Default PID Ki value
     static constexpr float kDefaultKd = 0.0f;                           // Default PID Kd value
-    static constexpr uint16_t kAntiWindupReduction = 97 * 256;          // Default PID anti-windup reduction in percentage (0-100) * 256
+    static constexpr uint16_t kAntiWindupReduction = 97 * kMinAntiWindupFactor; // Default PID anti-windup reduction in percentage (0-100) * kMinAntiWindupFactor
 
     // ui menu timeouts
     static constexpr uint32_t kWelcomeScreenTimeout = 3000;             // WelcomeScreen timeout in milliseconds

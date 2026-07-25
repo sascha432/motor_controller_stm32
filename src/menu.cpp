@@ -84,7 +84,7 @@ static const char *kRestoreDefaultsMenuItems[] = {
 // custom format for current and conversion from uint16_t to float
 static const char *current_slider_format_callback(uint32_t value, char *buf, size_t bufSize) 
 {
-    const uint32_t current = value * 2; // value = A * 500, so multiply by 2 to get mA
+    const uint32_t current = value * (uint32_t)(1000.0f / UIConstants::kCurrentToInt16Factor);
     snprintf(buf, bufSize, SPRINTF_FP1_FMT " A", CONVERT_TO_FP1(current));
     return buf;
 }
@@ -92,7 +92,7 @@ static const char *current_slider_format_callback(uint32_t value, char *buf, siz
 // custom format for current and conversion from uint16_t to float
 static const char *anti_windup_reduction_format_callback(uint32_t value, char *buf, size_t bufSize)
 {
-    const uint32_t reduction = value * (1000 / 100);
+    const uint32_t reduction = value * (1000 / UIConstants::kMinAntiWindupFactor); // value = percentage * 100, so multiply by 10 to get percentage * 1000
     snprintf(buf, bufSize, SPRINTF_FP2_FMT " %%", CONVERT_TO_FP2(reduction));
     return buf;
 }
@@ -100,8 +100,7 @@ static const char *anti_windup_reduction_format_callback(uint32_t value, char *b
 // custom format for PID parameters and conversion from uint32_t to float
 static const char *pid_parameter_format_callback(uint32_t value, char *buf, size_t bufSize)
 {
-    //TODO divide by 1000000 and show 6 decimal places for small values.. for example 123.4, 1.234, 0.000123, 0.000001 etc...
-    snprintf(buf, bufSize, "%lu", value);
+    FloatToString::convertTrimmed(buf, bufSize, value / UIConstants::kPIDParamFactor, 6);
     return buf;
 }
 
@@ -137,6 +136,153 @@ void Menu::saveEEPROMChanges()
     }
 
 }
+
+/**
+ * @brief Show welcome screen for a few seconds
+ * 
+ */
+void Menu::showWelcomeScreen()
+{
+    // Show welcome screen for a few seconds
+    screenFlow.init();
+    screenFlow.setScreen(new WelcomeScreen());
+    lv_timer_handler();
+    tft_backlight_pwm_set(eeprom.getTFTBrightness());
+
+    if (UIConstants::kEnableIlluminationLEDFading) {
+        // gradually increase LED brightness to target value
+        uint32_t start = HAL_GetTick();
+        uint8_t targetBrightness = eeprom.getLEDBrightness();
+        float currentBrightness = 0;
+        float step = targetBrightness / (UIConstants::kWelcomeScreenTimeout / 8.0f);
+        targetBrightness -= step;
+        for(;;) {
+            uint32_t elapsed = HAL_GetTick() - start;
+            if (elapsed >= UIConstants::kWelcomeScreenTimeout) {
+                break;
+            }
+            if (currentBrightness < targetBrightness) {
+                currentBrightness += step;
+            }
+            LEDs::illuminationLedSetPWM(currentBrightness);
+            // blink motor LEDs
+            ((elapsed / 500) & 0x01) ? LEDs::onLED1() : LEDs::onLED2();
+            HAL_Delay(8);
+        }   
+        LEDs::offLED1and2();
+    } 
+    else {
+        HAL_Delay(UIConstants::kWelcomeScreenTimeout);
+    }
+
+    clearUserInput();
+}
+
+/**
+ * @brief Load main menu screen
+ * 
+ */
+void Menu::loadMainMenu()
+{
+    screenFlow.setScreen(new MenuScreen(
+        Screen::Type::MAIN_MENU, 
+        kMainMenuItems, 
+        sizeof_array(kMainMenuItems)
+    ));
+    setValue(0);
+    clearUserInput();
+}
+
+/**
+ * @brief Start motor screen with some info
+ * 
+ */
+void Menu::loadStartScreen()
+{
+    screenFlow.setScreen(new StartScreen());
+    setValue(eeprom.getSpeed());
+    clearUserInput();
+}
+
+/**
+ * @brief Show motor dashboard screen with speed and other info while running
+ * 
+ */
+void Menu::loadDashboardScreen()
+{
+    screenFlow.setScreen(new DashboardScreen(eeprom.isPIDMode() ? 50 : 2));
+    setValue(eeprom.getSpeed());
+    clearUserInput();
+}
+
+/**
+ * @brief Update rotary encoder value and set screen value
+ * 
+ * @param value 
+ */
+void Menu::setValue(int32_t value)
+{
+    screenFlow->setValue(value);
+}
+
+/**
+ * @brief Get screen value
+ * 
+ * @return int32_t 
+ */
+int32_t Menu::getValue() const
+{
+    return screenFlow->getValue();
+}
+
+/**
+ * @brief Return reference to the ScreenFlow object
+ * 
+ * @return ScreenFlow& 
+ */
+ScreenFlow &Menu::getScreenFlow()
+{
+    return screenFlow;
+}
+
+void Menu::abortableDelay(uint32_t ms)
+{
+    uint32_t start = HAL_GetTick();
+    while (HAL_GetTick() - start < ms) {
+        if (isAnyButtonDown()) {
+            clearUserInput();
+            break;
+        }
+    }
+}
+
+bool Menu::isAnyButtonDown()
+{
+    return knobButton.isDown() || backButton.isDown() || startButton.isDown();
+}
+
+void Menu::clearUserInput()
+{
+    // wait until all buttons are released
+    while(isAnyButtonDown()) {
+    }
+
+    // clear states
+    knobButton.clear();
+    backButton.clear();
+    startButton.clear();
+    knob.clear();
+}
+
+void Menu::applyEEPROMSettings()
+{
+    tft_backlight_pwm_set(eeprom.getTFTBrightness());
+    LEDs::illuminationLedSetPWM(eeprom.getLEDBrightness());
+    adc.setInputCurrentLimit(eeprom.getInputCurrentLimit());
+    adc.setMotorCurrentLimit(eeprom.getMotorCurrentLimit());
+    pid.setRPM(eeprom.getMotorRPM());
+}
+
 
 /**
  * @brief Handle main button press based on the current screen and selected item
@@ -395,10 +541,9 @@ void Menu::handleButtonPress()
                 case 0: // Kp
                     screenFlow.next(new PidSliderScreen(
                         Screen::Type::PID_KP, 
-                        "Kp", 
+                        "Kp Parameter", 
                         UIConstants::kMinKp, 
                         UIConstants::kMaxKp, 
-                        "",
                         pid_parameter_format_callback
                     ));
                     setValue(EEPROM::kPIDParamToUint32(eeprom.getKp()));
@@ -406,7 +551,7 @@ void Menu::handleButtonPress()
                 case 1: // Ki
                     screenFlow.next(new PidSliderScreen(
                         Screen::Type::PID_KI, 
-                        "Ki", 
+                        "Ki Parameter", 
                         UIConstants::kMinKi, 
                         UIConstants::kMaxKi, 
                         pid_parameter_format_callback
@@ -416,7 +561,7 @@ void Menu::handleButtonPress()
                 case 2: // Kd
                     screenFlow.next(new PidSliderScreen(
                         Screen::Type::PID_KD, 
-                        "Kd", 
+                        "Kd Parameter", 
                         UIConstants::kMinKd, 
                         UIConstants::kMaxKd, 
                         pid_parameter_format_callback
@@ -500,7 +645,6 @@ void Menu::handleBackButtonPress()
             break;
         case Screen::Type::START:
             pid.toggleMotorDirection();
-            screenFlow->update();
             break;
         case Screen::Type::WELCOME:
         // case Screen::Type::DASHBOARD:
@@ -541,84 +685,6 @@ void Menu::handleStartButtonPress()
 }
 
 /**
- * @brief Show welcome screen for a few seconds
- * 
- */
-void Menu::showWelcomeScreen()
-{
-    // Show welcome screen for a few seconds
-    screenFlow.init();
-    screenFlow.setScreen(new WelcomeScreen());
-    lv_timer_handler();
-    tft_backlight_pwm_set(eeprom.getTFTBrightness());
-
-    if (UIConstants::kEnableIlluminationLEDFading) {
-        // gradually increase LED brightness to target value
-        uint32_t start = HAL_GetTick();
-        uint8_t targetBrightness = eeprom.getLEDBrightness();
-        float currentBrightness = 0;
-        float step = targetBrightness / (UIConstants::kWelcomeScreenTimeout / 8.0f);
-        targetBrightness -= step;
-        for(;;) {
-            uint32_t elapsed = HAL_GetTick() - start;
-            if (elapsed >= UIConstants::kWelcomeScreenTimeout) {
-                break;
-            }
-            if (currentBrightness < targetBrightness) {
-                currentBrightness += step;
-            }
-            LEDs::illuminationLedSetPWM(currentBrightness);
-            // blink motor LEDs
-            ((elapsed / 500) & 0x01) ? LEDs::onLED1() : LEDs::onLED2();
-            HAL_Delay(8);
-        }   
-        LEDs::offLED1and2();
-    } 
-    else {
-        HAL_Delay(UIConstants::kWelcomeScreenTimeout);
-    }
-
-    clearUserInput();
-}
-
-/**
- * @brief Load main menu screen
- * 
- */
-void Menu::loadMainMenu()
-{
-    screenFlow.setScreen(new MenuScreen(
-        Screen::Type::MAIN_MENU, 
-        kMainMenuItems, 
-        sizeof_array(kMainMenuItems)
-    ));
-    setValue(0);
-    clearUserInput();
-}
-
-/**
- * @brief Start motor screen with some info
- * 
- */
-void Menu::loadStartScreen()
-{
-    screenFlow.setScreen(new StartScreen());
-    setValue(eeprom.getSpeed());
-    clearUserInput();
-}
-
-/**
- * @brief Show motor dashboard screen with speed and other info while running
- * 
- */
-void Menu::loadDashboardScreen()
-{
-    screenFlow.setScreen(new DashboardScreen(eeprom.isPIDMode() ? 50 : 2));
-    setValue(eeprom.getSpeed());
-    clearUserInput();
-}
-
-/**
  * @brief Call to update menu position from rotary encoder
  * 
  * @param value 
@@ -627,6 +693,7 @@ int32_t Menu::updateRotaryValue(int32_t value)
 {
     screenFlow->setValue(screenFlow->getValue() + (value * screenFlow->getSteps()));
     switch(screenFlow->getId()) {
+        case Screen::Type::START:
         case Screen::Type::DASHBOARD:
             if (eeprom.isPIDMode()) {
                 eeprom.setSpeed(std::clamp<int32_t>(getValue(), eeprom.getMinRPM(), eeprom.getMaxRPM()));
@@ -634,7 +701,6 @@ int32_t Menu::updateRotaryValue(int32_t value)
             }
             else {
                 eeprom.setSpeed(std::clamp<int32_t>(getValue(), 0, eeprom.getMaxPWM() * pid.kMaxPWMLevel / 100));
-                pid.setRPM(eeprom.getSpeed());
             }
             break;
         case Screen::Type::TFT_BRIGHTNESS:
@@ -704,7 +770,6 @@ int32_t Menu::updateRotaryValue(int32_t value)
             pid.applyPIDParams();
             break;
         case Screen::Type::WELCOME:
-        case Screen::Type::START:
         case Screen::Type::EEPROM_SAVED:
         case Screen::Type::MAIN_MENU:
         case Screen::Type::ADVANCED_MENU:
@@ -721,72 +786,4 @@ int32_t Menu::updateRotaryValue(int32_t value)
     }   
 
     return getValue();
-}
-
-/**
- * @brief Update rotary encoder value and set screen value
- * 
- * @param value 
- */
-void Menu::setValue(int32_t value)
-{
-    screenFlow->setValue(value);
-}
-
-/**
- * @brief Get screen value
- * 
- * @return int32_t 
- */
-int32_t Menu::getValue() const
-{
-    return screenFlow->getValue();
-}
-
-/**
- * @brief Return reference to the ScreenFlow object
- * 
- * @return ScreenFlow& 
- */
-ScreenFlow &Menu::getScreenFlow()
-{
-    return screenFlow;
-}
-
-void Menu::abortableDelay(uint32_t ms)
-{
-    uint32_t start = HAL_GetTick();
-    while (HAL_GetTick() - start < ms) {
-        if (isAnyButtonDown()) {
-            clearUserInput();
-            break;
-        }
-    }
-}
-
-bool Menu::isAnyButtonDown()
-{
-    return knobButton.isDown() || backButton.isDown() || startButton.isDown();
-}
-
-void Menu::clearUserInput()
-{
-    // wait until all buttons are released
-    while(isAnyButtonDown()) {
-    }
-
-    // clear states
-    knobButton.clear();
-    backButton.clear();
-    startButton.clear();
-    knob.clear();
-}
-
-void Menu::applyEEPROMSettings()
-{
-    tft_backlight_pwm_set(eeprom.getTFTBrightness());
-    LEDs::illuminationLedSetPWM(eeprom.getLEDBrightness());
-    adc.setInputCurrentLimit(eeprom.getInputCurrentLimit());
-    adc.setMotorCurrentLimit(eeprom.getMotorCurrentLimit());
-    pid.setRPM(eeprom.getMotorRPM());
 }

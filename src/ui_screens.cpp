@@ -11,6 +11,27 @@
 #include "controls.h"
 #include "menu.h"
 
+namespace {
+
+void update_top_status_labels(lv_obj_t *voltageLabel, lv_obj_t *currentLabel, lv_obj_t *motorTempLabel, lv_obj_t *mosfetTempLabel)
+{
+    char buf[32];
+
+    snprintf(buf, sizeof(buf) - 1, "%u.%uV (%u.%uV)", CONVERT_TO_FP1(stats.vcc), CONVERT_TO_FP1(stats.max.vcc));
+    lv_label_set_text(voltageLabel, buf);
+
+    snprintf(buf, sizeof(buf) - 1, "%u.%uA (%u.%uA)", CONVERT_TO_FP1(stats.current), CONVERT_TO_FP1(stats.max.current));
+    lv_label_set_text(currentLabel, buf);
+
+    snprintf(buf, sizeof(buf) - 1, "%d" DEGREE_UTF8 "C", stats.motorTemp);
+    lv_label_set_text(motorTempLabel, buf);
+
+    snprintf(buf, sizeof(buf) - 1, "%d" DEGREE_UTF8 "C", stats.mosfetTemp);
+    lv_label_set_text(mosfetTempLabel, buf);
+}
+
+}
+
 // === Base Screen ===
 
 lv_obj_t *Screen::emptyScreen = nullptr;
@@ -341,18 +362,6 @@ uint32_t SliderScreen::getValue() const
     return value;
 }
 
-// === PID Slider Screen ===
-
-void PidSliderScreen::setValue(uint32_t value)
-{
-    // adjust acceleration based on the value to make it easier to adjust small values and faster for larger values
-    maxAcceleration = value ? (1000 / value) : 0;
-    if (maxAcceleration == 0) {
-        maxAcceleration = 1000000;
-    }
-    SliderScreen::setValue(value);
-}
-
 // === Diagnostics Screen ===
 
 void DiagnosticsScreen::load()
@@ -550,17 +559,7 @@ void DashboardScreen::_refreshVisuals()
     char buf[32];
 
     uint32_t pwmPercent = pid.stats.pwm.get() * 100 / pid.kMaxPWMLevel;
-    snprintf(buf, sizeof(buf) - 1, "%u.%uV (%u.%uV)", CONVERT_TO_FP1(stats.vcc), CONVERT_TO_FP1(stats.max.vcc));
-    lv_label_set_text(voltageLabel, buf);
-
-    snprintf(buf, sizeof(buf) - 1, "%u.%uA (%u.%uA)", CONVERT_TO_FP1(stats.current), CONVERT_TO_FP1(stats.max.current));
-    lv_label_set_text(currentLabel, buf);
-
-    snprintf(buf, sizeof(buf) - 1, "%d" DEGREE_UTF8 "C", stats.motorTemp);
-    lv_label_set_text(motorTempLabel, buf);
-
-    snprintf(buf, sizeof(buf) - 1, "%d" DEGREE_UTF8 "C", stats.mosfetTemp);
-    lv_label_set_text(mosfetTempLabel, buf);
+    update_top_status_labels(voltageLabel, currentLabel, motorTempLabel, mosfetTempLabel);
 
     if (pid.hasErrorCode()) {
         pid.errorPrintf(buf, sizeof(buf) - 1);
@@ -581,9 +580,82 @@ void DashboardScreen::_refreshVisuals()
 
 // === Start Screen ===
 
+void StartScreen::load()
+{
+    Screen::load();
+
+    lv_obj_t *container = lv_obj_create(screen);
+    lv_obj_remove_style_all(container);
+    lv_obj_set_pos(container, 8, 6);
+    lv_obj_set_size(container, kDashboardScreenContainerWidth, kDashboardScreenContainerHeight);
+    lv_obj_set_style_bg_opa(container, LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_style_border_width(container, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(container, 0, LV_PART_MAIN);
+
+    voltageLabel = lv_label_create(container);
+    lv_obj_set_style_text_color(voltageLabel, lv_color_white(), LV_PART_MAIN);
+    lv_obj_set_style_text_font(voltageLabel, Screen::kDashboardScreenFont, LV_PART_MAIN);
+    lv_obj_set_width(voltageLabel, kDashboardScreenColumnWidth);
+    lv_obj_set_style_text_align(voltageLabel, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
+    lv_obj_set_pos(voltageLabel, 0, 0);
+
+    currentLabel = lv_label_create(container);
+    lv_obj_set_style_text_color(currentLabel, lv_color_white(), LV_PART_MAIN);
+    lv_obj_set_style_text_font(currentLabel, Screen::kDashboardScreenFont, LV_PART_MAIN);
+    lv_obj_set_width(currentLabel, kDashboardScreenColumnWidth);
+    lv_obj_set_style_text_align(currentLabel, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
+    lv_obj_set_pos(currentLabel, 0, 18);
+
+    motorTempLabel = lv_label_create(container);
+    lv_obj_set_style_text_color(motorTempLabel, lv_color_white(), LV_PART_MAIN);
+    lv_obj_set_style_text_font(motorTempLabel, Screen::kDashboardScreenFont, LV_PART_MAIN);
+    lv_obj_set_width(motorTempLabel, kDashboardScreenColumnWidth);
+    lv_obj_set_style_text_align(motorTempLabel, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
+    lv_obj_set_pos(motorTempLabel, kDashboardScreenContainerWidth - kDashboardScreenColumnWidth, 0);
+
+    mosfetTempLabel = lv_label_create(container);
+    lv_obj_set_style_text_color(mosfetTempLabel, lv_color_white(), LV_PART_MAIN);
+    lv_obj_set_style_text_font(mosfetTempLabel, Screen::kDashboardScreenFont, LV_PART_MAIN);
+    lv_obj_set_width(mosfetTempLabel, kDashboardScreenColumnWidth);
+    lv_obj_set_style_text_align(mosfetTempLabel, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
+    lv_obj_set_pos(mosfetTempLabel, kDashboardScreenContainerWidth - kDashboardScreenColumnWidth, 18);
+
+    directionLabel = lv_label_create(container);
+    lv_obj_set_style_text_color(directionLabel, lv_color_white(), LV_PART_MAIN);
+    lv_obj_set_style_text_font(directionLabel, Screen::kDashboardScreenBigFont, LV_PART_MAIN);
+    lv_obj_set_width(directionLabel, kDashboardScreenContainerWidth);
+    lv_obj_set_style_text_align(directionLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+    lv_obj_set_pos(directionLabel, 0, (TFT_DIM_HEIGHT / 2) - 24);
+
+    speedLabel = lv_label_create(container);
+    lv_obj_set_style_text_color(speedLabel, lv_color_white(), LV_PART_MAIN);
+    lv_obj_set_style_text_font(speedLabel, Screen::kDashboardScreenBigFont, LV_PART_MAIN);
+    lv_obj_set_width(speedLabel, kDashboardScreenContainerWidth);
+    lv_obj_set_style_text_align(speedLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+    lv_obj_set_pos(speedLabel, 0, (TFT_DIM_HEIGHT / 2) + 16);
+
+    _refreshVisuals();
+
+    lv_scr_load(screen);
+}
+
+void StartScreen::_refreshVisuals()
+{
+    char buf[32];
+
+    update_top_status_labels(voltageLabel, currentLabel, motorTempLabel, mosfetTempLabel);
+
+    lv_label_set_text(directionLabel, pid.isForwardMotorDirection() ? "START FORWARD" : "START REVERSE");
+
+    if (eeprom.isPIDMode()) {
+        snprintf(buf, sizeof(buf) - 1, "%u RPM", (unsigned)eeprom.getSpeed());
+    } else {
+        snprintf(buf, sizeof(buf) - 1, "%u%% PWM", (unsigned)eeprom.getSpeed());
+    }
+    lv_label_set_text(speedLabel, buf);
+}
+
 void StartScreen::update() 
 {
-    pid.isForwardMotorDirection() ?
-        setMessage("START FORWARD") :
-        setMessage("START REVERSE");        
+    _refreshVisuals();
 }
