@@ -46,7 +46,13 @@ struct Screen
         EEPROM_RESTORED,
         MOTOR_SPEED,
         DIAGNOSTICS,
-        DASHBOARD
+        DASHBOARD,
+        PID_TUNING,
+        PID_PARAMETERS,
+        PID_KP,
+        PID_KI,
+        PID_KD,
+        PID_ANTI_WINDUP_REDUCTION,
     };
 
     // welcome screen style constants
@@ -248,6 +254,18 @@ private:
     lv_obj_t *sliderKnob;
     lv_obj_t *valueLabel;
     FormatCallbackType formatCallback;
+};
+
+// === PID Slider Screen ===
+
+struct PidSliderScreen : public SliderScreen
+{
+    PidSliderScreen(Type id, const char *label, uint32_t minValue, uint32_t maxValue, FormatCallbackType callback) : 
+        SliderScreen(id, label, minValue, maxValue, "", callback)
+    {
+    }
+
+    virtual void setValue(uint32_t value) override;
 };
 
 // === Diagnostics Screen ===

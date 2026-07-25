@@ -144,6 +144,27 @@ static void loop()
         lastLvHandler = HAL_GetTick();
     }
 
+    if (pid.pidTuning != EEPROM::kPidTuningDisabled) {
+        // send PID tuning data
+        PidController::PidLoopType item;
+        while (pid.pidLoopBuffer.pop(item)) {
+            DEBUG_PRINT_MSG(DEBUG_DEBUG, "pid_seq=%u rpm=%u pwm=%u U=%u Iocp=%u I=%u motor=%u mosfet=%u faults=%u drv_fault=%d ocp=%d snsout=%d",
+                item.sequence,
+                item.rpm,
+                item.pwmLevel,
+                item.voltage,
+                ADCConverter::Current::convert(item.currentOcp),
+                ADCConverter::Current::convert(item.currentAverage),
+                item.motorTemperature,
+                item.mosfetTemperature,
+                item.errorCount,
+                item.drv8701Fault ? 1 : 0,
+                item.ocpFault ? 1 : 0,
+                item.snsoutFault ? 1 : 0
+            );
+        }
+    }
+
     if (false) {
         static uint32_t lastTime37 = 0;
         if (HAL_GetTick() - lastTime37 >= 100) {

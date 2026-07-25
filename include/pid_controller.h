@@ -18,7 +18,7 @@ struct PidController
     static constexpr uint16_t kPPR = 1024;                                  // MT6701 PPR
     static constexpr uint16_t kCPR = kPPR * 4;                              // 4x Mode PPR to CPR
     static constexpr uint32_t kPIDInterval = 5;                             // PID update rate in millis
-    static constexpr uint32_t kAntiWindupReduction = 97;                    // reduce integral if error is out of range
+    static constexpr uint32_t kAntiWindupReduction = 97 * 100;              // reduce integral if error is out of range
     static constexpr uint32_t kIntegralTimeLimit = 2000;                    // limit integral to 2000ms worth of max. error
     static constexpr float kPWMScaleMultiplier = 1.0 / (100.0 / kMaxPWMLevel);
     static constexpr int32_t kScaleFactor =                                 // scale factor for PID calculations
@@ -63,48 +63,16 @@ struct PidController
         SNSOUT,
     };
 
-    struct DebugProtocol {
-
-        enum class PacketType : uint8_t {
-            START,
-            STOP,
-            ERROR,
-            PID,
-            ADC
-        };
-
-        struct HeaderType {
-            uint16_t crc;
-            uint16_t length;
-            PacketType type;
-        };
-
-        struct ErrorType {
-            ErrorCodeType errorCode;
-            uint32_t timestamp;
-            int32_t value;
-        };
-
-        struct PidLoopType {
-            uint32_t sequence;
-            uint16_t rpm;
-            uint16_t pwmLevel;
-        };
-
-        struct ADCType {
-            uint16_t voltage;
-            uint16_t current;
-            int8_t motorTemperature;
-            int8_t mosfetTemperature;
-        };
-
-    };
-
+    /**
+     * @brief Construct a new Pid Controller object
+     * 
+     */
     PidController() :
         rpm(0),
         motorDirection(EEPROM::kMotorDirectionForward),
         integralTimeLimit(kIntegralTimeLimit),
         antiWindupReduction(kAntiWindupReduction),
+        pidTuning(0),
         running(false)
     {
         setKp(kKpDefault);
@@ -112,7 +80,15 @@ struct PidController
         setKd(kKdDefault);
     }
 
-    PidController(float Kp, float Ki, float Kd) {
+    /**
+     * @brief Construct a new Pid Controller object
+     * 
+     * @param Kp 
+     * @param Ki 
+     * @param Kd 
+     */
+    PidController(float Kp, float Ki, float Kd) 
+    {
         setKp(Kp);
         setKi(Ki);
         setKd(Kd);
@@ -125,6 +101,11 @@ struct PidController
      */
     void init();
 
+    /**
+     * @brief Set the Kp value and pre-calculate KpPreCalc for PID loop
+     * 
+     * @param value 
+     */
     inline void setKp(float value) 
     {
         Kp = value;
@@ -138,6 +119,11 @@ struct PidController
         KpPreCalc = value * static_cast<float>(kScaleFactor / ((kRPMToIntCountsT<kCPR>() / static_cast<double>(kMaxPWMLevel)) / static_cast<double>(kPWMScaleMultiplier)));
     }
 
+    /**
+     * @brief Set the Ki value and pre-calculate KiPreCalc for PID loop
+     * 
+     * @param value 
+     */
     inline void setKi(float value) 
     {
         Ki = value;
@@ -150,6 +136,11 @@ struct PidController
         KiPreCalc = value * static_cast<float>(kScaleFactor * kPIDInterval / ((kRPMToIntCountsT<kCPR>() * 1000 / static_cast<double>(kMaxPWMLevel)) / static_cast<double>(kPWMScaleMultiplier)));
     }
 
+    /**
+     * @brief Set the Kd value and pre-calculate KdPreCalc for PID loop
+     * 
+     * @param value 
+     */
     inline void setKd(float value) 
     {
         Kd = value;
@@ -249,8 +240,8 @@ struct PidController
      */
     inline int32_t getDelta(uint32_t counter) 
     {
-        int16_t delta = (int16_t)counter - (int16_t)lastCounter;
-        lastCounter = counter;
+        int16_t delta = (int16_t)counter - (int16_t)lastEncoderCounter;
+        lastEncoderCounter = counter;
         return delta;
     }
 
@@ -281,7 +272,8 @@ struct PidController
      */
     void reset();
 
-    void setIntegral(int32_t value) {
+    void setIntegral(int32_t value) 
+    {
         // cap the integral
         if (value > cpiIntegralLimit) {
             integral = cpiIntegralLimit;
@@ -294,31 +286,38 @@ struct PidController
         }
     }
 
-    inline int32_t getIntegral() const {
+    inline int32_t getIntegral() const 
+    {
         return integral;
     }
 
-    inline void updateIntegral(int32_t error) {
+    inline void updateIntegral(int32_t error) 
+    {
         setIntegral(integral + error);
     }
 
-    inline void setLastError(int32_t value) {
+    inline void setLastError(int32_t value) 
+    {
         lastError = value;
     }
 
-    inline int32_t getLastError() const {
+    inline int32_t getLastError() const 
+    {
         return lastError;
     }
 
-    inline void setLastDerivative(int32_t value) {
+    inline void setLastDerivative(int32_t value) 
+    {
         lastDerivative = value;
     }
 
-    inline int32_t getLastDerivative() const {
+    inline int32_t getLastDerivative() const 
+    {
         return lastDerivative;
     }
 
-    inline int32_t getCountsPerInterval() const {
+    inline int32_t getCountsPerInterval() const 
+    {
         return cpi;
     }
 
@@ -344,6 +343,20 @@ struct PidController
     }
 
     /**
+     * @brief Apply PID parameters from EEPROM to the controller
+     * 
+     */
+    void applyPIDParams() 
+    {
+        setPidTuning(eeprom.getPidTuning());
+        setKp(eeprom.getKp());
+        setKi(eeprom.getKi());
+        setKd(eeprom.getKd());
+        antiWindupReduction = eeprom.getAntiWindupReduction();
+        setRPM(eeprom.getMotorRPM());
+    }
+
+    /**
      * @brief Turn motor on in the specified direction
      * 
      * @param direction 
@@ -364,6 +377,13 @@ struct PidController
      * @return false the motor is not running after the call
      */
     bool motorToggle();
+
+    /**
+     * @brief Enable or disable PID Tuning output
+     * 
+     * @param value 
+     */
+    void setPidTuning(uint8_t value);
 
     /**
      * @brief Set the Error Code and stop PID controller
@@ -465,7 +485,7 @@ public:
     uint16_t integralTimeLimit;
     uint16_t antiWindupReduction;
 
-    uint32_t lastCounter;               // last encoder counter value
+    uint32_t lastEncoderCounter;        // last encoder counter value
     int32_t integral;
     int32_t lastError;
     int32_t lastDerivative;
@@ -477,8 +497,8 @@ public:
     int32_t cpiIntegralLimit;
 
     struct StatsType {
-        Helpers::LowPass<16> rpm;
-        Helpers::LowPass<16> pwm;
+        Helpers::LowPass<32> rpm;
+        Helpers::LowPass<32> pwm;
         struct {
             uint32_t loop;                  // number of times the PID loop has been called
             int32_t pulse;                  // number of pulses received from the A/B motor encoder
@@ -512,6 +532,7 @@ public:
     FaultStates faults;             // DRV8701 and ocp faults
     ErrorCodeType errorCode;        // last error
     RingBuffer<PidLoopType, 8> pidLoopBuffer;
+    uint8_t pidTuning;              // PID tuning output, 0=disabled, 1=SWO, 2=UART, 3=USB
 
     volatile bool running;          // true if the PID controller is running
 };

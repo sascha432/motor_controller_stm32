@@ -33,8 +33,25 @@ static const char *kAdvancedMenuItems[] = {
     "Motor RPM Settings",       // 3
     "Motor Direction",          // 4
     "Sensor Direction",         // 5
-    "Diagnostics",              // 6
-    "Back"                      // 7
+    "PID Tuning",               // 6
+    "PID Parameters",           // 7
+    "Diagnostics",              // 8
+    "Back"                      // 9
+};
+
+static const char *kPIDTuningItems[] = {
+    "Disabled",                 // 0
+    "SWO",                      // 1    
+    "UART",                     // 2
+    "USB"                       // 3
+};
+
+static const char *kPIDParametersItems[] = {
+    "Kp",                       // 0
+    "Ki",                       // 1
+    "Kd",                       // 2
+    "Anti-Windup Reduction",    // 3
+    "Back"                      // 4
 };
 
 static const char *kMotorRPMSettingsItems[] = {
@@ -67,8 +84,24 @@ static const char *kRestoreDefaultsMenuItems[] = {
 // custom format for current and conversion from uint16_t to float
 static const char *current_slider_format_callback(uint32_t value, char *buf, size_t bufSize) 
 {
-    uint32_t current = value * 2; // value = A * 500, so multiply by 2 to get mA
+    const uint32_t current = value * 2; // value = A * 500, so multiply by 2 to get mA
     snprintf(buf, bufSize, SPRINTF_FP1_FMT " A", CONVERT_TO_FP1(current));
+    return buf;
+}
+
+// custom format for current and conversion from uint16_t to float
+static const char *anti_windup_reduction_format_callback(uint32_t value, char *buf, size_t bufSize)
+{
+    const uint32_t reduction = value * (1000 / 100);
+    snprintf(buf, bufSize, SPRINTF_FP2_FMT " %%", CONVERT_TO_FP2(reduction));
+    return buf;
+}
+
+// custom format for PID parameters and conversion from uint32_t to float
+static const char *pid_parameter_format_callback(uint32_t value, char *buf, size_t bufSize)
+{
+    //TODO divide by 1000000 and show 6 decimal places for small values.. for example 123.4, 1.234, 0.000123, 0.000001 etc...
+    snprintf(buf, bufSize, "%lu", value);
     return buf;
 }
 
@@ -303,7 +336,23 @@ void Menu::handleButtonPress()
                     ));
                     setValue(eeprom.getSensorDirection());
                     break;
-                case 6: // Diagnostics
+                case 6: // PID Tuning
+                    screenFlow.next(new MenuScreen(
+                        Screen::Type::PID_TUNING, 
+                        kPIDTuningItems, 
+                        sizeof_array(kPIDTuningItems)
+                    ));
+                    setValue(eeprom.getPidTuning());
+                    break;
+                case 7: // PID Parameters
+                    screenFlow.next(new MenuScreen(
+                        Screen::Type::PID_PARAMETERS, 
+                        kPIDParametersItems, 
+                        sizeof_array(kPIDParametersItems)
+                    ));
+                    setValue(0);
+                    break;
+                case 8: // Diagnostics
                     screenFlow.next(new DiagnosticsScreen(Screen::Type::DIAGNOSTICS));
                     setValue(0);
                     break;
@@ -334,6 +383,56 @@ void Menu::handleButtonPress()
                         "RPM"
                     ));
                     setValue(eeprom.getMaxRPM());
+                    break;
+                default: // Back
+                    restorePreviousMenu();
+                    break;
+            }
+            break;
+        // === pid parameters menu ===
+        case Screen::Type::PID_PARAMETERS:
+            switch(getValue()) {
+                case 0: // Kp
+                    screenFlow.next(new PidSliderScreen(
+                        Screen::Type::PID_KP, 
+                        "Kp", 
+                        UIConstants::kMinKp, 
+                        UIConstants::kMaxKp, 
+                        "",
+                        pid_parameter_format_callback
+                    ));
+                    setValue(EEPROM::kPIDParamToUint32(eeprom.getKp()));
+                    break;
+                case 1: // Ki
+                    screenFlow.next(new PidSliderScreen(
+                        Screen::Type::PID_KI, 
+                        "Ki", 
+                        UIConstants::kMinKi, 
+                        UIConstants::kMaxKi, 
+                        pid_parameter_format_callback
+                    ));
+                    setValue(EEPROM::kPIDParamToUint32(eeprom.getKi()));
+                    break;
+                case 2: // Kd
+                    screenFlow.next(new PidSliderScreen(
+                        Screen::Type::PID_KD, 
+                        "Kd", 
+                        UIConstants::kMinKd, 
+                        UIConstants::kMaxKd, 
+                        pid_parameter_format_callback
+                    ));
+                    setValue(EEPROM::kPIDParamToUint32(eeprom.getKd()));
+                    break;
+                case 3: // Anti-Windup Reduction
+                    screenFlow.next(new SliderScreen(
+                        Screen::Type::PID_ANTI_WINDUP_REDUCTION, 
+                        "Anti-Windup Reduction", 
+                        UIConstants::kMinAntiWindupReduction, 
+                        UIConstants::kMaxAntiWindupReduction, 
+                        "%",
+                        anti_windup_reduction_format_callback
+                    ));
+                    setValue(eeprom.getAntiWindupReduction());
                     break;
                 default: // Back
                     restorePreviousMenu();
@@ -373,6 +472,11 @@ void Menu::handleButtonPress()
         case Screen::Type::MOTOR_STALL_TIMEOUT:
         case Screen::Type::CONTROL_MODE:
         case Screen::Type::DIAGNOSTICS:
+        case Screen::Type::PID_TUNING:
+        case Screen::Type::PID_KP:
+        case Screen::Type::PID_KI:
+        case Screen::Type::PID_KD:
+        case Screen::Type::PID_ANTI_WINDUP_REDUCTION:
             restorePreviousMenu();
             break;
         default:
@@ -579,6 +683,26 @@ int32_t Menu::updateRotaryValue(int32_t value)
         case Screen::Type::MOTOR_STALL_TIMEOUT:
             eeprom.setMotorStallTimeout(getValue());
             break;
+        case Screen::Type::PID_TUNING:
+            eeprom.setPidTuning(getValue());
+            pid.setPidTuning(eeprom.getPidTuning());
+            break;
+        case Screen::Type::PID_KP:
+            eeprom.setKp(EEPROM::kUint32ToPIDParam(getValue()));
+            pid.applyPIDParams(); // apply or live tuning otherwise only a reset will apply the new values
+            break;
+        case Screen::Type::PID_KI:
+            eeprom.setKi(EEPROM::kUint32ToPIDParam(getValue()));
+            pid.applyPIDParams();
+            break;
+        case Screen::Type::PID_KD:
+            eeprom.setKd(EEPROM::kUint32ToPIDParam(getValue()));
+            pid.applyPIDParams();
+            break;
+        case Screen::Type::PID_ANTI_WINDUP_REDUCTION:
+            eeprom.setAntiWindupReduction(getValue());
+            pid.applyPIDParams();
+            break;
         case Screen::Type::WELCOME:
         case Screen::Type::START:
         case Screen::Type::EEPROM_SAVED:
@@ -591,6 +715,7 @@ int32_t Menu::updateRotaryValue(int32_t value)
         case Screen::Type::RESTORE_DEFAULTS_CONFIRMATION:
         case Screen::Type::EEPROM_RESTORED:
         case Screen::Type::DIAGNOSTICS:
+        case Screen::Type::PID_PARAMETERS:
         default:
             break;
     }   

@@ -341,6 +341,18 @@ uint32_t SliderScreen::getValue() const
     return value;
 }
 
+// === PID Slider Screen ===
+
+void PidSliderScreen::setValue(uint32_t value)
+{
+    // adjust acceleration based on the value to make it easier to adjust small values and faster for larger values
+    maxAcceleration = value ? (1000 / value) : 0;
+    if (maxAcceleration == 0) {
+        maxAcceleration = 1000000;
+    }
+    SliderScreen::setValue(value);
+}
+
 // === Diagnostics Screen ===
 
 void DiagnosticsScreen::load()

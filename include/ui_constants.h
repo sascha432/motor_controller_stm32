@@ -36,6 +36,14 @@ struct UIConstants
     static constexpr uint8_t kMaxMosfetTemperature = 125;               // Max. MOSFET temperature in °C
     static constexpr uint8_t kMinMotorTemperature = 25;                 // Min. Motor temperature in °C
     static constexpr uint8_t kMaxMotorTemperature = 85;                 // Max. Motor temperature in °C
+    static constexpr uint32_t kMinKp = 0;                               // Min. PID Kp value
+    static constexpr uint32_t kMaxKp = 1000000;                         // Max. PID Kp value
+    static constexpr uint32_t kMinKi = kMinKp;                          // Min. PID Ki value
+    static constexpr uint32_t kMaxKi = kMaxKp;                          // Max. PID Ki value
+    static constexpr uint32_t kMinKd = kMinKp;                          // Min. PID Kd value
+    static constexpr uint32_t kMaxKd = kMaxKp;                          // Max. PID Kd value 
+    static constexpr uint32_t kMinAntiWindupReduction = 0;              // Min. PID anti-windup reduction in percentage (0-100) * 100
+    static constexpr uint32_t kMaxAntiWindupReduction = 100 * 100;      // Max. PID anti-windup reduction in percentage (0-100) * 100
 
     // eeprom default values
     static constexpr uint8_t kDefaultTFTBrightness = 90;                // Default TFT Brightness
@@ -51,6 +59,10 @@ struct UIConstants
     static constexpr uint8_t kDefaultMaxPWM = 100;                      // Max. PWM value in percentage (0-100)
     static constexpr uint8_t kDefaultMotorPWM = 20;                     // Default motor PWM value in percentage (0-100)
     static constexpr uint16_t kDefaultMotorRPM = 250;                   // Default motor RPM value in RPM
+    static constexpr float kDefaultKp = 1.0f;                           // Default PID Kp value
+    static constexpr float kDefaultKi = 0.5f;                           // Default PID Ki value
+    static constexpr float kDefaultKd = 0.0f;                           // Default PID Kd value
+    static constexpr uint16_t kAntiWindupReduction = 97 * 256;          // Default PID anti-windup reduction in percentage (0-100) * 256
 
     // ui menu timeouts
     static constexpr uint32_t kWelcomeScreenTimeout = 3000;             // WelcomeScreen timeout in milliseconds

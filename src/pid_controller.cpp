@@ -10,7 +10,7 @@ MotorEncoder motorEncoder;
 
 void PidController::reset()
 {
-    lastCounter = readEncoderCounter();
+    lastEncoderCounter = readEncoderCounter();
     lastError = 0;
     lastDerivative = 0;
     integral = 0;
@@ -19,12 +19,11 @@ void PidController::reset()
     faults.reset();
     faults.isenseMax = ADC::_currentLimitValueToDAC(eeprom.getInputCurrentLimit());
     readFaults();
+    applyPIDParams();
 }
 
 void PidController::init()
 {
-    running = false;
-
     // // === PWM on TIM1 CH1 (PA8, PA9) ===
     // Enable clocks
     __HAL_RCC_AFIO_CLK_ENABLE();
@@ -154,7 +153,6 @@ void PidController::motorOn()
         running = true;
         __enable_irq();
         reset();
-        setRPM(eeprom.getMotorRPM());
     }
     else {
         __enable_irq();
@@ -247,7 +245,7 @@ void PidController::isr()
         if (eeprom.isPIDMode()) {
             if (antiWindupReduction) {
                 if (pwmLevel < -kMaxPWMLevel || pwmLevel > (kMaxPWMLevel * 2)) {
-                    setIntegral(getIntegral() * antiWindupReduction / 100);
+                    setIntegral(getIntegral() * antiWindupReduction / (100 * 100));
                 }
             }
         }
@@ -301,4 +299,34 @@ void PidController::isr()
         .ocpFault = faults.ocpFault,
         .snsoutFault = faults.snsoutFault
     });
+}
+
+void PidController::setPidTuning(uint8_t value)
+{
+    if (value == pidTuning) {
+        return;
+    }
+    switch(pidTuning) {
+        case EEPROM::kPidTuningSWO:
+            // disable SWO output
+            break;
+        case EEPROM::kPidTuningUART:
+            // disable UART output
+            break;
+        case EEPROM::kPidTuningUSB:
+            // disable USB output
+            break;
+    }
+    pidTuning = value;
+    switch(pidTuning) {
+        case EEPROM::kPidTuningSWO:
+            // enable SWO output
+            break;
+        case EEPROM::kPidTuningUART:
+            // enable UART output
+            break;
+        case EEPROM::kPidTuningUSB:
+            // enable USB output
+            break;
+    }
 }

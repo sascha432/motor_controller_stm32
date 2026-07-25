@@ -12,7 +12,7 @@
 struct EEPROM 
 {
     static constexpr uint32_t kMagic = 0xDEADBEEF;
-    static constexpr uint32_t kVersion = 2;
+    static constexpr uint32_t kVersion = 3;
 
     // ~130A max.
     static constexpr uint16_t kCurrentToUint16(float current) {
@@ -23,6 +23,14 @@ struct EEPROM
         return static_cast<float>(value) / 500.0f;
     }
 
+    static constexpr uint32_t kPIDParamToUint32(float value) {
+        return static_cast<uint32_t>(value * 1000000.0f);
+    }
+
+    static constexpr float kUint32ToPIDParam(uint32_t value) {
+        return value / 1000000.0f;
+    }
+
     static constexpr uint8_t kControlModePWM = 0;
     static constexpr uint8_t kControlModePID = 1;
 
@@ -31,6 +39,11 @@ struct EEPROM
 
     static constexpr uint8_t kSensorDirectionForward = kMotorDirectionForward;
     static constexpr uint8_t kSensorDirectionReverse = kMotorDirectionReverse;
+
+    static constexpr uint8_t kPidTuningDisabled = 0;
+    static constexpr uint8_t kPidTuningSWO = 1;
+    static constexpr uint8_t kPidTuningUART = 2;
+    static constexpr uint8_t kPidTuningUSB = 3;
 
     struct Data {
         uint32_t magic;
@@ -52,6 +65,11 @@ struct EEPROM
         uint8_t max_pwm;
         uint8_t motor_pwm;
         uint16_t motor_rpm;
+        uint8_t pid_tuning;
+        float Kp;
+        float Ki;
+        float Kd;
+        uint16_t anti_windup_reduction;
 
         Data() : 
             magic(kMagic), 
@@ -72,7 +90,12 @@ struct EEPROM
             motor_temperature_limit(UIConstants::kDefaultMotorTemperatureLimit),
             max_pwm(UIConstants::kDefaultMaxPWM),
             motor_pwm(UIConstants::kDefaultMotorPWM),
-            motor_rpm(UIConstants::kDefaultMotorRPM)
+            motor_rpm(UIConstants::kDefaultMotorRPM),
+            pid_tuning(kPidTuningDisabled),
+            Kp(UIConstants::kDefaultKp),
+            Ki(UIConstants::kDefaultKi),
+            Kd(UIConstants::kDefaultKd),
+            anti_windup_reduction(UIConstants::kAntiWindupReduction)
         {}
 
         bool operator==(const Data &other) const 
@@ -326,11 +349,61 @@ struct EEPROM
         return data.control_mode == kControlModePID ? getMotorRPM() : getMotorPWM();
     }
 
+    uint8_t getPidTuning() const
+    {
+        return data.pid_tuning;
+    }
+
+    void setPidTuning(uint8_t value) 
+    {
+        data.pid_tuning = value;
+    }
+
+    void setKp(float value) 
+    {
+        data.Kp = value;
+    }
+
+    float getKp() const
+    {
+        return data.Kp;
+    }
+
+    void setKi(float value) 
+    {
+        data.Ki = value;
+    }
+    float getKi() const
+    {
+        return data.Ki;
+    }
+    void setKd(float value) 
+    {
+        data.Kd = value;
+    }
+
+    float getKd() const
+    {
+        return data.Kd;
+    }
+
+    void setAntiWindupReduction(uint16_t value) 
+    {
+        data.anti_windup_reduction = value;
+    }
+
+    uint16_t getAntiWindupReduction() const
+    {
+        return data.anti_windup_reduction;
+    }
+
 protected:
     void updateTemperatureLimits();
 
 protected:
     Data data;
+    static constexpr uint16_t kDataSize = sizeof(Data);
+
     uint16_t mosfet_temperature_limit_adc;
     uint16_t motor_temperature_limit_adc;
 };
