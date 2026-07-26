@@ -467,6 +467,14 @@ public:
         return head == tail;
     }
 
+    void clear()
+    {
+        __disable_irq();
+        head = 0;
+        tail = 0;
+        __enable_irq();
+    }
+
     bool full() const
     {
         return ((head + 1) % SIZE) == tail;

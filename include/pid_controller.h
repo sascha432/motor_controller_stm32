@@ -451,11 +451,6 @@ struct PidController
         return snprintf(buf, bufSize, "ERROR #%d", static_cast<int>(errorCode));
     }
 
-    void debugPrintFaults() const 
-    {
-        DEBUG_PRINT(DEBUG_DEBUG, "FAULT=%d OCP=%d SNSOUT=%d COUNT=%d", faults.drv8701Fault, faults.ocpFault, faults.snsoutFault, faults.count);
-    }
-
 public:
     struct FaultStates {
         FaultStates() : isenseMax(0), count(0), drv8701Fault(false), ocpFault(false), snsoutFault(false) {}
@@ -526,6 +521,7 @@ public:
         uint32_t drv8701Fault : 1;
         uint32_t ocpFault : 1;
         uint32_t snsoutFault : 1;
+        // uint32_t dropped: 8;
 
         PidLoopType() : dataAddress(reinterpret_cast<uint32_t>(&SWO::data)) {}
     };

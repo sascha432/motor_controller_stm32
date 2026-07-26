@@ -15,6 +15,26 @@
 #include "stats.h"
 #include "debug.h"
 
+extern "C" void Error_Handler(void);
+
+static IWDG_HandleTypeDef watchdog;
+
+static void watchdog_init()
+{
+    __HAL_RCC_LSI_ENABLE();
+    watchdog.Instance = IWDG;
+    watchdog.Init.Prescaler = IWDG_PRESCALER_64;
+    watchdog.Init.Reload = 1249;
+    if (HAL_IWDG_Init(&watchdog) != HAL_OK) {
+        Error_Handler();
+    }
+}
+
+static inline void watchdog_feed()
+{
+    HAL_IWDG_Refresh(&watchdog);
+}
+
 // === core setup ===
 
 static void setup()
@@ -81,6 +101,8 @@ static void user_setup()
 
 static void loop()
 {
+    watchdog_feed();
+
     // handle buttons
     if (knobButton.isPressed()) {
         menu.handleButtonPress();
@@ -153,51 +175,21 @@ static void loop()
         PidController::PidLoopType item;
         static constexpr char kPidFrameMagic[] = {'P', 'I', 'D', '1'};
         while (pid.pidLoopBuffer.pop(item)) {
-            // DEBUG_PRINT_MSG(DEBUG_DEBUG, "pid_seq=%u rpm=%u pwm=%u U=%u Io=%u I=%u motor=%u mosfet=%u faults=%u drv_fault=%d ocp=%d snsout=%d",
-            //     item.sequence,
-            //     item.rpm,
-            //     item.pwmLevel,
-            //     item.voltage,
-            //     ADCConverter::Current::convert(item.currentOcp),
-            //     ADCConverter::Current::convert(item.currentAverage),
-            //     item.motorTemperature,
-            //     item.mosfetTemperature,
-            //     item.errorCount,
-            //     item.drv8701Fault ? 1 : 0,
-            //     item.ocpFault ? 1 : 0,
-            //     item.snsoutFault ? 1 : 0
-            // );
-            switch(eeprom.getPidTuning()) {
-                case EEPROM::kPidTuningSWO:
-                    SWO::write(1, kPidFrameMagic, sizeof(kPidFrameMagic));
-                    SWO::writeObject<1>(item);
+            if (eeprom.getPidTuning() == EEPROM::kPidTuningSWO) {
+                #if 1 
+                // don't check writes
+                SWO::write(1, kPidFrameMagic, sizeof(kPidFrameMagic));
+                SWO::writeObject<1>(item);
+                #else
+                if (
+                    (SWO::write(1, kPidFrameMagic, sizeof(kPidFrameMagic)) != sizeof(kPidFrameMagic)) ||
+                    (SWO::writeObject<1>(item) != sizeof(item))
+                ) {
+                    // if the SWO buffer is full, clear the buffer to avoid blocking the PID loop
+                    pid.pidLoopBuffer.clear();
                     break;
-                // not implemented or disabled
-                default:
-                case EEPROM::kPidTuningDisabled:
-                    break;
-            }
-        }
-    }
-
-    if (false) {
-        static uint32_t lastTime37 = 0;
-        if (HAL_GetTick() - lastTime37 >= 100) {
-            lastTime37 = HAL_GetTick();
-            // extern volatile uint32_t rpm_counter;
-            // DEBUG_PRINT(DEBUG_DEBUG, "RPM_COUNTER=%u", rpm_counter);
-            // DEBUG_PRINT(DEBUG_DEBUG, "TIM5=%u", TIM5->CNT);
-        }
-    }
-
-    if (false) { // print faults
-        static uint32_t lastTime3 = 0;
-        if (HAL_GetTick() - lastTime3 >= 1000) {
-            lastTime3 = HAL_GetTick();
-            static uint32_t lastCounter = 0;
-            if (pid.faults.count != lastCounter) {
-                lastCounter = pid.faults.count;
-                pid.debugPrintFaults();
+                }
+                #endif
             }
         }
     }
@@ -366,6 +358,7 @@ extern "C" void Error_Handler(void)
 {
     /* USER CODE BEGIN Error_Handler_Debug */
     /* User can add his own implementation to report the HAL error return state */
+    SWO::write(0, "ERR\n", sizeof("ERR\n") - 1);
     __disable_irq();
     PID_WRITE_MOTOR_PWM_OFF();
     while (1) {
@@ -378,6 +371,7 @@ extern "C" void Error_Handler(void)
   */
 extern "C" void NMI_Handler(void)
 {
+    SWO::write(0, "NMI\n", sizeof("NMI\n") - 1);
     Error_Handler();
 }
 
@@ -386,6 +380,7 @@ extern "C" void NMI_Handler(void)
   */
 extern "C" void HardFault_Handler(void)
 {
+    SWO::write(0, "HF\n", sizeof("HF\n") - 1);
     Error_Handler();
 }
 
@@ -394,6 +389,7 @@ extern "C" void HardFault_Handler(void)
   */
 extern "C" void MemManage_Handler(void)
 {
+    SWO::write(0, "MM\n", sizeof("MM\n") - 1);
   /* USER CODE BEGIN MemoryManagement_IRQn 0 */
 
   /* USER CODE END MemoryManagement_IRQn 0 */
@@ -409,6 +405,7 @@ extern "C" void MemManage_Handler(void)
   */
 extern "C" void BusFault_Handler(void)
 {
+    SWO::write(0, "BF\n", sizeof("BF\n") - 1);
     Error_Handler();
 }
 
@@ -417,6 +414,7 @@ extern "C" void BusFault_Handler(void)
   */
 extern "C" void UsageFault_Handler(void)
 {
+    SWO::write(0, "UF\n", sizeof("UF\n") - 1);
     Error_Handler();
 }
 
@@ -515,6 +513,7 @@ static void MX_USB_OTG_FS_PCD_Init(void)
 
 }
 
+
 /**
   * @brief PCD MSP Initialization
   * This function configures the hardware resources used in this example
@@ -537,6 +536,31 @@ extern "C" void HAL_PCD_MspInit(PCD_HandleTypeDef* hpcd)
 
     /* USER CODE END USB_OTG_FS_MspInit 1 */
 
+  }
+
+}
+
+/**
+  * @brief PCD MSP De-Initialization
+  * This function freeze the hardware resources used in this example
+  * @param hpcd: PCD handle pointer
+  * @retval None
+  */
+extern "C" void HAL_PCD_MspDeInit(PCD_HandleTypeDef* hpcd)
+{
+  if(hpcd->Instance==USB_OTG_FS)
+  {
+    /* USER CODE BEGIN USB_OTG_FS_MspDeInit 0 */
+
+    /* USER CODE END USB_OTG_FS_MspDeInit 0 */
+    /* Peripheral clock disable */
+    __HAL_RCC_USB_OTG_FS_CLK_DISABLE();
+
+    /* USB_OTG_FS interrupt DeInit */
+    HAL_NVIC_DisableIRQ(OTG_FS_IRQn);
+    /* USER CODE BEGIN USB_OTG_FS_MspDeInit 1 */
+
+    /* USER CODE END USB_OTG_FS_MspDeInit 1 */
   }
 
 }
@@ -570,9 +594,10 @@ int main(void)
     #endif
     setup();
     EXTI_Init();
-
     // user init
     user_setup();
+    // start the independent watchdog after startup is complete
+    watchdog_init();
 
     // main loop
     while (1) {
