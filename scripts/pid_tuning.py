@@ -608,6 +608,7 @@ class GDBMemoryClient:
 
 class PIDTuningApp:
     PRESETS = (5, 10, 20, 30)
+    STARTUP_SYNC_DELAY_MS = 200
 
     def __init__(self, config: AppConfig) -> None:
         self.config = config
@@ -642,6 +643,7 @@ class PIDTuningApp:
         self.start_reset_retried = False
         self._start_wait_armed = False
         self._start_wait_next_log_at: Optional[float] = None
+        self._startup_sync_job: Optional[str] = None
         self.gdb_mem = GDBMemoryClient(config)
 
         self._initial_sash_done = False
@@ -797,7 +799,8 @@ class PIDTuningApp:
         ttk.Label(pid_group, text="RPM:").grid(row=3, column=0, padx=6, pady=4, sticky="w")
         ttk.Entry(pid_group, textvariable=self.rpm_var, width=14).grid(row=3, column=1, padx=6, pady=4, sticky="ew")
 
-        ttk.Button(pid_group, text="Sync", command=self._sync_to_target).grid(
+        self.sync_button = ttk.Button(pid_group, text="Sync", command=self._sync_to_target, state=tk.DISABLED)
+        self.sync_button.grid(
             row=4, column=0, columnspan=2, padx=6, pady=(8, 6), sticky="ew"
         )
 
@@ -836,6 +839,28 @@ class PIDTuningApp:
             self._pid_fields_dirty = False
         finally:
             self._pid_fields_updating = False
+
+    def _set_sync_enabled(self, enabled: bool) -> None:
+        self.sync_button.configure(state=(tk.NORMAL if enabled else tk.DISABLED))
+
+    def _cancel_startup_sync_job(self) -> None:
+        if self._startup_sync_job is None:
+            return
+        try:
+            self.root.after_cancel(self._startup_sync_job)
+        except Exception:
+            pass
+        self._startup_sync_job = None
+
+    def _run_scheduled_startup_sync(self) -> None:
+        self._startup_sync_job = None
+        if not self.backend.running:
+            return
+        if not self.pending_initial_sync:
+            return
+        if self.data_address is None:
+            return
+        self._request_read_swo_data("startup")
 
     def _request_read_swo_data(self, reason: str) -> None:
         if self.data_address is None:
@@ -955,10 +980,12 @@ class PIDTuningApp:
             self._append_log(f"SWO::data address discovered: 0x{self.data_address:08X}")
 
         if self.pending_initial_sync and self.data_address:
-            # Avoid auto-opening a GDB memory session on Start, which can
-            # briefly halt the core and trip watchdog reset on some setups.
-            self.pending_initial_sync = False
-            self._append_log("First PID packet seen. Press Sync to read PID parameters.")
+            if self._startup_sync_job is None and not self.sync_in_progress:
+                self._append_log(f"First PID packet seen. Scheduling startup PID sync in {self.STARTUP_SYNC_DELAY_MS}ms")
+                self._startup_sync_job = self.root.after(
+                    self.STARTUP_SYNC_DELAY_MS,
+                    self._run_scheduled_startup_sync,
+                )
 
         self.filled = min(self.filled + 1, self.samples_per_window)
 
@@ -1017,10 +1044,14 @@ class PIDTuningApp:
 
     def _toggle_start_stop(self) -> None:
         if self.backend.running:
+            self._cancel_startup_sync_job()
             self.backend.stop()
             self.start_stop_button.configure(text="Start")
             self.status_var.set("Stopped")
             self._append_log("Stopped")
+            self.pending_initial_sync = False
+            self.sync_in_progress = False
+            self._set_sync_enabled(False)
             self.start_packet_deadline = None
             self.start_packet_seen = False
             self.start_reset_retried = False
@@ -1028,6 +1059,8 @@ class PIDTuningApp:
             self._start_wait_next_log_at = None
             return
 
+        self._cancel_startup_sync_job()
+        self._set_sync_enabled(False)
         self.start_packet_seen = False
         self.start_reset_retried = False
         self._start_wait_armed = False
@@ -1087,12 +1120,14 @@ class PIDTuningApp:
                 data, reason = payload  # type: ignore[misc]
                 self._set_pid_fields(data)
                 self._append_log(f"Loaded SWO::data ({reason}): Kp={data.kp:.6f} Ki={data.ki:.6f} Kd={data.kd:.6f} RPM={data.rpm} changed={int(data.changed)}")
+                self._set_sync_enabled(True)
                 if reason == "startup":
                     self.pending_initial_sync = False
                 self.sync_in_progress = False
             elif kind == "sync-done":
                 self.sync_in_progress = False
             elif kind == "startup-sync-retry":
+                self._startup_sync_job = None
                 self.pending_initial_sync = True
 
         now = time.monotonic()
@@ -1123,6 +1158,8 @@ class PIDTuningApp:
             self._append_log("No PID packets seen for 5000ms, resetting firmware once")
             self.backend.stop()
             if self.backend.reset_target() and self.backend.start(reset_run=False):
+                self._cancel_startup_sync_job()
+                self._set_sync_enabled(False)
                 self.start_reset_retried = True
                 self.pending_initial_sync = True
                 self.sync_in_progress = False
