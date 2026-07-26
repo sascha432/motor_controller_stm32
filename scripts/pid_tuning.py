@@ -627,6 +627,7 @@ class PIDTuningApp:
         self.start_packet_seen = False
         self.start_reset_retried = False
         self._start_wait_armed = False
+        self._start_wait_next_log_at: Optional[float] = None
         self.gdb_mem = GDBMemoryClient(config)
 
         self._initial_sash_done = False
@@ -980,12 +981,14 @@ class PIDTuningApp:
             self.start_packet_seen = False
             self.start_reset_retried = False
             self._start_wait_armed = False
+            self._start_wait_next_log_at = None
             return
 
         self.start_packet_seen = False
         self.start_reset_retried = False
         self._start_wait_armed = False
         self.start_packet_deadline = None
+        self._start_wait_next_log_at = None
         started = self.backend.start(reset_run=False)
         if started:
             self.start_stop_button.configure(text="Stop")
@@ -1027,12 +1030,14 @@ class PIDTuningApp:
                 self._append_log(text)
                 if text.startswith("Connected to SWV raw stream on tcp://127.0.0.1:") and not self.start_packet_seen:
                     self._start_wait_armed = True
-                    self.start_packet_deadline = time.monotonic() + 5.0
+                    self.start_packet_deadline = time.monotonic() + 5.1
+                    self._start_wait_next_log_at = time.monotonic()
             elif kind == "sample":
                 self._handle_sample(payload)  # type: ignore[arg-type]
                 got_sample = True
                 self.start_packet_seen = True
                 self._start_wait_armed = False
+                self._start_wait_next_log_at = None
             elif kind == "swo-read":
                 data, reason = payload  # type: ignore[misc]
                 self.kp_var.set(f"{data.kp:.6f}")
@@ -1058,6 +1063,19 @@ class PIDTuningApp:
             and self._start_wait_armed
             and not self.start_packet_seen
             and not self.start_reset_retried
+            and now < self.start_packet_deadline
+            and self._start_wait_next_log_at is not None
+            and now >= self._start_wait_next_log_at
+        ):
+            remaining = max(0.0, self.start_packet_deadline - now)
+            self._append_log(f"Waiting for PID packets... {remaining:.0f}s remaining")
+            self._start_wait_next_log_at = now + 1.0
+
+        if (
+            self.start_packet_deadline is not None
+            and self._start_wait_armed
+            and not self.start_packet_seen
+            and not self.start_reset_retried
             and now >= self.start_packet_deadline
         ):
             self._append_log("No PID packets seen for 5000ms, resetting firmware once")
@@ -1066,11 +1084,13 @@ class PIDTuningApp:
                 self.start_reset_retried = True
                 self.start_packet_deadline = None
                 self._start_wait_armed = False
+                self._start_wait_next_log_at = None
                 self._append_log("Firmware reset/restarted")
             else:
                 self.status_var.set("Error")
                 self.start_packet_deadline = None
                 self._start_wait_armed = False
+                self._start_wait_next_log_at = None
 
         if not self.backend.running and self.start_stop_button.cget("text") == "Stop":
             self.start_stop_button.configure(text="Start")
