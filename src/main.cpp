@@ -148,11 +148,11 @@ static void loop()
         lastLvHandler = HAL_GetTick();
     }
 
-    if (pid.pidTuning != EEPROM::kPidTuningDisabled) {
+    if (pid.running && eeprom.getPidTuning() != EEPROM::kPidTuningDisabled) {
         // send PID tuning data
         PidController::PidLoopType item;
         while (pid.pidLoopBuffer.pop(item)) {
-            DEBUG_PRINT_MSG(DEBUG_DEBUG, "pid_seq=%u rpm=%u pwm=%u U=%u Iocp=%u I=%u motor=%u mosfet=%u faults=%u drv_fault=%d ocp=%d snsout=%d",
+            DEBUG_PRINT_MSG(DEBUG_DEBUG, "pid_seq=%u rpm=%u pwm=%u U=%u Io=%u I=%u motor=%u mosfet=%u faults=%u drv_fault=%d ocp=%d snsout=%d",
                 item.sequence,
                 item.rpm,
                 item.pwmLevel,
@@ -561,7 +561,7 @@ int main(void)
     EXTI_Init();
 
     // user init
-    user_setup() ;
+    user_setup();
 
     // main loop
     while (1) {

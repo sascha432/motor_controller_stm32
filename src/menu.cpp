@@ -281,6 +281,11 @@ void Menu::applyEEPROMSettings()
     adc.setInputCurrentLimit(eeprom.getInputCurrentLimit());
     adc.setMotorCurrentLimit(eeprom.getMotorCurrentLimit());
     pid.setRPM(eeprom.getMotorRPM());
+    //TODO check what we have, disable the output and enable the new output
+    switch(eeprom.getPidTuning()) {
+        case EEPROM::kPidTuningDisabled:
+            break;
+    }
 }
 
 

@@ -11,9 +11,9 @@
 #include "controls.h"
 #include "menu.h"
 
-namespace {
+// === Helpers ===
 
-void update_top_status_labels(lv_obj_t *voltageLabel, lv_obj_t *currentLabel, lv_obj_t *motorTempLabel, lv_obj_t *mosfetTempLabel)
+void start_screen_update_top_status_labels(lv_obj_t *voltageLabel, lv_obj_t *currentLabel, lv_obj_t *motorTempLabel, lv_obj_t *mosfetTempLabel)
 {
     char buf[32];
 
@@ -28,8 +28,6 @@ void update_top_status_labels(lv_obj_t *voltageLabel, lv_obj_t *currentLabel, lv
 
     snprintf(buf, sizeof(buf) - 1, "%d" DEGREE_UTF8 "C", stats.mosfetTemp);
     lv_label_set_text(mosfetTempLabel, buf);
-}
-
 }
 
 // === Base Screen ===
@@ -559,7 +557,7 @@ void DashboardScreen::_refreshVisuals()
     char buf[32];
 
     uint32_t pwmPercent = pid.stats.pwm.get() * 100 / pid.kMaxPWMLevel;
-    update_top_status_labels(voltageLabel, currentLabel, motorTempLabel, mosfetTempLabel);
+    start_screen_update_top_status_labels(voltageLabel, currentLabel, motorTempLabel, mosfetTempLabel);
 
     if (pid.hasErrorCode()) {
         pid.errorPrintf(buf, sizeof(buf) - 1);
@@ -568,7 +566,7 @@ void DashboardScreen::_refreshVisuals()
         snprintf(buf, sizeof(buf) - 1, "%u RPM (%u)", (unsigned)pid.clampPWMLevel(pid.stats.rpm.get()), (unsigned)pid.getRPM());
     }
     else {
-        snprintf(buf, sizeof(buf) - 1, "%u RPM", (unsigned)pid.clampPWMLevel(pid.stats.rpm.get()));
+        snprintf(buf, sizeof(buf) - 1, "%u RPM", (unsigned)pid.stats.rpm.get());
     }
     lv_label_set_text(rpmLabel, buf);
 
@@ -632,7 +630,7 @@ void StartScreen::load()
     lv_obj_set_style_text_font(speedLabel, Screen::kDashboardScreenBigFont, LV_PART_MAIN);
     lv_obj_set_width(speedLabel, kDashboardScreenContainerWidth);
     lv_obj_set_style_text_align(speedLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    lv_obj_set_pos(speedLabel, 0, (TFT_DIM_HEIGHT / 2) + 16);
+    lv_obj_set_pos(speedLabel, 0, (TFT_DIM_HEIGHT / 2) + 10);
 
     _refreshVisuals();
 
@@ -643,7 +641,7 @@ void StartScreen::_refreshVisuals()
 {
     char buf[32];
 
-    update_top_status_labels(voltageLabel, currentLabel, motorTempLabel, mosfetTempLabel);
+    start_screen_update_top_status_labels(voltageLabel, currentLabel, motorTempLabel, mosfetTempLabel);
 
     lv_label_set_text(directionLabel, pid.isForwardMotorDirection() ? "START FORWARD" : "START REVERSE");
 

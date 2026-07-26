@@ -72,7 +72,6 @@ struct PidController
         motorDirection(EEPROM::kMotorDirectionForward),
         integralTimeLimit(kIntegralTimeLimit),
         antiWindupReduction(kAntiWindupReduction),
-        pidTuning(0),
         running(false)
     {
         setKp(kKpDefault);
@@ -348,7 +347,6 @@ struct PidController
      */
     void applyPIDParams() 
     {
-        setPidTuning(eeprom.getPidTuning());
         setKp(eeprom.getKp());
         setKi(eeprom.getKi());
         setKd(eeprom.getKd());
@@ -377,13 +375,6 @@ struct PidController
      * @return false the motor is not running after the call
      */
     bool motorToggle();
-
-    /**
-     * @brief Enable or disable PID Tuning output
-     * 
-     * @param value 
-     */
-    void setPidTuning(uint8_t value);
 
     /**
      * @brief Set the Error Code and stop PID controller
@@ -532,7 +523,6 @@ public:
     FaultStates faults;             // DRV8701 and ocp faults
     ErrorCodeType errorCode;        // last error
     RingBuffer<PidLoopType, 8> pidLoopBuffer;
-    uint8_t pidTuning;              // PID tuning output, 0=disabled, 1=SWO, 2=UART, 3=USB
 
     volatile bool running;          // true if the PID controller is running
 };

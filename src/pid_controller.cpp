@@ -310,33 +310,3 @@ void PidController::isr()
         .snsoutFault = faults.snsoutFault
     });
 }
-
-void PidController::setPidTuning(uint8_t value)
-{
-    if (value == pidTuning) {
-        return;
-    }
-    switch(pidTuning) {
-        case EEPROM::kPidTuningSWO:
-            // disable SWO output
-            break;
-        case EEPROM::kPidTuningUART:
-            // disable UART output
-            break;
-        case EEPROM::kPidTuningUSB:
-            // disable USB output
-            break;
-    }
-    pidTuning = value;
-    switch(pidTuning) {
-        case EEPROM::kPidTuningSWO:
-            // enable SWO output
-            break;
-        case EEPROM::kPidTuningUART:
-            // enable UART output
-            break;
-        case EEPROM::kPidTuningUSB:
-            // enable USB output
-            break;
-    }
-}

@@ -182,6 +182,7 @@
 			"TIM_OCMODE_PWM1",
 			"TIM_SMCR_SMS_Pos",
 			"TIM_SMCR_TS_Pos",
+			"TRCENA",
 			"USBD"
 		]
 	}
