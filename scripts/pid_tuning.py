@@ -1,0 +1,1081 @@
+#!/usr/bin/env python3
+"""Graphical SWO PID monitor for STM32 + pyOCD.
+
+Layout:
+- Top 60%: live graphs
+- Middle 20%: logs
+- Bottom 20%: controls
+
+The backend connects to pyOCD gdbserver and decodes raw SWV ITM packets.
+Port 1 is interpreted as PidController::PidLoopType binary frames.
+"""
+
+from __future__ import annotations
+
+import argparse
+import math
+import queue
+import re
+import socket
+import struct
+import subprocess
+import sys
+import threading
+import time
+import tkinter as tk
+from collections import deque
+from dataclasses import dataclass
+from tkinter import ttk
+from typing import Callable, Iterable, List, Optional, Tuple
+
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
+
+
+# Mirrors include/adc_converters.h aliases:
+# Voltage = VoltageConverterT<100000, 9100, 3300>
+# Current = CurrentConverterT<4, 20, 3300>
+# NTC = NTCConverterT<10000, 10000, 3950, 25, false>
+ADC_MAX = 4095
+VREF_MV = 3300
+VOLTAGE_RES_TOP = 100000
+VOLTAGE_RES_BOTTOM = 9100
+CURRENT_SHUNT_MOHM = 4
+CURRENT_GAIN = 20
+NTC_SERIES_RESISTANCE = 10000
+NTC_NOMINAL_RESISTANCE = 10000
+NTC_BETA = 3950
+NTC_NOMINAL_TEMP_C = 25.0
+
+
+@dataclass
+class Sample:
+    sequence: int
+    data_address: int
+    rpm: int
+    pwm_level: int
+    voltage_adc: int
+    voltage_mv: int
+    current_ocp_adc: int
+    current_ocp_ma: int
+    current_avg_adc: int
+    current_avg_ma: int
+    motor_temp_adc: int
+    motor_temp_c: float
+    mosfet_temp_adc: int
+    mosfet_temp_c: float
+    error_count: int
+    running: int
+    drv_fault: int
+    ocp_fault: int
+    snsout_fault: int
+
+
+@dataclass
+class AppConfig:
+    uid: str
+    target: str
+    system_clock: int
+    swo_clock: int
+    swd_frequency: int
+    connect_mode: str
+    raw_port: int
+    pid_port: int
+    pid_item_size: int
+    sample_hz: int
+    gdb_port: int
+    enable_gdb_sync: bool
+
+
+PID_FRAME_MAGIC = b"PID1"
+
+
+@dataclass
+class SWOData:
+    kp: float
+    ki: float
+    kd: float
+    rpm: int
+    changed: bool
+
+
+def convert_voltage_mv(adc_value: int) -> int:
+    divider_ratio = int(VREF_MV * ((VOLTAGE_RES_TOP + VOLTAGE_RES_BOTTOM) / VOLTAGE_RES_BOTTOM))
+    return (adc_value * divider_ratio) // ADC_MAX
+
+
+def convert_current_ma(adc_value: int) -> int:
+    mv_per_lsb_times_1000 = (VREF_MV * 1000) // ADC_MAX
+    return (adc_value * mv_per_lsb_times_1000) // (CURRENT_SHUNT_MOHM * CURRENT_GAIN)
+
+
+def convert_ntc_celsius(adc_value: int) -> float:
+    if adc_value <= 0 or adc_value >= ADC_MAX:
+        return 0.0
+
+    resistance = (
+        float(NTC_SERIES_RESISTANCE)
+        * float(adc_value)
+        / (float(ADC_MAX) - float(adc_value))
+    )
+
+    temperature = math.log(resistance / float(NTC_NOMINAL_RESISTANCE))
+    temperature /= float(NTC_BETA)
+    temperature += 1.0 / (NTC_NOMINAL_TEMP_C + 273.15)
+    temperature = 1.0 / temperature
+    return temperature - 273.15
+
+
+def decode_fault_word(word: int) -> Tuple[int, int, int, int, int]:
+    error_count = word & 0xFFFF
+    running = (word >> 16) & 0x1
+    drv_fault = (word >> 17) & 0x1
+    ocp_fault = (word >> 18) & 0x1
+    snsout_fault = (word >> 19) & 0x1
+    return error_count, running, drv_fault, ocp_fault, snsout_fault
+
+
+def decode_pid_item(payload: bytes, item_size: int) -> Optional[Sample]:
+    if item_size == 28:
+        if len(payload) != 28:
+            return None
+        sequence, data_address, rpm, pwm, voltage, i_ocp, i_avg, motor_ntc, mosfet_ntc, faults = struct.unpack(
+            "<II7H2xI", payload
+        )
+    elif item_size == 26:
+        if len(payload) != 26:
+            return None
+        sequence, data_address, rpm, pwm, voltage, i_ocp, i_avg, motor_ntc, mosfet_ntc, faults = struct.unpack(
+            "<II7HI", payload
+        )
+    elif item_size == 24:
+        if len(payload) != 24:
+            return None
+        sequence, rpm, pwm, voltage, i_ocp, i_avg, motor_ntc, mosfet_ntc, faults = struct.unpack("<I7H2xI", payload)
+        data_address = 0
+    elif item_size == 22:
+        if len(payload) != 22:
+            return None
+        sequence, rpm, pwm, voltage, i_ocp, i_avg, motor_ntc, mosfet_ntc, faults = struct.unpack("<I7HI", payload)
+        data_address = 0
+    else:
+        return None
+
+    error_count, running, drv_fault, ocp_fault, snsout_fault = decode_fault_word(faults)
+    return Sample(
+        sequence=sequence,
+        data_address=data_address,
+        rpm=rpm,
+        pwm_level=pwm,
+        voltage_adc=voltage,
+        voltage_mv=convert_voltage_mv(voltage),
+        current_ocp_adc=i_ocp,
+        current_ocp_ma=convert_current_ma(i_ocp),
+        current_avg_adc=i_avg,
+        current_avg_ma=convert_current_ma(i_avg),
+        motor_temp_adc=motor_ntc,
+        motor_temp_c=convert_ntc_celsius(motor_ntc),
+        mosfet_temp_adc=mosfet_ntc,
+        mosfet_temp_c=convert_ntc_celsius(mosfet_ntc),
+        error_count=error_count,
+        running=running,
+        drv_fault=drv_fault,
+        ocp_fault=ocp_fault,
+        snsout_fault=snsout_fault,
+    )
+
+
+def is_plausible_sample(sample: Sample, last_sequence: Optional[int]) -> bool:
+    for value in (
+        sample.voltage_adc,
+        sample.current_ocp_adc,
+        sample.current_avg_adc,
+        sample.motor_temp_adc,
+        sample.mosfet_temp_adc,
+    ):
+        if value > ADC_MAX:
+            return False
+
+    if sample.running not in (0, 1):
+        return False
+    if sample.drv_fault not in (0, 1):
+        return False
+    if sample.ocp_fault not in (0, 1):
+        return False
+    if sample.snsout_fault not in (0, 1):
+        return False
+
+    if sample.data_address and not (0x20000000 <= sample.data_address <= 0x20020000):
+        return False
+
+    if last_sequence is None:
+        return True
+
+    if sample.sequence == last_sequence:
+        return False
+
+    if sample.sequence > last_sequence:
+        return (sample.sequence - last_sequence) <= 4096
+
+    wrap_delta = (sample.sequence + (1 << 32)) - last_sequence
+    return wrap_delta <= 4096
+
+
+def parse_itm_packets(buffer: bytearray) -> Iterable[Tuple[int, bytes]]:
+    """Parse ITM packets from raw SWV stream.
+
+    This parser is intentionally small and focused on instrumentation packets.
+    """
+    while buffer:
+        header = buffer[0]
+
+        # Idle/sync/overflow markers.
+        if header in (0x00, 0x80, 0x70):
+            del buffer[0]
+            continue
+
+        size_code = header & 0x3
+        if (header & 0x4) == 0 and size_code != 0:
+            size = 4 if size_code == 0x3 else size_code
+            if len(buffer) < 1 + size:
+                break
+            port = header >> 3
+            payload = bytes(buffer[1 : 1 + size])
+            del buffer[: 1 + size]
+            yield port, payload
+            continue
+
+        # Skip other packet kinds.
+        if len(buffer) == 1:
+            break
+        del buffer[0]
+        while buffer:
+            value = buffer[0]
+            del buffer[0]
+            if (value & 0x80) == 0:
+                break
+
+
+class SWOBackend:
+    def __init__(
+        self,
+        config: AppConfig,
+        log_callback: Callable[[str], None],
+        sample_callback: Callable[[Sample], None],
+    ) -> None:
+        self.config = config
+        self.log = log_callback
+        self.sample_callback = sample_callback
+        self.proc: Optional[subprocess.Popen] = None
+        self.stop_event = threading.Event()
+        self.stdout_thread: Optional[threading.Thread] = None
+        self.swv_thread: Optional[threading.Thread] = None
+        self.running = False
+
+    def build_pyocd_command(self) -> List[str]:
+        cmd = [
+            "pyocd",
+            "gdbserver",
+            "--target",
+            self.config.target,
+            "--reset-run",
+            "-O",
+            f"frequency={self.config.swd_frequency}",
+            "-O",
+            f"connect_mode={self.config.connect_mode}",
+            "-O",
+            "enable_semihosting=1",
+            "-O",
+            "semihost_console_type=console",
+            "-O",
+            "enable_swv=1",
+            "-O",
+            "swv_raw_enable=1",
+            "-O",
+            f"swv_raw_port={self.config.raw_port}",
+            "-O",
+            f"swv_system_clock={self.config.system_clock}",
+            "-O",
+            f"swv_clock={self.config.swo_clock}",
+            "--persist",
+        ]
+        if self.config.uid:
+            cmd.extend(["--uid", self.config.uid])
+        return cmd
+
+    def start(self) -> bool:
+        if self.running:
+            return True
+
+        cmd = self.build_pyocd_command()
+        self.log("Launching: " + " ".join(cmd))
+
+        try:
+            self.proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                bufsize=0,
+            )
+        except FileNotFoundError:
+            self.log("pyOCD not found. Install with: pip install pyocd")
+            return False
+        except Exception as exc:  # pragma: no cover - defensive path
+            self.log(f"Failed to launch pyOCD: {exc}")
+            return False
+
+        self.stop_event.clear()
+        self.stdout_thread = threading.Thread(target=self._read_stdout, daemon=True)
+        self.swv_thread = threading.Thread(target=self._read_raw_swv, daemon=True)
+        self.stdout_thread.start()
+        self.swv_thread.start()
+        self.running = True
+        return True
+
+    def stop(self) -> None:
+        self.stop_event.set()
+
+        if self.proc and self.proc.poll() is None:
+            self.proc.terminate()
+            try:
+                self.proc.wait(timeout=1.5)
+            except subprocess.TimeoutExpired:
+                self.proc.kill()
+
+        self.proc = None
+        self.running = False
+
+    def _read_stdout(self) -> None:
+        if not self.proc or self.proc.stdout is None:
+            return
+
+        buffer = bytearray()
+        while not self.stop_event.is_set():
+            chunk = self.proc.stdout.read(1)
+            if not chunk:
+                if buffer:
+                    self.log(buffer.decode("utf-8", errors="replace"))
+                break
+
+            buffer.extend(chunk)
+            if chunk == b"\n":
+                self.log(buffer.decode("utf-8", errors="replace").rstrip("\r\n"))
+                buffer.clear()
+
+        self.running = False
+
+    def _read_raw_swv(self) -> None:
+        accumulated = bytearray()
+        pid_bytes = bytearray()
+        last_connect_log = 0.0
+        last_sequence: Optional[int] = None
+
+        while not self.stop_event.is_set():
+            try:
+                with socket.create_connection(("127.0.0.1", self.config.raw_port), timeout=1.0) as sock:
+                    sock.settimeout(1.0)
+                    self.log(f"Connected to SWV raw stream on tcp://127.0.0.1:{self.config.raw_port}")
+
+                    while not self.stop_event.is_set():
+                        try:
+                            chunk = sock.recv(4096)
+                        except socket.timeout:
+                            continue
+
+                        if not chunk:
+                            break
+
+                        accumulated.extend(chunk)
+                        for port, payload in parse_itm_packets(accumulated):
+                            if port != self.config.pid_port:
+                                continue
+
+                            pid_bytes.extend(payload)
+
+                            while True:
+                                magic_pos = pid_bytes.find(PID_FRAME_MAGIC)
+                                if magic_pos < 0:
+                                    if len(pid_bytes) > len(PID_FRAME_MAGIC) - 1:
+                                        del pid_bytes[: -(len(PID_FRAME_MAGIC) - 1)]
+                                    break
+
+                                if magic_pos > 0:
+                                    del pid_bytes[:magic_pos]
+
+                                frame_size = len(PID_FRAME_MAGIC) + self.config.pid_item_size
+                                if len(pid_bytes) < frame_size:
+                                    break
+
+                                del pid_bytes[: len(PID_FRAME_MAGIC)]
+                                raw_item = bytes(pid_bytes[: self.config.pid_item_size])
+                                del pid_bytes[: self.config.pid_item_size]
+
+                                sample = decode_pid_item(raw_item, self.config.pid_item_size)
+                                if not sample or not is_plausible_sample(sample, last_sequence):
+                                    continue
+
+                                last_sequence = sample.sequence
+                                self.sample_callback(sample)
+
+            except OSError:
+                now = time.monotonic()
+                if now - last_connect_log > 2.0:
+                    self.log(f"Waiting for SWV raw server on tcp://127.0.0.1:{self.config.raw_port}...")
+                    last_connect_log = now
+                time.sleep(0.2)
+
+
+class GDBMemoryClient:
+    """Direct GDB RSP client for reading/writing target memory via pyOCD gdbserver."""
+
+    def __init__(self, config: AppConfig, timeout: float = 4.0) -> None:
+        self.config = config
+        self.timeout = timeout
+        self._sock: Optional[socket.socket] = None
+        self._lock = threading.Lock()
+
+    @staticmethod
+    def _checksum(payload: str) -> int:
+        return sum(payload.encode("ascii")) & 0xFF
+
+    def _read_byte(self, sock: socket.socket) -> bytes:
+        value = sock.recv(1)
+        if not value:
+            raise ConnectionError("GDB connection closed")
+        return value
+
+    def _read_packet(self, sock: socket.socket) -> str:
+        while True:
+            ch = self._read_byte(sock)
+            if ch == b"$":
+                break
+
+        data = bytearray()
+        while True:
+            ch = self._read_byte(sock)
+            if ch == b"#":
+                break
+            data.extend(ch)
+
+        checksum = sock.recv(2)
+        if len(checksum) != 2:
+            raise ConnectionError("Invalid GDB checksum")
+        sock.sendall(b"+")
+        return data.decode("ascii", errors="replace")
+
+    def _send_packet(self, sock: socket.socket, payload: str) -> str:
+        packet = f"${payload}#{self._checksum(payload):02x}".encode("ascii")
+        sock.sendall(packet)
+
+        while True:
+            ch = self._read_byte(sock)
+            if ch == b"+":
+                break
+            if ch == b"-":
+                sock.sendall(packet)
+                continue
+            if ch == b"$":
+                # Ignore async traffic and consume its checksum/ack.
+                data = bytearray()
+                while True:
+                    c2 = self._read_byte(sock)
+                    if c2 == b"#":
+                        break
+                    data.extend(c2)
+                _ = sock.recv(2)
+                sock.sendall(b"+")
+
+        return self._read_packet(sock)
+
+    def _connect(self) -> socket.socket:
+        if self._sock is not None:
+            return self._sock
+
+        sock = socket.create_connection(("127.0.0.1", self.config.gdb_port), timeout=self.timeout)
+        sock.settimeout(self.timeout)
+        self._sock = sock
+        return sock
+
+    def _reset_connection(self) -> None:
+        self.close()
+
+    def close(self) -> None:
+        if self._sock is not None:
+            try:
+                self._sock.close()
+            finally:
+                self._sock = None
+
+    @staticmethod
+    def _parse_hex_bytes(output: str) -> bytes:
+        output = output.strip()
+        if not output:
+            return b""
+        if output.startswith("E"):
+            raise RuntimeError(f"GDB read/write error: {output}")
+        if all(ch in "0123456789abcdefABCDEF" for ch in output) and len(output) % 2 == 0:
+            return bytes.fromhex(output)
+        words = re.findall(r"0x[0-9a-fA-F]+", output)
+        if words:
+            return b"".join(struct.pack("<I", int(word, 16)) for word in words)
+        raise RuntimeError(f"Could not parse GDB output: {output}")
+
+    def read_memory(self, address: int, size: int) -> bytes:
+        with self._lock:
+            last_error: Optional[BaseException] = None
+            for attempt in range(2):
+                sock = self._connect()
+                try:
+                    response = self._send_packet(sock, f"m{address:x},{size:x}")
+                    return self._parse_hex_bytes(response)[:size]
+                except (OSError, ConnectionError, RuntimeError) as exc:
+                    last_error = exc
+                    self._reset_connection()
+                    if attempt == 0:
+                        continue
+                    break
+
+            assert last_error is not None
+            raise last_error
+
+    def write_memory(self, address: int, data: bytes) -> None:
+        with self._lock:
+            last_error: Optional[BaseException] = None
+            for attempt in range(2):
+                sock = self._connect()
+                try:
+                    response = self._send_packet(sock, f"M{address:x},{len(data):x}:{data.hex()}")
+                    if response != "OK":
+                        raise RuntimeError(f"Unexpected GDB write response: {response}")
+                    return
+                except (OSError, ConnectionError, RuntimeError) as exc:
+                    last_error = exc
+                    self._reset_connection()
+                    if attempt == 0:
+                        continue
+                    break
+
+            assert last_error is not None
+            raise last_error
+
+
+class PIDTuningApp:
+    PRESETS = (5, 10, 20, 30)
+
+    def __init__(self, config: AppConfig) -> None:
+        self.config = config
+        self.event_queue: queue.Queue[Tuple[str, object]] = queue.Queue()
+        self.backend = SWOBackend(
+            config,
+            log_callback=lambda msg: self.event_queue.put(("log", msg)),
+            sample_callback=lambda sample: self.event_queue.put(("sample", sample)),
+        )
+
+        self.root = tk.Tk()
+        self.root.title("PID Tuning SWO Monitor")
+        self.root.geometry("1920x820")
+        self.root.minsize(1000, 640)
+
+        self.window_seconds_var = tk.StringVar(value="10")
+        self.status_var = tk.StringVar(value="Stopped")
+        self.kp_var = tk.StringVar(value="0.0")
+        self.ki_var = tk.StringVar(value="0.0")
+        self.kd_var = tk.StringVar(value="0.0")
+        self.rpm_var = tk.StringVar(value="0")
+
+        self.data_address: Optional[int] = None
+        self.pending_initial_sync = False
+        self.sync_in_progress = False
+        self.gdb_mem = GDBMemoryClient(config)
+
+        self._initial_sash_done = False
+        self._build_layout()
+        self._init_buffers(window_seconds=10)
+        self._build_plot_lines()
+        self._refresh_plot()
+
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+        self.root.after(50, self._set_initial_sashes)
+        self.root.after(40, self._process_events)
+
+    def _build_layout(self) -> None:
+        self.panes = ttk.Panedwindow(self.root, orient=tk.HORIZONTAL)
+        self.panes.pack(fill=tk.BOTH, expand=True)
+
+        self.graph_frame = ttk.Frame(self.panes)
+        self.right_frame = ttk.Frame(self.panes)
+
+        self.graph_frame.configure(width=1440)
+        self.right_frame.configure(width=480)
+        self.panes.add(self.graph_frame, weight=3)
+        self.panes.add(self.right_frame, weight=1)
+
+        self.right_panes = ttk.Panedwindow(self.right_frame, orient=tk.VERTICAL)
+        self.right_panes.pack(fill=tk.BOTH, expand=True)
+
+        self.log_frame = ttk.Frame(self.right_panes)
+        self.controls_frame = ttk.Frame(self.right_panes)
+
+        self.log_frame.configure(height=420)
+        self.controls_frame.configure(height=280)
+        self.right_panes.add(self.log_frame, weight=2)
+        self.right_panes.add(self.controls_frame, weight=1)
+
+        self._build_graph_panel()
+        self._build_log_panel()
+        self._build_controls_panel()
+
+    def _set_initial_sashes(self) -> None:
+        if self._initial_sash_done:
+            return
+        width = self.panes.winfo_width()
+        right_height = self.right_panes.winfo_height()
+        if width <= 10 or right_height <= 10:
+            self.root.after(50, self._set_initial_sashes)
+            return
+
+        self.panes.sashpos(0, int(width * 0.75))
+        # Keep enough room for controls so they are visible at startup.
+        controls_min_height = 240
+        log_height = int(right_height * 0.55)
+        log_height = min(log_height, right_height - controls_min_height)
+        log_height = max(log_height, 120)
+        self.right_panes.sashpos(0, log_height)
+
+        self._initial_sash_done = True
+
+    def _build_graph_panel(self) -> None:
+        self.figure = Figure(figsize=(12, 7), dpi=100)
+        self.axes = self.figure.subplots(5, 1, sharex=True)
+        self.figure.subplots_adjust(left=0.055, right=0.995, top=0.985, bottom=0.065, hspace=0.30)
+
+        titles = [
+            "RPM / Avg RPM",
+            "PWM (%) / Avg PWM (%)",
+            "Current Avg/OCP (mA)",
+            "Voltage (mV)",
+            "Temperatures (C)",
+        ]
+        ylabels = ["RPM", "%", "mA", "mV", "C"]
+
+        for axis, title, ylabel in zip(self.axes, titles, ylabels):
+            axis.set_title(title, loc="left", fontsize=10)
+            axis.set_ylabel(ylabel)
+            axis.grid(True, linestyle="--", linewidth=0.5, alpha=0.5)
+
+        self.axes[-1].set_xlabel("Time (s)")
+
+        self.canvas = FigureCanvasTkAgg(self.figure, master=self.graph_frame)
+        self.canvas.draw()
+        self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=0, pady=0)
+
+    def _build_log_panel(self) -> None:
+        wrap = ttk.Frame(self.log_frame)
+        wrap.pack(fill=tk.BOTH, expand=True, padx=6, pady=6)
+        wrap.rowconfigure(0, weight=1)
+        wrap.columnconfigure(0, weight=1)
+
+        self.log_text = tk.Text(
+            wrap,
+            height=8,
+            state=tk.DISABLED,
+            font=("Consolas", 10),
+            wrap=tk.NONE,
+        )
+        v_scrollbar = ttk.Scrollbar(wrap, orient=tk.VERTICAL, command=self.log_text.yview)
+        h_scrollbar = ttk.Scrollbar(wrap, orient=tk.HORIZONTAL, command=self.log_text.xview)
+        self.log_text.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
+
+        self.log_text.grid(row=0, column=0, sticky="nsew")
+        v_scrollbar.grid(row=0, column=1, sticky="ns")
+        h_scrollbar.grid(row=1, column=0, sticky="ew")
+
+    def _build_controls_panel(self) -> None:
+        outer = ttk.Frame(self.controls_frame)
+        outer.pack(fill=tk.BOTH, expand=True, padx=10, pady=8)
+        outer.columnconfigure(0, weight=0)
+        outer.columnconfigure(1, weight=1)
+
+        self.start_stop_button = ttk.Button(outer, text="Start", command=self._toggle_start_stop)
+        self.start_stop_button.grid(row=0, column=0, rowspan=2, sticky="nsw", padx=(0, 12))
+
+        group = ttk.LabelFrame(outer, text="Time Window (seconds)")
+        group.grid(row=0, column=1, sticky="ew", pady=(0, 6))
+        group.columnconfigure(0, weight=0)
+        group.columnconfigure(1, weight=0)
+        group.columnconfigure(2, weight=1)
+
+        ttk.Label(group, text="Window:").grid(row=0, column=0, padx=6, pady=6)
+        self.window_entry = ttk.Entry(group, width=8, textvariable=self.window_seconds_var)
+        self.window_entry.grid(row=0, column=1, padx=6, pady=6)
+        ttk.Button(group, text="Apply", command=self._apply_window).grid(row=0, column=2, padx=6, pady=6, sticky="w")
+
+        presets_wrap = ttk.Frame(group)
+        presets_wrap.grid(row=1, column=0, columnspan=3, sticky="w", padx=6, pady=(0, 6))
+        ttk.Label(presets_wrap, text="Presets:").pack(side=tk.LEFT, padx=(0, 6))
+        for preset in self.PRESETS:
+            ttk.Button(
+                presets_wrap,
+                text=f"{preset}s",
+                command=lambda value=preset: self._set_window_preset(value),
+            ).pack(side=tk.LEFT, padx=(0, 4))
+
+        status_frame = ttk.Frame(outer)
+        status_frame.grid(row=1, column=1, sticky="ew")
+        ttk.Label(status_frame, text="Status:").pack(side=tk.LEFT)
+        ttk.Label(status_frame, textvariable=self.status_var).pack(side=tk.LEFT, padx=(6, 0))
+
+        pid_group = ttk.LabelFrame(outer, text="PID Parameters (SWO::DataType)")
+        pid_group.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(8, 6))
+        pid_group.columnconfigure(1, weight=1)
+
+        ttk.Label(pid_group, text="Kp:").grid(row=0, column=0, padx=6, pady=4, sticky="w")
+        ttk.Entry(pid_group, textvariable=self.kp_var, width=14).grid(row=0, column=1, padx=6, pady=4, sticky="ew")
+
+        ttk.Label(pid_group, text="Ki:").grid(row=1, column=0, padx=6, pady=4, sticky="w")
+        ttk.Entry(pid_group, textvariable=self.ki_var, width=14).grid(row=1, column=1, padx=6, pady=4, sticky="ew")
+
+        ttk.Label(pid_group, text="Kd:").grid(row=2, column=0, padx=6, pady=4, sticky="w")
+        ttk.Entry(pid_group, textvariable=self.kd_var, width=14).grid(row=2, column=1, padx=6, pady=4, sticky="ew")
+
+        ttk.Label(pid_group, text="RPM:").grid(row=3, column=0, padx=6, pady=4, sticky="w")
+        ttk.Entry(pid_group, textvariable=self.rpm_var, width=14).grid(row=3, column=1, padx=6, pady=4, sticky="ew")
+
+        ttk.Button(pid_group, text="Sync", command=self._sync_to_target).grid(
+            row=4, column=0, columnspan=2, padx=6, pady=(8, 6), sticky="ew"
+        )
+
+        ttk.Label(
+            outer,
+            text="Panels are resizable: drag separators to adjust Graph/Logs/Controls.",
+            wraplength=320,
+            justify=tk.LEFT,
+        ).grid(row=3, column=0, columnspan=2, sticky="w", pady=(6, 0))
+
+    def _pack_swo_data(self, data: SWOData) -> bytes:
+        # C++ layout: float Kp, float Ki, float Kd, uint16_t rpm, bool changed, 1-byte pad.
+        return struct.pack("<fffH?x", data.kp, data.ki, data.kd, data.rpm, data.changed)
+
+    def _unpack_swo_data(self, payload: bytes) -> SWOData:
+        kp, ki, kd, rpm, changed = struct.unpack("<fffH?x", payload)
+        return SWOData(kp=kp, ki=ki, kd=kd, rpm=rpm, changed=changed)
+
+    def _request_read_swo_data(self, reason: str) -> None:
+        if not self.config.enable_gdb_sync:
+            return
+        if self.data_address is None:
+            self._append_log("Cannot read SWO::data yet: dataAddress not available")
+            return
+        if self.sync_in_progress:
+            return
+
+        self.sync_in_progress = True
+
+        def worker() -> None:
+            try:
+                payload = self.gdb_mem.read_memory(self.data_address, 16)
+                self.event_queue.put(("swo-read", (self._unpack_swo_data(payload), reason)))
+            except Exception as exc:
+                self.event_queue.put(("log", f"Read SWO::data failed: {exc}"))
+                if reason == "startup":
+                    self.event_queue.put(("startup-sync-retry", None))
+                self.event_queue.put(("sync-done", None))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _sync_to_target(self) -> None:
+        if not self.config.enable_gdb_sync:
+            self._append_log("GDB memory sync is disabled; start with --enable-gdb-sync to allow writes.")
+            return
+        if self.data_address is None:
+            self._append_log("Cannot sync: no dataAddress received yet")
+            return
+        if self.sync_in_progress:
+            self._append_log("Sync already in progress")
+            return
+
+        try:
+            kp = float(self.kp_var.get().strip())
+            ki = float(self.ki_var.get().strip())
+            kd = float(self.kd_var.get().strip())
+            rpm = int(self.rpm_var.get().strip())
+            if rpm < 0 or rpm > 65535:
+                raise ValueError("RPM out of range (0..65535)")
+        except Exception as exc:
+            self._append_log(f"Invalid PID input: {exc}")
+            return
+
+        self.sync_in_progress = True
+        data = SWOData(kp=kp, ki=ki, kd=kd, rpm=rpm, changed=True)
+
+        def worker() -> None:
+            try:
+                self.gdb_mem.write_memory(self.data_address, self._pack_swo_data(data))
+                self.event_queue.put(("log", "Synced PID params to SWO::data (changed=true)"))
+                # Read back once after write for confirmation.
+                payload = self.gdb_mem.read_memory(self.data_address, 16)
+                self.event_queue.put(("swo-read", (self._unpack_swo_data(payload), "after write")))
+            except Exception as exc:
+                self.event_queue.put(("log", f"Write SWO::data failed: {exc}"))
+                self.event_queue.put(("sync-done", None))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _init_buffers(self, window_seconds: int) -> None:
+        self.window_seconds = max(1, int(window_seconds))
+        self.samples_per_window = max(16, self.window_seconds * self.config.sample_hz)
+        self.filled = 0
+        self._plot_dirty = False
+        self._last_plot_refresh = 0.0
+        self._rpm_sum = 0.0
+        self._pwm_sum = 0.0
+
+        if self.samples_per_window > 1:
+            dt = self.window_seconds / float(self.samples_per_window - 1)
+            self.x_values = [(-self.window_seconds + i * dt) for i in range(self.samples_per_window)]
+        else:
+            self.x_values = [0.0]
+
+        self.rpm = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
+        self.rpm_avg = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
+        self.pwm = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
+        self.pwm_avg = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
+        self.current_avg_ma = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
+        self.current_ocp_ma = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
+        self.voltage_mv = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
+        self.motor_temp_c = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
+        self.mosfet_temp_c = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
+
+    def _build_plot_lines(self) -> None:
+        ax0, ax1, ax2, ax3, ax4 = self.axes
+
+        (self.line_rpm,) = ax0.plot(self.x_values, self.rpm, label="RPM", color="#0077B6")
+        (self.line_rpm_avg,) = ax0.plot(self.x_values, self.rpm_avg, label="Avg RPM", color="#E85D04", linestyle="--")
+        ax0.legend(loc="upper right")
+
+        (self.line_pwm,) = ax1.plot(self.x_values, self.pwm, label="PWM %", color="#2A9D8F")
+        (self.line_pwm_avg,) = ax1.plot(self.x_values, self.pwm_avg, label="Avg PWM %", color="#9A031E", linestyle="--")
+        ax1.legend(loc="upper right")
+
+        (self.line_i_avg,) = ax2.plot(self.x_values, self.current_avg_ma, label="Current Avg", color="#4361EE")
+        (self.line_i_ocp,) = ax2.plot(self.x_values, self.current_ocp_ma, label="Current OCP", color="#F72585")
+        ax2.legend(loc="upper right")
+
+        (self.line_u_mv,) = ax3.plot(self.x_values, self.voltage_mv, label="Voltage", color="#FF9F1C")
+        ax3.legend(loc="upper right")
+
+        (self.line_motor_t,) = ax4.plot(self.x_values, self.motor_temp_c, label="Motor", color="#3A86FF")
+        (self.line_mosfet_t,) = ax4.plot(self.x_values, self.mosfet_temp_c, label="MOSFET", color="#FB5607")
+        ax4.legend(loc="upper right")
+
+    def _append_value(self, series: List[float], value: float) -> None:
+        series.append(value)
+
+    def _handle_sample(self, sample: Sample) -> None:
+        if sample.data_address and self.data_address != sample.data_address:
+            self.data_address = sample.data_address
+            self._append_log(f"SWO::data address discovered: 0x{self.data_address:08X}")
+
+        if self.config.enable_gdb_sync and self.pending_initial_sync and self.data_address and not self.sync_in_progress:
+            self._request_read_swo_data("startup")
+
+        self.filled = min(self.filled + 1, self.samples_per_window)
+
+        pwm_percent = (float(sample.pwm_level) * 100.0) / 1000.0
+
+        if self.filled < self.samples_per_window:
+            self._rpm_sum += float(sample.rpm)
+            self._pwm_sum += pwm_percent
+        else:
+            self._rpm_sum += float(sample.rpm) - self.rpm[0]
+            self._pwm_sum += pwm_percent - self.pwm[0]
+
+        self._append_value(self.rpm, float(sample.rpm))
+        self._append_value(self.pwm, pwm_percent)
+        self._append_value(self.current_avg_ma, float(sample.current_avg_ma))
+        self._append_value(self.current_ocp_ma, float(sample.current_ocp_ma))
+        self._append_value(self.voltage_mv, float(sample.voltage_mv))
+        self._append_value(self.motor_temp_c, float(sample.motor_temp_c))
+        self._append_value(self.mosfet_temp_c, float(sample.mosfet_temp_c))
+
+        current_count = max(1, self.filled)
+        rpm_mean = self._rpm_sum / float(current_count)
+        pwm_mean = self._pwm_sum / float(current_count)
+
+        self.rpm_avg = deque([rpm_mean] * self.samples_per_window, maxlen=self.samples_per_window)
+        self.pwm_avg = deque([pwm_mean] * self.samples_per_window, maxlen=self.samples_per_window)
+        self._plot_dirty = True
+
+    def _refresh_plot(self) -> None:
+        if not self._plot_dirty:
+            return
+
+        self.line_rpm.set_data(self.x_values, self.rpm)
+        self.line_rpm_avg.set_data(self.x_values, self.rpm_avg)
+        self.line_pwm.set_data(self.x_values, self.pwm)
+        self.line_pwm_avg.set_data(self.x_values, self.pwm_avg)
+        self.line_i_avg.set_data(self.x_values, self.current_avg_ma)
+        self.line_i_ocp.set_data(self.x_values, self.current_ocp_ma)
+        self.line_u_mv.set_data(self.x_values, self.voltage_mv)
+        self.line_motor_t.set_data(self.x_values, self.motor_temp_c)
+        self.line_mosfet_t.set_data(self.x_values, self.mosfet_temp_c)
+
+        for axis in self.axes:
+            axis.set_xlim(self.x_values[0], self.x_values[-1])
+            axis.relim()
+            axis.autoscale_view(scalex=False, scaley=True)
+
+        self.canvas.draw_idle()
+        self._plot_dirty = False
+
+    def _append_log(self, text: str) -> None:
+        self.log_text.configure(state=tk.NORMAL)
+        self.log_text.insert(tk.END, text + "\n")
+        self.log_text.see(tk.END)
+        self.log_text.configure(state=tk.DISABLED)
+
+    def _toggle_start_stop(self) -> None:
+        if self.backend.running:
+            self.backend.stop()
+            self.start_stop_button.configure(text="Start")
+            self.status_var.set("Stopped")
+            self._append_log("Stopped")
+            return
+
+        started = self.backend.start()
+        if started:
+            self.start_stop_button.configure(text="Stop")
+            self.status_var.set("Running")
+            self.pending_initial_sync = True
+            self.sync_in_progress = False
+            self._append_log("Started")
+        else:
+            self.status_var.set("Error")
+
+    def _set_window_preset(self, value: int) -> None:
+        self.window_seconds_var.set(str(value))
+        self._apply_window()
+
+    def _apply_window(self) -> None:
+        raw = self.window_seconds_var.get().strip()
+        try:
+            seconds = int(raw)
+            if seconds <= 0:
+                raise ValueError
+        except ValueError:
+            self._append_log(f"Invalid time window: {raw}")
+            return
+
+        self._init_buffers(seconds)
+        self._refresh_plot()
+        self._append_log(f"Applied time window: {seconds}s")
+
+    def _process_events(self) -> None:
+        got_sample = False
+        while True:
+            try:
+                kind, payload = self.event_queue.get_nowait()
+            except queue.Empty:
+                break
+
+            if kind == "log":
+                self._append_log(str(payload))
+            elif kind == "sample":
+                self._handle_sample(payload)  # type: ignore[arg-type]
+                got_sample = True
+            elif kind == "swo-read":
+                data, reason = payload  # type: ignore[misc]
+                self.kp_var.set(f"{data.kp:.6f}")
+                self.ki_var.set(f"{data.ki:.6f}")
+                self.kd_var.set(f"{data.kd:.6f}")
+                self.rpm_var.set(str(data.rpm))
+                self._append_log(f"Loaded SWO::data ({reason}): Kp={data.kp:.6f} Ki={data.ki:.6f} Kd={data.kd:.6f} RPM={data.rpm} changed={int(data.changed)}")
+                if reason == "startup":
+                    self.pending_initial_sync = False
+                self.sync_in_progress = False
+            elif kind == "sync-done":
+                self.sync_in_progress = False
+            elif kind == "startup-sync-retry":
+                self.pending_initial_sync = True
+
+        now = time.monotonic()
+        if got_sample and (now - self._last_plot_refresh) >= 0.10:
+            self._refresh_plot()
+            self._last_plot_refresh = now
+
+        if not self.backend.running and self.start_stop_button.cget("text") == "Stop":
+            self.start_stop_button.configure(text="Start")
+            self.status_var.set("Stopped")
+
+        self.root.after(40, self._process_events)
+
+    def _on_close(self) -> None:
+        self.backend.stop()
+        self.gdb_mem.close()
+        self.root.destroy()
+
+    def run(self) -> None:
+        self.root.mainloop()
+
+
+def parse_args() -> AppConfig:
+    parser = argparse.ArgumentParser(description="PID SWO graphical monitor")
+    parser.add_argument("--uid", default="", help="Optional pyOCD probe unique ID")
+    parser.add_argument("--target", default="cortex_m", help="pyOCD target")
+    parser.add_argument("--system-clock", type=int, default=72_000_000, help="System clock in Hz")
+    parser.add_argument("--swo-clock", type=int, default=2_000_000, help="SWO clock in Hz")
+    parser.add_argument("--swd-frequency", type=int, default=4_000_000, help="SWD frequency in Hz")
+    parser.add_argument(
+        "--connect-mode",
+        choices=["halt", "pre-reset", "under-reset", "attach"],
+        default="attach",
+        help="pyOCD connect mode",
+    )
+    parser.add_argument("--raw-port", type=int, default=3443, help="SWV raw TCP port")
+    parser.add_argument("--pid-port", type=int, default=1, help="ITM port for PidLoopType")
+    parser.add_argument(
+        "--pid-item-size",
+        type=int,
+        default=28,
+        choices=[22, 24, 26, 28],
+        help="PidLoopType size in bytes",
+    )
+    parser.add_argument("--gdb-port", type=int, default=3333, help="pyOCD gdbserver port for memory sync")
+    parser.add_argument(
+        "--enable-gdb-sync",
+        action="store_true",
+        help="Allow the app to read/write SWO::data through pyOCD gdbserver",
+    )
+    parser.add_argument(
+        "--sample-hz",
+        type=int,
+        default=200,
+        help="Expected PID sample rate used for window buffer sizing",
+    )
+
+    args = parser.parse_args()
+    return AppConfig(
+        uid=args.uid,
+        target=args.target,
+        system_clock=args.system_clock,
+        swo_clock=args.swo_clock,
+        swd_frequency=args.swd_frequency,
+        connect_mode=args.connect_mode,
+        raw_port=args.raw_port,
+        pid_port=args.pid_port,
+        pid_item_size=args.pid_item_size,
+        sample_hz=max(1, args.sample_hz),
+        gdb_port=args.gdb_port,
+        enable_gdb_sync=args.enable_gdb_sync,
+    )
+
+
+def main() -> int:
+    config = parse_args()
+    app = PIDTuningApp(config)
+    app.run()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

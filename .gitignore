@@ -6,3 +6,4 @@
 compile_commands.json
 cubemx/
 .vscode/settings.json
+__pycache__

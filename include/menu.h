@@ -28,14 +28,16 @@ struct Menu
     void loadStartScreen();
     void loadDashboardScreen();
     void restorePreviousMenu();
-    void saveEEPROMChanges();
 
     ScreenFlow &getScreenFlow();
     void abortableDelay(uint32_t ms);
 
     bool isAnyButtonDown();
     void clearUserInput();
+    
+    void saveEEPROMChanges();
     void applyEEPROMSettings();
+    void applyPIDTuningSettings();
 };
 
 extern Menu menu;

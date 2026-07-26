@@ -148,24 +148,35 @@ static void loop()
         lastLvHandler = HAL_GetTick();
     }
 
-    if (pid.running && eeprom.getPidTuning() != EEPROM::kPidTuningDisabled) {
+    if (eeprom.getPidTuning() != EEPROM::kPidTuningDisabled) {
         // send PID tuning data
         PidController::PidLoopType item;
+        static constexpr char kPidFrameMagic[] = {'P', 'I', 'D', '1'};
         while (pid.pidLoopBuffer.pop(item)) {
-            DEBUG_PRINT_MSG(DEBUG_DEBUG, "pid_seq=%u rpm=%u pwm=%u U=%u Io=%u I=%u motor=%u mosfet=%u faults=%u drv_fault=%d ocp=%d snsout=%d",
-                item.sequence,
-                item.rpm,
-                item.pwmLevel,
-                item.voltage,
-                ADCConverter::Current::convert(item.currentOcp),
-                ADCConverter::Current::convert(item.currentAverage),
-                item.motorTemperature,
-                item.mosfetTemperature,
-                item.errorCount,
-                item.drv8701Fault ? 1 : 0,
-                item.ocpFault ? 1 : 0,
-                item.snsoutFault ? 1 : 0
-            );
+            // DEBUG_PRINT_MSG(DEBUG_DEBUG, "pid_seq=%u rpm=%u pwm=%u U=%u Io=%u I=%u motor=%u mosfet=%u faults=%u drv_fault=%d ocp=%d snsout=%d",
+            //     item.sequence,
+            //     item.rpm,
+            //     item.pwmLevel,
+            //     item.voltage,
+            //     ADCConverter::Current::convert(item.currentOcp),
+            //     ADCConverter::Current::convert(item.currentAverage),
+            //     item.motorTemperature,
+            //     item.mosfetTemperature,
+            //     item.errorCount,
+            //     item.drv8701Fault ? 1 : 0,
+            //     item.ocpFault ? 1 : 0,
+            //     item.snsoutFault ? 1 : 0
+            // );
+            switch(eeprom.getPidTuning()) {
+                case EEPROM::kPidTuningSWO:
+                    SWO::write(1, kPidFrameMagic, sizeof(kPidFrameMagic));
+                    SWO::writeObject<1>(item);
+                    break;
+                // not implemented or disabled
+                default:
+                case EEPROM::kPidTuningDisabled:
+                    break;
+            }
         }
     }
 

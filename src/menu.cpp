@@ -124,20 +124,6 @@ void Menu::restorePreviousMenu()
 }
 
 /**
- * @brief Save changes to EEPROM and return to start screen
- * 
- */
-void Menu::saveEEPROMChanges()
-{
-    if (eeprom.write()) {
-        screenFlow.setScreen(new InfoScreen(Screen::Type::EEPROM_SAVED, "Saved"));
-        lv_timer_handler();
-        abortableDelay(UIConstants::kInfoScreenTimeout);
-    }
-
-}
-
-/**
  * @brief Show welcome screen for a few seconds
  * 
  */
@@ -264,9 +250,17 @@ bool Menu::isAnyButtonDown()
 void Menu::clearUserInput()
 {
     // wait until all buttons are released
-    while(isAnyButtonDown()) {
+    #if DEBUG
+    uint32_t start = HAL_GetTick();
+    #endif
+    while (isAnyButtonDown()) {
+        #if DEBUG
+        if (HAL_GetTick() - start > 5000) {
+            DEBUG_PRINT(DEBUG_ERROR, "button release timeout");
+            break;
+        }
+        #endif
     }
-
     // clear states
     knobButton.clear();
     backButton.clear();
@@ -274,6 +268,23 @@ void Menu::clearUserInput()
     knob.clear();
 }
 
+/**
+ * @brief Save changes to EEPROM and display info screen in case of changes written
+ * 
+ */
+void Menu::saveEEPROMChanges()
+{
+    if (eeprom.write()) {
+        screenFlow.setScreen(new InfoScreen(Screen::Type::EEPROM_SAVED, "Saved"));
+        lv_timer_handler();
+        abortableDelay(UIConstants::kInfoScreenTimeout);
+    }
+    applyPIDTuningSettings();
+}
+/**
+ * @brief Apply settings from EEPROM to the system after initialization or after restoring defaults
+ * 
+ */
 void Menu::applyEEPROMSettings()
 {
     tft_backlight_pwm_set(eeprom.getTFTBrightness());
@@ -281,13 +292,28 @@ void Menu::applyEEPROMSettings()
     adc.setInputCurrentLimit(eeprom.getInputCurrentLimit());
     adc.setMotorCurrentLimit(eeprom.getMotorCurrentLimit());
     pid.setRPM(eeprom.getMotorRPM());
-    //TODO check what we have, disable the output and enable the new output
+    applyPIDTuningSettings();
+}
+
+/**
+ * @brief Enable/disable PID tuning over SWO, UART or USB based on EEPROM settings
+ * 
+ */
+void Menu::applyPIDTuningSettings()
+{
+    // disable SWO
+    SWO::deinit();
     switch(eeprom.getPidTuning()) {
+        case EEPROM::kPidTuningSWO:
+            // enable SWO
+            SWO::init();
+            break;
+        // not implemented or disabled
+        default:
         case EEPROM::kPidTuningDisabled:
             break;
     }
 }
-
 
 /**
  * @brief Handle main button press based on the current screen and selected item

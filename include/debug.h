@@ -11,6 +11,30 @@
 #include <string.h>
 #include <stm32f1xx.h>
 
+struct SWO {
+    static void init();
+    static void deinit();
+    static size_t write(uint8_t port, const void *data, size_t size);
+
+    template<uint8_t Port, typename T>
+    static size_t writeObject(const T &value)
+    {
+        return write(Port, &value, sizeof(value));
+    }
+
+    static bool state;
+    struct DataType {
+        float Kp;
+        float Ki;
+        float Kd;
+        uint16_t rpm;
+        bool changed;
+
+        DataType() : Kp(0), Ki(0), Kd(0), rpm(0), changed(false) {}
+    };
+    static DataType data;
+};
+
 // === debug settings ===
 
 #define DEBUG_OUTPUT_NONE       0

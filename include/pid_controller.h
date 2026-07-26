@@ -116,6 +116,8 @@ struct PidController
 
         // optimized version using double precision inside the constexpr and a single float multiplication operation
         KpPreCalc = value * static_cast<float>(kScaleFactor / ((kRPMToIntCountsT<kCPR>() / static_cast<double>(kMaxPWMLevel)) / static_cast<double>(kPWMScaleMultiplier)));
+        // PID tuning via SWO
+        SWO::data.Kp = value;
     }
 
     /**
@@ -133,6 +135,8 @@ struct PidController
         // output to pwm scaler
         // KiPreCalc = KiPreCalc * kPWMScaleMultiplier;
         KiPreCalc = value * static_cast<float>(kScaleFactor * kPIDInterval / ((kRPMToIntCountsT<kCPR>() * 1000 / static_cast<double>(kMaxPWMLevel)) / static_cast<double>(kPWMScaleMultiplier)));
+        // PID tuning via SWO
+        SWO::data.Ki = value;
     }
 
     /**
@@ -150,6 +154,8 @@ struct PidController
         // output to pwm scaler
         // KdPreCalc = KdPreCalc * kPWMScaleMultiplier;
         KdPreCalc = value * static_cast<float>(kScaleFactor * 1000 / ((kRPMToIntCountsT<kCPR>() * kPIDInterval / static_cast<double>(kMaxPWMLevel)) / static_cast<double>(kPWMScaleMultiplier)));
+        // PID tuning via SWO
+        SWO::data.Kd = value;
     }
 
     inline int32_t calcPWMLevel(int32_t error, int32_t integral, int32_t derivative) const 
@@ -173,6 +179,8 @@ struct PidController
      */
     inline void setRPM(uint32_t value) 
     {
+        // PID tuning via SWO
+        SWO::data.rpm = value;
         // rev. per minute
         rpm = value;
         // to counts per interval
@@ -505,6 +513,7 @@ public:
 
     struct PidLoopType {
         uint32_t sequence;
+        uint32_t dataAddress;
         uint16_t rpm;
         uint16_t pwmLevel;
         uint16_t voltage;
@@ -513,9 +522,12 @@ public:
         uint16_t motorTemperature;
         uint16_t mosfetTemperature;
         uint32_t errorCount: 16;
+        uint32_t running: 1;
         uint32_t drv8701Fault : 1;
         uint32_t ocpFault : 1;
         uint32_t snsoutFault : 1;
+
+        PidLoopType() : dataAddress(reinterpret_cast<uint32_t>(&SWO::data)) {}
     };
     static constexpr size_t kPidLoopTypeSize = sizeof(PidLoopType);
 

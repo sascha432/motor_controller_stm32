@@ -295,18 +295,44 @@ void PidController::isr()
     // }
 
     stats.counter.loop++;
-    pidLoopBuffer.push({
-        .sequence = stats.counter.loop,
-        .rpm = (uint16_t)deltaRPM,
-        .pwmLevel = (uint16_t)pwmLevel,
-        .voltage = adc.getVSenseValue(),
-        .currentOcp = adc.getISenseOcpAverageValue(),
-        .currentAverage = adc.getISenseAverageValue(),
-        .motorTemperature = adc.getMotorNTCValue(),
-        .mosfetTemperature = adc.getMosfetNTCValue(),
-        .errorCount = faults.count,
-        .drv8701Fault = faults.drv8701Fault,
-        .ocpFault = faults.ocpFault,
-        .snsoutFault = faults.snsoutFault
-    });
+
+    // send PID tuning data if enabled
+    if (eeprom.getPidTuning() != EEPROM::kPidTuningDisabled) {
+        PidLoopType item;
+        item.sequence = stats.counter.loop;
+        item.dataAddress = reinterpret_cast<uint32_t>(&SWO::data);
+        item.rpm = static_cast<uint16_t>(deltaRPM);
+        item.pwmLevel = static_cast<uint16_t>(pwmLevel);
+        item.voltage = adc.getVSenseValue();
+        item.currentOcp = adc.getISenseOcpAverageValue();
+        item.currentAverage = adc.getISenseAverageValue();
+        item.motorTemperature = adc.getMotorNTCValue();
+        item.mosfetTemperature = adc.getMosfetNTCValue();
+        item.errorCount = faults.count;
+        item.running = running ? 1U : 0U;
+        item.drv8701Fault = faults.drv8701Fault ? 1U : 0U;
+        item.ocpFault = faults.ocpFault ? 1U : 0U;
+        item.snsoutFault = faults.snsoutFault ? 1U : 0U;
+        pidLoopBuffer.push(item);
+
+        if (SWO::data.changed) {
+            pid.setKp(SWO::data.Kp);
+            eeprom.setKd(SWO::data.Kd);
+            pid.setKi(SWO::data.Ki);
+            eeprom.setKp(SWO::data.Kp);
+            pid.setKd(SWO::data.Kd);   
+            eeprom.setKi(SWO::data.Ki); 
+            pid.setRPM(SWO::data.rpm);
+            eeprom.setMotorRPM(SWO::data.rpm);
+            SWO::data.changed = false;
+
+            #if DEBUG
+                char bufKp[16], bufKi[16], bufKd[16];
+                FloatToString::convertTrimmed(bufKp, sizeof(bufKp), SWO::data.Kp, 6);
+                FloatToString::convertTrimmed(bufKi, sizeof(bufKi), SWO::data.Ki, 6);
+                FloatToString::convertTrimmed(bufKd, sizeof(bufKd), SWO::data.Kd, 6);
+                DEBUG_PRINT(DEBUG_DEBUG, "PID tuning via SWO: Kp=%s Ki=%s Kd=%s RPM=%u", bufKp, bufKi, bufKd, SWO::data.rpm);
+            #endif
+        }
+    }
 }

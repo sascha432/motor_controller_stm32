@@ -4,6 +4,124 @@
 
 #include "debug.h"
 
+static void debug_swd_init()
+{
+    // Enable TRCENA in DEMCR (Debug Exception and Monitor Control Register)
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+
+    // Route asynchronous SWO on PB3 and enable trace pins.
+    DBGMCU->CR &= ~DBGMCU_CR_TRACE_MODE;
+    DBGMCU->CR |= DBGMCU_CR_TRACE_IOEN;
+
+    // Configure TPIU for NRZ/async SWO at 2 MHz.
+    constexpr uint32_t kSwoBaud = 2000000UL;
+    const uint32_t swoPrescaler = (SystemCoreClock / kSwoBaud);
+    TPI->SPPR = 0x00000002UL;
+    TPI->ACPR = (swoPrescaler > 0U) ? (swoPrescaler - 1U) : 0U;
+    TPI->FFCR = 0x00000100UL;
+
+    // Unlock ITM
+    ITM->LAR = 0xC5ACCE55;
+
+    // Enable ITM and set the trace bus ID
+    ITM->TCR = ITM_TCR_ITMENA_Msk | ITM_TCR_SYNCENA_Msk | ITM_TCR_TSENA_Msk | (1U << 16);
+
+    // Enable stimulus ports 0 (text logs) and 1 (binary sample stream).
+    ITM->TER |= (1UL << 0) | (1UL << 1);
+}
+
+bool SWO::state = false;
+SWO::DataType SWO::data;
+
+void SWO::init()
+{
+    if (state) {
+        return;
+    }
+    debug_swd_init();
+    SWO::state = true;
+}
+
+void SWO::deinit()
+{
+    // do not disable if SWD debugging is enabled
+    #if DEBUG_OUTPUT != DEBUG_OUTPUT_SWD
+    // Disable ITM
+    ITM->TCR = 0;
+
+    // Disable stimulus ports 0 and 1.
+    ITM->TER &= ~((1UL << 0) | (1UL << 1));
+
+    // Lock ITM
+    ITM->LAR = 0;
+
+    // Disable trace pins and asynchronous SWO
+    DBGMCU->CR &= ~DBGMCU_CR_TRACE_IOEN;
+
+    SWO::state = false;
+    #endif
+}
+
+size_t SWO::write(uint8_t port, const void *data, size_t size)
+{
+    if (!data || size == 0 || port > 31U) {
+        return 0;
+    }
+    if ((CoreDebug->DEMCR & CoreDebug_DEMCR_TRCENA_Msk) == 0U) {
+        return 0;
+    }
+    if ((ITM->TCR & ITM_TCR_ITMENA_Msk) == 0U || (ITM->TER & (1UL << port)) == 0U) {
+        return 0;
+    }
+
+    const uint8_t *bytes = static_cast<const uint8_t *>(data);
+    size_t sent = 0;
+
+    // Avoid stalling the firmware indefinitely when the debugger is too slow
+    // to consume trace data (common under heavy runtime load).
+    constexpr uint32_t kMaxReadyPolls = 50000U;
+
+    auto wait_port_ready = [port]() -> bool {
+        uint32_t polls = 0;
+        while (ITM->PORT[port].u32 == 0U) {
+            if (++polls >= kMaxReadyPolls) {
+                return false;
+            }
+        }
+        return true;
+    };
+
+    while (sent < size) {
+        if (!wait_port_ready()) {
+            break;
+        }
+
+        size_t remaining = size - sent;
+        if (remaining >= 4U) {
+            uint32_t word =
+                (static_cast<uint32_t>(bytes[sent + 0]) << 0) |
+                (static_cast<uint32_t>(bytes[sent + 1]) << 8) |
+                (static_cast<uint32_t>(bytes[sent + 2]) << 16) |
+                (static_cast<uint32_t>(bytes[sent + 3]) << 24);
+            ITM->PORT[port].u32 = word;
+            sent += 4U;
+        }
+        else if (remaining >= 2U) {
+            uint16_t half =
+                static_cast<uint16_t>(
+                    (static_cast<uint16_t>(bytes[sent + 0]) << 0) |
+                    (static_cast<uint16_t>(bytes[sent + 1]) << 8)
+                );
+            ITM->PORT[port].u16 = half;
+            sent += 2U;
+        }
+        else {
+            ITM->PORT[port].u8 = bytes[sent++];
+        }
+    }
+    return sent;
+}
+
 const char *debug_function_name(const char *signature, char *out, size_t outSize)
 {
     if (!signature || !out || outSize == 0) {
@@ -33,21 +151,6 @@ const char *debug_function_name(const char *signature, char *out, size_t outSize
 }
 
 #if DEBUG_OUTPUT == DEBUG_OUTPUT_SWD
-
-static void debug_swd_init()
-{
-    // Enable TRCENA in DEMCR (Debug Exception and Monitor Control Register)
-    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
-
-    // Unlock ITM
-    ITM->LAR = 0xC5ACCE55;
-
-    // Enable ITM and set the trace bus ID
-    ITM->TCR = ITM_TCR_ITMENA_Msk | ITM_TCR_SYNCENA_Msk | ITM_TCR_TSENA_Msk | (1U << 16);
-
-    // Enable stimulus port 0
-    ITM->TER |= 1UL;
-}
 
 static void debug_swd_write(const char *msg)
 {
