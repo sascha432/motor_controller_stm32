@@ -338,7 +338,9 @@ extern "C" void Error_Handler(void)
 {
     /* USER CODE BEGIN Error_Handler_Debug */
     /* User can add his own implementation to report the HAL error return state */
+    #if DEBUG
     SWO::write(0, "ERR\n", sizeof("ERR\n") - 1);
+    #endif
     __disable_irq();
     PID_WRITE_MOTOR_PWM_OFF();
     while (1) {
@@ -351,7 +353,9 @@ extern "C" void Error_Handler(void)
   */
 extern "C" void NMI_Handler(void)
 {
+    #if DEBUG
     SWO::write(0, "NMI\n", sizeof("NMI\n") - 1);
+    #endif
     Error_Handler();
 }
 
@@ -360,7 +364,9 @@ extern "C" void NMI_Handler(void)
   */
 extern "C" void HardFault_Handler(void)
 {
+    #if DEBUG
     SWO::write(0, "HF\n", sizeof("HF\n") - 1);
+    #endif
     Error_Handler();
 }
 
@@ -369,7 +375,9 @@ extern "C" void HardFault_Handler(void)
   */
 extern "C" void MemManage_Handler(void)
 {
+    #if DEBUG
     SWO::write(0, "MM\n", sizeof("MM\n") - 1);
+    #endif
   /* USER CODE BEGIN MemoryManagement_IRQn 0 */
 
   /* USER CODE END MemoryManagement_IRQn 0 */
@@ -385,16 +393,21 @@ extern "C" void MemManage_Handler(void)
   */
 extern "C" void BusFault_Handler(void)
 {
+    #if DEBUG
     SWO::write(0, "BF\n", sizeof("BF\n") - 1);
+    #endif
     Error_Handler();
 }
 
 /**
-  * @brief This function handles Undefined instruction or illegal state.
-  */
+ * @brief 
+ * 
+ */
 extern "C" void UsageFault_Handler(void)
 {
+    #if DEBUG
     SWO::write(0, "UF\n", sizeof("UF\n") - 1);
+    #endif
     Error_Handler();
 }
 

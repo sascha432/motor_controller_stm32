@@ -187,6 +187,18 @@ struct PidController
     }
 
     /**
+     * @brief Set the Anti Windup Reduction 
+     * 
+     * @param value 
+     */
+    inline void setAntiWindupReduction(uint16_t value) 
+    {
+        antiWindupReduction = value;
+        // PID tuning via SWO
+        SWO::data.antiWindupReduction = value / (float)UIConstants::kMinAntiWindupFactor;
+    }
+
+    /**
      * @brief Get target RPM
      * 
      * @return uint32_t 
@@ -355,7 +367,7 @@ struct PidController
         setKp(eeprom.getKp());
         setKi(eeprom.getKi());
         setKd(eeprom.getKd());
-        antiWindupReduction = eeprom.getAntiWindupReduction();
+        setAntiWindupReduction(eeprom.getAntiWindupReduction());
         setRPM(eeprom.getMotorRPM());
     }
 

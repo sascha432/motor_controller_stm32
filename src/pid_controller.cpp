@@ -316,15 +316,20 @@ void PidController::isr()
         pidLoopBuffer.push(item);
 
         if (SWO::data.changed) {
-            pid.setKp(SWO::data.Kp);
+            // apply data to EEPROM and PID controller
             eeprom.setKd(SWO::data.Kd);
-            pid.setKi(SWO::data.Ki);
             eeprom.setKp(SWO::data.Kp);
-            pid.setKd(SWO::data.Kd);   
-            eeprom.setKi(SWO::data.Ki); 
-            pid.setRPM(SWO::data.rpm);
+            eeprom.setKi(SWO::data.Ki);
             eeprom.setMotorRPM(SWO::data.rpm);
+            eeprom.setAntiWindupReduction(SWO::data.antiWindupReduction * UIConstants::kMinAntiWindupFactor);
             SWO::data.changed = false;
+
+            // apply to PID controller
+            pid.setKp(eeprom.getKp());
+            pid.setKd(eeprom.getKd());
+            pid.setKi(eeprom.getKi());
+            pid.setRPM(eeprom.getMotorRPM());
+            pid.setAntiWindupReduction(eeprom.getAntiWindupReduction());
 
             #if DEBUG
                 char bufKp[16], bufKi[16], bufKd[16];

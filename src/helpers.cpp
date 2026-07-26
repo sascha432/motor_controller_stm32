@@ -92,7 +92,9 @@ void WatchDog::init()
     watchdog.Init.Prescaler = IWDG_PRESCALER_64;
     watchdog.Init.Reload = 1249;
     if (HAL_IWDG_Init(&watchdog) != HAL_OK) {
+        #if DEBUG
         SWO::write(0, "IWDG\n", sizeof("IWDG\n") - 1);
+        #endif
         Error_Handler();
     }
 }

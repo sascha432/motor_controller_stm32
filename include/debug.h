@@ -27,10 +27,11 @@ struct SWO {
         float Kp;
         float Ki;
         float Kd;
+        float antiWindupReduction;
         uint16_t rpm;
         bool changed;
 
-        DataType() : Kp(0), Ki(0), Kd(0), rpm(0), changed(false) {}
+        DataType() : Kp(0), Ki(0), Kd(0), antiWindupReduction(0), rpm(0), changed(false) {}
     };
     static DataType data;
 };
