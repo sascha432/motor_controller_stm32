@@ -986,7 +986,6 @@ class PIDTuningApp:
         self.start_reset_retried = False
         self._start_wait_armed = False
         self.start_packet_deadline = None
-        self.backend.reset_target()
         started = self.backend.start(reset_run=False)
         if started:
             self.start_stop_button.configure(text="Stop")
