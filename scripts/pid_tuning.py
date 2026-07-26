@@ -87,6 +87,7 @@ class AppConfig:
 
 
 PID_FRAME_MAGIC = b"PID1"
+PID_PWM_MAX_LEVEL = 3599.0
 
 
 @dataclass
@@ -705,7 +706,7 @@ class PIDTuningApp:
     def _build_graph_panel(self) -> None:
         self.figure = Figure(figsize=(12, 7), dpi=100)
         self.axes = self.figure.subplots(5, 1, sharex=True)
-        self.figure.subplots_adjust(left=0.055, right=0.995, top=0.985, bottom=0.065, hspace=0.30)
+        self.figure.subplots_adjust(left=0.055, right=0.995, top=0.963, bottom=0.065, hspace=0.30)
 
         titles = [
             "RPM / Avg RPM",
@@ -989,7 +990,7 @@ class PIDTuningApp:
 
         self.filled = min(self.filled + 1, self.samples_per_window)
 
-        pwm_percent = (float(sample.pwm_level) * 100.0) / 1000.0
+        pwm_percent = (float(sample.pwm_level) * 100.0) / PID_PWM_MAX_LEVEL
 
         if self.filled < self.samples_per_window:
             self._rpm_sum += float(sample.rpm)
