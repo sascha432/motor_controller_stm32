@@ -1,9 +1,24 @@
 # DC Motor Controller Firmware for STM32F107/DRV8701
 
-My first STM32 project. Starting with arduino framework and moving over to baremetal later as i 
-learn how the stm32 works...
+## TODOs
 
-## Features
+ - Implement USB stack
+ - PID tuning over USB and/or UART
+
+## Software Features
+
+- Start/dashboard workflow for quick motor start-stop and live runtime status
+- Selectable control mode: PWM open-loop or RPM-based PID closed-loop
+- On-device tuning for speed, brake strength, and stall timeout
+- Configurable protection limits for input current, motor current, MOSFET temperature, and motor temperature
+- Advanced setup for RPM range, motor direction, and sensor direction
+- PID parameter tuning (Kp, Ki, Kd, anti-windup reduction) with live parameter apply
+- Diagnostics screen with firmware/PCB info and live min/max telemetry (VCC, current, temperatures, RPM/PWM)
+- EEPROM-backed settings with save/restore-defaults from the menu
+- LVGL TFT UI with rotary encoder plus dedicated start/back/knob buttons
+- Python script for PID parameter tuning over SWD connection
+
+## Hardware Features
 
 - 8-36V, 20A continuous, 40A peak
 - Adjustable cycle by cycle motor current limit (0.5-40A)

@@ -15,27 +15,6 @@
 #include "stats.h"
 #include "debug.h"
 
-extern "C" void Error_Handler(void);
-
-static IWDG_HandleTypeDef watchdog;
-
-static void watchdog_init()
-{
-    __HAL_RCC_LSI_ENABLE();
-    watchdog.Instance = IWDG;
-    watchdog.Init.Prescaler = IWDG_PRESCALER_64;
-    watchdog.Init.Reload = 1249;
-    if (HAL_IWDG_Init(&watchdog) != HAL_OK) {
-        SWO::write(0, "IWDG\n", sizeof("IWDG\n") - 1);
-        Error_Handler();
-    }
-}
-
-static inline void watchdog_feed()
-{
-    HAL_IWDG_Refresh(&watchdog);
-}
-
 // === core setup ===
 
 static void setup()
@@ -102,7 +81,7 @@ static void user_setup()
 
 static void loop()
 {
-    watchdog_feed();
+    WatchDog::feed();
 
     // handle buttons
     if (knobButton.isPressed()) {
@@ -598,7 +577,7 @@ int main(void)
     // user init
     user_setup();
     // start the independent watchdog after startup is complete
-    watchdog_init();
+    WatchDog::init();
 
     // main loop
     while (1) {

@@ -3,6 +3,9 @@
 */
 
 #include "helpers.h"
+#include "debug.h"
+
+//=== float to string conversion ===
 
 void float_to_string_convert(char *buffer, size_t size, float value, uint8_t precision, bool trimTrailingZeros)
 {
@@ -74,4 +77,27 @@ void float_to_string_convert(char *buffer, size_t size, float value, uint8_t pre
     }
 
     *out = '\0';
+}
+
+// === WatchDog implementation ===
+
+IWDG_HandleTypeDef WatchDog::watchdog;
+
+extern "C" void Error_Handler(void);
+
+void WatchDog::init()
+{
+    __HAL_RCC_LSI_ENABLE();
+    watchdog.Instance = IWDG;
+    watchdog.Init.Prescaler = IWDG_PRESCALER_64;
+    watchdog.Init.Reload = 1249;
+    if (HAL_IWDG_Init(&watchdog) != HAL_OK) {
+        SWO::write(0, "IWDG\n", sizeof("IWDG\n") - 1);
+        Error_Handler();
+    }
+}
+
+void WatchDog::feed()
+{
+    HAL_IWDG_Refresh(&watchdog);
 }

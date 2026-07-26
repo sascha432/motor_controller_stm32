@@ -256,10 +256,11 @@ void Menu::clearUserInput()
     while (isAnyButtonDown()) {
         #if DEBUG
         if (HAL_GetTick() - start > 5000) {
-            DEBUG_PRINT(DEBUG_ERROR, "button release timeout");
+            DEBUG_PRINT(DEBUG_ERROR, "5000ms button release timeout");
             break;
         }
         #endif
+        WatchDog::feed();
     }
     // clear states
     knobButton.clear();

@@ -11,9 +11,6 @@
 
 struct PidController
 {
-    static constexpr float kKpDefault = 0.15f;
-    static constexpr float kKiDefault = 0.4f;
-    static constexpr float kKdDefault = 0.0f;
     static constexpr uint16_t kMaxPWMLevel = kPWMFrequencyToARR<20000>();   // Motor PWM 20Khz
     static constexpr uint16_t kPPR = 1024;                                  // MT6701 PPR
     static constexpr uint16_t kCPR = kPPR * 4;                              // 4x Mode PPR to CPR
@@ -74,9 +71,9 @@ struct PidController
         antiWindupReduction(kAntiWindupReduction),
         running(false)
     {
-        setKp(kKpDefault);
-        setKi(kKiDefault);
-        setKd(kKdDefault);
+        setKp(1.0f);
+        setKi(0.5f);
+        setKd(0.0f);
     }
 
     /**

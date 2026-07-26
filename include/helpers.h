@@ -435,6 +435,12 @@ inline void FloatToString::convertTrimmed(char *buffer, size_t size, float value
     float_to_string_convert(buffer, size, value, precision, true);
 }
 
+/**
+ * @brief Simple non-blocking Ring buffer implementation
+ * 
+ * @tparam T 
+ * @tparam SIZE 
+ */
 template<typename T, size_t SIZE>
 class RingBuffer {
 public:
@@ -493,4 +499,15 @@ private:
 
     volatile size_t head = 0;
     volatile size_t tail = 0;
+};
+
+/**
+ * @brief Watchdog helper class
+ * 
+ */
+struct WatchDog {
+    static void init();
+    static void feed();
+
+    static IWDG_HandleTypeDef watchdog;
 };
