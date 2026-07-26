@@ -210,7 +210,7 @@ void Menu::loadStartScreen()
  */
 void Menu::loadDashboardScreen()
 {
-    screenFlow.setScreen(new DashboardScreen(eeprom.isPIDMode() ? 50 : 2));
+    screenFlow.setScreen(new DashboardScreen());
     setValue(eeprom.getSpeed());
     clearUserInput();
 }
@@ -756,7 +756,6 @@ int32_t Menu::updateRotaryValue(int32_t value)
             break;
         case Screen::Type::PID_TUNING:
             eeprom.setPidTuning(getValue());
-            pid.setPidTuning(eeprom.getPidTuning());
             break;
         case Screen::Type::PID_KP:
             eeprom.setKp(EEPROM::kUint32ToPIDParam(getValue()));

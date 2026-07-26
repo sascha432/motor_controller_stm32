@@ -10,6 +10,7 @@
 #include "lvgl.h"
 #include "tft_driver.h"
 #include "controls.h"
+#include "eeprom.h"
 #include "debug.h"
 
 // set to true to keep screen objects in memory when switching screens
@@ -302,7 +303,7 @@ private:
 
 struct DashboardScreen : public Screen
 {
-    DashboardScreen(uint32_t maxAcceleration, Type id = Screen::Type::DASHBOARD) :
+    DashboardScreen(Type id = Screen::Type::DASHBOARD) :
         Screen(id),
         voltageLabel(nullptr),
         currentLabel(nullptr),
@@ -313,7 +314,7 @@ struct DashboardScreen : public Screen
         pwmBarBackground(nullptr),
         pwmBarFill(nullptr)
     {
-         this->maxAcceleration = maxAcceleration;
+        maxAcceleration = eeprom.isPIDMode() ? 50 : 1;
     }
 
     void update() {
@@ -348,7 +349,9 @@ struct StartScreen : public Screen
         mosfetTempLabel(nullptr),
         directionLabel(nullptr),
         speedLabel(nullptr)
-    {}
+    {
+        maxAcceleration = eeprom.isPIDMode() ? 50 : 1;
+    }
 
     virtual void load() override;
     virtual void update() override;

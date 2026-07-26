@@ -45,6 +45,7 @@ void debug_init(void);
 
 #if DEBUG_OUTPUT == DEBUG_OUTPUT_NONE
 
+    #define DEBUG_PRINT_MSG(level, msg, ...) do {} while(0)
     #define DEBUG_PRINT(level, msg, ...) do {} while(0)
 
 #elif DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL
