@@ -210,14 +210,9 @@ def is_plausible_sample(sample: Sample, last_sequence: Optional[int]) -> bool:
     if last_sequence is None:
         return True
 
-    if sample.sequence == last_sequence:
-        return False
-
-    if sample.sequence > last_sequence:
-        return (sample.sequence - last_sequence) <= 4096
-
-    wrap_delta = (sample.sequence + (1 << 32)) - last_sequence
-    return wrap_delta <= 4096
+    # Only reject exact duplicates. Sequence jumps can legitimately happen
+    # after partial frame loss and should not lock out future valid samples.
+    return sample.sequence != last_sequence
 
 
 def parse_itm_packets(buffer: bytearray) -> Iterable[Tuple[int, bytes]]:
@@ -345,6 +340,47 @@ class SWOBackend:
         self.proc = None
         self.running = False
 
+    def reset_target(self) -> bool:
+        cmd = [
+            "pyocd",
+            "commander",
+            "--target",
+            self.config.target,
+            "-O",
+            f"frequency={self.config.swd_frequency}",
+            "-M",
+            "attach",
+        ]
+        if self.config.uid:
+            cmd.extend(["--uid", self.config.uid])
+        cmd.extend(["-c", "reset"])
+
+        self.log("Resetting firmware: " + " ".join(cmd))
+        try:
+            result = subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                check=False,
+            )
+        except FileNotFoundError:
+            self.log("pyOCD not found. Install with: pip install pyocd")
+            return False
+        except Exception as exc:  # pragma: no cover - defensive path
+            self.log(f"Failed to reset firmware: {exc}")
+            return False
+
+        if result.returncode != 0:
+            self.log(f"Firmware reset failed with exit code {result.returncode}")
+            if result.stdout:
+                self.log(result.stdout.rstrip())
+            return False
+
+        if result.stdout:
+            self.log(result.stdout.rstrip())
+        return True
+
     def _read_stdout(self) -> None:
         if not self.proc or self.proc.stdout is None:
             return
@@ -406,16 +442,17 @@ class SWOBackend:
                                 if len(pid_bytes) < frame_size:
                                     break
 
-                                del pid_bytes[: len(PID_FRAME_MAGIC)]
-                                raw_item = bytes(pid_bytes[: self.config.pid_item_size])
-                                del pid_bytes[: self.config.pid_item_size]
-
+                                raw_item = bytes(pid_bytes[len(PID_FRAME_MAGIC):frame_size])
                                 sample = decode_pid_item(raw_item, self.config.pid_item_size)
-                                if not sample or not is_plausible_sample(sample, last_sequence):
+                                if sample and is_plausible_sample(sample, last_sequence):
+                                    del pid_bytes[:frame_size]
+                                    last_sequence = sample.sequence
+                                    self.sample_callback(sample)
                                     continue
 
-                                last_sequence = sample.sequence
-                                self.sample_callback(sample)
+                                # Invalid candidate frame: shift by one byte and search again.
+                                # This recovers quickly from partial writes/split frames.
+                                del pid_bytes[0]
 
             except OSError:
                 now = time.monotonic()
@@ -949,6 +986,7 @@ class PIDTuningApp:
         self.start_reset_retried = False
         self._start_wait_armed = False
         self.start_packet_deadline = None
+        self.backend.reset_target()
         started = self.backend.start(reset_run=False)
         if started:
             self.start_stop_button.configure(text="Stop")
@@ -990,7 +1028,7 @@ class PIDTuningApp:
                 self._append_log(text)
                 if text.startswith("Connected to SWV raw stream on tcp://127.0.0.1:") and not self.start_packet_seen:
                     self._start_wait_armed = True
-                    self.start_packet_deadline = time.monotonic() + 1.0
+                    self.start_packet_deadline = time.monotonic() + 5.0
             elif kind == "sample":
                 self._handle_sample(payload)  # type: ignore[arg-type]
                 got_sample = True
@@ -1023,9 +1061,9 @@ class PIDTuningApp:
             and not self.start_reset_retried
             and now >= self.start_packet_deadline
         ):
-            self._append_log("No PID packets seen for 1000ms, resetting firmware once")
+            self._append_log("No PID packets seen for 5000ms, resetting firmware once")
             self.backend.stop()
-            if self.backend.start(reset_run=True):
+            if self.backend.reset_target() and self.backend.start(reset_run=False):
                 self.start_reset_retried = True
                 self.start_packet_deadline = None
                 self._start_wait_armed = False
