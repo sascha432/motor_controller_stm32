@@ -468,7 +468,6 @@ class GDBMemoryClient:
     def __init__(self, config: AppConfig, timeout: float = 4.0) -> None:
         self.config = config
         self.timeout = timeout
-        self._sock: Optional[socket.socket] = None
         self._lock = threading.Lock()
 
     @staticmethod
@@ -525,23 +524,30 @@ class GDBMemoryClient:
         return self._read_packet(sock)
 
     def _connect(self) -> socket.socket:
-        if self._sock is not None:
-            return self._sock
-
         sock = socket.create_connection(("127.0.0.1", self.config.gdb_port), timeout=self.timeout)
         sock.settimeout(self.timeout)
-        self._sock = sock
         return sock
 
     def _reset_connection(self) -> None:
         self.close()
 
-    def close(self) -> None:
-        if self._sock is not None:
+    def _detach_and_close(self, sock: socket.socket) -> None:
+        # Detach so target resumes, then close this short-lived RSP session.
+        try:
+            response = self._send_packet(sock, "D")
+            if response not in ("OK", ""):
+                pass
+        except Exception:
+            pass
+        finally:
             try:
-                self._sock.close()
-            finally:
-                self._sock = None
+                sock.close()
+            except Exception:
+                pass
+
+    def close(self) -> None:
+        # Connections are short-lived and closed per operation.
+        return
 
     @staticmethod
     def _parse_hex_bytes(output: str) -> bytes:
@@ -571,6 +577,8 @@ class GDBMemoryClient:
                     if attempt == 0:
                         continue
                     break
+                finally:
+                    self._detach_and_close(sock)
 
             assert last_error is not None
             raise last_error
@@ -591,6 +599,8 @@ class GDBMemoryClient:
                     if attempt == 0:
                         continue
                     break
+                finally:
+                    self._detach_and_close(sock)
 
             assert last_error is not None
             raise last_error
@@ -619,6 +629,10 @@ class PIDTuningApp:
         self.ki_var = tk.StringVar(value="0.0")
         self.kd_var = tk.StringVar(value="0.0")
         self.rpm_var = tk.StringVar(value="0")
+        self._pid_fields_updating = False
+        self._pid_fields_dirty = False
+        self._last_loaded_swo_data: Optional[SWOData] = None
+        self._install_pid_field_traces()
 
         self.data_address: Optional[int] = None
         self.pending_initial_sync = False
@@ -802,6 +816,27 @@ class PIDTuningApp:
         kp, ki, kd, rpm, changed = struct.unpack("<fffH?x", payload)
         return SWOData(kp=kp, ki=ki, kd=kd, rpm=rpm, changed=changed)
 
+    def _install_pid_field_traces(self) -> None:
+        for var in (self.kp_var, self.ki_var, self.kd_var, self.rpm_var):
+            var.trace_add("write", self._on_pid_field_edited)
+
+    def _on_pid_field_edited(self, *_: object) -> None:
+        if self._pid_fields_updating:
+            return
+        self._pid_fields_dirty = True
+
+    def _set_pid_fields(self, data: SWOData) -> None:
+        self._pid_fields_updating = True
+        try:
+            self.kp_var.set(f"{data.kp:.6f}")
+            self.ki_var.set(f"{data.ki:.6f}")
+            self.kd_var.set(f"{data.kd:.6f}")
+            self.rpm_var.set(str(data.rpm))
+            self._last_loaded_swo_data = data
+            self._pid_fields_dirty = False
+        finally:
+            self._pid_fields_updating = False
+
     def _request_read_swo_data(self, reason: str) -> None:
         if self.data_address is None:
             self._append_log("Cannot read SWO::data yet: dataAddress not available")
@@ -829,6 +864,12 @@ class PIDTuningApp:
             return
         if self.sync_in_progress:
             self._append_log("Sync already in progress")
+            return
+
+        # Read-only sync unless user edited fields. This prevents accidental
+        # writes of defaults and keeps Sync useful for refresh.
+        if not self._pid_fields_dirty:
+            self._request_read_swo_data("manual")
             return
 
         try:
@@ -913,8 +954,11 @@ class PIDTuningApp:
             self.data_address = sample.data_address
             self._append_log(f"SWO::data address discovered: 0x{self.data_address:08X}")
 
-        if self.pending_initial_sync and self.data_address and not self.sync_in_progress and sample.running == 0:
-            self._request_read_swo_data("startup")
+        if self.pending_initial_sync and self.data_address:
+            # Avoid auto-opening a GDB memory session on Start, which can
+            # briefly halt the core and trip watchdog reset on some setups.
+            self.pending_initial_sync = False
+            self._append_log("First PID packet seen. Press Sync to read PID parameters.")
 
         self.filled = min(self.filled + 1, self.samples_per_window)
 
@@ -993,8 +1037,9 @@ class PIDTuningApp:
         if started:
             self.start_stop_button.configure(text="Stop")
             self.status_var.set("Running")
-            self.pending_initial_sync = False
+            self.pending_initial_sync = True
             self.sync_in_progress = False
+            self._append_log("Waiting for first PID packet...")
             self._append_log("Started")
         else:
             self.status_var.set("Error")
@@ -1040,10 +1085,7 @@ class PIDTuningApp:
                 self._start_wait_next_log_at = None
             elif kind == "swo-read":
                 data, reason = payload  # type: ignore[misc]
-                self.kp_var.set(f"{data.kp:.6f}")
-                self.ki_var.set(f"{data.ki:.6f}")
-                self.kd_var.set(f"{data.kd:.6f}")
-                self.rpm_var.set(str(data.rpm))
+                self._set_pid_fields(data)
                 self._append_log(f"Loaded SWO::data ({reason}): Kp={data.kp:.6f} Ki={data.ki:.6f} Kd={data.kd:.6f} RPM={data.rpm} changed={int(data.changed)}")
                 if reason == "startup":
                     self.pending_initial_sync = False
@@ -1082,15 +1124,30 @@ class PIDTuningApp:
             self.backend.stop()
             if self.backend.reset_target() and self.backend.start(reset_run=False):
                 self.start_reset_retried = True
+                self.pending_initial_sync = True
+                self.sync_in_progress = False
                 self.start_packet_deadline = None
                 self._start_wait_armed = False
                 self._start_wait_next_log_at = None
+                self._append_log("Waiting for first PID packet...")
                 self._append_log("Firmware reset/restarted")
             else:
                 self.status_var.set("Error")
                 self.start_packet_deadline = None
                 self._start_wait_armed = False
                 self._start_wait_next_log_at = None
+
+        if (
+            self.start_packet_deadline is not None
+            and self._start_wait_armed
+            and not self.start_packet_seen
+            and self.start_reset_retried
+            and now >= self.start_packet_deadline
+        ):
+            self._append_log("No PID packets seen after one auto-reset; keeping target running")
+            self.start_packet_deadline = None
+            self._start_wait_armed = False
+            self._start_wait_next_log_at = None
 
         if not self.backend.running and self.start_stop_button.cget("text") == "Stop":
             self.start_stop_button.configure(text="Start")
