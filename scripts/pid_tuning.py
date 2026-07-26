@@ -84,7 +84,6 @@ class AppConfig:
     pid_item_size: int
     sample_hz: int
     gdb_port: int
-    enable_gdb_sync: bool
 
 
 PID_FRAME_MAGIC = b"PID1"
@@ -272,13 +271,12 @@ class SWOBackend:
         self.swv_thread: Optional[threading.Thread] = None
         self.running = False
 
-    def build_pyocd_command(self) -> List[str]:
+    def build_pyocd_command(self, reset_run: bool) -> List[str]:
         cmd = [
             "pyocd",
             "gdbserver",
             "--target",
             self.config.target,
-            "--reset-run",
             "-O",
             f"frequency={self.config.swd_frequency}",
             "-O",
@@ -299,15 +297,17 @@ class SWOBackend:
             f"swv_clock={self.config.swo_clock}",
             "--persist",
         ]
+        if reset_run:
+            cmd.insert(4, "--reset-run")
         if self.config.uid:
             cmd.extend(["--uid", self.config.uid])
         return cmd
 
-    def start(self) -> bool:
+    def start(self, reset_run: bool) -> bool:
         if self.running:
             return True
 
-        cmd = self.build_pyocd_command()
+        cmd = self.build_pyocd_command(reset_run=reset_run)
         self.log("Launching: " + " ".join(cmd))
 
         try:
@@ -586,6 +586,10 @@ class PIDTuningApp:
         self.data_address: Optional[int] = None
         self.pending_initial_sync = False
         self.sync_in_progress = False
+        self.start_packet_deadline: Optional[float] = None
+        self.start_packet_seen = False
+        self.start_reset_retried = False
+        self._start_wait_armed = False
         self.gdb_mem = GDBMemoryClient(config)
 
         self._initial_sash_done = False
@@ -761,8 +765,6 @@ class PIDTuningApp:
         return SWOData(kp=kp, ki=ki, kd=kd, rpm=rpm, changed=changed)
 
     def _request_read_swo_data(self, reason: str) -> None:
-        if not self.config.enable_gdb_sync:
-            return
         if self.data_address is None:
             self._append_log("Cannot read SWO::data yet: dataAddress not available")
             return
@@ -784,9 +786,6 @@ class PIDTuningApp:
         threading.Thread(target=worker, daemon=True).start()
 
     def _sync_to_target(self) -> None:
-        if not self.config.enable_gdb_sync:
-            self._append_log("GDB memory sync is disabled; start with --enable-gdb-sync to allow writes.")
-            return
         if self.data_address is None:
             self._append_log("Cannot sync: no dataAddress received yet")
             return
@@ -876,7 +875,7 @@ class PIDTuningApp:
             self.data_address = sample.data_address
             self._append_log(f"SWO::data address discovered: 0x{self.data_address:08X}")
 
-        if self.config.enable_gdb_sync and self.pending_initial_sync and self.data_address and not self.sync_in_progress:
+        if self.pending_initial_sync and self.data_address and not self.sync_in_progress and sample.running == 0:
             self._request_read_swo_data("startup")
 
         self.filled = min(self.filled + 1, self.samples_per_window)
@@ -940,13 +939,21 @@ class PIDTuningApp:
             self.start_stop_button.configure(text="Start")
             self.status_var.set("Stopped")
             self._append_log("Stopped")
+            self.start_packet_deadline = None
+            self.start_packet_seen = False
+            self.start_reset_retried = False
+            self._start_wait_armed = False
             return
 
-        started = self.backend.start()
+        self.start_packet_seen = False
+        self.start_reset_retried = False
+        self._start_wait_armed = False
+        self.start_packet_deadline = None
+        started = self.backend.start(reset_run=False)
         if started:
             self.start_stop_button.configure(text="Stop")
             self.status_var.set("Running")
-            self.pending_initial_sync = True
+            self.pending_initial_sync = False
             self.sync_in_progress = False
             self._append_log("Started")
         else:
@@ -979,10 +986,16 @@ class PIDTuningApp:
                 break
 
             if kind == "log":
-                self._append_log(str(payload))
+                text = str(payload)
+                self._append_log(text)
+                if text.startswith("Connected to SWV raw stream on tcp://127.0.0.1:") and not self.start_packet_seen:
+                    self._start_wait_armed = True
+                    self.start_packet_deadline = time.monotonic() + 1.0
             elif kind == "sample":
                 self._handle_sample(payload)  # type: ignore[arg-type]
                 got_sample = True
+                self.start_packet_seen = True
+                self._start_wait_armed = False
             elif kind == "swo-read":
                 data, reason = payload  # type: ignore[misc]
                 self.kp_var.set(f"{data.kp:.6f}")
@@ -1002,6 +1015,25 @@ class PIDTuningApp:
         if got_sample and (now - self._last_plot_refresh) >= 0.10:
             self._refresh_plot()
             self._last_plot_refresh = now
+
+        if (
+            self.start_packet_deadline is not None
+            and self._start_wait_armed
+            and not self.start_packet_seen
+            and not self.start_reset_retried
+            and now >= self.start_packet_deadline
+        ):
+            self._append_log("No PID packets seen for 1000ms, resetting firmware once")
+            self.backend.stop()
+            if self.backend.start(reset_run=True):
+                self.start_reset_retried = True
+                self.start_packet_deadline = None
+                self._start_wait_armed = False
+                self._append_log("Firmware reset/restarted")
+            else:
+                self.status_var.set("Error")
+                self.start_packet_deadline = None
+                self._start_wait_armed = False
 
         if not self.backend.running and self.start_stop_button.cget("text") == "Stop":
             self.start_stop_button.configure(text="Start")
@@ -1042,11 +1074,6 @@ def parse_args() -> AppConfig:
     )
     parser.add_argument("--gdb-port", type=int, default=3333, help="pyOCD gdbserver port for memory sync")
     parser.add_argument(
-        "--enable-gdb-sync",
-        action="store_true",
-        help="Allow the app to read/write SWO::data through pyOCD gdbserver",
-    )
-    parser.add_argument(
         "--sample-hz",
         type=int,
         default=200,
@@ -1066,7 +1093,6 @@ def parse_args() -> AppConfig:
         pid_item_size=args.pid_item_size,
         sample_hz=max(1, args.sample_hz),
         gdb_port=args.gdb_port,
-        enable_gdb_sync=args.enable_gdb_sync,
     )
 
 
