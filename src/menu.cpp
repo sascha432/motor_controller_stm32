@@ -292,7 +292,7 @@ void Menu::applyEEPROMSettings()
     LEDs::illuminationLedSetPWM(eeprom.getLEDBrightness());
     adc.setInputCurrentLimit(eeprom.getInputCurrentLimit());
     adc.setMotorCurrentLimit(eeprom.getMotorCurrentLimit());
-    pid.setRPM(eeprom.getMotorRPM());
+    pid.applyPIDParams();
     applyPIDTuningSettings();
 }
 

@@ -86,7 +86,6 @@ void EEPROM::updateTemperatureLimits()
     motor_temperature_limit_adc = ADCConverter::NTC::reverse(data.motor_temperature_limit);
 }
 
-
 // === AT24C02C I2C implementation ===
 
 //------------------------------------------------------------------

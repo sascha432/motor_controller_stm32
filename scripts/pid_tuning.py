@@ -95,6 +95,7 @@ class SWOData:
     kp: float
     ki: float
     kd: float
+    anti_windup_reduction: float
     rpm: int
     changed: bool
 
@@ -630,6 +631,7 @@ class PIDTuningApp:
         self.kp_var = tk.StringVar(value="0.0")
         self.ki_var = tk.StringVar(value="0.0")
         self.kd_var = tk.StringVar(value="0.0")
+        self.anti_windup_var = tk.StringVar(value="97.00")
         self.rpm_var = tk.StringVar(value="0")
         self._pid_fields_updating = False
         self._pid_fields_dirty = False
@@ -675,8 +677,8 @@ class PIDTuningApp:
         self.log_frame = ttk.Frame(self.right_panes)
         self.controls_frame = ttk.Frame(self.right_panes)
 
-        self.log_frame.configure(height=420)
-        self.controls_frame.configure(height=280)
+        self.log_frame.configure(height=390)
+        self.controls_frame.configure(height=310)
         self.right_panes.add(self.log_frame, weight=2)
         self.right_panes.add(self.controls_frame, weight=1)
 
@@ -695,8 +697,8 @@ class PIDTuningApp:
 
         self.panes.sashpos(0, int(width * 0.75))
         # Keep enough room for controls so they are visible at startup.
-        controls_min_height = 240
-        log_height = int(right_height * 0.55)
+        controls_min_height = 260
+        log_height = int(right_height * 0.50)
         log_height = min(log_height, right_height - controls_min_height)
         log_height = max(log_height, 120)
         self.right_panes.sashpos(0, log_height)
@@ -797,31 +799,49 @@ class PIDTuningApp:
         ttk.Label(pid_group, text="Kd:").grid(row=2, column=0, padx=6, pady=4, sticky="w")
         ttk.Entry(pid_group, textvariable=self.kd_var, width=14).grid(row=2, column=1, padx=6, pady=4, sticky="ew")
 
-        ttk.Label(pid_group, text="RPM:").grid(row=3, column=0, padx=6, pady=4, sticky="w")
-        ttk.Entry(pid_group, textvariable=self.rpm_var, width=14).grid(row=3, column=1, padx=6, pady=4, sticky="ew")
+        ttk.Label(pid_group, text="Anti-Windup Reduction (%):").grid(row=3, column=0, padx=6, pady=4, sticky="w")
+        ttk.Entry(pid_group, textvariable=self.anti_windup_var, width=14).grid(row=3, column=1, padx=6, pady=4, sticky="ew")
+
+        ttk.Label(pid_group, text="RPM:").grid(row=4, column=0, padx=6, pady=4, sticky="w")
+        ttk.Entry(pid_group, textvariable=self.rpm_var, width=14).grid(row=4, column=1, padx=6, pady=4, sticky="ew")
 
         self.sync_button = ttk.Button(pid_group, text="Sync", command=self._sync_to_target, state=tk.DISABLED)
         self.sync_button.grid(
-            row=4, column=0, columnspan=2, padx=6, pady=(8, 6), sticky="ew"
+            row=5, column=0, columnspan=2, padx=6, pady=(8, 6), sticky="ew"
         )
 
         ttk.Label(
             outer,
-            text="Panels are resizable: drag separators to adjust Graph/Logs/Controls.",
-            wraplength=320,
+            text="Panels are resizable; drag separators to adjust Graph / Logs / Controls.",
             justify=tk.LEFT,
         ).grid(row=3, column=0, columnspan=2, sticky="w", pady=(6, 0))
 
     def _pack_swo_data(self, data: SWOData) -> bytes:
-        # C++ layout: float Kp, float Ki, float Kd, uint16_t rpm, bool changed, 1-byte pad.
-        return struct.pack("<fffH?x", data.kp, data.ki, data.kd, data.rpm, data.changed)
+        # C++ layout: float Kp, float Ki, float Kd, float antiWindupReduction,
+        # uint16_t rpm, bool changed, 1-byte pad.
+        return struct.pack(
+            "<ffffH?x",
+            data.kp,
+            data.ki,
+            data.kd,
+            data.anti_windup_reduction,
+            data.rpm,
+            data.changed,
+        )
 
     def _unpack_swo_data(self, payload: bytes) -> SWOData:
-        kp, ki, kd, rpm, changed = struct.unpack("<fffH?x", payload)
-        return SWOData(kp=kp, ki=ki, kd=kd, rpm=rpm, changed=changed)
+        kp, ki, kd, anti_windup_reduction, rpm, changed = struct.unpack("<ffffH?x", payload)
+        return SWOData(
+            kp=kp,
+            ki=ki,
+            kd=kd,
+            anti_windup_reduction=anti_windup_reduction,
+            rpm=rpm,
+            changed=changed,
+        )
 
     def _install_pid_field_traces(self) -> None:
-        for var in (self.kp_var, self.ki_var, self.kd_var, self.rpm_var):
+        for var in (self.kp_var, self.ki_var, self.kd_var, self.anti_windup_var, self.rpm_var):
             var.trace_add("write", self._on_pid_field_edited)
 
     def _on_pid_field_edited(self, *_: object) -> None:
@@ -835,6 +855,7 @@ class PIDTuningApp:
             self.kp_var.set(f"{data.kp:.6f}")
             self.ki_var.set(f"{data.ki:.6f}")
             self.kd_var.set(f"{data.kd:.6f}")
+            self.anti_windup_var.set(f"{data.anti_windup_reduction:.2f}")
             self.rpm_var.set(str(data.rpm))
             self._last_loaded_swo_data = data
             self._pid_fields_dirty = False
@@ -874,7 +895,7 @@ class PIDTuningApp:
 
         def worker() -> None:
             try:
-                payload = self.gdb_mem.read_memory(self.data_address, 16)
+                payload = self.gdb_mem.read_memory(self.data_address, 20)
                 self.event_queue.put(("swo-read", (self._unpack_swo_data(payload), reason)))
             except Exception as exc:
                 self.event_queue.put(("log", f"Read SWO::data failed: {exc}"))
@@ -902,6 +923,9 @@ class PIDTuningApp:
             kp = float(self.kp_var.get().strip())
             ki = float(self.ki_var.get().strip())
             kd = float(self.kd_var.get().strip())
+            anti_windup_reduction = float(self.anti_windup_var.get().strip())
+            if anti_windup_reduction < 0.0 or anti_windup_reduction > 100.0:
+                raise ValueError("Anti-windup reduction out of range (0.00..100.00)")
             rpm = int(self.rpm_var.get().strip())
             if rpm < 0 or rpm > 65535:
                 raise ValueError("RPM out of range (0..65535)")
@@ -910,14 +934,21 @@ class PIDTuningApp:
             return
 
         self.sync_in_progress = True
-        data = SWOData(kp=kp, ki=ki, kd=kd, rpm=rpm, changed=True)
+        data = SWOData(
+            kp=kp,
+            ki=ki,
+            kd=kd,
+            anti_windup_reduction=anti_windup_reduction,
+            rpm=rpm,
+            changed=True,
+        )
 
         def worker() -> None:
             try:
                 self.gdb_mem.write_memory(self.data_address, self._pack_swo_data(data))
                 self.event_queue.put(("log", "Synced PID params to SWO::data (changed=true)"))
                 # Read back once after write for confirmation.
-                payload = self.gdb_mem.read_memory(self.data_address, 16)
+                payload = self.gdb_mem.read_memory(self.data_address, 20)
                 self.event_queue.put(("swo-read", (self._unpack_swo_data(payload), "after write")))
             except Exception as exc:
                 self.event_queue.put(("log", f"Write SWO::data failed: {exc}"))
@@ -1034,6 +1065,9 @@ class PIDTuningApp:
             axis.relim()
             axis.autoscale_view(scalex=False, scaley=True)
 
+        # Keep PWM plot in percentage range.
+        self.axes[1].set_ylim(0.0, 100.0)
+
         self.canvas.draw_idle()
         self._plot_dirty = False
 
@@ -1120,7 +1154,11 @@ class PIDTuningApp:
             elif kind == "swo-read":
                 data, reason = payload  # type: ignore[misc]
                 self._set_pid_fields(data)
-                self._append_log(f"Loaded SWO::data ({reason}): Kp={data.kp:.6f} Ki={data.ki:.6f} Kd={data.kd:.6f} RPM={data.rpm} changed={int(data.changed)}")
+                self._append_log(
+                    f"Loaded SWO::data ({reason}): "
+                    f"Kp={data.kp:.6f} Ki={data.ki:.6f} Kd={data.kd:.6f} "
+                    f"AWR={data.anti_windup_reduction:.2f}% RPM={data.rpm} changed={int(data.changed)}"
+                )
                 self._set_sync_enabled(True)
                 if reason == "startup":
                     self.pending_initial_sync = False
