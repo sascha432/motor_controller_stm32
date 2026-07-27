@@ -161,12 +161,12 @@ void Menu::showWelcomeScreen()
             LEDs::illuminationLedSetPWM(currentBrightness);
             // blink motor LEDs
             ((elapsed / 500) & 0x01) ? LEDs::onLED1() : LEDs::onLED2();
-            HAL_Delay(8);
+            WatchDog::delay(8);
         }
         LEDs::offLED1and2();
     }
     else {
-        HAL_Delay(UIConstants::kWelcomeScreenTimeout);
+        WatchDog::delay(UIConstants::kWelcomeScreenTimeout);
     }
 
     clearUserInput();
@@ -243,6 +243,7 @@ void Menu::abortableDelay(uint32_t ms)
 {
     uint32_t start = HAL_GetTick();
     while (HAL_GetTick() - start < ms) {
+        WatchDog::feed();
         if (isAnyButtonDown()) {
             clearUserInput();
             break;

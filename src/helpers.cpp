@@ -81,25 +81,31 @@ void float_to_string_convert(char *buffer, size_t size, float value, uint8_t pre
 
 // === WatchDog implementation ===
 
-IWDG_HandleTypeDef WatchDog::watchdog;
+WWDG_HandleTypeDef WatchDog::watchdog;
+volatile uint32_t WatchDog::ticks;
 
-extern "C" void Error_Handler(void);
+extern "C" void HAL_WWDG_MspInit(WWDG_HandleTypeDef *hwwdg)
+{
+    (void)hwwdg;
+    __HAL_RCC_WWDG_CLK_ENABLE();
+    HAL_NVIC_SetPriority(WWDG_IRQn, 0, 0);
+    HAL_NVIC_EnableIRQ(WWDG_IRQn);
+}
 
 void WatchDog::init()
 {
-    __HAL_RCC_LSI_ENABLE();
-    watchdog.Instance = IWDG;
-    watchdog.Init.Prescaler = IWDG_PRESCALER_64;
-    watchdog.Init.Reload = 1249;
-    if (HAL_IWDG_Init(&watchdog) != HAL_OK) {
-        #if DEBUG
-        SWO::write(0, "IWDG\n", sizeof("IWDG\n") - 1);
-        #endif
+    feed();
+    watchdog.Instance = WWDG;
+    watchdog.Init.Prescaler = WWDG_PRESCALER_8;
+    watchdog.Init.Window = 0x7F;
+    watchdog.Init.Counter = 0x7F;
+    watchdog.Init.EWIMode = WWDG_EWI_ENABLE;
+    if (HAL_WWDG_Init(&watchdog) != HAL_OK) {
         Error_Handler();
     }
 }
 
 void WatchDog::feed()
 {
-    HAL_IWDG_Refresh(&watchdog);
+    ticks = 0;
 }

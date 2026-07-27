@@ -94,7 +94,7 @@ void Screen::_fatal_error(const char *msg)
 {
     uint32_t num = 0;
     while (true) {
-        HAL_Delay(100);
+        WatchDog::delay(100);
         if (num++ % 10 == 0) {
             DEBUG_PRINT(DEBUG_ERROR, "UI ERROR: %s", msg);
         }

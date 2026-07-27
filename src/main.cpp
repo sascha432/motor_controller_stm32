@@ -13,6 +13,7 @@
 #include "menu.h"
 #include "eeprom.h"
 #include "stats.h"
+#include "helpers.h"
 #include "debug.h"
 
 // === core setup ===
@@ -63,6 +64,9 @@ static void user_setup()
     // Initialize LVGL and register flush callback
     lv_init();
     tft_driver_lvgl_init();
+
+    // start the watchdog after startup is complete
+    WatchDog::init();
 
     // Show welcome screen and load main menu
     menu.showWelcomeScreen();
@@ -326,7 +330,10 @@ static void TIM7_TIM6_Init()
 extern "C" void SysTick_Handler(void)
 {
     HAL_IncTick();
+    WatchDog::tickHandler();
 }
+
+InterruptErrorType interruptErrorType;
 
 /**
   * @brief  This function is executed in case of error occurrence.
@@ -334,16 +341,37 @@ extern "C" void SysTick_Handler(void)
   */
 extern "C" void Error_Handler(void)
 {
-    /* USER CODE BEGIN Error_Handler_Debug */
-    /* User can add his own implementation to report the HAL error return state */
+    // turn motor off
     PID_WRITE_MOTOR_PWM_OFF();
     #if DEBUG
-    SWO::write(0, "ERR\n", sizeof("ERR\n") - 1);
+    // report error type via SWO
+    switch(interruptErrorType) {
+        case InterruptErrorType::ERROR_HANDLER:
+            SWO::write(0, "EH\n", sizeof("EH\n") - 1);
+            break;
+        case InterruptErrorType::NMI_HANDLER:
+            SWO::write(0, "NMI\n", sizeof("NMI\n") - 1);
+            break;
+        case InterruptErrorType::HARD_FAULT_HANDLER:
+            SWO::write(0, "HF\n", sizeof("HF\n") - 1);
+            break;
+        case InterruptErrorType::MEM_MANAGE_HANDLER:
+            SWO::write(0, "MM\n", sizeof("MM\n") - 1);
+            break;
+        case InterruptErrorType::BUS_FAULT_HANDLER:
+            SWO::write(0, "BF\n", sizeof("BF\n") - 1);
+            break;
+        case InterruptErrorType::USAGE_FAULT_HANDLER:
+            SWO::write(0, "UF\n", sizeof("UF\n") - 1);
+            break;
+        case InterruptErrorType::WATCHDOG_TIMEOUT:
+            SWO::write(0, "WD\n", sizeof("WD\n") - 1);
+            break;
+    }
     #endif
     __disable_irq();
     while (1) {
     }
-    /* USER CODE END Error_Handler_Debug */
 }
 
 /**
@@ -351,11 +379,7 @@ extern "C" void Error_Handler(void)
   */
 extern "C" void NMI_Handler(void)
 {
-    PID_WRITE_MOTOR_PWM_OFF();
-    #if DEBUG
-    SWO::write(0, "NMI\n", sizeof("NMI\n") - 1);
-    #endif
-    Error_Handler();
+    call_default_error_handler(InterruptErrorType::NMI_HANDLER);
 }
 
 /**
@@ -363,11 +387,7 @@ extern "C" void NMI_Handler(void)
   */
 extern "C" void HardFault_Handler(void)
 {
-    PID_WRITE_MOTOR_PWM_OFF();
-    #if DEBUG
-    SWO::write(0, "HF\n", sizeof("HF\n") - 1);
-    #endif
-    Error_Handler();
+    call_default_error_handler(InterruptErrorType::HARD_FAULT_HANDLER);
 }
 
 /**
@@ -375,11 +395,7 @@ extern "C" void HardFault_Handler(void)
   */
 extern "C" void MemManage_Handler(void)
 {
-    PID_WRITE_MOTOR_PWM_OFF();
-    #if DEBUG
-    SWO::write(0, "MM\n", sizeof("MM\n") - 1);
-    #endif
-    Error_Handler();
+    call_default_error_handler(InterruptErrorType::MEM_MANAGE_HANDLER);
 }
 
 /**
@@ -387,24 +403,35 @@ extern "C" void MemManage_Handler(void)
   */
 extern "C" void BusFault_Handler(void)
 {
-    PID_WRITE_MOTOR_PWM_OFF();
-    #if DEBUG
-    SWO::write(0, "BF\n", sizeof("BF\n") - 1);
-    #endif
-    Error_Handler();
+    call_default_error_handler(InterruptErrorType::BUS_FAULT_HANDLER);
 }
 
 /**
- * @brief
+ * @brief This function handles Usage fault interrupt
  *
  */
 extern "C" void UsageFault_Handler(void)
 {
-    PID_WRITE_MOTOR_PWM_OFF();
-    #if DEBUG
-    SWO::write(0, "UF\n", sizeof("UF\n") - 1);
-    #endif
-    Error_Handler();
+    call_default_error_handler(InterruptErrorType::USAGE_FAULT_HANDLER);
+}
+
+/**
+ * @brief This function handles the Window Watchdog interrupt
+ */
+extern "C" void WWDG_IRQHandler(void)
+{
+    HAL_WWDG_IRQHandler(&WatchDog::watchdog);
+}
+
+/**
+ * @brief Handle watchdog timeouts
+ */
+extern "C" void HAL_WWDG_EarlyWakeupCallback(WWDG_HandleTypeDef *hwwdg)
+{
+    if (hwwdg != &WatchDog::watchdog) {
+        return;
+    }
+    call_default_error_handler(InterruptErrorType::WATCHDOG_TIMEOUT);
 }
 
 // === core clock configuration ===
@@ -585,8 +612,6 @@ int main(void)
     EXTI_Init();
     // user init
     user_setup();
-    // start the independent watchdog after startup is complete
-    WatchDog::init();
 
     // main loop
     while (1) {

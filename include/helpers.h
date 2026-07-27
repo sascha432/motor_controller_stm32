@@ -9,10 +9,10 @@
 
 /**
  * @brief Float printf converters
- * 
+ *
  * printf("32.1=" SPRINTF_FP1_FMT "\n", CONVERT_TO_FP2(32.1))
  * printf("123.45=" SPRINTF_FP2_FMT "\n", CONVERT_TO_FP2(123.56))
- * 
+ *
  */
 #define CONVERT_TO_FP1(value)               (int)(value / 1000), ((unsigned)(value / 100) % 10)
 #define CONVERT_TO_FP2(value)               (int)(value / 1000), ((unsigned)(value / 10) % 100)
@@ -120,13 +120,13 @@
 
 /**
  * @brief translate arduino digital pin number to GPIO pin number
- * 
- * @tparam PIN_TYPE 
+ *
+ * @tparam PIN_TYPE
  * @param pin Arduino digital pin number
  * @return constexpr uint8_t GPIO pin number 0-15
  */
 template<typename PIN_TYPE>
-constexpr uint8_t digitalPinToBit(PIN_TYPE pin) 
+constexpr uint8_t digitalPinToBit(PIN_TYPE pin)
 {
     switch(pin) {
         case PA0: case PB0: case PC0: case PD0: case PE0:
@@ -167,13 +167,13 @@ constexpr uint8_t digitalPinToBit(PIN_TYPE pin)
 
 /**
  * @brief translate arduino digital pin number to GPIO pin number
- * 
- * @tparam PIN_TYPE 
+ *
+ * @tparam PIN_TYPE
  * @param pin Arduino digital pin number
  * @return constexpr uint8_t GPIO pin number 0-15
  */
 template<uint32_t PIN>
-constexpr uint8_t digitalPinToBit() 
+constexpr uint8_t digitalPinToBit()
 {
     switch(PIN) {
         case PA0: case PB0: case PC0: case PD0: case PE0:
@@ -219,7 +219,7 @@ constexpr uint8_t digitalPinToBit()
  * @return constexpr uint32_t GPIOx_BASE address, or 0 for invalid port
  */
 template<uint32_t PIN>
-constexpr uint32_t digitalPinToGPIOBase() 
+constexpr uint32_t digitalPinToGPIOBase()
 {
     switch(PIN) {
         case PA0: case PA1: case PA2: case PA3: case PA4: case PA5: case PA6: case PA7: case PA8: case PA9: case PA10: case PA11: case PA12: case PA13: case PA14: case PA15:
@@ -229,7 +229,7 @@ constexpr uint32_t digitalPinToGPIOBase()
         case PC0: case PC1: case PC2: case PC3: case PC4: case PC5: case PC6: case PC7: case PC8: case PC9: case PC10: case PC11: case PC12: case PC13: case PC14: case PC15:
             return GPIOC_BASE;
         case PD0: case PD1: case PD2: case PD3: case PD4: case PD5: case PD6: case PD7: case PD8: case PD9: case PD10: case PD11: case PD12: case PD13: case PD14: case PD15:
-            return GPIOD_BASE;  
+            return GPIOD_BASE;
         case PE0: case PE1: case PE2: case PE3: case PE4: case PE5: case PE6: case PE7: case PE8: case PE9: case PE10: case PE11: case PE12: case PE13: case PE14: case PE15:
             return GPIOE_BASE;
     }
@@ -238,12 +238,12 @@ constexpr uint32_t digitalPinToGPIOBase()
 
 /**
  * @brief translate arduino pin macro to GPIO_TypeDef pointer
- * 
+ *
  * @tparam PIN Arduino pin macro (e.g. PA0, PB10, PD7)
- * @return constexpr GPIO_TypeDef* GPIO_TypeDef pointer, or nullptr for invalid port 
+ * @return constexpr GPIO_TypeDef* GPIO_TypeDef pointer, or nullptr for invalid port
  */
 template<uint32_t PIN>
-constexpr GPIO_TypeDef *digitalPinToGPIO() 
+constexpr GPIO_TypeDef *digitalPinToGPIO()
 {
     return reinterpret_cast<GPIO_TypeDef *>(digitalPinToGPIOBase<PIN>());
 }
@@ -256,7 +256,7 @@ constexpr GPIO_TypeDef *digitalPinToGPIO()
  * @return uint32_t GPIOx_BASE address, or 0 for invalid port
  */
 template<typename PIN_TYPE>
-inline uint32_t digitalPinToGPIOBase(PIN_TYPE pin) 
+inline uint32_t digitalPinToGPIOBase(PIN_TYPE pin)
 {
     switch(pin) {
         case PA0: case PA1: case PA2: case PA3: case PA4: case PA5: case PA6: case PA7: case PA8: case PA9: case PA10: case PA11: case PA12: case PA13: case PA14: case PA15:
@@ -266,7 +266,7 @@ inline uint32_t digitalPinToGPIOBase(PIN_TYPE pin)
         case PC0: case PC1: case PC2: case PC3: case PC4: case PC5: case PC6: case PC7: case PC8: case PC9: case PC10: case PC11: case PC12: case PC13: case PC14: case PC15:
             return GPIOC_BASE;
         case PD0: case PD1: case PD2: case PD3: case PD4: case PD5: case PD6: case PD7: case PD8: case PD9: case PD10: case PD11: case PD12: case PD13: case PD14: case PD15:
-            return GPIOD_BASE;  
+            return GPIOD_BASE;
         case PE0: case PE1: case PE2: case PE3: case PE4: case PE5: case PE6: case PE7: case PE8: case PE9: case PE10: case PE11: case PE12: case PE13: case PE14: case PE15:
             return GPIOE_BASE;
     }
@@ -275,7 +275,7 @@ inline uint32_t digitalPinToGPIOBase(PIN_TYPE pin)
 
 /**
  * @brief translate arduino digital pin number to GPIO configuration register shift value
- * 
+ *
  * @param pin Arduino digital pin number
  * @param bits Defaults to 4, number of bits per pin in the configuration register
  * @return constexpr uint32_t 0-7 * bits
@@ -287,9 +287,9 @@ inline constexpr uint32_t digitalPinShift(uint32_t pin, uint32_t bits = 4)
 
 /**
  * @brief Translate all arduino pins to HAL gpio pins
- * 
- * @tparam PIN 
- * @return constexpr uint32_t 
+ *
+ * @tparam PIN
+ * @return constexpr uint32_t
  */
 template<uint8_t PIN>
 inline constexpr uint32_t digitalPinToHAL()
@@ -317,8 +317,8 @@ inline constexpr uint32_t digitalPinToHAL()
 
 /**
  * @brief Enable the GPIO clock for the specified Arduino digital pin
- * 
- * @tparam PIN 
+ *
+ * @tparam PIN
  */
 template<uint8_t PIN>
 inline void __HAL_RCC_GPIOx_CLK_ENABLE()
@@ -334,7 +334,7 @@ inline void __HAL_RCC_GPIOx_CLK_ENABLE()
 
 /**
  * @brief get configuration register for GPIO pin
- * 
+ *
  * @param gpio_addr GPIOx_BASE address
  * @param pin Arduino PIN number
  * @return volatile uint32_t&
@@ -346,7 +346,7 @@ inline volatile uint32_t &GPIO_CRx_REG(GPIO_TypeDef *gpio_port, uint32_t pin)
 
 /**
  * @brief get configuration register for GPIO pin
- * 
+ *
  * @param gpio_addr GPIOx_BASE address
  * @param pin Arduino PIN number
  * @return volatile uint32_t&
@@ -358,7 +358,7 @@ inline volatile uint32_t &GPIO_CRx_REG(uint32_t gpio_addr, uint32_t pin)
 
 /**
  * @brief get configuration register for GPIO pin
- * 
+ *
  * @tparam Arduino PIN number (PA0, PB10, PD7, etc.)
  * @return volatile uint32_t&
  */
@@ -370,12 +370,12 @@ inline volatile uint32_t &GPIO_CRx_REG()
 
 /**
  * @brief calculate the auto-reload register value for a given PWM frequency with no prescaler (PSC=0)
- * 
+ *
  * @tparam FREQUENCY PWM frequency in Hz
  * @return constexpr uint16_t
  */
 template<uint32_t FREQUENCY>
-static constexpr uint16_t kPWMFrequencyToARR() 
+static constexpr uint16_t kPWMFrequencyToARR()
 {
     constexpr uint32_t tmp = 72000000 / FREQUENCY;
     static_assert(tmp <= 0xFFFF, "PWM frequency too low for 16bit timer");
@@ -384,10 +384,10 @@ static constexpr uint16_t kPWMFrequencyToARR()
 
 /**
  * @brief Delay microseconds
- * 
- * @param us 
+ *
+ * @param us
  */
-inline void delay_us(uint32_t us) 
+inline void delay_us(uint32_t us)
 {
     if (us > 1000) {
         HAL_Delay(us / 1000);
@@ -411,7 +411,7 @@ void float_to_string_convert(char *buffer, size_t size, float value, uint8_t pre
 
 /**
  * @brief Convert float to string with specified precision
- * 
+ *
  * @param buffer Output buffer
  * @param size Size of the output buffer
  * @param value Float value to convert
@@ -424,7 +424,7 @@ inline void FloatToString::convert(char *buffer, size_t size, float value, uint8
 
 /**
  * @brief Convert float to string with specified precision and trim trailing zeros
- * 
+ *
  * @param buffer Output buffer
  * @param size Size of the output buffer
  * @param value Float value to convert
@@ -437,9 +437,9 @@ inline void FloatToString::convertTrimmed(char *buffer, size_t size, float value
 
 /**
  * @brief Simple non-blocking Ring buffer implementation
- * 
- * @tparam T 
- * @tparam SIZE 
+ *
+ * @tparam T
+ * @tparam SIZE
  */
 template<typename T, size_t SIZE>
 class RingBuffer {
@@ -501,13 +501,56 @@ private:
     volatile size_t tail = 0;
 };
 
+// global error handling
+enum class InterruptErrorType : uint32_t {
+    ERROR_HANDLER = 0,
+    NMI_HANDLER,
+    HARD_FAULT_HANDLER,
+    MEM_MANAGE_HANDLER,
+    BUS_FAULT_HANDLER,
+    USAGE_FAULT_HANDLER,
+    WATCHDOG_TIMEOUT,
+};
+
+extern InterruptErrorType interruptErrorType;
+
+extern "C" void Error_Handler(void);
+
+inline void call_default_error_handler(InterruptErrorType type)
+{
+    interruptErrorType = type;
+    Error_Handler();
+}
+
 /**
  * @brief Watchdog helper class
- * 
+ *
  */
-struct WatchDog {
+struct WatchDog
+{
     static void init();
     static void feed();
+    static void delay(uint32_t ms);
+    static void tickHandler();
 
-    static IWDG_HandleTypeDef watchdog;
+    static constexpr uint32_t kTimeoutMs = 1000;
+
+    static volatile uint32_t ticks;
+    static WWDG_HandleTypeDef watchdog;
 };
+
+inline void WatchDog::delay(uint32_t ms)
+{
+    uint32_t start = HAL_GetTick();
+    while (HAL_GetTick() - start < ms) {
+        feed();
+    }
+}
+
+inline void WatchDog::tickHandler()
+{
+    WWDG->CR = 0x7F; // feed the watchdog
+    if (++ticks >= kTimeoutMs) { // 1000ms timeout
+        call_default_error_handler(InterruptErrorType::WATCHDOG_TIMEOUT);
+    }
+}
