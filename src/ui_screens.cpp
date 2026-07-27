@@ -34,7 +34,7 @@ void start_screen_update_top_status_labels(lv_obj_t *voltageLabel, lv_obj_t *cur
 
 lv_obj_t *Screen::emptyScreen = nullptr;
 
-Screen::Screen(Type id) : 
+Screen::Screen(Type id) :
     screen(nullptr),
     prevScreen(nullptr),
     id(id),
@@ -54,7 +54,7 @@ Screen::~Screen()
     }
 }
 
-void Screen::load() 
+void Screen::load()
 {
     DEBUG_PRINT(DEBUG_DEBUG, "screen=%p", screen);
     if (screen) {
@@ -75,7 +75,7 @@ void Screen::update()
     DEBUG_PRINT(DEBUG_DEBUG, "screen=%p", screen);
 }
 
-Screen::Type Screen::getId() const 
+Screen::Type Screen::getId() const
 {
     return id;
 }
@@ -90,7 +90,7 @@ uint32_t Screen::getValue() const
     return value;
 }
 
-void Screen::_fatal_error(const char *msg) 
+void Screen::_fatal_error(const char *msg)
 {
     uint32_t num = 0;
     while (true) {
@@ -111,7 +111,7 @@ void Screen::_style_screen(lv_obj_t *screen)
 
 // === Welcome Screen ===
 
-WelcomeScreen::WelcomeScreen() : 
+WelcomeScreen::WelcomeScreen() :
     InfoScreen(Type::WELCOME, Screen::kWelcomeScreenLabelFont)
 {
     char buf[32];
@@ -150,7 +150,7 @@ MenuScreen::MenuScreen(Type id, const char **itemLabels, size_t itemCount) :
     steps = -1; // invert for menus
 }
 
-void MenuScreen::load() 
+void MenuScreen::load()
 {
     DEBUG_PRINT(DEBUG_NOTICE, "items=%u selected=%u", count, selected);
     Screen::load();
@@ -181,7 +181,7 @@ void MenuScreen::load()
 uint8_t MenuScreen::_first_visible_start_index(uint8_t selected_index)
 {
     int16_t first = static_cast<int16_t>(selected_index) - 2;
-    const int16_t last_first = (count > MenuScreen::kMenuScreenVisibleItems) ? 
+    const int16_t last_first = (count > MenuScreen::kMenuScreenVisibleItems) ?
         (static_cast<int16_t>(count) - static_cast<int16_t>(MenuScreen::kMenuScreenVisibleItems)) : 0;
     return static_cast<uint8_t>(std::clamp<int16_t>(first, 0, last_first));
 }
@@ -271,10 +271,10 @@ void SliderScreen::_refreshVisuals()
     else {
         lv_label_set_text_fmt(valueLabel, "%u%s", static_cast<unsigned>(clampedValue), unit);
     }
-    
+
 }
 
-void SliderScreen::load() 
+void SliderScreen::load()
 {
     DEBUG_PRINT(DEBUG_NOTICE, "range=%u-%u value=%u label=%s unit=%s", minValue, maxValue, value, label, unit ? unit : "<NULL>");
     Screen::load();
@@ -435,16 +435,16 @@ void DiagnosticsScreen::_refreshVisuals()
 {
     char buf[64];
 
-    snprintf(buf, sizeof(buf) - 1, "VCC %u.%uV (%u.%uV/%u.%uV)", 
-        CONVERT_TO_FP1(stats.vcc), 
-        CONVERT_TO_FP1(stats.min.vcc), 
+    snprintf(buf, sizeof(buf) - 1, "VCC %u.%uV (%u.%uV/%u.%uV)",
+        CONVERT_TO_FP1(stats.vcc),
+        CONVERT_TO_FP1(stats.min.vcc),
         CONVERT_TO_FP1(stats.max.vcc)
     );
     lv_label_set_text(vccLabel, buf);
 
-    snprintf(buf, sizeof(buf) - 1, "Current %u.%02uA (%u.%02uA/%u.%02uA)", 
-        CONVERT_TO_FP2(stats.current), 
-        CONVERT_TO_FP2(stats.min.current), 
+    snprintf(buf, sizeof(buf) - 1, "Current %u.%02uA (%u.%02uA/%u.%02uA)",
+        CONVERT_TO_FP2(stats.current),
+        CONVERT_TO_FP2(stats.min.current),
         CONVERT_TO_FP2(stats.max.current)
     );
     lv_label_set_text(currentLabel, buf);
@@ -463,8 +463,8 @@ void DiagnosticsScreen::_refreshVisuals()
     );
     lv_label_set_text(mosfetTempLabel, buf);
 
-    snprintf(buf, sizeof(buf) - 1, "RPM %u/%u PWM %u%%", 
-        (unsigned)pid.stats.rpm.get(), 
+    snprintf(buf, sizeof(buf) - 1, "RPM %u/%u PWM %u%%",
+        (unsigned)pid.stats.rpm.get(),
         (unsigned)pid.getRPM(),
         (unsigned)pid.stats.pwm.get()
     );
@@ -563,7 +563,7 @@ void DashboardScreen::_refreshVisuals()
         pid.errorPrintf(buf, sizeof(buf) - 1);
     }
     else if (eeprom.isPIDMode()) {
-        snprintf(buf, sizeof(buf) - 1, "%u RPM (%u)", (unsigned)pid.clampPWMLevel(pid.stats.rpm.get()), (unsigned)pid.getRPM());
+        snprintf(buf, sizeof(buf) - 1, "%u RPM (%u)", (unsigned)pid.clampRPM(pid.stats.rpm.get()), (unsigned)pid.getRPM());
     }
     else {
         snprintf(buf, sizeof(buf) - 1, "%u RPM", (unsigned)pid.stats.rpm.get());
@@ -653,7 +653,7 @@ void StartScreen::_refreshVisuals()
     lv_label_set_text(speedLabel, buf);
 }
 
-void StartScreen::update() 
+void StartScreen::update()
 {
     _refreshVisuals();
 }
