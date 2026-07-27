@@ -8,7 +8,6 @@
 #include "pins.h"
 #include "eeprom.h"
 #include "stats.h"
-#include "leds.h"
 
 struct PidController
 {
@@ -16,7 +15,7 @@ struct PidController
     static constexpr uint16_t kPPR = 1024;                                  // MT6701 PPR
     static constexpr uint16_t kCPR = kPPR * 4;                              // 4x Mode PPR to CPR
     static constexpr uint32_t kPIDInterval = 5;                             // PID update rate in millis
-    static constexpr uint32_t kAntiWindupReduction = 97 * 100;              // reduce integral if error is out of range
+    static constexpr uint32_t kAntiWindupReduction = 0.97f * 1024;          // reduce integral if error is out of range (97%)
     static constexpr uint32_t kIntegralTimeLimit = 2000;                    // limit integral to 2000ms worth of max. error
     static constexpr float kPWMScaleMultiplier = 1.0 / (100.0 / kMaxPWMLevel);
     static constexpr int32_t kScaleFactor =                                 // scale factor for PID calculations
@@ -63,6 +62,7 @@ struct PidController
         FAULT,
         OCP,
         SNSOUT,
+        OVP
     };
 
     /**
@@ -469,6 +469,8 @@ struct PidController
                 return snprintf(buf, bufSize, "MOTOR %d" DEGREE_UTF8 "C", ::stats.motorTemp);
             case ErrorCodeType::MOSFET_OVER_TEMPERATURE:
                 return snprintf(buf, bufSize, "MOSFET %d" DEGREE_UTF8 "C", ::stats.mosfetTemp);
+            case ErrorCodeType::OVP:
+                return snprintf(buf, bufSize, "OVP");
             default:
                 break;
             // case ErrorCodeType::FAULT:
@@ -485,11 +487,12 @@ public:
     struct FaultStates
     {
         uint32_t isenseMax;
+        uint32_t vsenseMax;
         bool drv8701Fault : 1;
         bool ocpFault : 1;
         bool snsoutFault : 1;
 
-        FaultStates() : isenseMax(0), drv8701Fault(false), ocpFault(false), snsoutFault(false)
+        FaultStates() : isenseMax(0), vsenseMax(0), drv8701Fault(false), ocpFault(false), snsoutFault(false)
         {}
 
         void reset()

@@ -19,6 +19,7 @@ void PidController::reset()
     errorCode = ErrorCodeType::NONE;
     faults.reset();
     faults.isenseMax = ADC::_currentLimitValueToDAC(eeprom.getInputCurrentLimit());
+    faults.vsenseMax = ADCConverter::Voltage::reverse(eeprom.getOvpProtection());
     ocp.reset();
     resetFaults();
     applyPIDParams();

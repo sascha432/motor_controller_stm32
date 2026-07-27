@@ -30,6 +30,11 @@ struct ADCConverter {
         static constexpr uint32_t convert(uint16_t adcValue) {
             return (adcValue * kDividerRatio) / kADCMax;
         }
+
+        static constexpr uint16_t reverse(uint32_t millivolt) {
+            uint32_t adc = (millivolt * kADCMax) / kDividerRatio;
+            return static_cast<uint16_t>(adc > kADCMax ? kADCMax : adc);
+        }
     };
 
     /**

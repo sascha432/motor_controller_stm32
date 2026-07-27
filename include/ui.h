@@ -54,12 +54,13 @@ struct Screen
         PID_KI,
         PID_KD,
         PID_ANTI_WINDUP_REDUCTION,
+        OVP_PROTECTION,
     };
 
     // welcome screen style constants
     static constexpr const lv_font_t *kWelcomeScreenLabelFont = &lv_font_montserrat_24;
 
-    // info screen style constants    
+    // info screen style constants
     static constexpr const lv_font_t *kInfoScreenLabelFont = &lv_font_montserrat_24;
 
     // menu screen style constants
@@ -114,12 +115,12 @@ struct Screen
     virtual void setValue(uint32_t value);
     virtual uint32_t getValue() const;
 
-    inline void setMaxAcceleration(uint32_t value) 
+    inline void setMaxAcceleration(uint32_t value)
     {
         maxAcceleration = value;
     }
 
-    inline void setSteps(int32_t value) 
+    inline void setSteps(int32_t value)
     {
         steps = value;
     }
@@ -152,25 +153,25 @@ protected:
 
 struct InfoScreen : public Screen
 {
-    InfoScreen(Type id, const char *message, const lv_font_t *font = Screen::kInfoScreenLabelFont) : 
+    InfoScreen(Type id, const char *message, const lv_font_t *font = Screen::kInfoScreenLabelFont) :
         Screen(id),
         message(strdup(message)),
         font(font)
     {}
 
-    InfoScreen(Type id, const lv_font_t *font = Screen::kInfoScreenLabelFont) : 
+    InfoScreen(Type id, const lv_font_t *font = Screen::kInfoScreenLabelFont) :
         Screen(id),
         message(nullptr),
         font(font)
     {}
 
-    virtual ~InfoScreen() 
+    virtual ~InfoScreen()
     {
         free(message);
     }
 
     virtual void load() override;
-    void setMessage(const char *message) 
+    void setMessage(const char *message)
     {
         if (message) {
             lv_label_set_text(label, message);
@@ -223,7 +224,7 @@ struct SliderScreen : public Screen
 {
     typedef const char *(*FormatCallbackType)(uint32_t value, char *buf, size_t bufSize);
 
-    SliderScreen(Type id, const char *label, uint32_t minValue, uint32_t maxValue, const char *unit, FormatCallbackType callback = nullptr) : 
+    SliderScreen(Type id, const char *label, uint32_t minValue, uint32_t maxValue, const char *unit, FormatCallbackType callback = nullptr) :
         Screen(id),
         value(minValue),
         minValue(minValue),
@@ -241,7 +242,7 @@ struct SliderScreen : public Screen
     virtual void load() override;
     virtual void setValue(uint32_t value) override;
     virtual uint32_t getValue() const override;
-    
+
 protected:
     void _refreshVisuals();
 
@@ -261,7 +262,7 @@ private:
 
 struct PidSliderScreen : public SliderScreen
 {
-    PidSliderScreen(Type id, const char *label, uint32_t minValue, uint32_t maxValue, FormatCallbackType callback) : 
+    PidSliderScreen(Type id, const char *label, uint32_t minValue, uint32_t maxValue, FormatCallbackType callback) :
         SliderScreen(id, label, minValue, maxValue, "", callback)
     {
         maxAcceleration = 100000;

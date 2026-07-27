@@ -14,7 +14,7 @@
 #define PCB_REV_MINOR           0
 
 // === UI constants ===
-struct UIConstants 
+struct UIConstants
 {
     // ui slider min/max values^
     static constexpr float kCurrentToInt16Factor = 500.0f;              // factor to convert current in A to uint16_t
@@ -43,10 +43,12 @@ struct UIConstants
     static constexpr uint32_t kMinKi = kMinKp;                          // Min. PID Ki value
     static constexpr uint32_t kMaxKi = kMaxKp;                          // Max. PID Ki value
     static constexpr uint32_t kMinKd = kMinKp;                          // Min. PID Kd value
-    static constexpr uint32_t kMaxKd = kMaxKp;                          // Max. PID Kd value 
+    static constexpr uint32_t kMaxKd = kMaxKp;                          // Max. PID Kd value
     static constexpr uint32_t kMinAntiWindupFactor = 100;               // anti-windup factor
     static constexpr uint32_t kMinAntiWindupReduction = 0;              // Min. PID anti-windup reduction in percentage (0-100) * 100
     static constexpr uint32_t kMaxAntiWindupReduction = 100 * kMinAntiWindupFactor; // Max. PID anti-windup reduction in percentage (0-100) * kMinAntiWindupFactor
+    static constexpr uint32_t kMinOvpProtection = 8000;                 // Min. OVP protection in millivolts
+    static constexpr uint32_t kMaxOvpProtection = 40000;                // Max. OVP protection in millivolts
 
     // eeprom default values
     static constexpr uint8_t kDefaultTFTBrightness = 90;                // Default TFT Brightness
@@ -66,6 +68,7 @@ struct UIConstants
     static constexpr float kDefaultKi = 0.5f;                           // Default PID Ki value
     static constexpr float kDefaultKd = 0.0f;                           // Default PID Kd value
     static constexpr uint16_t kAntiWindupReduction = 97 * kMinAntiWindupFactor; // Default PID anti-windup reduction in percentage (0-100) * kMinAntiWindupFactor
+    static constexpr uint16_t kDefaultOvpProtection = 38500;             // Default OVP protection in millivolts
 
     // ui menu timeouts
     static constexpr uint32_t kWelcomeScreenTimeout = 3000;             // WelcomeScreen timeout in milliseconds

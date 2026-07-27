@@ -9,7 +9,7 @@
 #include "adc.h"
 #include "i2c.h"
 
-struct EEPROM 
+struct EEPROM
 {
     static constexpr uint32_t kMagic = 0xDEADBEEF;
     static constexpr uint32_t kVersion = 3;
@@ -70,15 +70,16 @@ struct EEPROM
         float Ki;
         float Kd;
         uint16_t anti_windup_reduction;
+        uint16_t ovp_protection;
 
-        Data() : 
-            magic(kMagic), 
-            version(kVersion), 
+        Data() :
+            magic(kMagic),
+            version(kVersion),
             sequence(1),
-            tft_brightness(UIConstants::kDefaultTFTBrightness), 
-            led_brightness(UIConstants::kDefaultLEDBrightness), 
-            input_current_limit(kCurrentToUint16(UIConstants::kDefaultInputCurrent)), 
-            motor_current_limit(kCurrentToUint16(UIConstants::kDefaultMotorCurrent)), 
+            tft_brightness(UIConstants::kDefaultTFTBrightness),
+            led_brightness(UIConstants::kDefaultLEDBrightness),
+            input_current_limit(kCurrentToUint16(UIConstants::kDefaultInputCurrent)),
+            motor_current_limit(kCurrentToUint16(UIConstants::kDefaultMotorCurrent)),
             min_rpm(UIConstants::kDefaultMinRPM),
             max_rpm(UIConstants::kDefaultMaxRPM),
             motor_stall_timeout(UIConstants::kDefaultMotorStallTimeout),
@@ -95,19 +96,20 @@ struct EEPROM
             Kp(UIConstants::kDefaultKp),
             Ki(UIConstants::kDefaultKi),
             Kd(UIConstants::kDefaultKd),
-            anti_windup_reduction(UIConstants::kAntiWindupReduction)
+            anti_windup_reduction(UIConstants::kAntiWindupReduction),
+            ovp_protection(UIConstants::kDefaultOvpProtection)
         {}
 
-        bool operator==(const Data &other) const 
+        bool operator==(const Data &other) const
         {
             return memcmp(
-                &reinterpret_cast<const uint8_t *>(this)[offsetof(Data, tft_brightness)], 
+                &reinterpret_cast<const uint8_t *>(this)[offsetof(Data, tft_brightness)],
                 &reinterpret_cast<const uint8_t *>(&other)[offsetof(Data, tft_brightness)],
                 sizeof(Data) - offsetof(Data, tft_brightness)
             ) == 0;
         }
 
-        void invalidate() 
+        void invalidate()
         {
             magic = 0xcccccccc;
             version = 0xcccccccc;
@@ -135,7 +137,7 @@ struct EEPROM
         return data.tft_brightness;
     }
 
-    void setTFTBrightness(uint8_t value) 
+    void setTFTBrightness(uint8_t value)
     {
         data.tft_brightness = value;
     }
@@ -145,7 +147,7 @@ struct EEPROM
         return data.led_brightness;
     }
 
-    void setLEDBrightness(uint8_t value) 
+    void setLEDBrightness(uint8_t value)
     {
         data.led_brightness = value;
     }
@@ -155,7 +157,7 @@ struct EEPROM
         return data.input_current_limit;
     }
 
-    void setInputCurrentLimit(uint16_t value) 
+    void setInputCurrentLimit(uint16_t value)
     {
         data.input_current_limit = value;
     }
@@ -165,7 +167,7 @@ struct EEPROM
         return data.motor_current_limit;
     }
 
-    void setMotorCurrentLimit(uint16_t value) 
+    void setMotorCurrentLimit(uint16_t value)
     {
         data.motor_current_limit = value;
     }
@@ -175,7 +177,7 @@ struct EEPROM
         return data.min_rpm;
     }
 
-    void setMinRPM(uint16_t value) 
+    void setMinRPM(uint16_t value)
     {
         data.min_rpm = value;
     }
@@ -185,7 +187,7 @@ struct EEPROM
         return data.max_rpm;
     }
 
-    void setMaxRPM(uint16_t value) 
+    void setMaxRPM(uint16_t value)
     {
         data.max_rpm = value;
     }
@@ -195,7 +197,7 @@ struct EEPROM
         return data.motor_stall_timeout;
     }
 
-    void setMotorStallTimeout(uint16_t value) 
+    void setMotorStallTimeout(uint16_t value)
     {
         data.motor_stall_timeout = value;
     }
@@ -205,7 +207,7 @@ struct EEPROM
         return data.motor_direction;
     }
 
-    void setSensorDirection(uint8_t value) 
+    void setSensorDirection(uint8_t value)
     {
         data.sensor_direction = value;
     }
@@ -215,7 +217,7 @@ struct EEPROM
         return data.sensor_direction;
     }
 
-    void setMotorDirection(uint8_t value) 
+    void setMotorDirection(uint8_t value)
     {
         data.motor_direction = value;
     }
@@ -245,7 +247,7 @@ struct EEPROM
         return data.motor_brake;
     }
 
-    void setMotorBrake(uint8_t value) 
+    void setMotorBrake(uint8_t value)
     {
         data.motor_brake = value;
     }
@@ -265,7 +267,7 @@ struct EEPROM
         return data.control_mode == kControlModePWM;
     }
 
-    void setControlMode(uint8_t value) 
+    void setControlMode(uint8_t value)
     {
         data.control_mode = value;
     }
@@ -275,7 +277,7 @@ struct EEPROM
         return data.mosfet_temperature_limit;
     }
 
-    void setMosfetTemperatureLimit(uint8_t value) 
+    void setMosfetTemperatureLimit(uint8_t value)
     {
         data.mosfet_temperature_limit = value;
         mosfet_temperature_limit_adc = ADCConverter::NTC::reverse(value);
@@ -291,7 +293,7 @@ struct EEPROM
         return data.motor_temperature_limit;
     }
 
-    void setMotorTemperatureLimit(uint8_t value) 
+    void setMotorTemperatureLimit(uint8_t value)
     {
         data.motor_temperature_limit = value;
         motor_temperature_limit_adc = ADCConverter::NTC::reverse(value);
@@ -307,7 +309,7 @@ struct EEPROM
         return data.max_pwm;
     }
 
-    void setMaxPWM(uint8_t value) 
+    void setMaxPWM(uint8_t value)
     {
         data.max_pwm = value;
     }
@@ -317,7 +319,7 @@ struct EEPROM
         return data.motor_pwm;
     }
 
-    void setMotorPWM(uint8_t value) 
+    void setMotorPWM(uint8_t value)
     {
         data.motor_pwm = value;
     }
@@ -327,7 +329,7 @@ struct EEPROM
         return data.motor_rpm;
     }
 
-    void setMotorRPM(uint16_t value) 
+    void setMotorRPM(uint16_t value)
     {
         data.motor_rpm = value;
     }
@@ -354,12 +356,12 @@ struct EEPROM
         return data.pid_tuning;
     }
 
-    void setPidTuning(uint8_t value) 
+    void setPidTuning(uint8_t value)
     {
         data.pid_tuning = value;
     }
 
-    void setKp(float value) 
+    void setKp(float value)
     {
         data.Kp = value;
     }
@@ -369,7 +371,7 @@ struct EEPROM
         return data.Kp;
     }
 
-    void setKi(float value) 
+    void setKi(float value)
     {
         data.Ki = value;
     }
@@ -377,7 +379,7 @@ struct EEPROM
     {
         return data.Ki;
     }
-    void setKd(float value) 
+    void setKd(float value)
     {
         data.Kd = value;
     }
@@ -387,7 +389,7 @@ struct EEPROM
         return data.Kd;
     }
 
-    void setAntiWindupReduction(uint16_t value) 
+    void setAntiWindupReduction(uint16_t value)
     {
         data.anti_windup_reduction = value;
     }
@@ -395,6 +397,16 @@ struct EEPROM
     uint16_t getAntiWindupReduction() const
     {
         return data.anti_windup_reduction;
+    }
+
+    void setOvpProtection(uint16_t value)
+    {
+        data.ovp_protection = value;
+    }
+
+    uint16_t getOvpProtection() const
+    {
+        return data.ovp_protection;
     }
 
 protected:

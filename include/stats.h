@@ -25,7 +25,7 @@ namespace Helpers {
             max = INT16_MIN;
         }
 
-        void update(int16_t value) 
+        void update(int16_t value)
         {
             if ((HAL_GetTick() - lastUpdate) > UPDATE_RATE_TIME) {
                 reset();
@@ -158,7 +158,7 @@ namespace Helpers {
 
         void update(int32_t value) {
             sum += value;
-            if (++count > MAX_COUNT) { 
+            if (++count > MAX_COUNT) {
                 sum -= sum / DECAY_DIVIDER;
                 count -= count / DECAY_DIVIDER;
             }
@@ -174,15 +174,15 @@ namespace Helpers {
 
     struct Raw {
 
-        Raw() : value(0) 
+        Raw() : value(0)
         {}
 
-        void update(int32_t value) 
+        void update(int32_t value)
         {
             this->value = value;
         }
 
-        int32_t get() const 
+        int32_t get() const
         {
             return value;
         }
@@ -222,6 +222,6 @@ struct Stats {
         int16_t motorTemp;
         int16_t mosfetTemp;
     } max;
-};    
+};
 
 extern Stats stats;
