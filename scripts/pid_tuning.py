@@ -759,11 +759,11 @@ class PIDTuningApp:
         self.ocp_indicator = tk.Label(wrap, width=10, anchor="center", relief="groove")
         self.ocp_indicator.grid(row=0, column=1, sticky="e", padx=8, pady=4)
 
-        ttk.Label(wrap, text="Driver Fault (DRV8192)").grid(row=1, column=0, sticky="w", padx=8, pady=4)
+        ttk.Label(wrap, text="DRV8701 Fault").grid(row=1, column=0, sticky="w", padx=8, pady=4)
         self.driver_fault_indicator = tk.Label(wrap, width=10, anchor="center", relief="groove")
         self.driver_fault_indicator.grid(row=1, column=1, sticky="e", padx=8, pady=4)
 
-        ttk.Label(wrap, text="Driver OCP (SNSOUT)").grid(row=2, column=0, sticky="w", padx=8, pady=4)
+        ttk.Label(wrap, text="DRV8701 SNSOUT").grid(row=2, column=0, sticky="w", padx=8, pady=4)
         self.driver_ocp_indicator = tk.Label(wrap, width=10, anchor="center", relief="groove")
         self.driver_ocp_indicator.grid(row=2, column=1, sticky="e", padx=8, pady=4)
 
