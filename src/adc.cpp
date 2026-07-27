@@ -98,8 +98,8 @@ void ADC::initDAC()
    GPIO_InitTypeDef GPIO_InitStruct = {};
    GPIO_InitStruct.Pin = digitalPinToHAL<DRVOCP_VREF_DAC_PIN>()|digitalPinToHAL<OCP_VREF_DAC_PIN>();
    GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
-   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);    
-        
+   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
     // Enable DAC channel 1 and channel 2
     DAC->CR |= DAC_CR_EN1 | DAC_CR_EN2;
 }
@@ -110,21 +110,17 @@ extern "C" void DMA1_Channel1_IRQHandler()
     if (DMA1->ISR & DMA_ISR_TCIF1)
     {
         // clear transfer complete
-        DMA1->IFCR = DMA_IFCR_CTCIF1;  
+        DMA1->IFCR = DMA_IFCR_CTCIF1;
 
         auto value = adc.getISenseValue();
         // store average for display
         adc.isenseSum += value;
         if (++adc.isenseCount >= ADC::kISenseCountMax) {
             // reduce by 6.5% to avoid overflow in rolling average
-            adc.isenseSum -= adc.isenseSum >> 4;    
-            adc.isenseCount -= adc.isenseCount >> 4;
+            adc.isenseSum -= adc.isenseSum / 16;
+            adc.isenseCount -= adc.isenseCount / 16;
         }
         // store average for OCP
-        adc.isenseOcpSum += value;
-        if (++adc.isenseOcpCount >= 100) { // IMPORTANT as few as possible to get a fast response to OCP faults
-            adc.isenseOcpSum -= adc.isenseOcpSum >> 3;
-            adc.isenseOcpCount -= adc.isenseOcpCount >> 3;
-        }
+        adc.isenseOcpAvg = (adc.isenseOcpAvg * 7 + value) / 8;
     }
 }

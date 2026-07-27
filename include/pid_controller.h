@@ -27,6 +27,11 @@ struct PidController
             (18.0f / kPWMScaleMultiplier)
         );
     static constexpr bool kProgramPPR = false;                              // set to true to program the MT6701 encoder during boot over i2c
+    static constexpr uint32_t kOcpRecoveryRampSteps = 8;                    // steps to ramp PWM ceiling back to max
+    static constexpr uint32_t kOcpRecoveryMinPercent = 35;                  // minimum PWM ceiling in percent after OCP trip
+    static constexpr uint32_t kOcpRecoveryMinPwm = (kMaxPWMLevel * kOcpRecoveryMinPercent) / 100;
+    static constexpr uint32_t kOcpRecoveryStepPwm =
+        ((kMaxPWMLevel - kOcpRecoveryMinPwm) + (kOcpRecoveryRampSteps - 1)) / kOcpRecoveryRampSteps;
 
     /*
         the kScaleFactor calculation gives the following range for tuning PID values (Kp, Ki, Kd)
@@ -62,7 +67,7 @@ struct PidController
 
     /**
      * @brief Construct a new Pid Controller object
-     * 
+     *
      */
     PidController() :
         rpm(0),
@@ -78,12 +83,12 @@ struct PidController
 
     /**
      * @brief Construct a new Pid Controller object
-     * 
-     * @param Kp 
-     * @param Ki 
-     * @param Kd 
+     *
+     * @param Kp
+     * @param Ki
+     * @param Kd
      */
-    PidController(float Kp, float Ki, float Kd) 
+    PidController(float Kp, float Ki, float Kd)
     {
         setKp(Kp);
         setKi(Ki);
@@ -99,10 +104,10 @@ struct PidController
 
     /**
      * @brief Set the Kp value and pre-calculate KpPreCalc for PID loop
-     * 
-     * @param value 
+     *
+     * @param value
      */
-    inline void setKp(float value) 
+    inline void setKp(float value)
     {
         Kp = value;
         // pre calculate Kp to reduce calculations to 3 multiplications in the PID loop
@@ -119,10 +124,10 @@ struct PidController
 
     /**
      * @brief Set the Ki value and pre-calculate KiPreCalc for PID loop
-     * 
-     * @param value 
+     *
+     * @param value
      */
-    inline void setKi(float value) 
+    inline void setKi(float value)
     {
         Ki = value;
         // scale value and reduce CPR
@@ -138,10 +143,10 @@ struct PidController
 
     /**
      * @brief Set the Kd value and pre-calculate KdPreCalc for PID loop
-     * 
-     * @param value 
+     *
+     * @param value
      */
-    inline void setKd(float value) 
+    inline void setKd(float value)
     {
         Kd = value;
         // scale value and reduce CPR
@@ -155,7 +160,7 @@ struct PidController
         SWO::data.Kd = value;
     }
 
-    inline int32_t calcPWMLevel(int32_t error, int32_t integral, int32_t derivative) const 
+    inline int32_t calcPWMLevel(int32_t error, int32_t integral, int32_t derivative) const
     {
         return (
             (error * (int64_t)KpPreCalc) +
@@ -164,17 +169,17 @@ struct PidController
         ) / kScaleFactor;
     }
 
-    inline int32_t clampPWMLevel(int32_t value) const 
+    inline int32_t clampPWMLevel(int32_t value) const
     {
         return std::clamp<int32_t>(value, 0, kMaxPWMLevel);
     }
 
     /**
      * @brief Set target RPM and update limits
-     * 
-     * @param value 
+     *
+     * @param value
      */
-    inline void setRPM(uint32_t value) 
+    inline void setRPM(uint32_t value)
     {
         // PID tuning via SWO
         SWO::data.rpm = value;
@@ -187,11 +192,11 @@ struct PidController
     }
 
     /**
-     * @brief Set the Anti Windup Reduction 
-     * 
-     * @param value 
+     * @brief Set the Anti Windup Reduction
+     *
+     * @param value
      */
-    inline void setAntiWindupReduction(uint16_t value) 
+    inline void setAntiWindupReduction(uint16_t value)
     {
         antiWindupReduction = value;
         // PID tuning via SWO
@@ -200,31 +205,31 @@ struct PidController
 
     /**
      * @brief Get target RPM
-     * 
-     * @return uint32_t 
+     *
+     * @return uint32_t
      */
-    inline uint32_t getRPM() const 
+    inline uint32_t getRPM() const
     {
         return rpm;
     }
 
     /**
      * @brief Set the motor direction
-     * 
-     * @param forward 
+     *
+     * @param forward
      */
-    void setMotorDirection(bool forward) 
+    void setMotorDirection(bool forward)
     {
         motorDirection = forward ? EEPROM::kMotorDirectionForward : EEPROM::kMotorDirectionReverse;
     }
 
     /**
      * @brief Return true if the motor direction is forward, false otherwise
-     * 
-     * @return true 
-     * @return false 
+     *
+     * @return true
+     * @return false
      */
-    bool isForwardMotorDirection() const 
+    bool isForwardMotorDirection() const
     {
         return motorDirection == EEPROM::kMotorDirectionForward;
     }
@@ -232,29 +237,29 @@ struct PidController
     /**
      * @brief Toggle the motor direction
      */
-    void toggleMotorDirection() 
+    void toggleMotorDirection()
     {
         motorDirection = (motorDirection == EEPROM::kMotorDirectionForward) ? EEPROM::kMotorDirectionReverse : EEPROM::kMotorDirectionForward;
     }
 
     /**
      * @brief Clamp RPM
-     * 
-     * @param value 
-     * @return uint32_t 
+     *
+     * @param value
+     * @return uint32_t
      */
-    inline uint32_t clampRPM(int32_t value) const 
+    inline uint32_t clampRPM(int32_t value) const
     {
         return std::clamp<int32_t>(value, 0, 55000);
     }
 
     /**
      * @brief Get delta since last call, counter is 16bit only
-     * 
-     * @param counter 
-     * @return int32_t 
+     *
+     * @param counter
+     * @return int32_t
      */
-    inline int32_t getDelta(uint32_t counter) 
+    inline int32_t getDelta(uint32_t counter)
     {
         int16_t delta = (int16_t)counter - (int16_t)lastEncoderCounter;
         lastEncoderCounter = counter;
@@ -263,32 +268,32 @@ struct PidController
 
     /**
      * @brief Read the encoder counter (TIM4->CNT)
-     * 
-     * @return uint16_t 
+     *
+     * @return uint16_t
      */
-    inline uint16_t readEncoderCounter() const 
+    inline uint16_t readEncoderCounter() const
     {
         return TIM4->CNT;
     }
 
     /**
      * @brief Read the analog signal RPM counter (TIM5->CNT)
-     * 
-     * @return uint16_t 
+     *
+     * @return uint16_t
      */
 
-    inline uint16_t readRpmCounter() const 
+    inline uint16_t readRpmCounter() const
     {
         return TIM5->CNT;
     }
 
     /**
      * @brief Reset controller
-     * 
+     *
      */
     void reset();
 
-    void setIntegral(int32_t value) 
+    void setIntegral(int32_t value)
     {
         // cap the integral
         if (value > cpiIntegralLimit) {
@@ -302,44 +307,44 @@ struct PidController
         }
     }
 
-    inline int32_t getIntegral() const 
+    inline int32_t getIntegral() const
     {
         return integral;
     }
 
-    inline void updateIntegral(int32_t error) 
+    inline void updateIntegral(int32_t error)
     {
         setIntegral(integral + error);
     }
 
-    inline void setLastError(int32_t value) 
+    inline void setLastError(int32_t value)
     {
         lastError = value;
     }
 
-    inline int32_t getLastError() const 
+    inline int32_t getLastError() const
     {
         return lastError;
     }
 
-    inline void setLastDerivative(int32_t value) 
+    inline void setLastDerivative(int32_t value)
     {
         lastDerivative = value;
     }
 
-    inline int32_t getLastDerivative() const 
+    inline int32_t getLastDerivative() const
     {
         return lastDerivative;
     }
 
-    inline int32_t getCountsPerInterval() const 
+    inline int32_t getCountsPerInterval() const
     {
         return cpi;
     }
 
     /**
      * @brief Interrupt service routine for the PID controller.
-     * 
+     *
      * This function should be called at a fixed interval defined by kPIDInterval.
      * It reads the encoder counter, calculates the error, derivative, and integral,
      * updates the PWM output, and handles anti-windup.
@@ -348,21 +353,24 @@ struct PidController
 
     /**
      * @brief Update internal fault states
-     * 
+     *
      */
-    void readFaults() 
+    void resetFaults()
     {
         faults.drv8701Fault = (digitalPinToGPIO<DRV8701_FAULT_PIN>()->IDR & (1 << digitalPinToBit(DRV8701_FAULT_PIN))) == 0;
         faults.ocpFault = (digitalPinToGPIO<OCP_INT_PIN>()->IDR & (1 << digitalPinToBit(OCP_INT_PIN))) == 0;
         faults.snsoutFault = (digitalPinToGPIO<DRV_SNSOUT_PIN>()->IDR & (1 << digitalPinToBit(DRV_SNSOUT_PIN))) == 0;
-        faults.count = 0;
+        if (!(faults.drv8701Fault || faults.ocpFault || faults.snsoutFault)) {
+            // reset if there are no faults
+            faults.count = 0;
+        }
     }
 
     /**
      * @brief Apply PID parameters from EEPROM to the controller
-     * 
+     *
      */
-    void applyPIDParams() 
+    void applyPIDParams()
     {
         setKp(eeprom.getKp());
         setKi(eeprom.getKi());
@@ -371,23 +379,32 @@ struct PidController
         setRPM(eeprom.getMotorRPM());
     }
 
+    inline void onOcpTripFromIsr()
+    {
+        faults.ocpFault = true;
+        ocpPwmCeiling = (ocpPwmCeiling > static_cast<uint16_t>(kOcpRecoveryMinPwm + kOcpRecoveryStepPwm))
+            ? (ocpPwmCeiling - static_cast<uint16_t>(kOcpRecoveryStepPwm))
+            : static_cast<uint16_t>(kOcpRecoveryMinPwm);
+        ocpClearCycles = 0;
+    }
+
     /**
      * @brief Turn motor on in the specified direction
-     * 
-     * @param direction 
+     *
+     * @param direction
      */
     void motorOn();
 
     /**
      * @brief Turn motor off
-     * 
+     *
      */
     void motorOff();
 
     /**
      * @brief Toggle motor state. If the motor is running, it will be turned off. If the motor is off, it will be turned on in the specified direction
-     * 
-     * @param direction 
+     *
+     * @param direction
      * @return true the motor is running after the call
      * @return false the motor is not running after the call
      */
@@ -395,10 +412,10 @@ struct PidController
 
     /**
      * @brief Set the Error Code and stop PID controller
-     * 
-     * @param code 
+     *
+     * @param code
      */
-    void setErrorCode(ErrorCodeType code) 
+    void setErrorCode(ErrorCodeType code)
     {
         PID_WRITE_MOTOR_PWM_OFF();
         running = false;
@@ -407,33 +424,33 @@ struct PidController
 
     /**
      * @brief Get the Error Code
-     * 
-     * @return ErrorCodeType 
+     *
+     * @return ErrorCodeType
      */
-    ErrorCodeType getErrorCode() const 
+    ErrorCodeType getErrorCode() const
     {
         return errorCode;
     }
 
     /**
      * @brief Return true if an error code is set, false otherwise
-     * 
-     * @return true 
-     * @return false 
+     *
+     * @return true
+     * @return false
      */
-    bool hasErrorCode() const 
+    bool hasErrorCode() const
     {
         return errorCode != ErrorCodeType::NONE;
     }
 
     /**
      * @brief Print the current error code as a string into the provided buffer.
-     * 
+     *
      * @param buf Buffer to store the error string.
      * @param bufSize Size of the buffer.
      * @return size_t Number of characters written.
      */
-    size_t errorPrintf(char *buf, size_t bufSize) const 
+    size_t errorPrintf(char *buf, size_t bufSize) const
     {
         switch(errorCode) {
             case ErrorCodeType::NONE:
@@ -537,11 +554,13 @@ public:
     static constexpr size_t kPidLoopTypeSize = sizeof(PidLoopType);
 
     StatsType stats;
-    FaultStates faults;             // DRV8701 and ocp faults
-    ErrorCodeType errorCode;        // last error
+    FaultStates faults;                 // DRV8701 and ocp faults
+    uint16_t ocpPwmCeiling;             // dynamic PWM ceiling during OCP recovery
+    uint8_t ocpClearCycles;             // consecutive clear cycles before releasing OCP latch
+    ErrorCodeType errorCode;            // last error
     RingBuffer<PidLoopType, 8> pidLoopBuffer;
 
-    volatile bool running;          // true if the PID controller is running
+    volatile bool running;              // true if the PID controller is running
 };
 
 extern PidController pid;

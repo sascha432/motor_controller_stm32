@@ -54,7 +54,7 @@ static void setup()
 
 // === user setup runs after core setup ===
 
-static void user_setup() 
+static void user_setup()
 {
     // Initialize display driver
     tft_driver_init();
@@ -94,22 +94,22 @@ static void loop()
         menu.handleStartButtonPress();
     }
 
-    if (pid.faults.count) {
-        static uint32_t lastFaultTime = 0;
-        if (HAL_GetTick() - lastFaultTime >= 500) {
-            lastFaultTime = HAL_GetTick();
-            pid.faults.reset();
-            LEDs::offLED1and2();
-        }
-        else {
-            if (pid.faults.ocpFault) {
-                LEDs::onLED1();
-            }
-            if (pid.faults.snsoutFault) {
-                LEDs::onLED2();
-            }
-        }
-    }
+    // // reset faults periodically
+    // // TODO check if that makes sense
+    // if (pid.faults.count) {
+    //     static uint32_t lastFaultTime = 0;
+    //     if (HAL_GetTick() - lastFaultTime >= 500) {
+    //         lastFaultTime = HAL_GetTick();
+    //         pid.faults.drv8701Fault = (digitalPinToGPIO<DRV8701_FAULT_PIN>()->IDR & (1 << digitalPinToBit(DRV8701_FAULT_PIN))) == 0;
+    //         pid.faults.snsoutFault = (digitalPinToGPIO<DRV_SNSOUT_PIN>()->IDR & (1 << digitalPinToBit(DRV_SNSOUT_PIN))) == 0;
+    //         if (!pid.faults.drv8701Fault && !pid.faults.snsoutFault) {
+    //             pid.faults.count = 0;
+    //         }
+    //         if (pid.faults.count == 0) {
+    //             LEDs::offLED1and2();
+    //         }
+    //     }
+    // }
 
     // handle ui updates and rotary encoder
     static uint32_t lastLvHandler = 0;
@@ -144,7 +144,7 @@ static void loop()
                 pid.setErrorCode(PidController::ErrorCodeType::MOSFET_OVER_TEMPERATURE);
             }
         }
-        
+
         // update UI
         lv_timer_handler();
         lastLvHandler = HAL_GetTick();
@@ -156,7 +156,7 @@ static void loop()
         static constexpr char kPidFrameMagic[] = {'P', 'I', 'D', '1'};
         while (pid.pidLoopBuffer.pop(item)) {
             if (eeprom.getPidTuning() == EEPROM::kPidTuningSWO) {
-                #if 1 
+                #if 1
                 // don't check writes
                 SWO::write(1, kPidFrameMagic, sizeof(kPidFrameMagic));
                 SWO::writeObject<1>(item);
@@ -188,7 +188,7 @@ extern "C" void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
     if (htim->Instance == TIM6) { // every 5ms
         static uint32_t timer6Counter = 0;
-        if (++timer6Counter >= 5) { 
+        if (++timer6Counter >= 5) {
             timer6Counter = 0;
             knob.isr(); // every 25ms
         }
@@ -220,22 +220,39 @@ extern "C" void EXTI15_10_IRQHandler(void)
     }
     if (pending & (1 << 11)) {
         // DRV_SNSOUT_PIN/PD11 changed
-        pid.faults.snsoutFault = true;
-        pid.faults.count++;
+        auto fault = pid.faults.snsoutFault;
+        pid.faults.snsoutFault = (digitalPinToGPIO<DRV_SNSOUT_PIN>()->IDR & (1 << digitalPinToBit(DRV_SNSOUT_PIN))) == 0;
+        if (pid.faults.snsoutFault) {
+            pid.faults.count++;
+            if (!fault) {
+                LEDs::onLED2();
+            }
+        }
     }
     if (pending & (1 << 12)) {
-        // OCP_INT_PIN/PB12 changed
-        if (adc.getISenseOcpAverageValue() > pid.faults.isenseMax) {
-            pid.faults.ocpFault = true;
+        // OCP_INT_PIN/PB12 falling edge
+        // Re-arm OCP interrupt only after recovery ceiling is fully restored.
+        if (
+            !pid.faults.ocpFault &&
+            (adc.getISenseOcpAverageValue() >= pid.faults.isenseMax) &&
+            (pid.ocpPwmCeiling >= PidController::kMaxPWMLevel)
+         ) {
+            // set OCP flag, turn the PWM off and let the PID loop handle the over current
+            pid.onOcpTripFromIsr();
             pid.faults.count++;
-            // disable PWM until the PID loop turns it on again
-            PID_WRITE_MOTOR_PWM_OFF();
+            LEDs::onLED1();
         }
     }
     if (pending & (1 << 14)) {
         // DRV8701_FAULT_PIN/PB14 changed
-        pid.faults.drv8701Fault = true;
-        pid.faults.count++;
+        auto fault = pid.faults.drv8701Fault;
+        pid.faults.drv8701Fault = (digitalPinToGPIO<DRV8701_FAULT_PIN>()->IDR & (1 << digitalPinToBit(DRV8701_FAULT_PIN))) == 0;
+        if (pid.faults.drv8701Fault) {
+            pid.faults.count++;
+            if (!fault) {
+                LEDs::onLED2();
+            }
+        }
     }
 }
 
@@ -256,7 +273,7 @@ static void EXTI_Init()
         (0x1 << 8);     // EXTI14 PB14
 
     // Clear pending flags
-    EXTI->PR =  
+    EXTI->PR =
         (1U<<8)  |   // PD8  BTN_1
         (1U<<9)  |   // PD9  BTN_2
         (1U<<10) |   // PD10 BTN_3
@@ -265,7 +282,7 @@ static void EXTI_Init()
         (1U<<14);    // PB14 DRV_FAULT
 
     // Enable interrupt lines
-    EXTI->IMR |= 
+    EXTI->IMR |=
         (1U<<8)  |   // PD8  BTN_1
         (1U<<9)  |   // PD9  BTN_2
         (1U<<10) |   // PD10 BTN_3
@@ -274,13 +291,15 @@ static void EXTI_Init()
         (1U<<14);    // PB14 DRV_FAULT
 
     // Rising edge: button change interrupt
-    EXTI->RTSR |= 
+    EXTI->RTSR |=
         (1U<<8)  |   // PD8  BTN_1
         (1U<<9)  |   // PD9  BTN_2
-        (1U<<10);    // PD10 BTN_3
+        (1U<<10) |   // PD10 BTN_3
+        (1U<<11) |   // PD11 DRV_SNSOUT
+        (1U<<14);    // PB14 DRV_FAULT
 
     // Falling edge: button change + fault inputs
-    EXTI->FTSR |= 
+    EXTI->FTSR |=
         (1U<<8)  |   // PD8  BTN_1
         (1U<<9)  |   // PD9  BTN_2
         (1U<<10) |   // PD10 BTN_3
@@ -293,7 +312,7 @@ static void EXTI_Init()
     NVIC_EnableIRQ(EXTI15_10_IRQn);
 }
 
-static void TIM7_TIM6_Init() 
+static void TIM7_TIM6_Init()
 {
     // TIM7 for microsecond delay
     TIM_HandleTypeDef tim7;
@@ -317,7 +336,7 @@ static void TIM7_TIM6_Init()
     HAL_TIM_Base_Start_IT(&tim6);
     HAL_NVIC_SetPriority(TIM6_IRQn, 1, 0);
     HAL_NVIC_EnableIRQ(TIM6_IRQn);
-   
+
 }
 
 // === interrupt handlers ===
@@ -338,11 +357,11 @@ extern "C" void Error_Handler(void)
 {
     /* USER CODE BEGIN Error_Handler_Debug */
     /* User can add his own implementation to report the HAL error return state */
+    PID_WRITE_MOTOR_PWM_OFF();
     #if DEBUG
     SWO::write(0, "ERR\n", sizeof("ERR\n") - 1);
     #endif
     __disable_irq();
-    PID_WRITE_MOTOR_PWM_OFF();
     while (1) {
     }
     /* USER CODE END Error_Handler_Debug */
@@ -353,6 +372,7 @@ extern "C" void Error_Handler(void)
   */
 extern "C" void NMI_Handler(void)
 {
+    PID_WRITE_MOTOR_PWM_OFF();
     #if DEBUG
     SWO::write(0, "NMI\n", sizeof("NMI\n") - 1);
     #endif
@@ -364,6 +384,7 @@ extern "C" void NMI_Handler(void)
   */
 extern "C" void HardFault_Handler(void)
 {
+    PID_WRITE_MOTOR_PWM_OFF();
     #if DEBUG
     SWO::write(0, "HF\n", sizeof("HF\n") - 1);
     #endif
@@ -375,17 +396,11 @@ extern "C" void HardFault_Handler(void)
   */
 extern "C" void MemManage_Handler(void)
 {
+    PID_WRITE_MOTOR_PWM_OFF();
     #if DEBUG
     SWO::write(0, "MM\n", sizeof("MM\n") - 1);
     #endif
-  /* USER CODE BEGIN MemoryManagement_IRQn 0 */
-
-  /* USER CODE END MemoryManagement_IRQn 0 */
-  while (1)
-  {
-    /* USER CODE BEGIN W1_MemoryManagement_IRQn 0 */
-    /* USER CODE END W1_MemoryManagement_IRQn 0 */
-  }
+    Error_Handler();
 }
 
 /**
@@ -393,6 +408,7 @@ extern "C" void MemManage_Handler(void)
   */
 extern "C" void BusFault_Handler(void)
 {
+    PID_WRITE_MOTOR_PWM_OFF();
     #if DEBUG
     SWO::write(0, "BF\n", sizeof("BF\n") - 1);
     #endif
@@ -400,11 +416,12 @@ extern "C" void BusFault_Handler(void)
 }
 
 /**
- * @brief 
- * 
+ * @brief
+ *
  */
 extern "C" void UsageFault_Handler(void)
 {
+    PID_WRITE_MOTOR_PWM_OFF();
     #if DEBUG
     SWO::write(0, "UF\n", sizeof("UF\n") - 1);
     #endif

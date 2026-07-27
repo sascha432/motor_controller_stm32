@@ -185,6 +185,7 @@
 			"TIM_SMCR_TS_Pos",
 			"TRCENA",
 			"USBD"
-		]
+		],
+		"files.trimTrailingWhitespace": true
 	}
 }

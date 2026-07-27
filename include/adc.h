@@ -39,8 +39,7 @@ struct ADC {
     ADC() : 
         isenseSum(0), 
         isenseCount(0), 
-        isenseOcpSum(0),
-        isenseOcpCount(0)
+        isenseOcpAvg(0)
     {
     }
 
@@ -129,13 +128,13 @@ struct ADC {
     }
 
     /**
-     * @brief Get the Input Current average value for OCP in ADC units.
+     * @brief Get the Input Current average value for OCP in ADC units
      * 
      * @return uint16_t 
      */
     inline uint16_t getISenseOcpAverageValue() const 
     {
-        return isenseOcpCount ? (isenseOcpSum / isenseOcpCount) : 0;
+        return isenseOcpAvg;
     }
 
     /**
@@ -170,8 +169,7 @@ struct ADC {
     volatile uint16_t adc_buffer[kNumConversions];
     volatile uint32_t isenseSum;
     volatile uint16_t isenseCount;
-    volatile uint32_t isenseOcpSum;
-    volatile uint16_t isenseOcpCount;
+    volatile uint32_t isenseOcpAvg;
 };
 
 extern ADC adc;
