@@ -11,14 +11,16 @@
 
 struct PidController
 {
-    static constexpr uint16_t kMaxPWMLevel = kPWMFrequencyToARR<20000>();   // Motor PWM 20Khz
-    static constexpr uint16_t kPPR = 1024;                                  // MT6701 PPR
-    static constexpr uint16_t kCPR = kPPR * 4;                              // 4x Mode PPR to CPR
-    static constexpr uint32_t kPIDInterval = 5;                             // PID update rate in millis
-    static constexpr uint32_t kAntiWindupReduction = 0.97f * 1024;          // reduce integral if error is out of range (97%)
-    static constexpr uint32_t kIntegralTimeLimit = 2000;                    // limit integral to 2000ms worth of max. error
+    static constexpr uint16_t kMaxPWMLevel = kPWMFrequencyToARR<20000>();           // Motor PWM 20Khz
+    static constexpr uint16_t kPPR = 1024;                                          // MT6701 PPR
+    static constexpr uint16_t kCPR = kPPR * 4;                                      // 4x Mode PPR to CPR
+    static constexpr float kPIDIntervalFloat = 5.12f;                               // PID update rate in millis used for precise RPM calculation
+    static constexpr uint32_t kPIDInterval = 5;                                     // PID update rate in millis
+    static constexpr uint32_t kAntiWindupFactor = 100;                              // anti-windup factor
+    static constexpr uint32_t kAntiWindupReduction = 0.97f * kAntiWindupFactor;     // reduce integral if error is out of range (97%)
+    static constexpr uint32_t kIntegralTimeLimit = 2000;                            // limit integral to 2000ms worth of max. error
     static constexpr float kPWMScaleMultiplier = 1.0 / (100.0 / kMaxPWMLevel);
-    static constexpr int32_t kScaleFactor =                                 // scale factor for PID calculations
+    static constexpr int32_t kScaleFactor =                                         // scale factor for PID calculations
         static_cast<int32_t>(
             16384.0f *
             (kCPR / 4096.0f) *
@@ -45,11 +47,11 @@ struct PidController
     // convert counts/RPM for 200Hz/5ms interval
     template<int32_t VALUE>
     static constexpr uint32_t kRPMToIntCountsT() {
-        return (VALUE * kCPR) / (60000 / kPIDInterval);
+        return (VALUE * kCPR) / (60000 / kPIDIntervalFloat);
     }
 
     static constexpr int32_t kIntCountsToRPM(int32_t value) {
-        return (value * (60000 / kPIDInterval)) / kCPR;
+        return (value * (60000 / kPIDIntervalFloat)) / kCPR;
     }
 
     enum class ErrorCodeType : int32_t {
@@ -200,7 +202,7 @@ struct PidController
     {
         antiWindupReduction = value;
         // PID tuning via SWO
-        SWO::data.antiWindupReduction = value / (float)UIConstants::kMinAntiWindupFactor;
+        SWO::data.antiWindupReduction = value / (float)UIConstants::kAntiWindupFactor;
     }
 
     /**

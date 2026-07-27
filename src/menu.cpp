@@ -93,7 +93,7 @@ static const char *current_slider_format_callback(uint32_t value, char *buf, siz
 // custom format for current and conversion from uint16_t to float
 static const char *anti_windup_reduction_format_callback(uint32_t value, char *buf, size_t bufSize)
 {
-    const uint32_t reduction = value * (1000 / UIConstants::kMinAntiWindupFactor); // value = percentage * 100, so multiply by 10 to get percentage * 1000
+    const uint32_t reduction = value * (1000 / UIConstants::kAntiWindupFactor); // value = percentage * 100, so multiply by 10 to get percentage * 1000
     snprintf(buf, bufSize, SPRINTF_FP2_FMT " %%", CONVERT_TO_FP2(reduction));
     return buf;
 }

@@ -243,11 +243,11 @@ void PidController::isr()
 
     if (eeprom.isPIDMode()) {
         if (ocp.state != OcpStateType::NONE) {
-            setIntegral((getIntegral() * 900) / 1024); // strong anti windup reduction during OCP condition
+            setIntegral((getIntegral() * 850) / 1024); // strong anti windup reduction during OCP condition
         }
         else if (antiWindupReduction) {
-            if (pwmLevel != clampedPwmLevel) {
-                setIntegral((getIntegral() * antiWindupReduction) / 1024);
+            if (pwmLevel < -kMaxPWMLevel || pwmLevel > (kMaxPWMLevel * 2)) {
+                setIntegral((getIntegral() * antiWindupReduction) / kAntiWindupFactor);
             }
         }
     }
@@ -298,7 +298,7 @@ void PidController::isr()
         item.mosfetTemperature = adc.getMosfetNTCValue();
         item.running = running ? 1U : 0U;
         item.drv8701Fault = faults.drv8701Fault ? 1U : 0U;
-        item.ocpFault = faults.ocpFault ? 1U : 0U;
+        item.ocpFault = (ocp.state != OcpStateType::NONE) ? 1U : 0U;
         item.snsoutFault = faults.snsoutFault ? 1U : 0U;
         pidLoopBuffer.push(item);
 
@@ -308,7 +308,7 @@ void PidController::isr()
             eeprom.setKp(SWO::data.Kp);
             eeprom.setKi(SWO::data.Ki);
             eeprom.setMotorRPM(SWO::data.rpm);
-            eeprom.setAntiWindupReduction(SWO::data.antiWindupReduction * UIConstants::kMinAntiWindupFactor);
+            eeprom.setAntiWindupReduction(SWO::data.antiWindupReduction * UIConstants::kAntiWindupFactor);
             SWO::data.changed = false;
 
             // apply to PID controller
