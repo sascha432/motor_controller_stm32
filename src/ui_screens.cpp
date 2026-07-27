@@ -563,7 +563,7 @@ void DashboardScreen::_refreshVisuals()
         pid.errorPrintf(buf, sizeof(buf) - 1);
     }
     else if (eeprom.isPIDMode()) {
-        snprintf(buf, sizeof(buf) - 1, "%u RPM (%u)", (unsigned)pid.clampRPM(pid.stats.rpm.get()), (unsigned)pid.getRPM());
+        snprintf(buf, sizeof(buf) - 1, "%u RPM (%u)", (unsigned)pid.stats.rpm.get(), (unsigned)pid.getRPM());
     }
     else {
         snprintf(buf, sizeof(buf) - 1, "%u RPM", (unsigned)pid.stats.rpm.get());
