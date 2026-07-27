@@ -240,9 +240,14 @@ void PidController::isr()
     // clamp pwm level to max. allowed value
     int32_t clampedPwmLevel = clampPWMLevel(pwmLevel);
 
-    if (eeprom.isPIDMode() && antiWindupReduction) {
-        if (pwmLevel != clampedPwmLevel) {
-            setIntegral((getIntegral() * antiWindupReduction) / (100 * 100));
+    if (eeprom.isPIDMode()) {
+        if (ocp.state != OcpStateType::NONE) {
+            setIntegral((getIntegral() * 900) / 1024); // strong anti windup reduction during OCP condition
+        }
+        else if (antiWindupReduction) {
+            if (pwmLevel != clampedPwmLevel) {
+                setIntegral((getIntegral() * antiWindupReduction) / 1024);
+            }
         }
     }
 
@@ -290,7 +295,6 @@ void PidController::isr()
         item.currentAverage = adc.getISenseAverageValue();
         item.motorTemperature = adc.getMotorNTCValue();
         item.mosfetTemperature = adc.getMosfetNTCValue();
-        item.errorCount = faults.count;
         item.running = running ? 1U : 0U;
         item.drv8701Fault = faults.drv8701Fault ? 1U : 0U;
         item.ocpFault = faults.ocpFault ? 1U : 0U;
@@ -322,4 +326,54 @@ void PidController::isr()
             #endif
         }
     }
+}
+
+void PidController::ocp_isr()
+{
+    if (ocp.state == OcpStateType::TRIGGERED) {
+        ocp.counter++;
+        if (ocp.counter >= kOcpForceRecoveryTicks) {
+            trigger_ocp_recovery(); // force recovery
+        }
+        else if (ocp.counter >= kOcpRecoveryMinTicks) {
+            if (adc.getISenseOcpFilteredValue() < faults.isenseMax) {
+                trigger_ocp_recovery(); // recovery condition met
+            }
+        }
+    }
+}
+
+void PidController::trigger_ocp()
+{
+    if (ocp.state == OcpStateType::RECOVERING) {
+        if (++ocp.counter <= kOcpRetriggerMinTicks) {
+            // do not allow to retrigger for n ticks
+            return;
+        }
+        ocp.state = OcpStateType::NONE;
+    }
+    if (ocp.state == OcpStateType::NONE) {
+        if (adc.getISenseOcpFilteredValue() > faults.isenseMax) {
+            // set triggered state and turn motor off
+            ocp.state = OcpStateType::TRIGGERED;
+            ocp.counter = 0;
+            // restore a fraction of the PWM to avoid retriggering OCP immediately after recovery, the PID loop will restore the correct PWM level
+            ocp.pwmLevel1 = PID_READ_MOTOR_PWM_DRV_IN1();
+            ocp.pwmLevel2 = PID_READ_MOTOR_PWM_DRV_IN2();
+            PID_WRITE_MOTOR_PWM_OFF();
+            LEDs::onLED2();
+        }
+    }
+}
+
+void PidController::trigger_ocp_recovery()
+{
+    // set recovering state and restore PWM levels
+    ocp.state = OcpStateType::RECOVERING;
+    ocp.counter = 0;
+    if (running) {
+        PID_WRITE_MOTOR_PWM_DRV_IN1(ocp.pwmLevel1);
+        PID_WRITE_MOTOR_PWM_DRV_IN2(ocp.pwmLevel2);
+    }
+    LEDs::offLED1and2();
 }

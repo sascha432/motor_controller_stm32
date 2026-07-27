@@ -64,7 +64,6 @@ class Sample:
     motor_temp_c: float
     mosfet_temp_adc: int
     mosfet_temp_c: float
-    error_count: int
     running: int
     drv_fault: int
     ocp_fault: int
@@ -127,13 +126,14 @@ def convert_ntc_celsius(adc_value: int) -> float:
     return temperature - 273.15
 
 
-def decode_fault_word(word: int) -> Tuple[int, int, int, int, int]:
-    error_count = word & 0xFFFF
-    running = (word >> 16) & 0x1
-    drv_fault = (word >> 17) & 0x1
-    ocp_fault = (word >> 18) & 0x1
-    snsout_fault = (word >> 19) & 0x1
-    return error_count, running, drv_fault, ocp_fault, snsout_fault
+def decode_fault_word(word: int) -> Tuple[int, int, int, int]:
+    # C++ bitfield order in PidLoopType:
+    # bit0=running, bit1=drv8701Fault, bit2=ocpFault, bit3=snsoutFault.
+    running = word & 0x1
+    drv_fault = (word >> 1) & 0x1
+    ocp_fault = (word >> 2) & 0x1
+    snsout_fault = (word >> 3) & 0x1
+    return running, drv_fault, ocp_fault, snsout_fault
 
 
 def decode_pid_item(payload: bytes, item_size: int) -> Optional[Sample]:
@@ -162,7 +162,9 @@ def decode_pid_item(payload: bytes, item_size: int) -> Optional[Sample]:
     else:
         return None
 
-    error_count, running, drv_fault, ocp_fault, snsout_fault = decode_fault_word(faults)
+    running, drv_fault, ocp_fault, snsout_fault = decode_fault_word(faults)
+    if rpm > 55000: # RPM might go negative due to small vibrations when the motor is stalled and the sensor limit is 55k RPM
+        rpm = 0
     return Sample(
         sequence=sequence,
         data_address=data_address,
@@ -178,7 +180,6 @@ def decode_pid_item(payload: bytes, item_size: int) -> Optional[Sample]:
         motor_temp_c=convert_ntc_celsius(motor_ntc),
         mosfet_temp_adc=mosfet_ntc,
         mosfet_temp_c=convert_ntc_celsius(mosfet_ntc),
-        error_count=error_count,
         running=running,
         drv_fault=drv_fault,
         ocp_fault=ocp_fault,

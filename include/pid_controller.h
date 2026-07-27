@@ -28,11 +28,10 @@ struct PidController
             (18.0f / kPWMScaleMultiplier)
         );
     static constexpr bool kProgramPPR = false;                              // set to true to program the MT6701 encoder during boot over i2c
-    static constexpr uint32_t kOcpForceRecoveryTicks = 26;                  // 1950us max. delay before the OCP isr turns the motor back on
-    static constexpr uint32_t kOcpRecoveryMinTicks = 7;                     // 525us min. delay before the OCP isr checks the ADC again
-    static constexpr uint32_t kOcpRetriggerMinTicks = 2;                    // 15us min. delay before the OCP isr allows to retrigger OCP
-    static constexpr float kOcpPwmReductionPercent = 70;                    // reduce PWM by 70% to avoid retriggering OCP immediately after recovery
-    static constexpr uint32_t kOcpPwmReductionFactor = (4096 / 100.0f) * kOcpPwmReductionPercent;
+    // 5us per tick 200KHz
+    static constexpr uint32_t kOcpForceRecoveryTicks = 40;                  // 200us max. delay before the OCP isr turns the motor back on
+    static constexpr uint32_t kOcpRecoveryMinTicks = 4;                     // 20us min. delay before the OCP isr checks the ADC again
+    static constexpr uint32_t kOcpRetriggerMinTicks = 2;                    // 10us min. delay before the OCP isr allows to retrigger OCP
 
     /*
         the kScaleFactor calculation gives the following range for tuning PID values (Kp, Ki, Kd)
@@ -356,61 +355,18 @@ struct PidController
      * @brief OCP interrupt service routine for the PID controller
      *
      */
-    void ocp_isr()
-    {
-        if (ocp.state == OcpStateType::TRIGGERED) {
-            ocp.counter++;
-            if (ocp.counter >= kOcpForceRecoveryTicks) {
-                trigger_ocp_recovery();
-            }
-            else if (ocp.counter >= kOcpRecoveryMinTicks) {
-                if (adc.getISenseOcpFilteredValue() < faults.isenseMax) {
-                    trigger_ocp_recovery();
-                }
-            }
-        }
-    }
+    void ocp_isr();
 
     /**
      * @brief Trigger OCP event
      */
-    void trigger_ocp()
-    {
-        if (ocp.state == OcpStateType::RECOVERING) {
-            if (++ocp.counter <= kOcpRetriggerMinTicks) {
-                // do not allow to retrigger for n ticks
-                return;
-            }
-            ocp.state = OcpStateType::NONE;
-        }
-        if (ocp.state == OcpStateType::NONE) {
-            // set triggered state and turn motor off
-            ocp.state = OcpStateType::TRIGGERED;
-            ocp.counter = 0;
-            // restore a fraction of the PWM to avoid retriggering OCP immediately after recovery, the PID loop will restore the correct PWM level
-            ocp.pwmLevel1 = (PID_READ_MOTOR_PWM_DRV_IN1() * kOcpPwmReductionFactor) / 4096;
-            ocp.pwmLevel2 = (PID_READ_MOTOR_PWM_DRV_IN2() * kOcpPwmReductionFactor) / 4096;
-            PID_WRITE_MOTOR_PWM_OFF();
-            LEDs::onLED1();
-            faults.ocpFault = true;
-            faults.count++;
-        }
-    }
+    void trigger_ocp();
 
     /**
      * @brief Recover from last OCP event
      *
      */
-    void trigger_ocp_recovery()
-    {
-        // set recovering state and restore PWM levels
-        ocp.state = OcpStateType::RECOVERING;
-        ocp.counter = 0;
-        PID_WRITE_MOTOR_PWM_DRV_IN1(ocp.pwmLevel1);
-        PID_WRITE_MOTOR_PWM_DRV_IN2(ocp.pwmLevel2);
-        LEDs::offLED1and2();
-        faults.ocpFault = false;
-    }
+    void trigger_ocp_recovery();
 
     /**
      * @brief Update internal fault states
@@ -421,10 +377,6 @@ struct PidController
         faults.drv8701Fault = (digitalPinToGPIO<DRV8701_FAULT_PIN>()->IDR & (1 << digitalPinToBit(DRV8701_FAULT_PIN))) == 0;
         faults.ocpFault = (digitalPinToGPIO<OCP_INT_PIN>()->IDR & (1 << digitalPinToBit(OCP_INT_PIN))) == 0;
         faults.snsoutFault = (digitalPinToGPIO<DRV_SNSOUT_PIN>()->IDR & (1 << digitalPinToBit(DRV_SNSOUT_PIN))) == 0;
-        if (!(faults.drv8701Fault || faults.ocpFault || faults.snsoutFault)) {
-            // reset if there are no faults
-            faults.count = 0;
-        }
     }
 
     /**
@@ -530,17 +482,19 @@ struct PidController
     }
 
 public:
-    struct FaultStates {
-        FaultStates() : isenseMax(0), count(0), drv8701Fault(false), ocpFault(false), snsoutFault(false) {}
+    struct FaultStates
+    {
         uint32_t isenseMax;
-        volatile uint32_t count;
-        volatile bool drv8701Fault : 1;
-        volatile bool ocpFault : 1;
-        volatile bool snsoutFault : 1;
+        bool drv8701Fault : 1;
+        bool ocpFault : 1;
+        bool snsoutFault : 1;
 
-        void reset() {
+        FaultStates() : isenseMax(0), drv8701Fault(false), ocpFault(false), snsoutFault(false)
+        {}
+
+        void reset()
+        {
             __disable_irq();
-            count = 0;
             drv8701Fault = false;
             ocpFault = false;
             snsoutFault = false;
@@ -548,27 +502,8 @@ public:
         }
     };
 
-public:
-    float Kp;                           // P, I, D ...
-    float Ki;
-    float Kd;
-    uint32_t rpm;                       // target RPM
-    uint32_t motorDirection;            // motor direction
-    uint16_t integralTimeLimit;
-    uint16_t antiWindupReduction;
-
-    uint32_t lastEncoderCounter;        // last encoder counter value
-    int32_t integral;
-    int32_t lastError;
-    int32_t lastDerivative;
-
-    int32_t KpPreCalc;
-    int32_t KiPreCalc;
-    int32_t KdPreCalc;
-    int32_t cpi;
-    int32_t cpiIntegralLimit;
-
-    struct StatsType {
+    struct StatsType
+    {
         Helpers::LowPass<32> rpm;
         Helpers::LowPass<32> pwm;
         struct {
@@ -584,7 +519,8 @@ public:
         }
     };
 
-    struct PidLoopType {
+    struct PidLoopType
+    {
         uint32_t sequence;
         uint32_t dataAddress;
         uint16_t rpm;
@@ -594,13 +530,13 @@ public:
         uint16_t currentAverage;
         uint16_t motorTemperature;
         uint16_t mosfetTemperature;
-        uint32_t errorCount: 16;
         uint32_t running: 1;
         uint32_t drv8701Fault : 1;
         uint32_t ocpFault : 1;
         uint32_t snsoutFault : 1;
 
-        PidLoopType() : dataAddress(reinterpret_cast<uint32_t>(&SWO::data)) {}
+        PidLoopType() : dataAddress(reinterpret_cast<uint32_t>(&SWO::data))
+        {}
     };
     static constexpr size_t kPidLoopTypeSize = sizeof(PidLoopType);
 
@@ -634,12 +570,32 @@ public:
         }
     };
 
+public:
+    float Kp;                           // P, I, D ...
+    float Ki;
+    float Kd;
+    uint32_t rpm;                       // target RPM
+    uint32_t motorDirection;            // motor direction
+    uint16_t integralTimeLimit;
+    uint16_t antiWindupReduction;
+
+    uint32_t lastEncoderCounter;        // last encoder counter value
+    int32_t integral;
+    int32_t lastError;
+    int32_t lastDerivative;
+
+    int32_t KpPreCalc;
+    int32_t KiPreCalc;
+    int32_t KdPreCalc;
+    int32_t cpi;
+    int32_t cpiIntegralLimit;
+
     StatsType stats;
     FaultStates faults;                 // DRV8701 and ocp faults
     OcpState ocp;
 
     ErrorCodeType errorCode;            // last error
-    RingBuffer<PidLoopType, 8> pidLoopBuffer;
+    RingBuffer<PidLoopType, 8> pidLoopBuffer; // buffer for PID loop data for PID tuning
 
     volatile bool running;              // true if the PID controller is running
 };

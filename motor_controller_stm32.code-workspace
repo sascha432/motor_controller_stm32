@@ -178,6 +178,7 @@
 			"SMPR1",
 			"SMPR2",
 			"snsout",
+			"SWSTART",
 			"SYSCLKSource",
 			"TIM_CCER_CC2P",
 			"TIM_OCMODE_PWM1",

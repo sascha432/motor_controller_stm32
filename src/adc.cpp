@@ -121,6 +121,6 @@ extern "C" void DMA1_Channel1_IRQHandler()
             adc.isenseCount -= adc.isenseCount / 16;
         }
         // store filtered value for fast OCP detection
-        adc.isenseOcpFiltered = (adc.isenseOcpFiltered * 3 + value) / 4;
+        adc.isenseOcpFiltered = (adc.isenseOcpFiltered * 1 + value) / 2;
     }
 }

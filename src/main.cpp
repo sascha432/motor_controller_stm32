@@ -94,22 +94,14 @@ static void loop()
         menu.handleStartButtonPress();
     }
 
-    // // reset faults periodically
-    // // TODO check if that makes sense
-    // if (pid.faults.count) {
-    //     static uint32_t lastFaultTime = 0;
-    //     if (HAL_GetTick() - lastFaultTime >= 500) {
-    //         lastFaultTime = HAL_GetTick();
-    //         pid.faults.drv8701Fault = (digitalPinToGPIO<DRV8701_FAULT_PIN>()->IDR & (1 << digitalPinToBit(DRV8701_FAULT_PIN))) == 0;
-    //         pid.faults.snsoutFault = (digitalPinToGPIO<DRV_SNSOUT_PIN>()->IDR & (1 << digitalPinToBit(DRV_SNSOUT_PIN))) == 0;
-    //         if (!pid.faults.drv8701Fault && !pid.faults.snsoutFault) {
-    //             pid.faults.count = 0;
-    //         }
-    //         if (pid.faults.count == 0) {
-    //             LEDs::offLED1and2();
-    //         }
-    //     }
-    // }
+    // LED 1 signals fault or driver ocp
+    if (LEDs::isLED1On()) {
+        // check if faults have cleared
+        if (!pid.faults.drv8701Fault && !pid.faults.snsoutFault) {
+            // turn LEDs off
+            LEDs::offLED1and2();
+        }
+    }
 
     // handle ui updates and rotary encoder
     static uint32_t lastLvHandler = 0;
@@ -187,11 +179,11 @@ extern "C" void TIM6_IRQHandler(void)
 
 extern "C" void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-    if (htim->Instance == TIM6) { // every 75us
+    if (htim->Instance == TIM6) { // every 5us
         pid.ocp_isr();
-        if ((timer6Counter & 0x3f) == 0) { // every 4.8ms
+        if ((timer6Counter & 0x3ff) == 0) { // every 5.12ms
             pid.isr();
-            if (timer6Counter % 320 == 0) { // every 24ms
+            if (timer6Counter % 5120 == 0) { // every 25.6ms
                 knob.isr();
             }
         }
@@ -225,32 +217,22 @@ extern "C" void EXTI15_10_IRQHandler(void)
         // DRV_SNSOUT_PIN/PD11 changed
         auto fault = pid.faults.snsoutFault;
         pid.faults.snsoutFault = (digitalPinToGPIO<DRV_SNSOUT_PIN>()->IDR & (1 << digitalPinToBit(DRV_SNSOUT_PIN))) == 0;
-        if (pid.faults.snsoutFault) {
-            pid.faults.count++;
-            if (!fault) {
-                LEDs::onLED2();
-            }
-        }
-    }
-    if (pending & (1 << 12)) {
-        // OCP_INT_PIN/PB12 falling edge
-        if (
-            !pid.faults.ocpFault &&
-            (adc.getISenseOcpFilteredValue() > pid.faults.isenseMax)
-         ) {
-            pid.trigger_ocp();
+        if (!fault && pid.faults.snsoutFault) {
+            LEDs::onLED1(); // turn fault LED on, main loop resets it after the fault has cleared
         }
     }
     if (pending & (1 << 14)) {
         // DRV8701_FAULT_PIN/PB14 changed
         auto fault = pid.faults.drv8701Fault;
         pid.faults.drv8701Fault = (digitalPinToGPIO<DRV8701_FAULT_PIN>()->IDR & (1 << digitalPinToBit(DRV8701_FAULT_PIN))) == 0;
-        if (pid.faults.drv8701Fault) {
-            pid.faults.count++;
-            if (!fault) {
-                LEDs::onLED2();
-            }
+        if (!fault && pid.faults.drv8701Fault) {
+            LEDs::onLED1(); // turn fault LED on, main loop resets it after the fault has cleared
         }
+    }
+    if (pending & (1 << 12)) {
+        // OCP_INT_PIN/PB12 falling edge
+        pid.faults.ocpFault = true;
+        pid.trigger_ocp();
     }
 }
 
@@ -327,7 +309,7 @@ static void TIM7_TIM6_Init()
     tim6.Instance = TIM6;
     tim6.Init.Prescaler = 71; // 72 MHz / 72 = 1 MHz (1 us tick)
     tim6.Init.CounterMode = TIM_COUNTERMODE_UP;
-    tim6.Init.Period = 75 - 1; // 75 counts = 75us
+    tim6.Init.Period = 5 - 1; // 5 counts = 5us
     tim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
     __HAL_RCC_TIM6_CLK_ENABLE();
     HAL_TIM_Base_Init(&tim6);

@@ -10,12 +10,12 @@
 
 /**
  * @brief Charlieplexed LEDs
- * 
+ *
  */
 template <uint32_t GPIO_LEDS_PIN, uint32_t GPIO_ILLUMINATION_LED_PIN, uint32_t GPIO_LEDS_PORT_ADDRESS = (digitalPinToGPIOBase<GPIO_LEDS_PIN>()), uint32_t GPIO_ILLUMINATION_PORT_ADDRESS = (digitalPinToGPIOBase<GPIO_ILLUMINATION_LED_PIN>())>
 struct LEDs_T {
 
-    static void init() 
+    static void init()
     {
         // Enable GPIO port clock
         __HAL_RCC_GPIOx_CLK_ENABLE<GPIO_LEDS_PIN>();
@@ -25,18 +25,28 @@ struct LEDs_T {
         offLED1and2();
 
         // Illumination LED
-        // tft_driver_gpio_init() is handling the PWM configuration 
+        // tft_driver_gpio_init() is handling the PWM configuration
         static_assert(GPIO_ILLUMINATION_LED_PIN == PB10, "Illumination LED pin must be PB10");
     }
 
-    static void offLED1and2() 
+    static void offLED1and2()
     {
         // MODE=00, CNF=01 (floating input) to turn both LEDs off
         GPIO_CRx_REG(GPIO_LEDS_PORT_ADDRESS, GPIO_LEDS_PIN) &= ~(0xF << digitalPinShift(GPIO_LEDS_PIN));
         GPIO_CRx_REG(GPIO_LEDS_PORT_ADDRESS, GPIO_LEDS_PIN) |= (0x4 << digitalPinShift(GPIO_LEDS_PIN));
     }
 
-    static void onLED1() 
+    static bool isLED1On()
+    {
+        return ((GPIO_TypeDef *)GPIO_LEDS_PORT_ADDRESS)->ODR & (1U << digitalPinToBit(GPIO_LEDS_PIN));
+    }
+
+    static bool isLED2On()
+    {
+        return !(((GPIO_TypeDef *)GPIO_LEDS_PORT_ADDRESS)->ODR & (1U << digitalPinToBit(GPIO_LEDS_PIN)));
+    }
+
+    static void onLED1()
     {
         ((GPIO_TypeDef *)GPIO_LEDS_PORT_ADDRESS)->BSRR = (1U << digitalPinToBit(GPIO_LEDS_PIN)); // set pin high to turn on LED1
         // MODE=10 (2MHz), CNF=00 (push-pull)
@@ -44,7 +54,7 @@ struct LEDs_T {
         GPIO_CRx_REG(GPIO_LEDS_PORT_ADDRESS, GPIO_LEDS_PIN) |= (0x2 << digitalPinShift(GPIO_LEDS_PIN));
     }
 
-    static void onLED2() 
+    static void onLED2()
     {
         ((GPIO_TypeDef *)GPIO_LEDS_PORT_ADDRESS)->BSRR = (1U << (digitalPinToBit(GPIO_LEDS_PIN) + 16)); // set pin low to turn on LED2
         // MODE=10 (2MHz), CNF=00 (push-pull)
@@ -52,7 +62,7 @@ struct LEDs_T {
         GPIO_CRx_REG(GPIO_LEDS_PORT_ADDRESS, GPIO_LEDS_PIN) |= (0x2 << digitalPinShift(GPIO_LEDS_PIN));
     }
 
-    static void illuminationLedSetPWM(float value) 
+    static void illuminationLedSetPWM(float value)
     {
         if (value == 0) {
             TIM2->CCR3 = 0;
