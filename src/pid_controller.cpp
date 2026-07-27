@@ -19,6 +19,7 @@ void PidController::reset()
     errorCode = ErrorCodeType::NONE;
     faults.reset();
     faults.isenseMax = ADC::_currentLimitValueToDAC(eeprom.getInputCurrentLimit());
+    ocp.reset();
     resetFaults();
     applyPIDParams();
 
@@ -247,7 +248,10 @@ void PidController::isr()
 
     // apply new PWM level if motor is running
     if (running) {
-        PID_WRITE_MOTOR_PWM_ON(clampedPwmLevel, motorDirection);
+        // do not update PWM during OCP condition
+        if (ocp.state != OcpStateType::TRIGGERED) {
+            PID_WRITE_MOTOR_PWM_ON(clampedPwmLevel, motorDirection);
+        }
     }
 
     // update pwm stats
@@ -282,7 +286,7 @@ void PidController::isr()
         item.rpm = static_cast<uint16_t>(deltaRPM);
         item.pwmLevel = static_cast<uint16_t>(clampedPwmLevel);
         item.voltage = adc.getVSenseValue();
-        item.currentOcp = adc.getISenseOcpAverageValue();
+        item.currentOcp = adc.getISenseOcpFilteredValue();
         item.currentAverage = adc.getISenseAverageValue();
         item.motorTemperature = adc.getMotorNTCValue();
         item.mosfetTemperature = adc.getMosfetNTCValue();
@@ -318,8 +322,4 @@ void PidController::isr()
             #endif
         }
     }
-}
-
-void PidController::ocp_isr()
-{
 }

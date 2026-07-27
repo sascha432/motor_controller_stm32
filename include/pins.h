@@ -84,6 +84,8 @@
 // motor driver pins are connected to channels 1 and 2 of TIM1 (PA8 and PA9)
 #define PID_WRITE_MOTOR_PWM_DRV_IN1(level)          (TIM1->CCR1 = (level))
 #define PID_WRITE_MOTOR_PWM_DRV_IN2(level)          (TIM1->CCR2 = (level))
+#define PID_READ_MOTOR_PWM_DRV_IN1()                ((uint16_t)TIM1->CCR1)
+#define PID_READ_MOTOR_PWM_DRV_IN2()                ((uint16_t)TIM1->CCR2)
 #define PID_WRITE_MOTOR_PWM_FORWARD(level)          (TIM1->CCR1 = (level), TIM1->CCR2 = 0)
 #define PID_WRITE_MOTOR_PWM_REVERSE(level)          (TIM1->CCR1 = 0, TIM1->CCR2 = (level))
 #define PID_WRITE_MOTOR_PWM_ON(level, reverse)      (reverse) ? PID_WRITE_MOTOR_PWM_REVERSE(level) : PID_WRITE_MOTOR_PWM_FORWARD(level)

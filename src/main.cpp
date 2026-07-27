@@ -178,7 +178,7 @@ static void loop()
 // === interrupt handlers ===
 
 static TIM_HandleTypeDef tim6;
-static uint32_t timer6Counter = 0; // 0.5ms counter
+static uint32_t timer6Counter = 0;
 
 extern "C" void TIM6_IRQHandler(void)
 {
@@ -187,11 +187,11 @@ extern "C" void TIM6_IRQHandler(void)
 
 extern "C" void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-    if (htim->Instance == TIM6) { // every 0.625ms
+    if (htim->Instance == TIM6) { // every 75us
         pid.ocp_isr();
-        if ((timer6Counter & 0x07) == 0) { // every 5ms
+        if ((timer6Counter & 0x3f) == 0) { // every 4.8ms
             pid.isr();
-            if (timer6Counter % 40 == 0) { // every 25ms
+            if (timer6Counter % 320 == 0) { // every 24ms
                 knob.isr();
             }
         }
@@ -234,14 +234,11 @@ extern "C" void EXTI15_10_IRQHandler(void)
     }
     if (pending & (1 << 12)) {
         // OCP_INT_PIN/PB12 falling edge
-        // Re-arm OCP interrupt only after recovery ceiling is fully restored.
         if (
             !pid.faults.ocpFault &&
-            (adc.getISenseOcpAverageValue() >= pid.faults.isenseMax)
+            (adc.getISenseOcpFilteredValue() > pid.faults.isenseMax)
          ) {
-            // set OCP flag, turn the PWM off and let the PID loop handle the over current
-            pid.faults.count++;
-            LEDs::onLED1();
+            pid.trigger_ocp();
         }
     }
     if (pending & (1 << 14)) {
@@ -330,14 +327,13 @@ static void TIM7_TIM6_Init()
     tim6.Instance = TIM6;
     tim6.Init.Prescaler = 71; // 72 MHz / 72 = 1 MHz (1 us tick)
     tim6.Init.CounterMode = TIM_COUNTERMODE_UP;
-    tim6.Init.Period = 625 - 1; // 625 counts = 0.625ms
+    tim6.Init.Period = 75 - 1; // 75 counts = 75us
     tim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
     __HAL_RCC_TIM6_CLK_ENABLE();
     HAL_TIM_Base_Init(&tim6);
     HAL_TIM_Base_Start_IT(&tim6);
     HAL_NVIC_SetPriority(TIM6_IRQn, 1, 0);
     HAL_NVIC_EnableIRQ(TIM6_IRQn);
-
 }
 
 // === interrupt handlers ===

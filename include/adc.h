@@ -9,7 +9,7 @@
 
 /**
  * @brief ADC class to read multiple channels using DMA
- * 
+ *
  */
 struct ADC {
 
@@ -23,7 +23,7 @@ struct ADC {
 
     /**
      * @brief struct to access the ADC buffer values
-     * 
+     *
      */
     struct BufferType {
         uint16_t isense;
@@ -34,32 +34,32 @@ struct ADC {
 
     /**
      * @brief Construct a new ADC object
-     * 
+     *
      */
-    ADC() : 
-        isenseSum(0), 
-        isenseCount(0), 
-        isenseOcpAvg(0)
+    ADC() :
+        isenseSum(0),
+        isenseCount(0),
+        isenseOcpFiltered(0)
     {
     }
 
     /**
      * @brief Initialize the ADC and DMA for reading multiple channels
-     * 
+     *
      */
     void init();
 
     /**
      * @brief Initialize the DAC for reference voltages
-     * 
+     *
      */
     void initDAC();
 
     /**
      * @brief convert eeprom values (current * 500) to DAC values based on the 3.3V vref, 4mΩ shunt and 20x gain
-     * 
-     * @param limit 
-     * @return ** constexpr uint16_t 
+     *
+     * @param limit
+     * @return ** constexpr uint16_t
      */
     static constexpr uint16_t _currentLimitValueToDAC(uint16_t limit)
     {
@@ -69,8 +69,8 @@ struct ADC {
 
     /**
      * @brief Set DAC voltage for the DRV8701 reference voltage
-     * 
-     * @param value 
+     *
+     * @param value
      */
     void setMotorCurrentLimit(uint16_t value)
     {
@@ -79,8 +79,8 @@ struct ADC {
 
     /**
      * @brief Set DAC voltage for the INA381 comparator reference voltage
-     * 
-     * @param value 
+     *
+     * @param value
      */
     void setInputCurrentLimit(uint16_t value)
     {
@@ -89,79 +89,79 @@ struct ADC {
 
     /**
      * @brief Read single ADC value from the buffer
-     * 
-     * @param index 
-     * @return uint16_t 
+     *
+     * @param index
+     * @return uint16_t
      */
-    uint16_t read(uint8_t index) const 
+    uint16_t read(uint8_t index) const
     {
         return adc_buffer[index];
     }
 
     /**
      * @brief Copy ADC buffer into struct
-     * 
-     * @return BufferType 
+     *
+     * @return BufferType
      */
-    BufferType readAll() const 
+    BufferType readAll() const
     {
         return *(BufferType *)adc_buffer;
     }
 
     /**
      * @brief Get the Input Current value in ADC units
-     * 
+     *
      */
-    inline uint16_t getISenseValue() const 
+    inline uint16_t getISenseValue() const
     {
         return adc_buffer[0];
     }
 
     /**
      * @brief Get the Input Current average value in ADC units. Used to display stable current values.
-     * 
-     * @return uint16_t 
+     *
+     * @return uint16_t
      */
-    inline uint16_t getISenseAverageValue() const 
+    inline uint16_t getISenseAverageValue() const
     {
         return isenseCount ? (isenseSum / isenseCount) : 0;
     }
 
     /**
      * @brief Get the Input Current average value for OCP in ADC units
-     * 
-     * @return uint16_t 
+     *
+     * @return uint16_t
      */
-    inline uint16_t getISenseOcpAverageValue() const 
+    inline uint16_t getISenseOcpFilteredValue() const
     {
-        return isenseOcpAvg;
+        return isenseOcpFiltered;
     }
 
     /**
      * @brief Get the Input Voltage value in ADC units
-     * 
+     *
      */
-    inline uint16_t getVSenseValue() const 
+    inline uint16_t getVSenseValue() const
     {
         return adc_buffer[1];
     }
 
     /**
      * @brief Get the Motor NTC value in ADC units
-     * 
-     * @return uint16_t 
+     *
+     * @return uint16_t
      */
-    inline uint16_t getMotorNTCValue() const 
+    inline uint16_t getMotorNTCValue() const
     {
         return adc_buffer[2];
     }
 
     /**
      * @brief Get the Mosfet NTC value in ADC units
-     * 
-     * @return uint16_t 
+     *
+     * @return uint16_t
      */
-    inline uint16_t getMosfetNTCValue() const 
+    inline uint16_t getMosfetNTCValue() const
     {
         return adc_buffer[3];
     }
@@ -169,7 +169,7 @@ struct ADC {
     volatile uint16_t adc_buffer[kNumConversions];
     volatile uint32_t isenseSum;
     volatile uint16_t isenseCount;
-    volatile uint32_t isenseOcpAvg;
+    volatile uint32_t isenseOcpFiltered;
 };
 
 extern ADC adc;

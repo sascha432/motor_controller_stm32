@@ -8,6 +8,7 @@
 #include "pins.h"
 #include "eeprom.h"
 #include "stats.h"
+#include "leds.h"
 
 struct PidController
 {
@@ -27,6 +28,11 @@ struct PidController
             (18.0f / kPWMScaleMultiplier)
         );
     static constexpr bool kProgramPPR = false;                              // set to true to program the MT6701 encoder during boot over i2c
+    static constexpr uint32_t kOcpForceRecoveryTicks = 26;                  // 1950us max. delay before the OCP isr turns the motor back on
+    static constexpr uint32_t kOcpRecoveryMinTicks = 7;                     // 525us min. delay before the OCP isr checks the ADC again
+    static constexpr uint32_t kOcpRetriggerMinTicks = 2;                    // 15us min. delay before the OCP isr allows to retrigger OCP
+    static constexpr float kOcpPwmReductionPercent = 70;                    // reduce PWM by 70% to avoid retriggering OCP immediately after recovery
+    static constexpr uint32_t kOcpPwmReductionFactor = (4096 / 100.0f) * kOcpPwmReductionPercent;
 
     /*
         the kScaleFactor calculation gives the following range for tuning PID values (Kp, Ki, Kd)
@@ -350,7 +356,61 @@ struct PidController
      * @brief OCP interrupt service routine for the PID controller
      *
      */
-    void ocp_isr();
+    void ocp_isr()
+    {
+        if (ocp.state == OcpStateType::TRIGGERED) {
+            ocp.counter++;
+            if (ocp.counter >= kOcpForceRecoveryTicks) {
+                trigger_ocp_recovery();
+            }
+            else if (ocp.counter >= kOcpRecoveryMinTicks) {
+                if (adc.getISenseOcpFilteredValue() < faults.isenseMax) {
+                    trigger_ocp_recovery();
+                }
+            }
+        }
+    }
+
+    /**
+     * @brief Trigger OCP event
+     */
+    void trigger_ocp()
+    {
+        if (ocp.state == OcpStateType::RECOVERING) {
+            if (++ocp.counter <= kOcpRetriggerMinTicks) {
+                // do not allow to retrigger for n ticks
+                return;
+            }
+            ocp.state = OcpStateType::NONE;
+        }
+        if (ocp.state == OcpStateType::NONE) {
+            // set triggered state and turn motor off
+            ocp.state = OcpStateType::TRIGGERED;
+            ocp.counter = 0;
+            // restore a fraction of the PWM to avoid retriggering OCP immediately after recovery, the PID loop will restore the correct PWM level
+            ocp.pwmLevel1 = (PID_READ_MOTOR_PWM_DRV_IN1() * kOcpPwmReductionFactor) / 4096;
+            ocp.pwmLevel2 = (PID_READ_MOTOR_PWM_DRV_IN2() * kOcpPwmReductionFactor) / 4096;
+            PID_WRITE_MOTOR_PWM_OFF();
+            LEDs::onLED1();
+            faults.ocpFault = true;
+            faults.count++;
+        }
+    }
+
+    /**
+     * @brief Recover from last OCP event
+     *
+     */
+    void trigger_ocp_recovery()
+    {
+        // set recovering state and restore PWM levels
+        ocp.state = OcpStateType::RECOVERING;
+        ocp.counter = 0;
+        PID_WRITE_MOTOR_PWM_DRV_IN1(ocp.pwmLevel1);
+        PID_WRITE_MOTOR_PWM_DRV_IN2(ocp.pwmLevel2);
+        LEDs::offLED1and2();
+        faults.ocpFault = false;
+    }
 
     /**
      * @brief Update internal fault states
@@ -544,8 +604,40 @@ public:
     };
     static constexpr size_t kPidLoopTypeSize = sizeof(PidLoopType);
 
+    enum class OcpStateType : uint32_t {
+        NONE = 0,
+        TRIGGERED = 1,
+        RECOVERING = 2
+    };
+
+    struct OcpState
+    {
+        OcpStateType state;                 // state of the over current protection
+        uint32_t counter;                   // tick counter 0.625ms increments
+        uint16_t pwmLevel1;                 // pwm levels before OCP was triggered
+        uint16_t pwmLevel2;
+
+        OcpState() :
+            state(OcpStateType::NONE),
+            counter(0),
+            pwmLevel1(0),
+            pwmLevel2(0)
+        {
+        }
+
+        void reset()
+        {
+            state = OcpStateType::NONE;
+            counter = 0;
+            pwmLevel1 = 0;
+            pwmLevel2 = 0;
+        }
+    };
+
     StatsType stats;
     FaultStates faults;                 // DRV8701 and ocp faults
+    OcpState ocp;
+
     ErrorCodeType errorCode;            // last error
     RingBuffer<PidLoopType, 8> pidLoopBuffer;
 
