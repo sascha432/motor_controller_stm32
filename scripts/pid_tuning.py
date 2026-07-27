@@ -64,6 +64,7 @@ class Sample:
     motor_temp_c: float
     mosfet_temp_adc: int
     mosfet_temp_c: float
+    integral: int
     running: int
     drv_fault: int
     ocp_fault: int
@@ -80,12 +81,12 @@ class AppConfig:
     connect_mode: str
     raw_port: int
     pid_port: int
-    pid_item_size: int
     sample_hz: int
     gdb_port: int
 
 
 PID_FRAME_MAGIC = b"PID1"
+PID_ITEM_SIZE = 32
 PID_PWM_MAX_LEVEL = 3599.0
 
 
@@ -136,31 +137,13 @@ def decode_fault_word(word: int) -> Tuple[int, int, int, int]:
     return running, drv_fault, ocp_fault, snsout_fault
 
 
-def decode_pid_item(payload: bytes, item_size: int) -> Optional[Sample]:
-    if item_size == 28:
-        if len(payload) != 28:
-            return None
-        sequence, data_address, rpm, pwm, voltage, i_ocp, i_avg, motor_ntc, mosfet_ntc, faults = struct.unpack(
-            "<II7H2xI", payload
-        )
-    elif item_size == 26:
-        if len(payload) != 26:
-            return None
-        sequence, data_address, rpm, pwm, voltage, i_ocp, i_avg, motor_ntc, mosfet_ntc, faults = struct.unpack(
-            "<II7HI", payload
-        )
-    elif item_size == 24:
-        if len(payload) != 24:
-            return None
-        sequence, rpm, pwm, voltage, i_ocp, i_avg, motor_ntc, mosfet_ntc, faults = struct.unpack("<I7H2xI", payload)
-        data_address = 0
-    elif item_size == 22:
-        if len(payload) != 22:
-            return None
-        sequence, rpm, pwm, voltage, i_ocp, i_avg, motor_ntc, mosfet_ntc, faults = struct.unpack("<I7HI", payload)
-        data_address = 0
-    else:
+def decode_pid_item(payload: bytes) -> Optional[Sample]:
+    if len(payload) != PID_ITEM_SIZE:
         return None
+
+    sequence, data_address, rpm, pwm, voltage, i_ocp, i_avg, motor_ntc, mosfet_ntc, integral, faults = struct.unpack(
+        "<II7H2xII", payload
+    )
 
     running, drv_fault, ocp_fault, snsout_fault = decode_fault_word(faults)
     if rpm > 55000: # RPM might go negative due to small vibrations when the motor is stalled and the sensor limit is 55k RPM
@@ -180,6 +163,7 @@ def decode_pid_item(payload: bytes, item_size: int) -> Optional[Sample]:
         motor_temp_c=convert_ntc_celsius(motor_ntc),
         mosfet_temp_adc=mosfet_ntc,
         mosfet_temp_c=convert_ntc_celsius(mosfet_ntc),
+        integral=integral,
         running=running,
         drv_fault=drv_fault,
         ocp_fault=ocp_fault,
@@ -441,12 +425,12 @@ class SWOBackend:
                                 if magic_pos > 0:
                                     del pid_bytes[:magic_pos]
 
-                                frame_size = len(PID_FRAME_MAGIC) + self.config.pid_item_size
+                                frame_size = len(PID_FRAME_MAGIC) + PID_ITEM_SIZE
                                 if len(pid_bytes) < frame_size:
                                     break
 
                                 raw_item = bytes(pid_bytes[len(PID_FRAME_MAGIC):frame_size])
-                                sample = decode_pid_item(raw_item, self.config.pid_item_size)
+                                sample = decode_pid_item(raw_item)
                                 if sample and is_plausible_sample(sample, last_sequence):
                                     del pid_bytes[:frame_size]
                                     last_sequence = sample.sequence
@@ -676,15 +660,19 @@ class PIDTuningApp:
         self.right_panes.pack(fill=tk.BOTH, expand=True)
 
         self.log_frame = ttk.Frame(self.right_panes)
+        self.faults_frame = ttk.Frame(self.right_panes)
         self.controls_frame = ttk.Frame(self.right_panes)
 
         self.log_frame.configure(height=390)
+        self.faults_frame.configure(height=120)
         self.controls_frame.configure(height=310)
         self.right_panes.add(self.log_frame, weight=2)
+        self.right_panes.add(self.faults_frame, weight=1)
         self.right_panes.add(self.controls_frame, weight=1)
 
         self._build_graph_panel()
         self._build_log_panel()
+        self._build_faults_panel()
         self._build_controls_panel()
 
     def _set_initial_sashes(self) -> None:
@@ -697,18 +685,20 @@ class PIDTuningApp:
             return
 
         self.panes.sashpos(0, int(width * 0.75))
-        # Keep enough room for controls so they are visible at startup.
+        # Keep enough room for controls and faults so they are visible at startup.
         controls_min_height = 260
-        log_height = int(right_height * 0.50)
-        log_height = min(log_height, right_height - controls_min_height)
+        faults_height = 120
+        log_height = int(right_height * 0.42)
+        log_height = min(log_height, right_height - controls_min_height - faults_height)
         log_height = max(log_height, 120)
         self.right_panes.sashpos(0, log_height)
+        self.right_panes.sashpos(1, log_height + faults_height)
 
         self._initial_sash_done = True
 
     def _build_graph_panel(self) -> None:
         self.figure = Figure(figsize=(12, 7), dpi=100)
-        self.axes = self.figure.subplots(5, 1, sharex=True)
+        self.axes = self.figure.subplots(6, 1, sharex=True)
         self.figure.subplots_adjust(left=0.055, right=0.995, top=0.963, bottom=0.065, hspace=0.30)
 
         titles = [
@@ -717,8 +707,9 @@ class PIDTuningApp:
             "Current Avg/OCP (mA)",
             "Voltage (mV)",
             "Temperatures (C)",
+            "Integral",
         ]
-        ylabels = ["RPM", "%", "mA", "mV", "C"]
+        ylabels = ["RPM", "%", "mA", "mV", "C", "I"]
 
         for axis, title, ylabel in zip(self.axes, titles, ylabels):
             axis.set_title(title, loc="left", fontsize=10)
@@ -751,6 +742,34 @@ class PIDTuningApp:
         self.log_text.grid(row=0, column=0, sticky="nsew")
         v_scrollbar.grid(row=0, column=1, sticky="ns")
         h_scrollbar.grid(row=1, column=0, sticky="ew")
+
+    def _set_fault_indicator(self, widget: tk.Label, active: bool) -> None:
+        if active:
+            widget.configure(text="ACTIVE", bg="#9A031E", fg="#FFFFFF")
+        else:
+            widget.configure(text="OK", bg="#2A9D8F", fg="#FFFFFF")
+
+    def _build_faults_panel(self) -> None:
+        wrap = ttk.LabelFrame(self.faults_frame, text="Fault Indicators")
+        wrap.pack(fill=tk.BOTH, expand=True, padx=10, pady=8)
+        wrap.columnconfigure(0, weight=1)
+        wrap.columnconfigure(1, weight=0)
+
+        ttk.Label(wrap, text="OCP").grid(row=0, column=0, sticky="w", padx=8, pady=4)
+        self.ocp_indicator = tk.Label(wrap, width=10, anchor="center", relief="groove")
+        self.ocp_indicator.grid(row=0, column=1, sticky="e", padx=8, pady=4)
+
+        ttk.Label(wrap, text="Driver Fault (DRV8192)").grid(row=1, column=0, sticky="w", padx=8, pady=4)
+        self.driver_fault_indicator = tk.Label(wrap, width=10, anchor="center", relief="groove")
+        self.driver_fault_indicator.grid(row=1, column=1, sticky="e", padx=8, pady=4)
+
+        ttk.Label(wrap, text="Driver OCP (SNSOUT)").grid(row=2, column=0, sticky="w", padx=8, pady=4)
+        self.driver_ocp_indicator = tk.Label(wrap, width=10, anchor="center", relief="groove")
+        self.driver_ocp_indicator.grid(row=2, column=1, sticky="e", padx=8, pady=4)
+
+        self._set_fault_indicator(self.ocp_indicator, False)
+        self._set_fault_indicator(self.driver_fault_indicator, False)
+        self._set_fault_indicator(self.driver_ocp_indicator, False)
 
     def _build_controls_panel(self) -> None:
         outer = ttk.Frame(self.controls_frame)
@@ -813,7 +832,7 @@ class PIDTuningApp:
 
         ttk.Label(
             outer,
-            text="Panels are resizable; drag separators to adjust Graph / Logs / Controls.",
+            text="Panels are resizable; drag separators to adjust Graph / Logs / Faults / Controls.",
             justify=tk.LEFT,
         ).grid(row=3, column=0, columnspan=2, sticky="w", pady=(6, 0))
 
@@ -981,9 +1000,10 @@ class PIDTuningApp:
         self.voltage_mv = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
         self.motor_temp_c = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
         self.mosfet_temp_c = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
+        self.integral = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
 
     def _build_plot_lines(self) -> None:
-        ax0, ax1, ax2, ax3, ax4 = self.axes
+        ax0, ax1, ax2, ax3, ax4, ax5 = self.axes
 
         (self.line_rpm,) = ax0.plot(self.x_values, self.rpm, label="RPM", color="#0077B6")
         (self.line_rpm_avg,) = ax0.plot(self.x_values, self.rpm_avg, label="Avg RPM", color="#E85D04", linestyle="--")
@@ -1003,6 +1023,9 @@ class PIDTuningApp:
         (self.line_motor_t,) = ax4.plot(self.x_values, self.motor_temp_c, label="Motor", color="#3A86FF")
         (self.line_mosfet_t,) = ax4.plot(self.x_values, self.mosfet_temp_c, label="MOSFET", color="#FB5607")
         ax4.legend(loc="upper right")
+
+        (self.line_integral,) = ax5.plot(self.x_values, self.integral, label="Integral", color="#6A4C93")
+        ax5.legend(loc="upper right")
 
     def _append_value(self, series: List[float], value: float) -> None:
         series.append(value)
@@ -1038,6 +1061,11 @@ class PIDTuningApp:
         self._append_value(self.voltage_mv, float(sample.voltage_mv))
         self._append_value(self.motor_temp_c, float(sample.motor_temp_c))
         self._append_value(self.mosfet_temp_c, float(sample.mosfet_temp_c))
+        self._append_value(self.integral, float(sample.integral))
+
+        self._set_fault_indicator(self.ocp_indicator, bool(sample.ocp_fault))
+        self._set_fault_indicator(self.driver_fault_indicator, bool(sample.drv_fault))
+        self._set_fault_indicator(self.driver_ocp_indicator, bool(sample.snsout_fault))
 
         current_count = max(1, self.filled)
         rpm_mean = self._rpm_sum / float(current_count)
@@ -1060,6 +1088,7 @@ class PIDTuningApp:
         self.line_u_mv.set_data(self.x_values, self.voltage_mv)
         self.line_motor_t.set_data(self.x_values, self.motor_temp_c)
         self.line_mosfet_t.set_data(self.x_values, self.mosfet_temp_c)
+        self.line_integral.set_data(self.x_values, self.integral)
 
         for axis in self.axes:
             axis.set_xlim(self.x_values[0], self.x_values[-1])
@@ -1093,6 +1122,9 @@ class PIDTuningApp:
             self.start_reset_retried = False
             self._start_wait_armed = False
             self._start_wait_next_log_at = None
+            self._set_fault_indicator(self.ocp_indicator, False)
+            self._set_fault_indicator(self.driver_fault_indicator, False)
+            self._set_fault_indicator(self.driver_ocp_indicator, False)
             return
 
         self._cancel_startup_sync_job()
@@ -1256,13 +1288,6 @@ def parse_args() -> AppConfig:
     )
     parser.add_argument("--raw-port", type=int, default=3443, help="SWV raw TCP port")
     parser.add_argument("--pid-port", type=int, default=1, help="ITM port for PidLoopType")
-    parser.add_argument(
-        "--pid-item-size",
-        type=int,
-        default=28,
-        choices=[22, 24, 26, 28],
-        help="PidLoopType size in bytes",
-    )
     parser.add_argument("--gdb-port", type=int, default=3333, help="pyOCD gdbserver port for memory sync")
     parser.add_argument(
         "--sample-hz",
@@ -1281,7 +1306,6 @@ def parse_args() -> AppConfig:
         connect_mode=args.connect_mode,
         raw_port=args.raw_port,
         pid_port=args.pid_port,
-        pid_item_size=args.pid_item_size,
         sample_hz=max(1, args.sample_hz),
         gdb_port=args.gdb_port,
     )

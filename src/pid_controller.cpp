@@ -296,6 +296,7 @@ void PidController::isr()
         item.currentAverage = adc.getISenseAverageValue();
         item.motorTemperature = adc.getMotorNTCValue();
         item.mosfetTemperature = adc.getMosfetNTCValue();
+        item.integral = getIntegral();
         item.running = running ? 1U : 0U;
         item.drv8701Fault = faults.drv8701Fault ? 1U : 0U;
         item.ocpFault = (ocp.state != OcpStateType::NONE) ? 1U : 0U;

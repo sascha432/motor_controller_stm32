@@ -18,7 +18,7 @@ struct PidController
     static constexpr uint32_t kPIDInterval = 5;                                     // PID update rate in millis
     static constexpr uint32_t kAntiWindupFactor = 100;                              // anti-windup factor
     static constexpr uint32_t kAntiWindupReduction = 0.97f * kAntiWindupFactor;     // reduce integral if error is out of range (97%)
-    static constexpr uint32_t kIntegralTimeLimit = 2000;                            // limit integral to 2000ms worth of max. error
+    static constexpr uint32_t kIntegralTimeLimit = 2000;                            // anti windup integral time limit in milliseconds
     static constexpr float kPWMScaleMultiplier = 1.0 / (100.0 / kMaxPWMLevel);
     static constexpr int32_t kScaleFactor =                                         // scale factor for PID calculations
         static_cast<int32_t>(
@@ -74,7 +74,6 @@ struct PidController
     PidController() :
         rpm(0),
         motorDirection(EEPROM::kMotorDirectionForward),
-        integralTimeLimit(kIntegralTimeLimit),
         antiWindupReduction(kAntiWindupReduction),
         running(false)
     {
@@ -190,7 +189,7 @@ struct PidController
         // to counts per interval
         cpi = (rpm * kCPR) / (60000 / kPIDInterval);
         // anti windup limit for integral term
-        cpiIntegralLimit = cpi * integralTimeLimit / kPIDInterval;
+        cpiIntegralLimit = cpi * (kIntegralTimeLimit * kPIDInterval / 1000);
     }
 
     /**
@@ -535,6 +534,7 @@ public:
         uint16_t currentAverage;
         uint16_t motorTemperature;
         uint16_t mosfetTemperature;
+        uint32_t integral;
         uint32_t running: 1;
         uint32_t drv8701Fault : 1;
         uint32_t ocpFault : 1;
@@ -581,7 +581,6 @@ public:
     float Kd;
     uint32_t rpm;                       // target RPM
     uint32_t motorDirection;            // motor direction
-    uint16_t integralTimeLimit;
     uint16_t antiWindupReduction;
 
     uint32_t lastEncoderCounter;        // last encoder counter value
