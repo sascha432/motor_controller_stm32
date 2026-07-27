@@ -243,7 +243,7 @@ void PidController::isr()
 
     if (eeprom.isPIDMode()) {
         if (ocp.state != OcpStateType::NONE) {
-            setIntegral((getIntegral() * 850) / 1024); // strong anti windup reduction during OCP condition
+            setIntegral((getIntegral() * 900) / 1024); // strong anti windup reduction during OCP condition
         }
         else if (antiWindupReduction) {
             if (pwmLevel < -kMaxPWMLevel || pwmLevel > (kMaxPWMLevel * 2)) {
@@ -332,10 +332,16 @@ void PidController::isr()
 
 void PidController::ocp_isr()
 {
-    if (ocp.state == OcpStateType::TRIGGERED) {
+    if (ocp.state == OcpStateType::RECOVERING) {
+        // increase counter to track recovery time
         ocp.counter++;
-        if (ocp.counter >= kOcpForceRecoveryTicks) {
-            trigger_ocp_recovery(); // force recovery
+    }
+    else if (ocp.state == OcpStateType::TRIGGERED) {
+        // increase counter to track trigger time
+        ocp.counter++;
+        if (ocp.counter >= kOcpMaxRecoveryTicks) {
+            // fatal error if the OCP condition is not cleared after a certain time
+            setErrorCode(ErrorCodeType::OCP);
         }
         else if (ocp.counter >= kOcpRecoveryMinTicks) {
             if (adc.getISenseOcpFilteredValue() < faults.isenseMax) {
@@ -348,7 +354,7 @@ void PidController::ocp_isr()
 void PidController::trigger_ocp()
 {
     if (ocp.state == OcpStateType::RECOVERING) {
-        if (++ocp.counter <= kOcpRetriggerMinTicks) {
+        if (ocp.counter <= kOcpRetriggerMinTicks) {
             // do not allow to retrigger for n ticks
             return;
         }

@@ -30,9 +30,9 @@ struct PidController
         );
     static constexpr bool kProgramPPR = false;                              // set to true to program the MT6701 encoder during boot over i2c
     // 5us per tick 200KHz
-    static constexpr uint32_t kOcpForceRecoveryTicks = 40;                  // 200us max. delay before the OCP isr turns the motor back on
+    static constexpr uint32_t kOcpMaxRecoveryTicks = 80;                    // 400us max. delay before the OCP turns into hard fault
     static constexpr uint32_t kOcpRecoveryMinTicks = 4;                     // 20us min. delay before the OCP isr checks the ADC again
-    static constexpr uint32_t kOcpRetriggerMinTicks = 2;                    // 10us min. delay before the OCP isr allows to retrigger OCP
+    static constexpr uint32_t kOcpRetriggerMinTicks = 1;                    // 5us min. delay before the OCP isr allows to retrigger OCP
 
     /*
         the kScaleFactor calculation gives the following range for tuning PID values (Kp, Ki, Kd)
@@ -472,6 +472,8 @@ struct PidController
                 return snprintf(buf, bufSize, "MOSFET %d" DEGREE_UTF8 "C", ::stats.mosfetTemp);
             case ErrorCodeType::OVP:
                 return snprintf(buf, bufSize, "OVP");
+            case ErrorCodeType::OCP:
+                return snprintf(buf, bufSize, "OCP");
             default:
                 break;
             // case ErrorCodeType::FAULT:
