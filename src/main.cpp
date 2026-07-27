@@ -178,6 +178,7 @@ static void loop()
 // === interrupt handlers ===
 
 static TIM_HandleTypeDef tim6;
+static uint32_t timer6Counter = 0; // 0.5ms counter
 
 extern "C" void TIM6_IRQHandler(void)
 {
@@ -186,13 +187,15 @@ extern "C" void TIM6_IRQHandler(void)
 
 extern "C" void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-    if (htim->Instance == TIM6) { // every 5ms
-        static uint32_t timer6Counter = 0;
-        if (++timer6Counter >= 5) {
-            timer6Counter = 0;
-            knob.isr(); // every 25ms
+    if (htim->Instance == TIM6) { // every 0.625ms
+        pid.ocp_isr();
+        if ((timer6Counter & 0x07) == 0) { // every 5ms
+            pid.isr();
+            if (timer6Counter % 40 == 0) { // every 25ms
+                knob.isr();
+            }
         }
-        pid.isr();
+        timer6Counter++;
     }
 }
 
@@ -234,11 +237,9 @@ extern "C" void EXTI15_10_IRQHandler(void)
         // Re-arm OCP interrupt only after recovery ceiling is fully restored.
         if (
             !pid.faults.ocpFault &&
-            (adc.getISenseOcpAverageValue() >= pid.faults.isenseMax) &&
-            (pid.ocpPwmCeiling >= PidController::kMaxPWMLevel)
+            (adc.getISenseOcpAverageValue() >= pid.faults.isenseMax)
          ) {
             // set OCP flag, turn the PWM off and let the PID loop handle the over current
-            pid.onOcpTripFromIsr();
             pid.faults.count++;
             LEDs::onLED1();
         }
@@ -329,7 +330,7 @@ static void TIM7_TIM6_Init()
     tim6.Instance = TIM6;
     tim6.Init.Prescaler = 71; // 72 MHz / 72 = 1 MHz (1 us tick)
     tim6.Init.CounterMode = TIM_COUNTERMODE_UP;
-    tim6.Init.Period = 5000 - 1; // 5000 counts = 5ms
+    tim6.Init.Period = 625 - 1; // 625 counts = 0.625ms
     tim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
     __HAL_RCC_TIM6_CLK_ENABLE();
     HAL_TIM_Base_Init(&tim6);

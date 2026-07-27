@@ -19,8 +19,6 @@ void PidController::reset()
     errorCode = ErrorCodeType::NONE;
     faults.reset();
     faults.isenseMax = ADC::_currentLimitValueToDAC(eeprom.getInputCurrentLimit());
-    ocpPwmCeiling = kMaxPWMLevel;
-    ocpClearCycles = 0;
     resetFaults();
     applyPIDParams();
 
@@ -218,70 +216,6 @@ void PidController::isr()
 
     int32_t pwmLevel;
 
-    // OCP limiter state:
-    // - OCP trip is latched by EXTI.
-    // - Recovery is gated by averaged ADC current with hysteresis and clear cycles.
-    const uint32_t ocpCurrentAdc = adc.getISenseOcpAverageValue();
-    const uint32_t ocpTripAdc = faults.isenseMax;
-    const uint32_t ocpClearAdc = (ocpTripAdc * 90U) / 100U;
-    const uint32_t ocpRampAdc = (ocpTripAdc * 95U) / 100U;
-    constexpr uint8_t kOcpClearCyclesRequired = 4; // 4 * 5ms = 20ms below clear threshold
-    constexpr uint8_t kOcpRampStepClearCycles = 12; // 12 * 5ms = 60ms stable current before each ramp step
-
-    if (faults.ocpFault) {
-        // While fault is latched, back off ceiling only if current is still in trip region.
-        if (ocpCurrentAdc >= ocpTripAdc) {
-            ocpPwmCeiling = (ocpPwmCeiling > static_cast<uint16_t>(kOcpRecoveryMinPwm + kOcpRecoveryStepPwm))
-                ? (ocpPwmCeiling - static_cast<uint16_t>(kOcpRecoveryStepPwm))
-                : static_cast<uint16_t>(kOcpRecoveryMinPwm);
-        }
-
-        if (ocpCurrentAdc <= ocpClearAdc) {
-            if (ocpClearCycles < kOcpClearCyclesRequired) {
-                ocpClearCycles++;
-            }
-        }
-        else {
-            ocpClearCycles = 0;
-        }
-
-        if (ocpClearCycles >= kOcpClearCyclesRequired) {
-            faults.ocpFault = false;
-            // Start recovery from configured minimum once OCP is stably cleared.
-            ocpPwmCeiling = kOcpRecoveryMinPwm;
-            ocpClearCycles = 0;
-        }
-    }
-
-    if (!faults.ocpFault && ocpPwmCeiling < kMaxPWMLevel) {
-        if (ocpCurrentAdc >= ocpTripAdc) {
-            // Current rose back into OCP region: drop ceiling quickly to break limit-lock.
-            ocpPwmCeiling = (ocpPwmCeiling > static_cast<uint16_t>(kOcpRecoveryMinPwm + kOcpRecoveryStepPwm))
-                ? (ocpPwmCeiling - static_cast<uint16_t>(kOcpRecoveryStepPwm))
-                : static_cast<uint16_t>(kOcpRecoveryMinPwm);
-            ocpClearCycles = 0;
-        }
-        else if (ocpCurrentAdc <= ocpRampAdc) {
-            if (ocpClearCycles < kOcpRampStepClearCycles) {
-                ocpClearCycles++;
-            }
-            if (ocpClearCycles >= kOcpRampStepClearCycles) {
-                // Increase ceiling in paced steps only while current is stably low.
-                ocpPwmCeiling = std::min<uint16_t>(kMaxPWMLevel, ocpPwmCeiling + static_cast<uint16_t>(kOcpRecoveryStepPwm));
-                ocpClearCycles = 0;
-            }
-        }
-        else {
-            // Mid band: hold ceiling and gently decay ramp progress instead of hard reset.
-            if (ocpClearCycles > 0) {
-                ocpClearCycles--;
-            }
-        }
-        if (ocpPwmCeiling >= kMaxPWMLevel) {
-            LEDs::offLED1and2();
-        }
-    }
-
     if (eeprom.isPIDMode()) {
         // calculate error and derivative
         int32_t error = (getCountsPerInterval() - delta);
@@ -302,8 +236,8 @@ void PidController::isr()
         pwmLevel = eeprom.getMotorPWM() * kMaxPWMLevel / 100;
     }
 
-    // Clamp level with dynamic OCP ceiling.
-    int32_t clampedPwmLevel = std::clamp<int32_t>(pwmLevel, 0, static_cast<int32_t>(ocpPwmCeiling));
+    // clamp pwm level to max. allowed value
+    int32_t clampedPwmLevel = clampPWMLevel(pwmLevel);
 
     if (eeprom.isPIDMode() && antiWindupReduction) {
         if (pwmLevel != clampedPwmLevel) {
@@ -348,7 +282,7 @@ void PidController::isr()
         item.rpm = static_cast<uint16_t>(deltaRPM);
         item.pwmLevel = static_cast<uint16_t>(clampedPwmLevel);
         item.voltage = adc.getVSenseValue();
-        item.currentOcp = ocpCurrentAdc;
+        item.currentOcp = adc.getISenseOcpAverageValue();
         item.currentAverage = adc.getISenseAverageValue();
         item.motorTemperature = adc.getMotorNTCValue();
         item.mosfetTemperature = adc.getMosfetNTCValue();
@@ -384,11 +318,8 @@ void PidController::isr()
             #endif
         }
     }
+}
 
-    __enable_irq();
-    if(running) {
-        if (ocpPwmCeiling<kMaxPWMLevel) {
-            DEBUG_PRINT_MSG(DEBUG_DEBUG, "f=%d c=%d m=%d", faults.ocpFault, ocpClearCycles, ocpPwmCeiling);
-        }
-    }
+void PidController::ocp_isr()
+{
 }

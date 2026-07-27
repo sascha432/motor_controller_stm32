@@ -27,11 +27,6 @@ struct PidController
             (18.0f / kPWMScaleMultiplier)
         );
     static constexpr bool kProgramPPR = false;                              // set to true to program the MT6701 encoder during boot over i2c
-    static constexpr uint32_t kOcpRecoveryRampSteps = 8;                    // steps to ramp PWM ceiling back to max
-    static constexpr uint32_t kOcpRecoveryMinPercent = 35;                  // minimum PWM ceiling in percent after OCP trip
-    static constexpr uint32_t kOcpRecoveryMinPwm = (kMaxPWMLevel * kOcpRecoveryMinPercent) / 100;
-    static constexpr uint32_t kOcpRecoveryStepPwm =
-        ((kMaxPWMLevel - kOcpRecoveryMinPwm) + (kOcpRecoveryRampSteps - 1)) / kOcpRecoveryRampSteps;
 
     /*
         the kScaleFactor calculation gives the following range for tuning PID values (Kp, Ki, Kd)
@@ -352,6 +347,12 @@ struct PidController
     void isr();
 
     /**
+     * @brief OCP interrupt service routine for the PID controller
+     *
+     */
+    void ocp_isr();
+
+    /**
      * @brief Update internal fault states
      *
      */
@@ -377,15 +378,6 @@ struct PidController
         setKd(eeprom.getKd());
         setAntiWindupReduction(eeprom.getAntiWindupReduction());
         setRPM(eeprom.getMotorRPM());
-    }
-
-    inline void onOcpTripFromIsr()
-    {
-        faults.ocpFault = true;
-        ocpPwmCeiling = (ocpPwmCeiling > static_cast<uint16_t>(kOcpRecoveryMinPwm + kOcpRecoveryStepPwm))
-            ? (ocpPwmCeiling - static_cast<uint16_t>(kOcpRecoveryStepPwm))
-            : static_cast<uint16_t>(kOcpRecoveryMinPwm);
-        ocpClearCycles = 0;
     }
 
     /**
@@ -547,7 +539,6 @@ public:
         uint32_t drv8701Fault : 1;
         uint32_t ocpFault : 1;
         uint32_t snsoutFault : 1;
-        // uint32_t dropped: 8;
 
         PidLoopType() : dataAddress(reinterpret_cast<uint32_t>(&SWO::data)) {}
     };
@@ -555,8 +546,6 @@ public:
 
     StatsType stats;
     FaultStates faults;                 // DRV8701 and ocp faults
-    uint16_t ocpPwmCeiling;             // dynamic PWM ceiling during OCP recovery
-    uint8_t ocpClearCycles;             // consecutive clear cycles before releasing OCP latch
     ErrorCodeType errorCode;            // last error
     RingBuffer<PidLoopType, 8> pidLoopBuffer;
 
