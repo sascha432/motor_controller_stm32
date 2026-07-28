@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
 """Graphical SWO PID monitor for STM32 + pyOCD.
 
-Layout:
-- Top 60%: live graphs
-- Middle 20%: logs
-- Bottom 20%: controls
+Author: sascha_lammers@gmx.de
 
 The backend connects to pyOCD gdbserver and decodes raw SWV ITM packets.
 Port 1 is interpreted as PidController::PidLoopType binary frames.

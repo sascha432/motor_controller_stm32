@@ -482,13 +482,15 @@ struct PidController
     }
 
 public:
+    // === Fault states data structure ===
+
     struct FaultStates
     {
-        uint32_t isenseMax;
-        uint32_t vsenseMax;
-        bool drv8701Fault : 1;
-        bool ocpFault : 1;
-        bool snsoutFault : 1;
+        uint32_t isenseMax;             // maximum current as ADC value
+        uint32_t vsenseMax;             // maximum voltage as ADC value
+        bool drv8701Fault : 1;          // DRV8701 fault pin state
+        bool ocpFault : 1;              // OCP(INA381) fault pin state
+        bool snsoutFault : 1;           // SNSOUT(motor current limit) fault pin state
 
         FaultStates() :
             isenseMax(INT32_MAX),
@@ -507,10 +509,12 @@ public:
         }
     };
 
+    // === Statistics data structure ===
+
     struct StatsType
     {
-        Helpers::LowPass<32> rpm;
-        Helpers::LowPass<32> pwm;
+        Helpers::LowPass<32> rpm;           // filtered RPM for displaying
+        Helpers::LowPass<32> pwm;           // filtered PWM for displaying
         struct {
             uint32_t loop;                  // number of times the PID loop has been called
             int32_t pulse;                  // number of pulses received from the A/B motor encoder
@@ -524,6 +528,8 @@ public:
             counter.pulse = 0;
         }
     };
+
+    // === PID tuning data structure ===
 
     struct PidLoopType
     {
@@ -544,23 +550,27 @@ public:
         uint32_t ocpFault : 1;
         uint32_t snsoutFault : 1;
 
-        PidLoopType() : dataAddress(reinterpret_cast<uint32_t>(&SWO::data))
-        {}
+        PidLoopType() :
+            dataAddress(reinterpret_cast<uint32_t>(&SWO::data))
+        {
+        }
     };
     static constexpr size_t kPidLoopTypeSize = sizeof(PidLoopType);
 
+    // === OCP state machine ===
+
     enum class OcpStateType : uint32_t {
-        NONE = 0,
-        TRIGGERED = 1,
-        RECOVERY = 2
+        NONE = 0,           // no OCP condition
+        TRIGGERED = 1,      // OCP detected, decreasing motor current limit
+        RECOVERY = 2        // OCP recovery, increasing motor current limit
     };
 
     struct OcpState
     {
         OcpStateType state;                 // state of the over current protection
-        uint32_t counter;                   // tick counter 0.625ms increments
+        uint32_t counter;                   // 5us tick counter
         uint32_t lastCounter;
-        uint16_t dacMotorCurrent;                 // pwm levels before OCP was triggered
+        uint16_t dacMotorCurrent;
         uint16_t dacInputCurrent;
 
         OcpState() :
@@ -583,27 +593,27 @@ public:
     };
 
 public:
-    float Kp;                           // P, I, D ...
+    float Kp;                           // PID K-values
     float Ki;
     float Kd;
     uint32_t rpm;                       // target RPM
     uint32_t motorDirection;            // motor direction
-    uint16_t antiWindupReduction;
+    uint16_t antiWindupReduction;       // anti-windup reduction factor
 
     uint32_t lastEncoderCounter;        // last encoder counter value
-    int32_t integral;
+    int32_t integral;                   // PID variables
     int32_t lastError;
     int32_t lastDerivative;
 
-    int32_t KpPreCalc;
+    int32_t KpPreCalc;                  // fixed point pre-calculated K-values for PID loop
     int32_t KiPreCalc;
     int32_t KdPreCalc;
-    int32_t cpi;
-    int32_t cpiIntegralLimit;
+    int32_t cpi;                        // counts per interval (RPM)
+    int32_t cpiIntegralLimit;           // cpi integral limit to avoid windup
 
-    StatsType stats;
+    StatsType stats;                    // statistics
     FaultStates faults;                 // DRV8701 and ocp faults
-    OcpState ocp;
+    OcpState ocp;                       // OCP state machine
 
     ErrorCodeType errorCode;            // last error
     RingBuffer<PidLoopType, 8> pidLoopBuffer; // buffer for PID loop data for PID tuning
