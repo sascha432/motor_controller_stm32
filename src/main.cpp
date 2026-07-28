@@ -542,6 +542,17 @@ int main(void)
     SystemClock_Config();
     TIM7_TIM6_Init();
     #if HAVE_USB_DEVICE
+        /*
+
+        AFTER manually disabling vbus sensing in the USB_OTG_FS->GCCFG register, the USB device
+        does not detect the cable in one direction, check PCB ... in one direction the cable is detecetd
+        and fires 2 interrupts, but does not enumerate.. try different usb hub etc...
+        check if tvs diode blocks usb_dp or usb_dm
+        check if reverse usb connector pins are not soldered properly = one direction only/could be a bad cable as well
+
+
+        */
+
         debug_usb_otg_state("pre-init");
         MX_USB_DEVICE_Init();
         /* F107 workaround: disable VBUS sensing when VBUS detect is not wired. */

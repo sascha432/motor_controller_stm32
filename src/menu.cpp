@@ -43,8 +43,9 @@ static const char *kAdvancedMenuItems[] = {
 static const char *kPIDTuningItems[] = {
     "Disabled",                 // 0
     "SWO",                      // 1
-    "UART",                     // 2
-    "USB"                       // 3
+#if HAVE_USB_DEVICE
+    "USB",                      // 2
+#endif
 };
 
 static const char *kPIDParametersItems[] = {
