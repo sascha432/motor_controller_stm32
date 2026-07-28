@@ -15,6 +15,35 @@
 #include "stats.h"
 #include "helpers.h"
 #include "debug.h"
+#if HAVE_USB_DEVICE
+#include <usb_device.h>
+
+static uint32_t irqCount = 0;
+
+static void debug_usb_otg_state(const char *tag)
+{
+    auto *usb = USB_OTG_FS;
+    auto *dev = reinterpret_cast<USB_OTG_DeviceTypeDef *>(reinterpret_cast<uint32_t>(usb) + USB_OTG_DEVICE_BASE);
+    uint32_t pcgcctl = *reinterpret_cast<volatile uint32_t *>(reinterpret_cast<uint32_t>(usb) + USB_OTG_PCGCCTL_BASE);
+
+    DEBUG_PRINT_MSG(
+        DEBUG_DEBUG,
+        "USB[%s] irc#=%u GOTGCTL=%08lx GCCFG=%08lx GAHBCFG=%08lx GUSBCFG=%08lx GINTSTS=%08lx GINTMSK=%08lx GRSTCTL=%08lx DSTS=%08lx DCTL=%08lx PCGCCTL=%08lx",
+        tag,
+        irqCount,
+        static_cast<unsigned long>(usb->GOTGCTL),
+        static_cast<unsigned long>(usb->GCCFG),
+        static_cast<unsigned long>(usb->GAHBCFG),
+        static_cast<unsigned long>(usb->GUSBCFG),
+        static_cast<unsigned long>(usb->GINTSTS),
+        static_cast<unsigned long>(usb->GINTMSK),
+        static_cast<unsigned long>(usb->GRSTCTL),
+        static_cast<unsigned long>(dev->DSTS),
+        static_cast<unsigned long>(dev->DCTL),
+        static_cast<unsigned long>(pcgcctl)
+    );
+}
+#endif
 
 // === core setup ===
 
@@ -434,6 +463,21 @@ extern "C" void HAL_WWDG_EarlyWakeupCallback(WWDG_HandleTypeDef *hwwdg)
     call_default_error_handler(InterruptErrorType::WATCHDOG_TIMEOUT);
 }
 
+#if HAVE_USB_DEVICE
+
+extern PCD_HandleTypeDef hpcd_USB_OTG_FS;
+
+/**
+  * @brief This function handles USB OTG FS global interrupt.
+  */
+extern "C" void OTG_FS_IRQHandler(void)
+{
+    irqCount++;
+    HAL_PCD_IRQHandler(&hpcd_USB_OTG_FS);
+}
+
+#endif
+
 // === core clock configuration ===
 
 /**
@@ -489,114 +533,6 @@ extern "C" void SystemClock_Config(void)
   __HAL_RCC_PLLI2S_ENABLE();
 }
 
-// === USB initialization ===
-
-#define INIT_USB 0
-
-#if INIT_USB
-
-PCD_HandleTypeDef hpcd_USB_OTG_FS;
-
-/**
-  * @brief USB_OTG_FS Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_USB_OTG_FS_PCD_Init(void)
-{
-
-  /* USER CODE BEGIN USB_OTG_FS_Init 0 */
-
-  /* USER CODE END USB_OTG_FS_Init 0 */
-
-  /* USER CODE BEGIN USB_OTG_FS_Init 1 */
-
-  /* USER CODE END USB_OTG_FS_Init 1 */
-  hpcd_USB_OTG_FS.Instance = USB_OTG_FS;
-  hpcd_USB_OTG_FS.Init.dev_endpoints = 4;
-  hpcd_USB_OTG_FS.Init.speed = PCD_SPEED_FULL;
-  hpcd_USB_OTG_FS.Init.phy_itface = PCD_PHY_EMBEDDED;
-  hpcd_USB_OTG_FS.Init.Sof_enable = DISABLE;
-  hpcd_USB_OTG_FS.Init.low_power_enable = DISABLE;
-  hpcd_USB_OTG_FS.Init.vbus_sensing_enable = DISABLE;
-  if (HAL_PCD_Init(&hpcd_USB_OTG_FS) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN USB_OTG_FS_Init 2 */
-
-  /* USER CODE END USB_OTG_FS_Init 2 */
-
-}
-
-
-/**
-  * @brief PCD MSP Initialization
-  * This function configures the hardware resources used in this example
-  * @param hpcd: PCD handle pointer
-  * @retval None
-  */
-extern "C" void HAL_PCD_MspInit(PCD_HandleTypeDef* hpcd)
-{
-  if(hpcd->Instance==USB_OTG_FS)
-  {
-    /* USER CODE BEGIN USB_OTG_FS_MspInit 0 */
-
-    /* USER CODE END USB_OTG_FS_MspInit 0 */
-    /* Peripheral clock enable */
-    __HAL_RCC_USB_OTG_FS_CLK_ENABLE();
-    /* USB_OTG_FS interrupt Init */
-    HAL_NVIC_SetPriority(OTG_FS_IRQn, 0, 0);
-    HAL_NVIC_EnableIRQ(OTG_FS_IRQn);
-    /* USER CODE BEGIN USB_OTG_FS_MspInit 1 */
-
-    /* USER CODE END USB_OTG_FS_MspInit 1 */
-
-  }
-
-}
-
-/**
-  * @brief PCD MSP De-Initialization
-  * This function freeze the hardware resources used in this example
-  * @param hpcd: PCD handle pointer
-  * @retval None
-  */
-extern "C" void HAL_PCD_MspDeInit(PCD_HandleTypeDef* hpcd)
-{
-  if(hpcd->Instance==USB_OTG_FS)
-  {
-    /* USER CODE BEGIN USB_OTG_FS_MspDeInit 0 */
-
-    /* USER CODE END USB_OTG_FS_MspDeInit 0 */
-    /* Peripheral clock disable */
-    __HAL_RCC_USB_OTG_FS_CLK_DISABLE();
-
-    /* USB_OTG_FS interrupt DeInit */
-    HAL_NVIC_DisableIRQ(OTG_FS_IRQn);
-    /* USER CODE BEGIN USB_OTG_FS_MspDeInit 1 */
-
-    /* USER CODE END USB_OTG_FS_MspDeInit 1 */
-  }
-
-}
-
-/**
-  * @brief This function handles USB OTG FS global interrupt.
-  */
-extern "C" void OTG_FS_IRQHandler(void)
-{
-  /* USER CODE BEGIN OTG_FS_IRQn 0 */
-
-  /* USER CODE END OTG_FS_IRQn 0 */
-  HAL_PCD_IRQHandler(&hpcd_USB_OTG_FS);
-  /* USER CODE BEGIN OTG_FS_IRQn 1 */
-
-  /* USER CODE END OTG_FS_IRQn 1 */
-}
-
-#endif
-
 // === main ===
 
 int main(void)
@@ -605,9 +541,18 @@ int main(void)
     HAL_Init();
     SystemClock_Config();
     TIM7_TIM6_Init();
-    #if INIT_USB
-        MX_USB_OTG_FS_PCD_Init();
+    #if HAVE_USB_DEVICE
+        debug_usb_otg_state("pre-init");
+        MX_USB_DEVICE_Init();
+        // /* F107 workaround: disable VBUS sensing when VBUS detect is not wired. */
+        // hpcd_USB_OTG_FS.Instance->GCCFG &= ~(USB_OTG_GCCFG_VBUSASEN | USB_OTG_GCCFG_VBUSBSEN);
+        debug_usb_otg_state("post-init");
+        for(;;) {
+            debug_usb_otg_state("loop");
+            WatchDog::delay(500);
+        }
     #endif
+
     setup();
     EXTI_Init();
     // user init
