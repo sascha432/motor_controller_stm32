@@ -335,15 +335,33 @@ void PidController::ocp_isr()
 {
     ocp.counter++;
     if (ocp.state == OcpStateType::TRIGGERED) {
-        if (adc.getISenseOcpFilteredValue() < ((faults.isenseMax * 800) / 1024)) {
-            trigger_ocp_recovery();
+        if (adc.getISenseOcpFilteredValue() < ((faults.isenseMax * 900) / 1024)) {
+            // start recovery after the current dropped to ~90% of the limit
+            ocp.state = OcpStateType::RECOVERY;
+            ocp.counter = 0;
+        }
+    }
+    if (ocp.state == OcpStateType::RECOVERY) {
+        // every 20us
+        if ((ocp.counter & 0x03) == 0) {
+            uint32_t value = DAC_GET_MOTOR_CURRENT();
+            value = value + (value / 8);
+            if (value > ocp.dacMotorCurrent) {
+                // once the motor current limit is back to the original value, we can reset the OCP state
+                value = ocp.dacMotorCurrent;
+                ocp.state = OcpStateType::NONE;
+                ocp.counter = 0;
+                ocp.lastCounter = 0;
+                LEDs::offLED1and2();
+            }
+            DAC_SET_MOTOR_CURRENT(value);
         }
     }
 }
 
 void PidController::trigger_ocp()
 {
-    if (ocp.state == OcpStateType::NONE) {
+    if (ocp.state == OcpStateType::NONE || ocp.state == OcpStateType::RECOVERY) {
         if (adc.getISenseOcpFilteredValue() > faults.isenseMax) {
             ocp.state = OcpStateType::TRIGGERED;
             ocp.counter = 0;
@@ -367,18 +385,10 @@ void PidController::trigger_ocp()
             // reduce motor current every time we trigger input OCP
             uint16_t value = DAC_GET_MOTOR_CURRENT();
             value = value - (value / 8);
-            if (value < ocp.dacInputCurrent / 2) {
-                value = ocp.dacInputCurrent / 2;
+            if (value < ocp.dacInputCurrent) {
+                value = ocp.dacInputCurrent;
             }
             DAC_SET_MOTOR_CURRENT(value);
         }
     }
-}
-
-void PidController::trigger_ocp_recovery()
-{
-    ocp.state = OcpStateType::NONE;
-    ocp.counter = 0;
-    DAC_SET_MOTOR_CURRENT(ocp.dacMotorCurrent);
-    LEDs::offLED1and2();
 }

@@ -360,12 +360,6 @@ struct PidController
     void trigger_ocp();
 
     /**
-     * @brief Recover from last OCP event
-     *
-     */
-    void trigger_ocp_recovery();
-
-    /**
      * @brief Update internal fault states
      *
      */
@@ -547,7 +541,8 @@ public:
 
     enum class OcpStateType : uint32_t {
         NONE = 0,
-        TRIGGERED = 1
+        TRIGGERED = 1,
+        RECOVERY = 2
     };
 
     struct OcpState
