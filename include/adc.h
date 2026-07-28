@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include "adc_converters.h"
+#include "pins.h"
 
 /**
  * @brief ADC class to read multiple channels using DMA
@@ -68,13 +69,24 @@ struct ADC {
     }
 
     /**
+     * @brief Convert DAC value to milliamps based on the 3.3V vref, 4mΩ shunt and 20x gain
+     *
+     * @param dac
+     * @return constexpr uint32_t
+     */
+    static constexpr uint32_t _DACtoMilliAmps(uint16_t dac)
+    {
+        return (dac * 10073u + 500u) / 1000u;
+    }
+
+    /**
      * @brief Set DAC voltage for the DRV8701 reference voltage
      *
      * @param value
      */
     void setMotorCurrentLimit(uint16_t value)
     {
-        DAC->DHR12R1 = _currentLimitValueToDAC(value) & 0xfff;
+        DAC_SET_MOTOR_CURRENT(_currentLimitValueToDAC(value));
     }
 
     /**
@@ -84,7 +96,7 @@ struct ADC {
      */
     void setInputCurrentLimit(uint16_t value)
     {
-        DAC->DHR12R2 = _currentLimitValueToDAC(value) & 0xfff;
+        DAC_SET_INPUT_CURRENT(_currentLimitValueToDAC(value));
     }
 
     /**

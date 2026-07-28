@@ -20,6 +20,8 @@ void PidController::reset()
     faults.reset();
     faults.isenseMax = ADC::_currentLimitValueToDAC(eeprom.getInputCurrentLimit());
     faults.vsenseMax = ADCConverter::Voltage::reverse(eeprom.getOvpProtection());
+    adc.setMotorCurrentLimit(eeprom.getMotorCurrentLimit());
+    adc.setInputCurrentLimit(eeprom.getInputCurrentLimit());
     ocp.reset();
     resetFaults();
     applyPIDParams();
@@ -243,10 +245,10 @@ void PidController::isr()
 
     if (eeprom.isPIDMode()) {
         if (ocp.state != OcpStateType::NONE) {
-            setIntegral((getIntegral() * 900) / 1024); // strong anti windup reduction during OCP condition
+            setIntegral((getIntegral() * 800) / 1024); // strong anti windup reduction during OCP condition
         }
         else if (antiWindupReduction) {
-            if (pwmLevel < -kMaxPWMLevel || pwmLevel > (kMaxPWMLevel * 2)) {
+            if (pwmLevel != clampedPwmLevel) {
                 setIntegral((getIntegral() * antiWindupReduction) / kAntiWindupFactor);
             }
         }
@@ -254,10 +256,7 @@ void PidController::isr()
 
     // apply new PWM level if motor is running
     if (running) {
-        // do not update PWM during OCP condition
-        if (ocp.state != OcpStateType::TRIGGERED) {
-            PID_WRITE_MOTOR_PWM_ON(clampedPwmLevel, motorDirection);
-        }
+        PID_WRITE_MOTOR_PWM_ON(clampedPwmLevel, motorDirection);
     }
 
     // update pwm stats
@@ -296,6 +295,8 @@ void PidController::isr()
         item.currentAverage = adc.getISenseAverageValue();
         item.motorTemperature = adc.getMotorNTCValue();
         item.mosfetTemperature = adc.getMosfetNTCValue();
+        item.dacMotorCurrent = DAC_GET_MOTOR_CURRENT();
+        item.dacInputCurrent =  DAC_GET_INPUT_CURRENT();
         item.integral = getIntegral();
         item.running = running ? 1U : 0U;
         item.drv8701Fault = faults.drv8701Fault ? 1U : 0U;
@@ -332,56 +333,52 @@ void PidController::isr()
 
 void PidController::ocp_isr()
 {
-    if (ocp.state == OcpStateType::RECOVERING) {
-        // increase counter to track recovery time
-        ocp.counter++;
-    }
-    else if (ocp.state == OcpStateType::TRIGGERED) {
-        // increase counter to track trigger time
-        ocp.counter++;
-        if (ocp.counter >= kOcpMaxRecoveryTicks) {
-            // fatal error if the OCP condition is not cleared after a certain time
-            setErrorCode(ErrorCodeType::OCP);
-        }
-        else if (ocp.counter >= kOcpRecoveryMinTicks) {
-            if (adc.getISenseOcpFilteredValue() < faults.isenseMax) {
-                trigger_ocp_recovery(); // recovery condition met
-            }
+    ocp.counter++;
+    if (ocp.state == OcpStateType::TRIGGERED) {
+        if (adc.getISenseOcpFilteredValue() < ((faults.isenseMax * 800) / 1024)) {
+            trigger_ocp_recovery();
         }
     }
 }
 
 void PidController::trigger_ocp()
 {
-    if (ocp.state == OcpStateType::RECOVERING) {
-        if (ocp.counter <= kOcpRetriggerMinTicks) {
-            // do not allow to retrigger for n ticks
-            return;
-        }
-        ocp.state = OcpStateType::NONE;
-    }
     if (ocp.state == OcpStateType::NONE) {
         if (adc.getISenseOcpFilteredValue() > faults.isenseMax) {
-            // set triggered state and turn motor off
             ocp.state = OcpStateType::TRIGGERED;
             ocp.counter = 0;
-            // restore a fraction of the PWM to avoid retriggering OCP immediately after recovery, the PID loop will restore the correct PWM level
-            ocp.pwmLevel1 = PID_READ_MOTOR_PWM_DRV_IN1();
-            ocp.pwmLevel2 = PID_READ_MOTOR_PWM_DRV_IN2();
-            PID_WRITE_MOTOR_PWM_OFF();
+            ocp.lastCounter = 0;
+            uint16_t value = ocp.dacMotorCurrent;
+            // start with a max. of 4x the input current limit or the current motor current limit, whichever is lower
+            if (value > ocp.dacInputCurrent * 4U) {
+                value = ocp.dacInputCurrent * 4U;
+            }
+            else {
+                value = value - (value / 8);
+            }
+            DAC_SET_MOTOR_CURRENT(value);
             LEDs::onLED2();
+        }
+    }
+    else if (ocp.state == OcpStateType::TRIGGERED) {
+        // limit to min. 20us
+        if (ocp.counter >= ocp.lastCounter + 4) {
+            ocp.lastCounter = ocp.counter;
+            // reduce motor current every time we trigger input OCP
+            uint16_t value = DAC_GET_MOTOR_CURRENT();
+            value = value - (value / 8);
+            if (value < ocp.dacInputCurrent / 2) {
+                value = ocp.dacInputCurrent / 2;
+            }
+            DAC_SET_MOTOR_CURRENT(value);
         }
     }
 }
 
 void PidController::trigger_ocp_recovery()
 {
-    // set recovering state and restore PWM levels
-    ocp.state = OcpStateType::RECOVERING;
+    ocp.state = OcpStateType::NONE;
     ocp.counter = 0;
-    if (running) {
-        PID_WRITE_MOTOR_PWM_DRV_IN1(ocp.pwmLevel1);
-        PID_WRITE_MOTOR_PWM_DRV_IN2(ocp.pwmLevel2);
-    }
+    DAC_SET_MOTOR_CURRENT(ocp.dacMotorCurrent);
     LEDs::offLED1and2();
 }

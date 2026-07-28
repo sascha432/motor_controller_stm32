@@ -91,3 +91,9 @@
 #define PID_WRITE_MOTOR_PWM_ON(level, reverse)      (reverse) ? PID_WRITE_MOTOR_PWM_REVERSE(level) : PID_WRITE_MOTOR_PWM_FORWARD(level)
 #define PID_WRITE_MOTOR_PWM_OFF()                   (TIM1->CCR1 = 0, TIM1->CCR2 = 0)
 #define PID_WRITE_MOTOR_PWM_BREAK(level)            (TIM1->CCR1 = (level), TIM1->CCR2 = (level))
+
+// DAC macros for DRV8701 and INA381 overcurrent protection
+#define DAC_SET_MOTOR_CURRENT(value)                (DAC->DHR12R1 = (value) & 0xfff)
+#define DAC_SET_INPUT_CURRENT(value)                (DAC->DHR12R2 = (value) & 0xfff)
+#define DAC_GET_MOTOR_CURRENT()                     ((uint16_t)DAC->DHR12R1)
+#define DAC_GET_INPUT_CURRENT()                     ((uint16_t)DAC->DHR12R2)

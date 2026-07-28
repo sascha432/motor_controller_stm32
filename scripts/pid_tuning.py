@@ -60,6 +60,10 @@ class Sample:
     current_ocp_ma: int
     current_avg_adc: int
     current_avg_ma: int
+    dac_motor_current: int
+    dac_motor_current_ma: int
+    dac_input_current: int
+    dac_input_current_ma: int
     motor_temp_adc: int
     motor_temp_c: float
     mosfet_temp_adc: int
@@ -86,7 +90,7 @@ class AppConfig:
 
 
 PID_FRAME_MAGIC = b"PID1"
-PID_ITEM_SIZE = 32
+PID_ITEM_SIZE = 36
 PID_PWM_MAX_LEVEL = 3599.0
 
 
@@ -108,6 +112,11 @@ def convert_voltage_mv(adc_value: int) -> int:
 def convert_current_ma(adc_value: int) -> int:
     mv_per_lsb_times_1000 = (VREF_MV * 1000) // ADC_MAX
     return (adc_value * mv_per_lsb_times_1000) // (CURRENT_SHUNT_MOHM * CURRENT_GAIN)
+
+
+def convert_current_limit_dac_to_ma(dac_value: int) -> int:
+    # Exact reverse helper from firmware: ADC::_DACtoMilliAmps.
+    return (dac_value * 10073 + 500) // 1000
 
 
 def convert_ntc_celsius(adc_value: int) -> float:
@@ -141,13 +150,15 @@ def decode_pid_item(payload: bytes) -> Optional[Sample]:
     if len(payload) != PID_ITEM_SIZE:
         return None
 
-    sequence, data_address, rpm, pwm, voltage, i_ocp, i_avg, motor_ntc, mosfet_ntc, integral, faults = struct.unpack(
-        "<II7H2xII", payload
+    sequence, data_address, rpm, pwm, voltage, i_ocp, i_avg, motor_ntc, mosfet_ntc, dac_motor, dac_input, integral, faults = struct.unpack(
+        "<II9H2xII", payload
     )
-
-    running, drv_fault, ocp_fault, snsout_fault = decode_fault_word(faults)
+    if integral > 0x7FFFFFFF: # make signed
+        integral -= 0x100000000
     if rpm > 55000: # RPM might go negative due to small vibrations when the motor is stalled and the sensor limit is 55k RPM
         rpm = 0
+
+    running, drv_fault, ocp_fault, snsout_fault = decode_fault_word(faults)
     return Sample(
         sequence=sequence,
         data_address=data_address,
@@ -159,6 +170,10 @@ def decode_pid_item(payload: bytes) -> Optional[Sample]:
         current_ocp_ma=convert_current_ma(i_ocp),
         current_avg_adc=i_avg,
         current_avg_ma=convert_current_ma(i_avg),
+        dac_motor_current=dac_motor,
+        dac_motor_current_ma=convert_current_limit_dac_to_ma(dac_motor),
+        dac_input_current=dac_input,
+        dac_input_current_ma=convert_current_limit_dac_to_ma(dac_input),
         motor_temp_adc=motor_ntc,
         motor_temp_c=convert_ntc_celsius(motor_ntc),
         mosfet_temp_adc=mosfet_ntc,
@@ -176,6 +191,8 @@ def is_plausible_sample(sample: Sample, last_sequence: Optional[int]) -> bool:
         sample.voltage_adc,
         sample.current_ocp_adc,
         sample.current_avg_adc,
+        sample.dac_motor_current,
+        sample.dac_input_current,
         sample.motor_temp_adc,
         sample.mosfet_temp_adc,
     ):
@@ -608,7 +625,7 @@ class PIDTuningApp:
 
         self.root = tk.Tk()
         self.root.title("PID Tuning SWO Monitor")
-        self.root.geometry("1920x820")
+        self.root.geometry("1920x880")
         self.root.minsize(1000, 640)
 
         self.window_seconds_var = tk.StringVar(value="10")
@@ -704,7 +721,7 @@ class PIDTuningApp:
         titles = [
             "RPM / Avg RPM",
             "PWM (%) / Avg PWM (%)",
-            "Current Avg/OCP (mA)",
+            "Current Avg/OCP + DAC Limits (mA)",
             "Voltage (mV)",
             "Temperatures (C)",
             "Integral",
@@ -751,11 +768,11 @@ class PIDTuningApp:
 
     def _build_faults_panel(self) -> None:
         wrap = ttk.LabelFrame(self.faults_frame, text="Fault Indicators")
-        wrap.pack(fill=tk.BOTH, expand=True, padx=10, pady=8)
+        wrap.pack(fill=tk.BOTH, expand=True, padx=10, pady=4)
         wrap.columnconfigure(0, weight=1)
         wrap.columnconfigure(1, weight=0)
 
-        ttk.Label(wrap, text="OCP").grid(row=0, column=0, sticky="w", padx=8, pady=4)
+        ttk.Label(wrap, text="Over Current Protection").grid(row=0, column=0, sticky="w", padx=8, pady=4)
         self.ocp_indicator = tk.Label(wrap, width=10, anchor="center", relief="groove")
         self.ocp_indicator.grid(row=0, column=1, sticky="e", padx=8, pady=4)
 
@@ -763,7 +780,7 @@ class PIDTuningApp:
         self.driver_fault_indicator = tk.Label(wrap, width=10, anchor="center", relief="groove")
         self.driver_fault_indicator.grid(row=1, column=1, sticky="e", padx=8, pady=4)
 
-        ttk.Label(wrap, text="DRV8701 SNSOUT").grid(row=2, column=0, sticky="w", padx=8, pady=4)
+        ttk.Label(wrap, text="DRV8701 SNSOUT (OCP)").grid(row=2, column=0, sticky="w", padx=8, pady=4)
         self.driver_ocp_indicator = tk.Label(wrap, width=10, anchor="center", relief="groove")
         self.driver_ocp_indicator.grid(row=2, column=1, sticky="e", padx=8, pady=4)
 
@@ -997,6 +1014,8 @@ class PIDTuningApp:
         self.pwm_avg = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
         self.current_avg_ma = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
         self.current_ocp_ma = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
+        self.dac_motor_current_ma = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
+        self.dac_input_current_ma = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
         self.voltage_mv = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
         self.motor_temp_c = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
         self.mosfet_temp_c = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
@@ -1007,25 +1026,41 @@ class PIDTuningApp:
 
         (self.line_rpm,) = ax0.plot(self.x_values, self.rpm, label="RPM", color="#0077B6")
         (self.line_rpm_avg,) = ax0.plot(self.x_values, self.rpm_avg, label="Avg RPM", color="#E85D04", linestyle="--")
-        ax0.legend(loc="upper right")
+        ax0.legend(loc="upper left")
 
         (self.line_pwm,) = ax1.plot(self.x_values, self.pwm, label="PWM %", color="#2A9D8F")
         (self.line_pwm_avg,) = ax1.plot(self.x_values, self.pwm_avg, label="Avg PWM %", color="#9A031E", linestyle="--")
-        ax1.legend(loc="upper right")
+        ax1.legend(loc="upper left")
 
         (self.line_i_avg,) = ax2.plot(self.x_values, self.current_avg_ma, label="Current Avg", color="#4361EE")
         (self.line_i_ocp,) = ax2.plot(self.x_values, self.current_ocp_ma, label="Current OCP", color="#F72585")
-        ax2.legend(loc="upper right")
+        (self.line_i_motor_limit,) = ax2.plot(
+            self.x_values,
+            self.dac_motor_current_ma,
+            label="Motor Limit (DAC)",
+            color="#2A9D8F",
+            linestyle=":",
+            linewidth=1.2,
+        )
+        (self.line_i_input_limit,) = ax2.plot(
+            self.x_values,
+            self.dac_input_current_ma,
+            label="Input Limit (DAC)",
+            color="#FF9F1C",
+            linestyle=":",
+            linewidth=1.2,
+        )
+        ax2.legend(loc="upper left")
 
         (self.line_u_mv,) = ax3.plot(self.x_values, self.voltage_mv, label="Voltage", color="#FF9F1C")
-        ax3.legend(loc="upper right")
+        ax3.legend(loc="upper left")
 
         (self.line_motor_t,) = ax4.plot(self.x_values, self.motor_temp_c, label="Motor", color="#3A86FF")
         (self.line_mosfet_t,) = ax4.plot(self.x_values, self.mosfet_temp_c, label="MOSFET", color="#FB5607")
-        ax4.legend(loc="upper right")
+        ax4.legend(loc="upper left")
 
         (self.line_integral,) = ax5.plot(self.x_values, self.integral, label="Integral", color="#6A4C93")
-        ax5.legend(loc="upper right")
+        ax5.legend(loc="upper left")
 
     def _append_value(self, series: List[float], value: float) -> None:
         series.append(value)
@@ -1058,6 +1093,8 @@ class PIDTuningApp:
         self._append_value(self.pwm, pwm_percent)
         self._append_value(self.current_avg_ma, float(sample.current_avg_ma))
         self._append_value(self.current_ocp_ma, float(sample.current_ocp_ma))
+        self._append_value(self.dac_motor_current_ma, float(sample.dac_motor_current_ma))
+        self._append_value(self.dac_input_current_ma, float(sample.dac_input_current_ma))
         self._append_value(self.voltage_mv, float(sample.voltage_mv))
         self._append_value(self.motor_temp_c, float(sample.motor_temp_c))
         self._append_value(self.mosfet_temp_c, float(sample.mosfet_temp_c))
@@ -1085,6 +1122,8 @@ class PIDTuningApp:
         self.line_pwm_avg.set_data(self.x_values, self.pwm_avg)
         self.line_i_avg.set_data(self.x_values, self.current_avg_ma)
         self.line_i_ocp.set_data(self.x_values, self.current_ocp_ma)
+        self.line_i_motor_limit.set_data(self.x_values, self.dac_motor_current_ma)
+        self.line_i_input_limit.set_data(self.x_values, self.dac_input_current_ma)
         self.line_u_mv.set_data(self.x_values, self.voltage_mv)
         self.line_motor_t.set_data(self.x_values, self.motor_temp_c)
         self.line_mosfet_t.set_data(self.x_values, self.mosfet_temp_c)

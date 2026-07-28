@@ -29,10 +29,6 @@ struct PidController
             (18.0f / kPWMScaleMultiplier)
         );
     static constexpr bool kProgramPPR = false;                              // set to true to program the MT6701 encoder during boot over i2c
-    // 5us per tick 200KHz
-    static constexpr uint32_t kOcpMaxRecoveryTicks = 80;                    // 400us max. delay before the OCP turns into hard fault
-    static constexpr uint32_t kOcpRecoveryMinTicks = 4;                     // 20us min. delay before the OCP isr checks the ADC again
-    static constexpr uint32_t kOcpRetriggerMinTicks = 1;                    // 5us min. delay before the OCP isr allows to retrigger OCP
 
     /*
         the kScaleFactor calculation gives the following range for tuning PID values (Kp, Ki, Kd)
@@ -536,6 +532,8 @@ public:
         uint16_t currentAverage;
         uint16_t motorTemperature;
         uint16_t mosfetTemperature;
+        uint16_t dacMotorCurrent;
+        uint16_t dacInputCurrent;
         uint32_t integral;
         uint32_t running: 1;
         uint32_t drv8701Fault : 1;
@@ -549,22 +547,23 @@ public:
 
     enum class OcpStateType : uint32_t {
         NONE = 0,
-        TRIGGERED = 1,
-        RECOVERING = 2
+        TRIGGERED = 1
     };
 
     struct OcpState
     {
         OcpStateType state;                 // state of the over current protection
         uint32_t counter;                   // tick counter 0.625ms increments
-        uint16_t pwmLevel1;                 // pwm levels before OCP was triggered
-        uint16_t pwmLevel2;
+        uint32_t lastCounter;
+        uint16_t dacMotorCurrent;                 // pwm levels before OCP was triggered
+        uint16_t dacInputCurrent;
 
         OcpState() :
             state(OcpStateType::NONE),
             counter(0),
-            pwmLevel1(0),
-            pwmLevel2(0)
+            lastCounter(0),
+            dacMotorCurrent(0),
+            dacInputCurrent(0)
         {
         }
 
@@ -572,8 +571,9 @@ public:
         {
             state = OcpStateType::NONE;
             counter = 0;
-            pwmLevel1 = 0;
-            pwmLevel2 = 0;
+            lastCounter = 0;
+            dacMotorCurrent = DAC_GET_MOTOR_CURRENT();
+            dacInputCurrent = DAC_GET_INPUT_CURRENT();
         }
     };
 
