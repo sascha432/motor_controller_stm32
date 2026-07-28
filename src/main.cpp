@@ -544,8 +544,8 @@ int main(void)
     #if HAVE_USB_DEVICE
         debug_usb_otg_state("pre-init");
         MX_USB_DEVICE_Init();
-        // /* F107 workaround: disable VBUS sensing when VBUS detect is not wired. */
-        // hpcd_USB_OTG_FS.Instance->GCCFG &= ~(USB_OTG_GCCFG_VBUSASEN | USB_OTG_GCCFG_VBUSBSEN);
+        /* F107 workaround: disable VBUS sensing when VBUS detect is not wired. */
+        hpcd_USB_OTG_FS.Instance->GCCFG &= ~(USB_OTG_GCCFG_VBUSASEN | USB_OTG_GCCFG_VBUSBSEN);
         debug_usb_otg_state("post-init");
         for(;;) {
             debug_usb_otg_state("loop");
