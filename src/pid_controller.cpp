@@ -352,7 +352,7 @@ void PidController::ocp_isr()
                 ocp.state = OcpStateType::NONE;
                 ocp.counter = 0;
                 ocp.lastCounter = 0;
-                LEDs::offLED1and2();
+                LEDs::off();
             }
             DAC_SET_MOTOR_CURRENT(value);
         }
@@ -375,7 +375,7 @@ void PidController::trigger_ocp()
                 value = value - (value / 8);
             }
             DAC_SET_MOTOR_CURRENT(value);
-            LEDs::onLED2();
+            LEDs::onLEDWarning();
         }
     }
     else if (ocp.state == OcpStateType::TRIGGERED) {

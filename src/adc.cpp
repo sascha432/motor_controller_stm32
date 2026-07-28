@@ -118,7 +118,7 @@ extern "C" void DMA1_Channel1_IRQHandler()
         if (adc.getVSenseValue() > pid.faults.vsenseMax) {
             if (pid.errorCode != PidController::ErrorCodeType::OVP) {
                 pid.setErrorCode(PidController::ErrorCodeType::OVP);
-                LEDs::onLED1();
+                LEDs::onLEDError();
             }
         }
 

@@ -99,11 +99,11 @@ static void loop()
     }
 
     // LED 1 signals fault or driver ocp
-    if (LEDs::isLED1On()) {
+    if (LEDs::isErrorLEDOn()) {
         // check if faults have cleared
         if (!pid.faults.drv8701Fault) {//} && !pid.faults.snsoutFault) {
             // turn LEDs off
-            LEDs::offLED1and2();
+            LEDs::off();
         }
     }
 
@@ -230,7 +230,7 @@ extern "C" void EXTI15_10_IRQHandler(void)
         auto fault = pid.faults.drv8701Fault;
         pid.faults.drv8701Fault = (digitalPinToGPIO<DRV8701_FAULT_PIN>()->IDR & (1 << digitalPinToBit(DRV8701_FAULT_PIN))) == 0;
         if (!fault && pid.faults.drv8701Fault) {
-            LEDs::onLED1(); // turn fault LED on, main loop resets it after the fault has cleared
+            LEDs::onLEDError(); // turn fault LED on, main loop resets it after the fault has cleared
         }
     }
     if (pending & (1 << 12)) {

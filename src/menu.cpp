@@ -160,10 +160,10 @@ void Menu::showWelcomeScreen()
             }
             LEDs::illuminationLedSetPWM(currentBrightness);
             // blink motor LEDs
-            ((elapsed / 500) & 0x01) ? LEDs::onLED1() : LEDs::onLED2();
+            ((elapsed / 500) & 0x01) ? LEDs::onLEDError() : LEDs::onLEDWarning();
             WatchDog::delay(8);
         }
-        LEDs::offLED1and2();
+        LEDs::off();
     }
     else {
         WatchDog::delay(UIConstants::kWelcomeScreenTimeout);

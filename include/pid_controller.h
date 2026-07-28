@@ -8,6 +8,7 @@
 #include "pins.h"
 #include "eeprom.h"
 #include "stats.h"
+#include "leds.h"
 
 struct PidController
 {
@@ -71,6 +72,7 @@ struct PidController
         rpm(0),
         motorDirection(EEPROM::kMotorDirectionForward),
         antiWindupReduction(kAntiWindupReduction),
+        errorCode(ErrorCodeType::NONE),
         running(false)
     {
         setKp(1.0f);
@@ -415,6 +417,9 @@ struct PidController
         PID_WRITE_MOTOR_PWM_OFF();
         running = false;
         errorCode = code;
+        if (code != ErrorCodeType::NONE) {
+            LEDs::onLEDError();
+        }
     }
 
     /**
@@ -485,16 +490,20 @@ public:
         bool ocpFault : 1;
         bool snsoutFault : 1;
 
-        FaultStates() : isenseMax(0), vsenseMax(0), drv8701Fault(false), ocpFault(false), snsoutFault(false)
-        {}
+        FaultStates() :
+            isenseMax(INT32_MAX),
+            vsenseMax(INT32_MAX),
+            drv8701Fault(false),
+            ocpFault(false),
+            snsoutFault(false)
+        {
+        }
 
         void reset()
         {
-            __disable_irq();
             drv8701Fault = false;
             ocpFault = false;
             snsoutFault = false;
-            __enable_irq();
         }
     };
 
@@ -507,7 +516,8 @@ public:
             int32_t pulse;                  // number of pulses received from the A/B motor encoder
         } counter;
 
-        void reset(uint32_t rpmCounter) {
+        void reset(uint32_t rpmCounter)
+        {
             rpm.reset();
             pwm.reset();
             counter.loop = 0;

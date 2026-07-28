@@ -99,7 +99,14 @@ struct Screen
     static constexpr lv_coord_t kSliderScreenKnobSize = 30;
     static constexpr lv_coord_t kSliderScreenValueTopGap = 40;
 
+    // diagnostics screen style constants
     static constexpr const lv_font_t *kDiagnosticsScreenLabelFont = &lv_font_montserrat_14;
+    static constexpr lv_coord_t kDiagnosticScreenViewportX = 10;
+    static constexpr lv_coord_t kDiagnosticScreenViewportY = 10;
+    static constexpr lv_coord_t kDiagnosticScreenMargin = 20;
+    static constexpr lv_coord_t kDiagnosticScreenScrollbarWidth = 4;
+    static constexpr lv_coord_t kDiagnosticScreenRowHeight = 20;
+    static constexpr int32_t kDiagnosticScreenRowCount = 7;
 
     static constexpr lv_coord_t kDashboardScreenContainerWidth = TFT_DIM_WIDTH - 16;
     static constexpr lv_coord_t kDashboardScreenContainerHeight = TFT_DIM_HEIGHT - 12;
@@ -274,30 +281,45 @@ struct PidSliderScreen : public SliderScreen
 struct DiagnosticsScreen :  public Screen
 {
     DiagnosticsScreen(Type id) : Screen(id),
+        viewport(nullptr),
+        content(nullptr),
         firmwareLabel(nullptr),
         vccLabel(nullptr),
         currentLabel(nullptr),
         motorTempLabel(nullptr),
         mosfetTempLabel(nullptr),
-        rpmPwmLabel(nullptr)
-    {}
+        rpmPwmLabel(nullptr),
+        lastErrorLabel(nullptr),
+        scrollbarTrack(nullptr),
+        scrollbarThumb(nullptr),
+        scrollOffset(0),
+        scrollMax(0)
+    {
+        setMaxAcceleration(1);
+        setSteps(-1);
+    }
 
     virtual void load() override;
-
-    void update() {
-        _refreshVisuals();
-    }
+    virtual void setValue(uint32_t value) override;
+    virtual void update() override;
 
 protected:
     void _refreshVisuals();
 
 private:
+    lv_obj_t *viewport;
+    lv_obj_t *content;
     lv_obj_t *firmwareLabel;
     lv_obj_t *vccLabel;
     lv_obj_t *currentLabel;
     lv_obj_t *motorTempLabel;
     lv_obj_t *mosfetTempLabel;
     lv_obj_t *rpmPwmLabel;
+    lv_obj_t *lastErrorLabel;
+    lv_obj_t *scrollbarTrack;
+    lv_obj_t *scrollbarThumb;
+    int32_t scrollOffset;
+    int32_t scrollMax;
 };
 
 // === Dashboard Screen ===
