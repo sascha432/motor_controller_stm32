@@ -11,17 +11,19 @@ MotorEncoder motorEncoder;
 
 void PidController::reset()
 {
-    lastEncoderCounter = readEncoderCounter();
+    lastEncoderCounter = PID_READ_ENCODER_COUNTER();
     lastError = 0;
     lastDerivative = 0;
     integral = 0;
-    stats.reset(readRpmCounter());
+    stats.reset(PID_READ_RPM_COUNTER());
     errorCode = ErrorCodeType::NONE;
     faults.reset();
     faults.isenseMax = ADC::_currentLimitValueToDAC(eeprom.getInputCurrentLimit());
     faults.vsenseMax = ADCConverter::Voltage::reverse(eeprom.getOvpProtection());
     adc.setMotorCurrentLimit(eeprom.getMotorCurrentLimit());
     adc.setInputCurrentLimit(eeprom.getInputCurrentLimit());
+    lastRpmCounter = PID_READ_RPM_COUNTER();
+    lastRpmCounterUpdated = HAL_GetTick();
     ocp.reset();
     resetFaults();
     applyPIDParams();
@@ -207,7 +209,7 @@ bool PidController::motorToggle()
 void PidController::isr()
 {
     // most timers are 16bit counters only
-    int32_t delta = getDelta(readEncoderCounter());
+    int32_t delta = getDelta(PID_READ_ENCODER_COUNTER());
     // apply fixed sensor, motor and selected motor direction to delta
     if (
         eeprom.isForwardMotorDirection() ?
@@ -272,12 +274,23 @@ void PidController::isr()
             if (stats.counter.pulse < -10) { // sensor counts backwards, wrong direction set
                 setErrorCode(ErrorCodeType::SENSOR_REVERSE);
             }
-            else if (readRpmCounter() >= 1 && stats.counter.pulse < 10) { // we have 1 rotation but less than 10 pulses, something is wrong with the sensor
+            else if (PID_READ_RPM_COUNTER() >= 1 && stats.counter.pulse < 10) { // we have 1 rotation but less than 10 pulses, something is wrong with the sensor
                 setErrorCode(ErrorCodeType::SENSOR);
             }
             else if (stats.counter.pulse < (kCPR / 4)) { // quarter of a rotation or less, motor has stalled
                 setErrorCode(ErrorCodeType::STALL);
             }
+        }
+
+        // check for motor stall
+        uint32_t now = HAL_GetTick();
+        uint32_t newRpmCounter = PID_READ_RPM_COUNTER();
+        if (newRpmCounter >= lastRpmCounter + 2) { // require more than one rotation before updating the value
+            lastRpmCounter = newRpmCounter;
+            lastRpmCounterUpdated = now;
+        }
+        if (now - lastRpmCounterUpdated > eeprom.getMotorStallTimeout()) {
+            setErrorCode(ErrorCodeType::STALL);
         }
     }
 

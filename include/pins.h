@@ -97,3 +97,7 @@
 #define DAC_SET_INPUT_CURRENT(value)                (DAC->DHR12R2 = (value) & 0xfff)
 #define DAC_GET_MOTOR_CURRENT()                     ((uint16_t)DAC->DHR12R1)
 #define DAC_GET_INPUT_CURRENT()                     ((uint16_t)DAC->DHR12R2)
+
+// macros to read encoder pulse counter and rpm counter
+#define PID_READ_ENCODER_COUNTER()                  ((uint16_t)TIM4->CNT) // QDEC on MT6701_I2C_SCL_PIN/MT6701_I2C_SDA_PIN
+#define PID_READ_RPM_COUNTER()                      ((uint16_t)TIM5->CNT) // falling edge counter on ENC1_ANALOG_PIN

@@ -159,6 +159,7 @@
 			"OCPOLARITY",
 			"Periph",
 			"PLLMUL",
+			"QDEC",
 			"RCC_ADCPCLK2_DIV6",
 			"RCC_CFGR_ADCPRE",
 			"RCC_CLOCKTYPE_HCLK",

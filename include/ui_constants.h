@@ -30,7 +30,7 @@ struct UIConstants
     static constexpr uint8_t kMaxTFTBrightness = 100;                   // Max. TFT Brightness
     static constexpr uint8_t kMinLEDBrightness = 0;                     // Min. LED Brightness
     static constexpr uint8_t kMaxLEDBrightness = 100;                   // Max. LED Brightness
-    static constexpr uint32_t kMinMotorStallTimeout = 100;              // Motor stall time in milliseconds
+    static constexpr uint32_t kMinMotorStallTimeout = 250;              // Motor stall time in milliseconds
     static constexpr uint32_t kMaxMotorStallTimeout = 10000;            // Motor stall time in milliseconds
     static constexpr int32_t kStepMotorStallTimeout = 100;              // Motor stall time step in milliseconds
     static constexpr uint8_t kMinMosfetTemperature = 25;                // Min. MOSFET temperature in °C
@@ -57,7 +57,7 @@ struct UIConstants
     static constexpr float kDefaultMotorCurrent = 10.0f;                // Default peak motor current in A
     static constexpr uint8_t kDefaultMotorBrake = 100;                  // Default motor brake in percentage (0-100)
     static constexpr uint16_t kDefaultMotorStallTimeout = 1500;         // Default motor stall time in milliseconds
-    static constexpr uint16_t kDefaultMinRPM = 10;                      // Default min. motor RPM
+    static constexpr uint16_t kDefaultMinRPM = 100;                     // Default min. motor RPM
     static constexpr uint16_t kDefaultMaxRPM = 15000;                   // Default max. motor RPM
     static constexpr uint8_t kDefaultMosfetTemperatureLimit = 95;       // Default MOSFET temperature limit in °C
     static constexpr uint8_t kDefaultMotorTemperatureLimit = 55;        // Default motor temperature limit in °C

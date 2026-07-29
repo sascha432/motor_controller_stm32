@@ -259,27 +259,6 @@ struct PidController
     }
 
     /**
-     * @brief Read the encoder counter (TIM4->CNT)
-     *
-     * @return uint16_t
-     */
-    inline uint16_t readEncoderCounter() const
-    {
-        return TIM4->CNT;
-    }
-
-    /**
-     * @brief Read the analog signal RPM counter (TIM5->CNT)
-     *
-     * @return uint16_t
-     */
-
-    inline uint16_t readRpmCounter() const
-    {
-        return TIM5->CNT;
-    }
-
-    /**
      * @brief Reset controller
      *
      */
@@ -603,6 +582,9 @@ public:
     int32_t KdPreCalc;
     int32_t cpi;                        // counts per interval (RPM)
     int32_t cpiIntegralLimit;           // cpi integral limit to avoid windup
+
+    uint32_t lastRpmCounter;
+    uint32_t lastRpmCounterUpdated;
 
     StatsType stats;                    // statistics
     FaultStates faults;                 // DRV8701 and ocp faults
