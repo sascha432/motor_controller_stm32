@@ -37,7 +37,6 @@ struct Menu
 
     void saveEEPROMChanges();
     void applyEEPROMSettings();
-    void applyPIDTuningSettings();
 };
 
 extern Menu menu;

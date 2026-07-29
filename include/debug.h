@@ -25,15 +25,20 @@ struct SWO {
     }
 
     static bool state;
+    enum class EnableState : uint8_t {
+        DISABLED = 0,
+        SWO = 1,
+        USB = 2
+    };
     struct DataType {
         volatile float Kp;
         volatile float Ki;
         volatile float Kd;
         volatile float antiWindup;
         volatile uint16_t rpm;
-        volatile bool enabled;
+        volatile EnableState enabled;
         volatile bool changed;
-        DataType() : Kp(0), Ki(0), Kd(0), antiWindup(0), rpm(0), enabled(false), changed(false) {}
+        DataType() : Kp(0), Ki(0), Kd(0), antiWindup(0), rpm(0), enabled(EnableState::DISABLED), changed(false) {}
     };
     static DataType data;
 };

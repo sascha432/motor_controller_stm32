@@ -175,25 +175,15 @@ static void loop()
         lastLvHandler = HAL_GetTick();
     }
 
-    if (SWO::data.enabled) {
+    if (SWO::data.enabled != SWO::EnableState::DISABLED) {
         // send PID tuning data
         PidController::PidLoopType item;
         static constexpr char kPidFrameMagic[] = {'P', 'I', 'D', '1'};
         while (pid.pidLoopBuffer.pop(item)) {
-            #if 1
-            // don't check writes
-            SWO::write(1, kPidFrameMagic, sizeof(kPidFrameMagic));
-            SWO::writeObject<1>(item);
-            #else
-            if (
-                (SWO::write(1, kPidFrameMagic, sizeof(kPidFrameMagic)) != sizeof(kPidFrameMagic)) ||
-                (SWO::writeObject<1>(item) != sizeof(item))
-            ) {
-                // if the SWO buffer is full, clear the buffer to avoid blocking the PID loop
-                pid.pidLoopBuffer.clear();
-                break;
+            if (SWO::data.enabled == SWO::EnableState::SWO) {
+                SWO::write(1, kPidFrameMagic, sizeof(kPidFrameMagic));
+                SWO::writeObject<1>(item);
             }
-            #endif
         }
     }
 }

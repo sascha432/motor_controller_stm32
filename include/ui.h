@@ -103,7 +103,6 @@ struct Screen
         MOTOR_SPEED,
         DIAGNOSTICS,
         DASHBOARD,
-        // PID_TUNING,
         PID_PARAMETERS,
         PID_KP,
         PID_KI,

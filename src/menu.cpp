@@ -39,16 +39,6 @@ static const char *kAdvancedMenuItems[] = {
     "Back"                      // 9
 };
 
-#if 0
-static const char *kPIDTuningItems[] = {
-    "Disabled",                 // 0
-    "SWO",                      // 1
-#if HAVE_USB_DEVICE
-    "USB",                      // 2
-#endif
-};
-#endif
-
 static const char *kPIDParametersItems[] = {
     "Kp",                       // 0
     "Ki",                       // 1
@@ -281,7 +271,6 @@ void Menu::saveEEPROMChanges()
         lv_timer_handler();
         abortableDelay(UIConstants::kInfoScreenTimeout);
     }
-    applyPIDTuningSettings();
 }
 /**
  * @brief Apply settings from EEPROM to the system after initialization or after restoring defaults
@@ -294,27 +283,6 @@ void Menu::applyEEPROMSettings()
     adc.setInputCurrentLimit(eeprom.getInputCurrentLimit());
     adc.setMotorCurrentLimit(eeprom.getMotorCurrentLimit());
     pid.applyPIDParams();
-    applyPIDTuningSettings();
-}
-
-/**
- * @brief Enable/disable PID tuning over SWO, UART or USB based on EEPROM settings
- *
- */
-void Menu::applyPIDTuningSettings()
-{
-    // // disable SWO
-    // SWO::deinit();
-    // switch(eeprom.getPidTuning()) {
-    //     case EEPROM::kPidTuningSWO:
-    //         // enable SWO
-    //         SWO::init();
-    //         break;
-    //     // not implemented or disabled
-    //     default:
-    //     case EEPROM::kPidTuningDisabled:
-    //         break;
-    // }
 }
 
 /**
@@ -515,14 +483,6 @@ void Menu::handleButtonPress()
                     ));
                     setValue(eeprom.getSensorDirection());
                     break;
-                // case 6: // PID Tuning
-                //     screenFlow.next(new MenuScreen(
-                //         Screen::Type::PID_TUNING,
-                //         kPIDTuningItems,
-                //         sizeof_array(kPIDTuningItems)
-                //     ));
-                //     setValue(eeprom.getPidTuning());
-                //     break;
                 case 6: // PID Parameters
                     screenFlow.next(new MenuScreen(
                         Screen::Type::PID_PARAMETERS,
@@ -661,7 +621,6 @@ void Menu::handleButtonPress()
         case Screen::Type::MOTOR_STALL_TIMEOUT:
         case Screen::Type::CONTROL_MODE:
         case Screen::Type::DIAGNOSTICS:
-        // case Screen::Type::PID_TUNING:
         case Screen::Type::PID_KP:
         case Screen::Type::PID_KI:
         case Screen::Type::PID_KD:
@@ -798,9 +757,6 @@ int32_t Menu::updateRotaryValue(int32_t value)
         case Screen::Type::MOTOR_STALL_TIMEOUT:
             eeprom.setMotorStallTimeout(getValue());
             break;
-        // case Screen::Type::PID_TUNING:
-        //     eeprom.setPidTuning(getValue());
-        //     break;
         case Screen::Type::PID_KP:
             eeprom.setKp(EEPROM::kUint32ToPIDParam(getValue()));
             pid.applyPIDParams(); // apply or live tuning otherwise only a reset will apply the new values

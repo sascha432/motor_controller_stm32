@@ -12,7 +12,7 @@
 struct EEPROM
 {
     static constexpr uint32_t kMagic = 0xDEADBEEF;
-    static constexpr uint32_t kVersion = 3;
+    static constexpr uint32_t kVersion = 4;
 
     // ~130A max.
     static constexpr uint16_t kCurrentToUint16(float current) {
@@ -40,11 +40,6 @@ struct EEPROM
     static constexpr uint8_t kSensorDirectionForward = kMotorDirectionForward;
     static constexpr uint8_t kSensorDirectionReverse = kMotorDirectionReverse;
 
-    static constexpr uint8_t kPidTuningDisabled = 0;
-    static constexpr uint8_t kPidTuningSWO = 1;
-    static constexpr uint8_t kPidTuningUART = 2;
-    static constexpr uint8_t kPidTuningUSB = 3;
-
     struct Data {
         uint32_t magic;
         uint32_t version;
@@ -65,7 +60,6 @@ struct EEPROM
         uint8_t max_pwm;
         uint8_t motor_pwm;
         uint16_t motor_rpm;
-        uint8_t pid_tuning;
         float Kp;
         float Ki;
         float Kd;
@@ -92,7 +86,6 @@ struct EEPROM
             max_pwm(UIConstants::kDefaultMaxPWM),
             motor_pwm(UIConstants::kDefaultMotorPWM),
             motor_rpm(UIConstants::kDefaultMotorRPM),
-            pid_tuning(kPidTuningDisabled),
             Kp(UIConstants::kDefaultKp),
             Ki(UIConstants::kDefaultKi),
             Kd(UIConstants::kDefaultKd),
@@ -350,16 +343,6 @@ struct EEPROM
     {
         return data.control_mode == kControlModePID ? getMotorRPM() : getMotorPWM();
     }
-
-    // uint8_t getPidTuning() const
-    // {
-    //     return data.pid_tuning;
-    // }
-
-    // void setPidTuning(uint8_t value)
-    // {
-    //     data.pid_tuning = value;
-    // }
 
     void setKp(float value)
     {

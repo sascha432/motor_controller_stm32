@@ -88,9 +88,17 @@ class AppConfig:
 
 
 PID_FRAME_MAGIC = b"PID1"
-PID_ITEM_SIZE = struct.calcsize("<I9HfffI")
+# C++ PidLoopType has 2 bytes padding before float members for 4-byte alignment.
+PID_ITEM_STRUCT = "<I9H2xfffI"
+PID_ITEM_SIZE = struct.calcsize(PID_ITEM_STRUCT)
 PID_PWM_MAX_LEVEL = 3599.0
 SWO_DATA_FIXED_RAM_ADDRESS = 0x2000F000
+SWO_ENABLE_DISABLED = 0
+SWO_ENABLE_SWO = 1
+SWO_ENABLE_USB = 2
+SWO_DATA_STRUCT = "<ffffHB?"
+SWO_DATA_SIZE = struct.calcsize(SWO_DATA_STRUCT)
+SWO_DATA_ENABLED_OFFSET = struct.calcsize("<ffffH")
 
 
 @dataclass
@@ -150,7 +158,7 @@ def decode_pid_item(payload: bytes) -> Optional[Sample]:
         return None
 
     sequence, rpm, pwm, voltage, i_ocp, i_avg, motor_ntc, mosfet_ntc, dac_motor, dac_input, error, integral, derivative, faults = struct.unpack(
-        "<I9HfffI", payload
+        PID_ITEM_STRUCT, payload
     )
     if rpm > 55000:  # RPM might go negative due to small vibrations when the motor is stalled and the sensor limit is 55k RPM
         rpm = 0
@@ -848,22 +856,25 @@ class PIDTuningApp:
             justify=tk.LEFT,
         ).grid(row=3, column=0, columnspan=2, sticky="w", pady=(6, 0))
 
-    def _pack_swo_data(self, data: SWOData, enabled: bool = False, changed: bool = True) -> bytes:
-        # C++ layout: float Kp, float Ki, float Kd, float antiWindupReduction,
-        # uint16_t rpm, bool enabled, bool changed.
+    def _pack_swo_data(self, data: SWOData, enabled_state: int = SWO_ENABLE_DISABLED, changed: bool = True) -> bytes:
+        # C++ layout: float Kp, float Ki, float Kd, float antiWindup,
+        # uint16_t rpm, enum class EnableState : uint8_t enabled, bool changed.
         return struct.pack(
-            "<ffffH??",
+            SWO_DATA_STRUCT,
             data.kp,
             data.ki,
             data.kd,
             data.anti_windup_reduction,
             data.rpm,
-            enabled,
+            enabled_state & 0xFF,
             changed,
         )
 
     def _unpack_swo_data(self, payload: bytes) -> SWOData:
-        kp, ki, kd, anti_windup_reduction, rpm, _enabled, changed = struct.unpack("<ffffH??", payload)
+        kp, ki, kd, anti_windup_reduction, rpm, _enabled_state, changed = struct.unpack(
+            SWO_DATA_STRUCT,
+            payload[:SWO_DATA_SIZE],
+        )
         return SWOData(
             kp=kp,
             ki=ki,
@@ -904,11 +915,11 @@ class PIDTuningApp:
 
         def worker() -> None:
             try:
-                payload = self.gdb_mem.read_memory(self.data_address, 20)
-                if len(payload) < 20:
+                payload = self.gdb_mem.read_memory(self.data_address, SWO_DATA_SIZE)
+                if len(payload) < SWO_DATA_SIZE:
                     raise RuntimeError("SWO::data read returned too few bytes")
                 data = bytearray(payload)
-                data[18] = 1 if enabled else 0
+                data[SWO_DATA_ENABLED_OFFSET] = SWO_ENABLE_SWO if enabled else SWO_ENABLE_DISABLED
                 self.gdb_mem.write_memory(self.data_address, bytes(data))
             except Exception as exc:
                 self.event_queue.put(("log", f"Set SWO::data.enabled failed: {exc}"))
@@ -945,7 +956,7 @@ class PIDTuningApp:
 
         def worker() -> None:
             try:
-                payload = self.gdb_mem.read_memory(self.data_address, 20)
+                payload = self.gdb_mem.read_memory(self.data_address, SWO_DATA_SIZE)
                 self.event_queue.put(("swo-read", (self._unpack_swo_data(payload), reason)))
             except Exception as exc:
                 self.event_queue.put(("log", f"Read SWO::data failed: {exc}"))
@@ -995,15 +1006,19 @@ class PIDTuningApp:
 
         def worker() -> None:
             try:
-                current_payload = self.gdb_mem.read_memory(self.data_address, 20)
-                enabled_state = bool(current_payload[18]) if len(current_payload) >= 20 else False
+                current_payload = self.gdb_mem.read_memory(self.data_address, SWO_DATA_SIZE)
+                enabled_state = (
+                    current_payload[SWO_DATA_ENABLED_OFFSET]
+                    if len(current_payload) >= SWO_DATA_SIZE
+                    else SWO_ENABLE_DISABLED
+                )
                 self.gdb_mem.write_memory(
                     self.data_address,
-                    self._pack_swo_data(data, enabled=enabled_state, changed=True),
+                    self._pack_swo_data(data, enabled_state=enabled_state, changed=True),
                 )
                 self.event_queue.put(("log", "Synced PID params to SWO::data (changed=true)"))
                 # Read back once after write for confirmation.
-                payload = self.gdb_mem.read_memory(self.data_address, 20)
+                payload = self.gdb_mem.read_memory(self.data_address, SWO_DATA_SIZE)
                 self.event_queue.put(("swo-read", (self._unpack_swo_data(payload), "after write")))
             except Exception as exc:
                 self.event_queue.put(("log", f"Write SWO::data failed: {exc}"))

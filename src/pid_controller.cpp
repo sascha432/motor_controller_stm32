@@ -300,8 +300,8 @@ void PidController::isr()
 
     stats.counter.loop++;
 
-    // send PID tuning data if enabled
-    if (SWO::data.enabled) {
+    // send PID tuning data if tuning is enabled
+    if (SWO::data.enabled != SWO::EnableState::DISABLED) {
         PidLoopType item;
         item.sequence = stats.counter.loop;
         item.rpm = static_cast<uint16_t>(deltaRPM);
