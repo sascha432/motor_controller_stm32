@@ -16,6 +16,59 @@
 // set to true to keep screen objects in memory when switching screens
 static constexpr bool kUIKeepScreenObjectsInMemory = false;
 
+// === Color palette and schema ===
+
+#define COLOR_PALETTE_WHITE                     lv_color_make(255, 255, 255)
+#define COLOR_PALETTE_BLACK                     lv_color_make(0, 0, 0)
+#define COLOR_PALETTE_DARK_GRAY                 lv_color_make(24, 24, 24)
+#define COLOR_PALETTE_LIGHT_GRAY                lv_color_make(128, 128, 128)
+#define COLOR_PALETTE_RED                       lv_color_make(255, 0, 0)
+#define COLOR_PALETTE_GREEN                     lv_color_make(0, 255, 0)
+#define COLOR_PALETTE_YELLOW                    lv_color_make(255, 255, 0)
+#define COLOR_PALETTE_CYAN                      lv_color_make(0, 255, 255)
+#define COLOR_PALETTE_PURPLE                    lv_color_make(255, 0, 255)
+#define COLOR_PALETTE_DARK_PURPLE               lv_color_make(128, 0, 128)
+#define COLOR_PALETTE_BLUE                      lv_color_make(0, 0, 128)
+#define COLOR_PALETTE_LIGHT_BLUE                lv_color_make(0, 128, 255)
+
+#define SCREEN_COLOR_TEXT                       COLOR_PALETTE_LIGHT_GRAY
+#define SCREEN_COLOR_BG                         COLOR_PALETTE_BLACK
+#define SCREEN_COLOR_VOLTAGE                    COLOR_PALETTE_GREEN
+#define SCREEN_COLOR_CURRENT                    COLOR_PALETTE_YELLOW
+#define SCREEN_COLOR_TEMPERATURE                COLOR_PALETTE_CYAN
+
+#define INFOSCREEN_COLOR_TEXT                   SCREEN_COLOR_TEXT
+
+#define DIAGNOSTICSCREEN_COLOR_TEXT             COLOR_PALETTE_CYAN
+
+#define STARTSCREEN_COLOR_START_LABEL           SCREEN_COLOR_TEXT
+#define STARTSCREEN_COLOR_SPEED                 COLOR_PALETTE_PURPLE
+#define STARTSCREEN_COLOR_VOLTAGE               SCREEN_COLOR_VOLTAGE
+#define STARTSCREEN_COLOR_CURRENT               SCREEN_COLOR_CURRENT
+#define STARTSCREEN_COLOR_TEMPERATURE           SCREEN_COLOR_TEMPERATURE
+
+#define MENUSCREEN_COLOR_ITEM                   COLOR_PALETTE_DARK_GRAY
+#define MENUSCREEN_COLOR_BG                     COLOR_PALETTE_BLACK
+#define MENUSCREEN_COLOR_SELECTED_ITEM          COLOR_PALETTE_LIGHT_GRAY
+#define MENUSCREEN_COLOR_SELECTED_BG            COLOR_PALETTE_BLUE
+
+#define DASHBOARDSCREEN_COLOR_VOLTAGE           SCREEN_COLOR_VOLTAGE
+#define DASHBOARDSCREEN_COLOR_CURRENT           SCREEN_COLOR_CURRENT
+#define DASHBOARDSCREEN_COLOR_TEMPERATURE       SCREEN_COLOR_TEMPERATURE
+#define DASHBOARDSCREEN_COLOR_SPEED             COLOR_PALETTE_PURPLE
+#define DASHBOARDSCREEN_COLOR_PWM_BG            COLOR_PALETTE_DARK_GRAY
+#define DASHBOARDSCREEN_COLOR_PWM_BORDER        COLOR_PALETTE_CYAN
+#define DASHBOARDSCREEN_COLOR_PWM_FILL          COLOR_PALETTE_LIGHT_GRAY
+#define DASHBOARDSCREEN_COLOR_PWM_LABEL         COLOR_PALETTE_CYAN
+
+#define SLIDERSCREEN_COLOR_LABEL                SCREEN_COLOR_TEXT
+#define SLIDERSCREEN_COLOR_VALUE                COLOR_PALETTE_CYAN
+#define SLIDERSCREEN_COLOR_SLIDER_BG            COLOR_PALETTE_DARK_GRAY
+#define SLIDERSCREEN_COLOR_SLIDER_FILL          COLOR_PALETTE_LIGHT_GRAY
+#define SLIDERSCREEN_COLOR_SLIDER_BORDER        COLOR_PALETTE_BLACK
+#define SLIDERSCREEN_COLOR_SLIDER_KNOB          COLOR_PALETTE_CYAN
+#define SLIDERSCREEN_COLOR_SLIDER_KNOB_BORDER   COLOR_PALETTE_BLACK
+
 // === Base Screen class ===
 struct Screen
 {
@@ -82,6 +135,7 @@ struct Screen
 
     // slider screen style constants
     static constexpr const lv_font_t *kSliderScreenLabelFont = &lv_font_montserrat_14;
+    static constexpr const lv_font_t *kSliderScreenLabelFontBig = &lv_font_montserrat_18;
     static constexpr const lv_font_t *kSliderScreenValueFont = &lv_font_montserrat_18;
     static constexpr lv_coord_t kSliderScreenContainerX = 16;
     #if TFT_DIM_HEIGHT == 135
@@ -113,7 +167,6 @@ struct Screen
     static constexpr lv_coord_t kDashboardScreenColumnWidth = (kDashboardScreenContainerWidth / 2) - 4;
     static constexpr const lv_font_t *kDashboardScreenFont = &lv_font_montserrat_14;
     static constexpr const lv_font_t *kDashboardScreenBigFont = &lv_font_montserrat_24;
-
 
     Screen(Type id);
     virtual ~Screen();

@@ -20,7 +20,7 @@ inline lv_coord_t diagnostic_screen_get_ypos_for_row(int32_t row)
         default:
             break;
     }
-    return Screen::kDiagnosticScreenRowHeight * row + 48;
+    return Screen::kDiagnosticScreenRowHeight * row + (Screen::kDiagnosticScreenRowHeight * 3);
 }
 
 inline int32_t diagnostic_screen_content_height()
@@ -37,7 +37,7 @@ inline int32_t diagnostic_screen_scroll_max_lines(int32_t viewportHeight)
 lv_obj_t *diagnostic_screen_create_label(lv_obj_t *parent, lv_coord_t width, int32_t row)
 {
     lv_obj_t *label = lv_label_create(parent);
-    lv_obj_set_style_text_color(label, lv_color_white(), LV_PART_MAIN);
+    lv_obj_set_style_text_color(label, DIAGNOSTICSCREEN_COLOR_TEXT, LV_PART_MAIN);
     lv_obj_set_style_text_font(label, Screen::kDiagnosticsScreenLabelFont, LV_PART_MAIN);
     lv_obj_set_pos(label, 0, diagnostic_screen_get_ypos_for_row(row));
     lv_obj_set_width(label, width);
@@ -140,7 +140,7 @@ void Screen::_fatal_error(const char *msg)
 
 void Screen::_style_screen(lv_obj_t *screen)
 {
-    lv_obj_set_style_bg_color(screen, lv_color_black(), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(screen, SCREEN_COLOR_BG, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_border_width(screen, 0, LV_PART_MAIN);
     lv_obj_set_style_pad_all(screen, 0, LV_PART_MAIN);
@@ -149,10 +149,10 @@ void Screen::_style_screen(lv_obj_t *screen)
 // === Welcome Screen ===
 
 WelcomeScreen::WelcomeScreen() :
-    InfoScreen(Type::WELCOME, Screen::kWelcomeScreenLabelFont)
+    InfoScreen(Type::WELCOME, kWelcomeScreenLabelFont)
 {
     char buf[32];
-    snprintf(buf, sizeof(buf)- 1, "Version %u.%u.%u", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
+    snprintf(buf, sizeof(buf) - 1, "Version %u.%u.%u", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
     message = strdup(buf);
 }
 
@@ -168,7 +168,7 @@ void InfoScreen::load()
         free(message);
         message = nullptr;
     }
-    lv_obj_set_style_text_color(label, lv_color_white(), LV_PART_MAIN);
+    lv_obj_set_style_text_color(label, INFOSCREEN_COLOR_TEXT, LV_PART_MAIN);
     lv_obj_set_style_text_font(label, font, LV_PART_MAIN);
     lv_obj_center(label);
     lv_scr_load(screen);
@@ -259,12 +259,12 @@ void MenuScreen::_style_menu_row(lv_obj_t *row, bool selected)
     lv_obj_set_style_border_width(row, 0, LV_PART_MAIN);
     lv_obj_set_style_pad_all(row, 0, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(row, selected ? LV_OPA_COVER : LV_OPA_TRANSP, LV_PART_MAIN);
-    lv_obj_set_style_bg_color(row, selected ? lv_color_white() : lv_color_black(), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(row, selected ? MENUSCREEN_COLOR_SELECTED_BG : MENUSCREEN_COLOR_BG, LV_PART_MAIN);
 }
 
 void MenuScreen::_style_menu_label(lv_obj_t *label, bool selected)
 {
-    lv_obj_set_style_text_color(label, selected ? lv_color_black() : lv_color_white(), LV_PART_MAIN);
+    lv_obj_set_style_text_color(label, selected ? MENUSCREEN_COLOR_SELECTED_ITEM : MENUSCREEN_COLOR_ITEM, LV_PART_MAIN);
     lv_obj_set_style_text_font(label, kMenuScreenLabelFont, LV_PART_MAIN);
     lv_label_set_long_mode(label, selected ? LV_LABEL_LONG_SCROLL_CIRCULAR : LV_LABEL_LONG_CLIP);
 }
@@ -285,6 +285,85 @@ lv_obj_t *MenuScreen::_style_create_menu_label(lv_obj_t *parent, const char *tex
 
 // === Slider Screen ===
 
+void SliderScreen::load()
+{
+    DEBUG_PRINT(DEBUG_NOTICE, "range=%u-%u value=%u label=%s unit=%s", minValue, maxValue, value, label, unit ? unit : "<NULL>");
+    Screen::load();
+
+    lv_obj_t *container = lv_obj_create(screen);
+    lv_obj_remove_style_all(container);
+    lv_obj_set_pos(container, kSliderScreenContainerX, kSliderScreenContainerY);
+    lv_obj_set_size(container, kSliderScreenContainerWidth, kSliderScreenContainerHeight);
+    lv_obj_set_style_bg_opa(container, LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_style_border_width(container, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(container, 0, LV_PART_MAIN);
+
+    auto titleFont = (lv_txt_get_width(label, strlen(label), kSliderScreenLabelFontBig, 0, LV_TEXT_FLAG_NONE) < kSliderScreenContainerWidth) ?
+        kSliderScreenLabelFontBig :
+        kSliderScreenLabelFont;
+
+    lv_obj_t *titleRow = lv_obj_create(container);
+    lv_obj_remove_style_all(titleRow);
+    lv_obj_set_size(titleRow, kSliderScreenContainerWidth, lv_font_get_line_height(titleFont));
+    lv_obj_set_style_bg_opa(titleRow, LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_style_border_width(titleRow, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(titleRow, 0, LV_PART_MAIN);
+    lv_obj_set_style_clip_corner(titleRow, true, LV_PART_MAIN);
+    lv_obj_set_pos(titleRow, 0, 0);
+
+    lv_obj_t *titleObj = lv_label_create(titleRow);
+    lv_label_set_text(titleObj, label);
+    lv_obj_set_style_text_color(titleObj, SLIDERSCREEN_COLOR_LABEL, LV_PART_MAIN);
+    lv_obj_set_style_text_font(titleObj, titleFont, LV_PART_MAIN);
+    lv_obj_set_width(titleObj, kSliderScreenContainerWidth);
+    lv_obj_set_style_text_align(titleObj, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
+    lv_obj_set_style_anim_speed(titleObj, kSliderScreenTitleAnimSpeed, LV_PART_MAIN);
+    lv_label_set_long_mode(titleObj, LV_LABEL_LONG_CLIP);
+    lv_obj_set_pos(titleObj, 0, 0);
+    lv_label_set_long_mode(titleObj, LV_LABEL_LONG_SCROLL_CIRCULAR);
+
+    lv_obj_t *slider = lv_obj_create(container);
+    lv_obj_remove_style_all(slider);
+    lv_obj_set_pos(slider, 0, lv_obj_get_height(titleRow) + kSliderScreenTitleBottomGap);
+    lv_obj_set_size(slider, kSliderScreenContainerWidth, kSliderScreenSliderHeight);
+    lv_obj_set_style_bg_color(slider, SLIDERSCREEN_COLOR_SLIDER_BG, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(slider, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_radius(slider, kSliderScreenSliderRadius, LV_PART_MAIN);
+    lv_obj_set_style_border_width(slider, kSliderScreenSliderBorder, LV_PART_MAIN);
+    lv_obj_set_style_border_color(slider, SLIDERSCREEN_COLOR_SLIDER_BORDER, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(slider, 0, LV_PART_MAIN);
+
+    sliderFill = lv_obj_create(slider);
+    lv_obj_remove_style_all(sliderFill);
+    lv_obj_set_pos(sliderFill, 0, 0);
+    lv_obj_set_size(sliderFill, 0, kSliderScreenSliderHeight);
+    lv_obj_set_style_bg_color(sliderFill, SLIDERSCREEN_COLOR_SLIDER_FILL, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(sliderFill, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_radius(sliderFill, kSliderScreenSliderRadius, LV_PART_MAIN);
+    lv_obj_set_style_border_width(sliderFill, 0, LV_PART_MAIN);
+
+    sliderKnob = lv_obj_create(slider);
+    lv_obj_remove_style_all(sliderKnob);
+    lv_obj_set_size(sliderKnob, kSliderScreenKnobSize, kSliderScreenKnobSize);
+    lv_obj_set_style_bg_color(sliderKnob, SLIDERSCREEN_COLOR_SLIDER_KNOB, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(sliderKnob, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_radius(sliderKnob, LV_RADIUS_CIRCLE, LV_PART_MAIN);
+    lv_obj_set_style_border_width(sliderKnob, 2, LV_PART_MAIN);
+    lv_obj_set_style_border_color(sliderKnob, SLIDERSCREEN_COLOR_SLIDER_KNOB_BORDER, LV_PART_MAIN);
+    lv_obj_set_pos(sliderKnob, -(kSliderScreenKnobSize / 2), -((kSliderScreenKnobSize - kSliderScreenSliderHeight) / 2));
+
+    valueLabel = lv_label_create(container);
+    lv_obj_set_style_text_color(valueLabel, SLIDERSCREEN_COLOR_VALUE, LV_PART_MAIN);
+    lv_obj_set_style_text_font(valueLabel, kSliderScreenValueFont, LV_PART_MAIN);
+    lv_obj_set_width(valueLabel, kSliderScreenContainerWidth);
+    lv_obj_set_style_text_align(valueLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+    lv_obj_align_to(valueLabel, slider, LV_ALIGN_OUT_BOTTOM_MID, 0, 8);
+
+    _refreshVisuals();
+
+    lv_scr_load(screen);
+}
+
 void SliderScreen::_refreshVisuals()
 {
     const uint32_t clampedValue =  std::clamp<uint32_t>(value, minValue, maxValue);
@@ -299,8 +378,6 @@ void SliderScreen::_refreshVisuals()
 
     lv_obj_set_x(sliderKnob, knobX);
 
-    DEBUG_PRINT(DEBUG_DEBUG, "callback=%p", formatCallback);
-
     if (formatCallback) {
         char buf[32];
         lv_label_set_text(valueLabel, formatCallback(clampedValue, buf, sizeof(buf) - 1));
@@ -308,82 +385,6 @@ void SliderScreen::_refreshVisuals()
     else {
         lv_label_set_text_fmt(valueLabel, "%u%s", static_cast<unsigned>(clampedValue), unit);
     }
-
-}
-
-void SliderScreen::load()
-{
-    DEBUG_PRINT(DEBUG_NOTICE, "range=%u-%u value=%u label=%s unit=%s", minValue, maxValue, value, label, unit ? unit : "<NULL>");
-    Screen::load();
-
-    lv_obj_t *container = lv_obj_create(screen);
-    lv_obj_remove_style_all(container);
-    lv_obj_set_pos(container, kSliderScreenContainerX, kSliderScreenContainerY);
-    lv_obj_set_size(container, kSliderScreenContainerWidth, kSliderScreenContainerHeight);
-    lv_obj_set_style_bg_opa(container, LV_OPA_TRANSP, LV_PART_MAIN);
-    lv_obj_set_style_border_width(container, 0, LV_PART_MAIN);
-    lv_obj_set_style_pad_all(container, 0, LV_PART_MAIN);
-
-    lv_obj_t *titleRow = lv_obj_create(container);
-    lv_obj_remove_style_all(titleRow);
-    lv_obj_set_size(titleRow, kSliderScreenContainerWidth, lv_font_get_line_height(kSliderScreenLabelFont));
-    lv_obj_set_style_bg_opa(titleRow, LV_OPA_TRANSP, LV_PART_MAIN);
-    lv_obj_set_style_border_width(titleRow, 0, LV_PART_MAIN);
-    lv_obj_set_style_pad_all(titleRow, 0, LV_PART_MAIN);
-    lv_obj_set_style_clip_corner(titleRow, true, LV_PART_MAIN);
-    lv_obj_set_pos(titleRow, 0, 0);
-
-    lv_obj_t *titleObj = lv_label_create(titleRow);
-    lv_label_set_text(titleObj, label);
-    lv_obj_set_style_text_color(titleObj, lv_color_white(), LV_PART_MAIN);
-    lv_obj_set_style_text_font(titleObj, kSliderScreenLabelFont, LV_PART_MAIN);
-    lv_obj_set_width(titleObj, kSliderScreenContainerWidth);
-    lv_obj_set_style_text_align(titleObj, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
-    lv_obj_set_style_anim_speed(titleObj, kSliderScreenTitleAnimSpeed, LV_PART_MAIN);
-    lv_label_set_long_mode(titleObj, LV_LABEL_LONG_CLIP);
-    lv_obj_set_pos(titleObj, 0, 0);
-    lv_label_set_long_mode(titleObj, LV_LABEL_LONG_SCROLL_CIRCULAR);
-
-    lv_obj_t *slider = lv_obj_create(container);
-    lv_obj_remove_style_all(slider);
-    lv_obj_set_pos(slider, 0, lv_obj_get_height(titleRow) + kSliderScreenTitleBottomGap);
-    lv_obj_set_size(slider, kSliderScreenContainerWidth, kSliderScreenSliderHeight);
-    lv_obj_set_style_bg_color(slider, lv_palette_darken(LV_PALETTE_GREY, 2), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(slider, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_radius(slider, kSliderScreenSliderRadius, LV_PART_MAIN);
-    lv_obj_set_style_border_width(slider, kSliderScreenSliderBorder, LV_PART_MAIN);
-    lv_obj_set_style_border_color(slider, lv_color_white(), LV_PART_MAIN);
-    lv_obj_set_style_pad_all(slider, 0, LV_PART_MAIN);
-
-    sliderFill = lv_obj_create(slider);
-    lv_obj_remove_style_all(sliderFill);
-    lv_obj_set_pos(sliderFill, 0, 0);
-    lv_obj_set_size(sliderFill, 0, kSliderScreenSliderHeight);
-    lv_obj_set_style_bg_color(sliderFill, lv_color_white(), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(sliderFill, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_radius(sliderFill, kSliderScreenSliderRadius, LV_PART_MAIN);
-    lv_obj_set_style_border_width(sliderFill, 0, LV_PART_MAIN);
-
-    sliderKnob = lv_obj_create(slider);
-    lv_obj_remove_style_all(sliderKnob);
-    lv_obj_set_size(sliderKnob, kSliderScreenKnobSize, kSliderScreenKnobSize);
-    lv_obj_set_style_bg_color(sliderKnob, lv_color_white(), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(sliderKnob, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_radius(sliderKnob, LV_RADIUS_CIRCLE, LV_PART_MAIN);
-    lv_obj_set_style_border_width(sliderKnob, 2, LV_PART_MAIN);
-    lv_obj_set_style_border_color(sliderKnob, lv_color_black(), LV_PART_MAIN);
-    lv_obj_set_pos(sliderKnob, -(kSliderScreenKnobSize / 2), -((kSliderScreenKnobSize - kSliderScreenSliderHeight) / 2));
-
-    valueLabel = lv_label_create(container);
-    lv_obj_set_style_text_color(valueLabel, lv_color_white(), LV_PART_MAIN);
-    lv_obj_set_style_text_font(valueLabel, kSliderScreenValueFont, LV_PART_MAIN);
-    lv_obj_set_width(valueLabel, kSliderScreenContainerWidth);
-    lv_obj_set_style_text_align(valueLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    lv_obj_align_to(valueLabel, slider, LV_ALIGN_OUT_BOTTOM_MID, 0, 8);
-
-    _refreshVisuals();
-
-    lv_scr_load(screen);
 }
 
 void SliderScreen::setValue(uint32_t value)
@@ -404,13 +405,13 @@ void DiagnosticsScreen::load()
     Screen::load();
 
     // Diagnostics container with manual scrolling and a visual scrollbar.
-    const lv_coord_t viewportWidth = TFT_DIM_WIDTH - Screen::kDiagnosticScreenMargin;
-    const lv_coord_t viewportHeight = TFT_DIM_HEIGHT - Screen::kDiagnosticScreenMargin;
-    const lv_coord_t textWidth = viewportWidth - Screen::kDiagnosticScreenScrollbarWidth - 4;
+    const lv_coord_t viewportWidth = TFT_DIM_WIDTH - kDiagnosticScreenMargin;
+    const lv_coord_t viewportHeight = TFT_DIM_HEIGHT - kDiagnosticScreenMargin;
+    const lv_coord_t textWidth = viewportWidth - kDiagnosticScreenScrollbarWidth - 4;
 
     viewport = lv_obj_create(screen);
     lv_obj_remove_style_all(viewport);
-    lv_obj_set_pos(viewport, Screen::kDiagnosticScreenViewportX, Screen::kDiagnosticScreenViewportY);
+    lv_obj_set_pos(viewport, kDiagnosticScreenViewportX, kDiagnosticScreenViewportY);
     lv_obj_set_size(viewport, viewportWidth, viewportHeight);
     lv_obj_set_style_bg_opa(viewport, LV_OPA_TRANSP, LV_PART_MAIN);
     lv_obj_set_style_border_width(viewport, 0, LV_PART_MAIN);
@@ -420,15 +421,15 @@ void DiagnosticsScreen::load()
 
     scrollbarTrack = lv_obj_create(viewport);
     lv_obj_remove_style_all(scrollbarTrack);
-    lv_obj_set_size(scrollbarTrack, Screen::kDiagnosticScreenScrollbarWidth, viewportHeight);
-    lv_obj_set_pos(scrollbarTrack, viewportWidth - Screen::kDiagnosticScreenScrollbarWidth, 0);
+    lv_obj_set_size(scrollbarTrack, kDiagnosticScreenScrollbarWidth, viewportHeight);
+    lv_obj_set_pos(scrollbarTrack, viewportWidth - kDiagnosticScreenScrollbarWidth, 0);
     lv_obj_set_style_bg_color(scrollbarTrack, lv_palette_darken(LV_PALETTE_GREY, 3), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(scrollbarTrack, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_radius(scrollbarTrack, 2, LV_PART_MAIN);
 
     scrollbarThumb = lv_obj_create(scrollbarTrack);
     lv_obj_remove_style_all(scrollbarThumb);
-    lv_obj_set_size(scrollbarThumb, Screen::kDiagnosticScreenScrollbarWidth, 16);
+    lv_obj_set_size(scrollbarThumb, kDiagnosticScreenScrollbarWidth, 16);
     lv_obj_set_pos(scrollbarThumb, 0, 0);
     lv_obj_set_style_bg_color(scrollbarThumb, lv_color_white(), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(scrollbarThumb, LV_OPA_COVER, LV_PART_MAIN);
@@ -436,12 +437,7 @@ void DiagnosticsScreen::load()
 
     // Firmware label
     firmwareLabel = diagnostic_screen_create_label(content, textWidth, 0);
-    {
-        char buf[128];
-        snprintf(buf, sizeof(buf) - 1, "Firmware %u.%u.%u\nPCB Rev %u.%u\nBuild " __DATE__ " " __TIME__  "\nEEPROM cycle #%u",  VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, PCB_REV_MAJOR, PCB_REV_MINOR, (unsigned)eeprom.getData().sequence);
-        lv_label_set_text(firmwareLabel, buf);
-    }
-
+    lv_label_set_text_fmt(firmwareLabel, "Firmware %u.%u.%u\nPCB Rev %u.%u\nBuild " __DATE__ " " __TIME__  "\nEEPROM cycle #%u",  VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, PCB_REV_MAJOR, PCB_REV_MINOR, (unsigned)eeprom.getData().sequence);
 
     // VCC label
     vccLabel = diagnostic_screen_create_label(content, textWidth, 1);
@@ -549,10 +545,8 @@ void DiagnosticsScreen::_refreshVisuals()
     );
     lv_label_set_text(rpmPwmLabel, buf);
 
-    char errorBuf[48];
-    pid.errorPrintf(errorBuf, sizeof(errorBuf));
-    snprintf(buf, sizeof(buf) - 1, "Last Error %s", errorBuf);
-    lv_label_set_text(lastErrorLabel, buf);
+    pid.errorPrintf(buf, sizeof(buf));
+    lv_label_set_text_fmt(lastErrorLabel, "Last Error %s", buf);
 }
 
 // === Dashboard Screen ===
@@ -570,36 +564,36 @@ void DashboardScreen::load()
     lv_obj_set_style_pad_all(container, 0, LV_PART_MAIN);
 
     voltageLabel = lv_label_create(container);
-    lv_obj_set_style_text_color(voltageLabel, lv_color_white(), LV_PART_MAIN);
-    lv_obj_set_style_text_font(voltageLabel, Screen::kDashboardScreenFont, LV_PART_MAIN);
+    lv_obj_set_style_text_color(voltageLabel, DASHBOARDSCREEN_COLOR_VOLTAGE, LV_PART_MAIN);
+    lv_obj_set_style_text_font(voltageLabel, kDashboardScreenFont, LV_PART_MAIN);
     lv_obj_set_width(voltageLabel, kDashboardScreenColumnWidth);
     lv_obj_set_style_text_align(voltageLabel, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
     lv_obj_set_pos(voltageLabel, 0, 0);
 
     currentLabel = lv_label_create(container);
-    lv_obj_set_style_text_color(currentLabel, lv_color_white(), LV_PART_MAIN);
-    lv_obj_set_style_text_font(currentLabel, Screen::kDashboardScreenFont, LV_PART_MAIN);
+    lv_obj_set_style_text_color(currentLabel, DASHBOARDSCREEN_COLOR_CURRENT, LV_PART_MAIN);
+    lv_obj_set_style_text_font(currentLabel, kDashboardScreenFont, LV_PART_MAIN);
     lv_obj_set_width(currentLabel, kDashboardScreenColumnWidth);
     lv_obj_set_style_text_align(currentLabel, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
     lv_obj_set_pos(currentLabel, 0, 18);
 
     motorTempLabel = lv_label_create(container);
-    lv_obj_set_style_text_color(motorTempLabel, lv_color_white(), LV_PART_MAIN);
-    lv_obj_set_style_text_font(motorTempLabel, Screen::kDashboardScreenFont, LV_PART_MAIN);
+    lv_obj_set_style_text_color(motorTempLabel, DASHBOARDSCREEN_COLOR_TEMPERATURE, LV_PART_MAIN);
+    lv_obj_set_style_text_font(motorTempLabel, kDashboardScreenFont, LV_PART_MAIN);
     lv_obj_set_width(motorTempLabel, kDashboardScreenColumnWidth);
     lv_obj_set_style_text_align(motorTempLabel, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
     lv_obj_set_pos(motorTempLabel, kDashboardScreenContainerWidth - kDashboardScreenColumnWidth, 0);
 
     mosfetTempLabel = lv_label_create(container);
-    lv_obj_set_style_text_color(mosfetTempLabel, lv_color_white(), LV_PART_MAIN);
-    lv_obj_set_style_text_font(mosfetTempLabel, Screen::kDashboardScreenFont, LV_PART_MAIN);
+    lv_obj_set_style_text_color(mosfetTempLabel, DASHBOARDSCREEN_COLOR_TEMPERATURE, LV_PART_MAIN);
+    lv_obj_set_style_text_font(mosfetTempLabel, kDashboardScreenFont, LV_PART_MAIN);
     lv_obj_set_width(mosfetTempLabel, kDashboardScreenColumnWidth);
     lv_obj_set_style_text_align(mosfetTempLabel, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
     lv_obj_set_pos(mosfetTempLabel, kDashboardScreenContainerWidth - kDashboardScreenColumnWidth, 18);
 
     rpmLabel = lv_label_create(container);
-    lv_obj_set_style_text_color(rpmLabel, lv_color_white(), LV_PART_MAIN);
-    lv_obj_set_style_text_font(rpmLabel, Screen::kDashboardScreenBigFont, LV_PART_MAIN);
+    lv_obj_set_style_text_color(rpmLabel, DASHBOARDSCREEN_COLOR_SPEED, LV_PART_MAIN);
+    lv_obj_set_style_text_font(rpmLabel, kDashboardScreenBigFont, LV_PART_MAIN);
     lv_obj_set_width(rpmLabel, kDashboardScreenContainerWidth);
     lv_obj_set_style_text_align(rpmLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     lv_obj_set_pos(rpmLabel, 0, (TFT_DIM_HEIGHT / 2) - 22);
@@ -608,25 +602,25 @@ void DashboardScreen::load()
     lv_obj_remove_style_all(pwmBarBackground);
     lv_obj_set_size(pwmBarBackground, kDashboardScreenContainerWidth, 16);
     lv_obj_set_pos(pwmBarBackground, 0, kDashboardScreenContainerHeight - 24);
-    lv_obj_set_style_bg_color(pwmBarBackground, lv_palette_darken(LV_PALETTE_GREY, 2), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(pwmBarBackground, DASHBOARDSCREEN_COLOR_PWM_BG, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(pwmBarBackground, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_radius(pwmBarBackground, 4, LV_PART_MAIN);
     lv_obj_set_style_border_width(pwmBarBackground, 1, LV_PART_MAIN);
-    lv_obj_set_style_border_color(pwmBarBackground, lv_color_white(), LV_PART_MAIN);
+    lv_obj_set_style_border_color(pwmBarBackground, DASHBOARDSCREEN_COLOR_PWM_BORDER, LV_PART_MAIN);
     lv_obj_set_style_pad_all(pwmBarBackground, 0, LV_PART_MAIN);
 
     pwmBarFill = lv_obj_create(pwmBarBackground);
     lv_obj_remove_style_all(pwmBarFill);
     lv_obj_set_size(pwmBarFill, 0, 16);
     lv_obj_set_pos(pwmBarFill, 0, 0);
-    lv_obj_set_style_bg_color(pwmBarFill, lv_color_white(), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(pwmBarFill, DASHBOARDSCREEN_COLOR_PWM_FILL, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(pwmBarFill, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_radius(pwmBarFill, 4, LV_PART_MAIN);
     lv_obj_set_style_border_width(pwmBarFill, 0, LV_PART_MAIN);
 
     pwmLabel = lv_label_create(container);
-    lv_obj_set_style_text_color(pwmLabel, lv_color_white(), LV_PART_MAIN);
-    lv_obj_set_style_text_font(pwmLabel, Screen::kDashboardScreenFont, LV_PART_MAIN);
+    lv_obj_set_style_text_color(pwmLabel, DASHBOARDSCREEN_COLOR_PWM_LABEL, LV_PART_MAIN);
+    lv_obj_set_style_text_font(pwmLabel, kDashboardScreenFont, LV_PART_MAIN);
     lv_obj_set_width(pwmLabel, kDashboardScreenContainerWidth);
     lv_obj_set_style_text_align(pwmLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     lv_obj_align_to(pwmLabel, pwmBarBackground, LV_ALIGN_OUT_TOP_MID, 0, -4);
@@ -675,43 +669,43 @@ void StartScreen::load()
     lv_obj_set_style_pad_all(container, 0, LV_PART_MAIN);
 
     voltageLabel = lv_label_create(container);
-    lv_obj_set_style_text_color(voltageLabel, lv_color_white(), LV_PART_MAIN);
-    lv_obj_set_style_text_font(voltageLabel, Screen::kDashboardScreenFont, LV_PART_MAIN);
+    lv_obj_set_style_text_color(voltageLabel, STARTSCREEN_COLOR_VOLTAGE, LV_PART_MAIN);
+    lv_obj_set_style_text_font(voltageLabel, kDashboardScreenFont, LV_PART_MAIN);
     lv_obj_set_width(voltageLabel, kDashboardScreenColumnWidth);
     lv_obj_set_style_text_align(voltageLabel, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
     lv_obj_set_pos(voltageLabel, 0, 0);
 
     currentLabel = lv_label_create(container);
-    lv_obj_set_style_text_color(currentLabel, lv_color_white(), LV_PART_MAIN);
-    lv_obj_set_style_text_font(currentLabel, Screen::kDashboardScreenFont, LV_PART_MAIN);
+    lv_obj_set_style_text_color(currentLabel, STARTSCREEN_COLOR_CURRENT, LV_PART_MAIN);
+    lv_obj_set_style_text_font(currentLabel, kDashboardScreenFont, LV_PART_MAIN);
     lv_obj_set_width(currentLabel, kDashboardScreenColumnWidth);
     lv_obj_set_style_text_align(currentLabel, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
     lv_obj_set_pos(currentLabel, 0, 18);
 
     motorTempLabel = lv_label_create(container);
-    lv_obj_set_style_text_color(motorTempLabel, lv_color_white(), LV_PART_MAIN);
-    lv_obj_set_style_text_font(motorTempLabel, Screen::kDashboardScreenFont, LV_PART_MAIN);
+    lv_obj_set_style_text_color(motorTempLabel, STARTSCREEN_COLOR_TEMPERATURE, LV_PART_MAIN);
+    lv_obj_set_style_text_font(motorTempLabel, kDashboardScreenFont, LV_PART_MAIN);
     lv_obj_set_width(motorTempLabel, kDashboardScreenColumnWidth);
     lv_obj_set_style_text_align(motorTempLabel, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
     lv_obj_set_pos(motorTempLabel, kDashboardScreenContainerWidth - kDashboardScreenColumnWidth, 0);
 
     mosfetTempLabel = lv_label_create(container);
-    lv_obj_set_style_text_color(mosfetTempLabel, lv_color_white(), LV_PART_MAIN);
-    lv_obj_set_style_text_font(mosfetTempLabel, Screen::kDashboardScreenFont, LV_PART_MAIN);
+    lv_obj_set_style_text_color(mosfetTempLabel, STARTSCREEN_COLOR_TEMPERATURE, LV_PART_MAIN);
+    lv_obj_set_style_text_font(mosfetTempLabel, kDashboardScreenFont, LV_PART_MAIN);
     lv_obj_set_width(mosfetTempLabel, kDashboardScreenColumnWidth);
     lv_obj_set_style_text_align(mosfetTempLabel, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
     lv_obj_set_pos(mosfetTempLabel, kDashboardScreenContainerWidth - kDashboardScreenColumnWidth, 18);
 
     directionLabel = lv_label_create(container);
-    lv_obj_set_style_text_color(directionLabel, lv_color_white(), LV_PART_MAIN);
-    lv_obj_set_style_text_font(directionLabel, Screen::kDashboardScreenBigFont, LV_PART_MAIN);
+    lv_obj_set_style_text_color(directionLabel, STARTSCREEN_COLOR_START_LABEL, LV_PART_MAIN);
+    lv_obj_set_style_text_font(directionLabel, kDashboardScreenBigFont, LV_PART_MAIN);
     lv_obj_set_width(directionLabel, kDashboardScreenContainerWidth);
     lv_obj_set_style_text_align(directionLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     lv_obj_set_pos(directionLabel, 0, (TFT_DIM_HEIGHT / 2) - 24);
 
     speedLabel = lv_label_create(container);
-    lv_obj_set_style_text_color(speedLabel, lv_color_white(), LV_PART_MAIN);
-    lv_obj_set_style_text_font(speedLabel, Screen::kDashboardScreenBigFont, LV_PART_MAIN);
+    lv_obj_set_style_text_color(speedLabel, STARTSCREEN_COLOR_SPEED, LV_PART_MAIN);
+    lv_obj_set_style_text_font(speedLabel, kDashboardScreenBigFont, LV_PART_MAIN);
     lv_obj_set_width(speedLabel, kDashboardScreenContainerWidth);
     lv_obj_set_style_text_align(speedLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     lv_obj_set_pos(speedLabel, 0, (TFT_DIM_HEIGHT / 2) + 10);

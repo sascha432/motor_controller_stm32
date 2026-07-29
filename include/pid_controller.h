@@ -486,7 +486,7 @@ public:
     struct StatsType
     {
         Helpers::LowPass<32> rpm;           // filtered RPM for displaying
-        Helpers::LowPass<32> pwm;           // filtered PWM for displaying
+        Helpers::LowPass<8> pwm;            // filtered PWM for displaying
         struct {
             uint32_t loop;                  // number of times the PID loop has been called
             int32_t pulse;                  // number of pulses received from the A/B motor encoder
