@@ -68,7 +68,7 @@ void ADC::init()
 
     // Enable ADC for calibration
     ADC1->CR2 |= ADC_CR2_ADON;
-    delay_us(10);
+    delay_us<10>();
 
     // Reset calibration
     ADC1->CR2 |= ADC_CR2_RSTCAL;
@@ -82,7 +82,7 @@ void ADC::init()
 
     // Enable ADC again after calibration
     ADC1->CR2 |= ADC_CR2_ADON;
-    delay_us(10);
+    delay_us<10>();
 
     ADC1->CR2 |= ADC_CR2_DMA;           // Enable DMA
     ADC1->CR2 |= ADC_CR2_CONT;          // Continuous conversion

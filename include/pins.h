@@ -8,12 +8,22 @@
 
 #include "helpers.h"
 
+/*
+
+Timer configurations:
+
+    TIM1 motor pwm output
+    TIM2 tft backlight and led brightness pwm output
+    TIM3 rotary encoder input
+    TIM4 MT6701 encoder input
+    TIM5 RPM counter input
+    TIM6 PID loop - 5us
+    TIM7 SysTick_Handler() - 1us
+
+*/
+
 // MT6701 encoder pins
-#if defined(STM32F107xC)
 #define MT6701_I2C_ENABLE_PIN       PD7             // MT6701 encoder I2C pin
-#else
-#define MT6701_I2C_PIN              PB7             // MT6701 encoder I2C pin
-#endif
 #define MT6701_I2C_SCL_PIN          PB6             // MT6701 encoder I2C SCL pin / A
 #define MT6701_I2C_SDA_PIN          PB7             // MT6701 encoder I2C SDA pin / B
 
@@ -40,11 +50,7 @@
 #define OCP_VREF_DAC_PIN            PA5             // INA381 CMPREF overcurrent protection
 
 // Charlieplexed LEDs
-#if defined(STM32F107xC)
 #define MOTOR_LEDS_PIN              PD12            // motor LEDs pin
-#else
-#define MOTOR_LEDS_PIN              PB12            // motor LEDs pin
-#endif
 
 #define ILLUMINATION_LED_PIN        PB10            // illumination LED pin
 

@@ -550,6 +550,9 @@ int main(void)
         check if tvs diode blocks usb_dp or usb_dm
         check if reverse usb connector pins are not soldered properly = one direction only/could be a bad cable as well
 
+        OUTCOME: the connector had a solder bridge and might have connected vbus to d+ or d- damaging the mcu
+        until the MCU is replaced i cannot test this further
+
 
         */
 

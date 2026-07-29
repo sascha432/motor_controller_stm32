@@ -8,7 +8,7 @@
 
 /**
  * @brief initialization of the I2C bus and simple blocking functions to communicate
- * 
+ *
  */
 struct I2CHelper {
 
@@ -16,7 +16,7 @@ struct I2CHelper {
 
     /**
      * @brief initialize I2C1 on PB8/PB9 (remapped)
-     * 
+     *
      */
     void initI2C1Remapped(void)
     {
@@ -37,7 +37,7 @@ struct I2CHelper {
 
     /**
      * @brief initialize I2C1 on PB6/PB7 (default)
-     * 
+     *
      */
     void initI2C1()
     {
@@ -53,11 +53,11 @@ struct I2CHelper {
         GPIOB->CRL |=  ((0xF << (6 * 4)) | (0xF << (7 * 4)));
 
         initI2C1Common();
-    }   
+    }
 
     /**
      * @brief disable I2C1 and reset PB6, PB7, PB8, PB9 to floating input
-     * 
+     *
      */
     void deinitI2C1()
     {
@@ -82,12 +82,12 @@ struct I2CHelper {
         // Optional: disable peripheral clock if no longer needed
         RCC->APB1ENR &= ~RCC_APB1ENR_I2C1EN;
 
-        delay_us(10);
+        delay_us<10>();
     }
 
     /**
      * @brief send data to I2C bus
-     * 
+     *
      * @param address I2C address of the device
      * @param data Pointer to the data buffer
      * @param length Number of bytes to send
@@ -154,7 +154,7 @@ struct I2CHelper {
 
     /**
      * @brief read data from I2C bus
-     * 
+     *
      * @param address I2C address of the device
      * @param data Pointer to the data buffer
      * @param length Number of bytes to read
@@ -201,7 +201,7 @@ struct I2CHelper {
             (void)I2C1->SR1;
             (void)I2C1->SR2;
             I2C1->CR1 |= I2C_CR1_STOP;
-            
+
             timeout = kTimeoutMicros;
             while (!(I2C1->SR1 & I2C_SR1_RXNE)) {
                 if (isTimeout(timeout)) {
@@ -235,11 +235,11 @@ struct I2CHelper {
 
         I2C1->CR1 |= I2C_CR1_ACK;
         return true;
-    }    
+    }
 
     /**
      * @brief send a single byte to i2c bus
-     * 
+     *
      * @param address I2C address of the device
      * @param data Byte to send
      * @param stop Whether to send a STOP condition after transmission
@@ -253,7 +253,7 @@ struct I2CHelper {
 
     /**
      * @brief read a single byte from i2c bus
-     * 
+     *
      * @param address I2C address of the device
      * @return int16_t The read byte, or -1 if an error occurred
      */
@@ -285,17 +285,17 @@ private:
         // Enable I2C
         I2C1->CR1 = I2C_CR1_PE;
 
-        delay_us(10);
+        delay_us<10>();
     }
 
-    inline bool I2CError() 
+    inline bool I2CError()
     {
         I2C1->CR1 |= I2C_CR1_STOP;
         I2C1->SR1 &= ~I2C_SR1_AF;
         return false;
     }
 
-    inline bool isTimeout(uint32_t &counter) 
+    inline bool isTimeout(uint32_t &counter)
     {
         __NOP();
         return --counter == 0;

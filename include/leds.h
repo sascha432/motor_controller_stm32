@@ -32,34 +32,34 @@ struct LEDs_T {
     static void off()
     {
         // MODE=00, CNF=01 (floating input) to turn both LEDs off
-        GPIO_CRx_REG(digitalPinToGPIO<GPIO_LEDS_PIN>(), GPIO_LEDS_PIN) &= ~(0xF << digitalPinShift(GPIO_LEDS_PIN));
-        GPIO_CRx_REG(digitalPinToGPIO<GPIO_LEDS_PIN>(), GPIO_LEDS_PIN) |= (0x4 << digitalPinShift(GPIO_LEDS_PIN));
+        GPIO_CRx_REG<GPIO_LEDS_PIN>() &= ~(0xF << digitalPinShift<GPIO_LEDS_PIN>());
+        GPIO_CRx_REG<GPIO_LEDS_PIN>() |= (0x4 << digitalPinShift<GPIO_LEDS_PIN>());
     }
 
     static bool isErrorLEDOn()
     {
-        return digitalPinToGPIO<GPIO_LEDS_PIN>()->ODR & (1U << digitalPinToBit(GPIO_LEDS_PIN));
+        return digitalPinToGPIO<GPIO_LEDS_PIN>()->ODR & (1U << digitalPinToBit<GPIO_LEDS_PIN>());
     }
 
     static bool isWarningLEDOn()
     {
-        return !(digitalPinToGPIO<GPIO_LEDS_PIN>()->ODR & (1U << digitalPinToBit(GPIO_LEDS_PIN)));
+        return !(digitalPinToGPIO<GPIO_LEDS_PIN>()->ODR & (1U << digitalPinToBit<GPIO_LEDS_PIN>()));
     }
 
     static void onLEDError()
     {
-        digitalPinToGPIO<GPIO_LEDS_PIN>()->BSRR = (1U << digitalPinToBit(GPIO_LEDS_PIN)); // set pin high to turn on LED1
+        digitalPinToGPIO<GPIO_LEDS_PIN>()->BSRR = (1U << digitalPinToBit<GPIO_LEDS_PIN>()); // set pin high to turn on LED1
         // MODE=10 (2MHz), CNF=00 (push-pull)
-        GPIO_CRx_REG(digitalPinToGPIO<GPIO_LEDS_PIN>(), GPIO_LEDS_PIN) &= ~(0xF << digitalPinShift(GPIO_LEDS_PIN));
-        GPIO_CRx_REG(digitalPinToGPIO<GPIO_LEDS_PIN>(), GPIO_LEDS_PIN) |= (0x2 << digitalPinShift(GPIO_LEDS_PIN));
+        GPIO_CRx_REG<GPIO_LEDS_PIN>() &= ~(0xF << digitalPinShift<GPIO_LEDS_PIN>());
+        GPIO_CRx_REG<GPIO_LEDS_PIN>() |= (0x2 << digitalPinShift<GPIO_LEDS_PIN>());
     }
 
     static void onLEDWarning()
     {
-        digitalPinToGPIO<GPIO_LEDS_PIN>()->BSRR = (1U << (digitalPinToBit(GPIO_LEDS_PIN) + 16)); // set pin low to turn on LED2
+        digitalPinToGPIO<GPIO_LEDS_PIN>()->BSRR = (1U << (digitalPinToBit<GPIO_LEDS_PIN>() + 16)); // set pin low to turn on LED2
         // MODE=10 (2MHz), CNF=00 (push-pull)
-        GPIO_CRx_REG(digitalPinToGPIO<GPIO_LEDS_PIN>(), GPIO_LEDS_PIN) &= ~(0xF << digitalPinShift(GPIO_LEDS_PIN));
-        GPIO_CRx_REG(digitalPinToGPIO<GPIO_LEDS_PIN>(), GPIO_LEDS_PIN) |= (0x2 << digitalPinShift(GPIO_LEDS_PIN));
+        GPIO_CRx_REG<GPIO_LEDS_PIN>() &= ~(0xF << digitalPinShift<GPIO_LEDS_PIN>());
+        GPIO_CRx_REG<GPIO_LEDS_PIN>() |= (0x2 << digitalPinShift<GPIO_LEDS_PIN>());
     }
 
     static void illuminationLedSetPWM(float value)

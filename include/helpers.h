@@ -276,13 +276,14 @@ inline uint32_t digitalPinToGPIOBase(PIN_TYPE pin)
 /**
  * @brief translate arduino digital pin number to GPIO configuration register shift value
  *
- * @param pin Arduino digital pin number
- * @param bits Defaults to 4, number of bits per pin in the configuration register
- * @return constexpr uint32_t 0-7 * bits
+ * @tparam PIN Arduino digital pin number
+ * @tparam BITS Defaults to 4, number of bits per pin in the configuration register
+ * @return constexpr uint32_t
  */
-inline constexpr uint32_t digitalPinShift(uint32_t pin, uint32_t bits = 4)
+template<uint32_t PIN, size_t BITS = 4>
+inline constexpr uint32_t digitalPinShift()
 {
-    return (digitalPinToBit(pin) & 7u) * bits;
+    return (digitalPinToBit<PIN>() & 7u) * BITS;
 }
 
 /**
@@ -332,20 +333,28 @@ inline void __HAL_RCC_GPIOx_CLK_ENABLE()
     }
 }
 
+// Helper function, constexpr cannot return volatile IO address
+template<uint32_t PIN>
+constexpr uint32_t __GPIO_CRx_REG()
+{
+    return (digitalPinToBit<PIN>() < 8) ? (uint32_t)&digitalPinToGPIO<PIN>()->CRL : (uint32_t)&digitalPinToGPIO<PIN>()->CRH;
+}
+
 /**
- * @brief get configuration register for GPIO pin
+ * @brief Get configuration register for GPIO pin
  *
  * @param gpio_addr GPIOx_BASE address
  * @param pin Arduino PIN number
  * @return volatile uint32_t&
  */
-inline volatile uint32_t &GPIO_CRx_REG(GPIO_TypeDef *gpio_port, uint32_t pin)
+template<uint32_t PIN>
+inline volatile uint32_t &GPIO_CRx_REG()
 {
-    return (digitalPinToBit(pin) < 8) ? (gpio_port)->CRL : (gpio_port)->CRH;
+    return *reinterpret_cast<volatile uint32_t *>(__GPIO_CRx_REG<PIN>());
 }
 
 /**
- * @brief calculate the auto-reload register value for a given PWM frequency with no prescaler (PSC=0)
+ * @brief Calculate the auto-reload register value for a given PWM frequency with no prescaler (PSC=0)
  *
  * @tparam FREQUENCY PWM frequency in Hz
  * @return constexpr uint16_t
@@ -359,20 +368,25 @@ static constexpr uint16_t kPWMFrequencyToARR()
 }
 
 /**
- * @brief Delay microseconds
+ * @brief Delay function for up to 65535 microseconds
  *
- * @param us
+ * @tparam microseconds delay
  */
-inline void delay_us(uint32_t us)
+template<uint32_t US>
+inline void delay_us()
 {
-    if (us > 1000) {
-        HAL_Delay(us / 1000);
-        us %= 1000;
-    }
-    uint16_t start = TIM7->CNT;
-    while ((uint16_t)(TIM7->CNT - start) < us) {
+    static_assert(US <= 0xFFFF, "delay_us() value too high for 16bit timer");
+    const uint16_t start = TIM7->CNT;
+    while ((uint16_t)(TIM7->CNT - start) < (uint16_t)US) {
     }
 }
+
+/**
+ * @brief Delay function
+ *
+ * @param us microseconds
+ */
+void delay_us(uint32_t us);
 
 /**
  * @brief Convert float to string helper
@@ -529,4 +543,9 @@ inline void WatchDog::tickHandler()
     if (++ticks >= kTimeoutMs) { // 1000ms timeout
         call_default_error_handler(InterruptErrorType::WATCHDOG_TIMEOUT);
     }
+}
+
+inline void WatchDog::feed()
+{
+    ticks = 0;
 }

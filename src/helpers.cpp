@@ -5,7 +5,20 @@
 #include "helpers.h"
 #include "debug.h"
 
-//=== float to string conversion ===
+// == delay function ===
+
+void delay_us(uint32_t us)
+{
+    if (us > 1000) {
+        HAL_Delay(us / 1000);
+        us %= 1000;
+    }
+    const uint16_t start = TIM7->CNT;
+    while ((uint16_t)(TIM7->CNT - start) < us) {
+    }
+}
+
+// === float to string conversion ===
 
 void float_to_string_convert(char *buffer, size_t size, float value, uint8_t precision, bool trimTrailingZeros)
 {
@@ -103,9 +116,4 @@ void WatchDog::init()
     if (HAL_WWDG_Init(&watchdog) != HAL_OK) {
         Error_Handler();
     }
-}
-
-void WatchDog::feed()
-{
-    ticks = 0;
 }
