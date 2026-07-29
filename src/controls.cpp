@@ -44,7 +44,6 @@ void Button<GPIO_PIN, ACTIVE_STATE, kDebounceTimeMs>::isr(uint32_t idr)
             else {
                 // once the button is released, set released to true
                 released = true;
-                waitForReleased = false;
             }
         }
     }

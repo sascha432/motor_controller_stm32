@@ -31,7 +31,6 @@ struct Button
         state = readState();;
         pressed = (state == ACTIVE_STATE);
         released = !pressed;
-        waitForReleased = pressed;
         __enable_irq();
     }
 
@@ -49,32 +48,11 @@ struct Button
         // check if the button has been pressed and released
         if (released && pressed) {
             pressed = false; // clear pressed flag
-            waitForReleased = false;
             __enable_irq();
             return true;
         }
         __enable_irq();
         return false;
-    }
-
-    /**
-     * @brief Check if the button has been pressed since the last call to this method
-     *
-     * This method can be used to detect a single button press event
-     *
-     * @return true
-     * @return false
-     */
-    inline bool hasBeenPressed()
-    {
-        __disable_irq();
-        bool result = !waitForReleased && pressed;
-        if (result) {
-            pressed = false; // clear pressed flag
-            waitForReleased = true;
-        }
-        __enable_irq();
-        return result;
     }
 
     /**
@@ -104,7 +82,6 @@ struct Button
     volatile bool state;
     volatile bool pressed;
     volatile bool released;
-    volatile bool waitForReleased;
 };
 
 /**

@@ -105,7 +105,7 @@ struct Screen
     static constexpr lv_coord_t kDiagnosticScreenViewportY = 10;
     static constexpr lv_coord_t kDiagnosticScreenMargin = 20;
     static constexpr lv_coord_t kDiagnosticScreenScrollbarWidth = 4;
-    static constexpr lv_coord_t kDiagnosticScreenRowHeight = 20;
+    static constexpr lv_coord_t kDiagnosticScreenRowHeight = 16;
     static constexpr int32_t kDiagnosticScreenRowCount = 7;
 
     static constexpr lv_coord_t kDashboardScreenContainerWidth = TFT_DIM_WIDTH - 16;

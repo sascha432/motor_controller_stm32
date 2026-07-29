@@ -246,6 +246,9 @@ void Menu::abortableDelay(uint32_t ms)
     while (HAL_GetTick() - start < ms) {
         WatchDog::feed();
         if (isAnyButtonDown()) {
+            while(isAnyButtonDown()) {
+                WatchDog::feed();
+            }
             clearUserInput();
             break;
         }
@@ -712,6 +715,10 @@ void Menu::handleStartButtonPress()
         case Screen::Type::START:
             if (pid.motorToggle()) {
                 loadDashboardScreen();
+            }
+            if (!pid.running) {
+                // save changes after stopping
+                eeprom.write();
             }
             break;
         case Screen::Type::DASHBOARD:

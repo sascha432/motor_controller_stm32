@@ -248,8 +248,8 @@ struct PidController
     /**
      * @brief Get delta since last call, counter is 16bit only
      *
-     * @param counter
-     * @return int32_t
+     * @param counter The current encoder counter value
+     * @return int32_t The delta since the last call
      */
     inline int32_t getDelta(uint32_t counter)
     {

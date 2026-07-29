@@ -13,9 +13,19 @@
 
 // === Helpers ===
 
+inline lv_coord_t diagnostic_screen_get_ypos_for_row(int32_t row)
+{
+    switch(row) {
+        case 0: return 0;
+        default:
+            break;
+    }
+    return Screen::kDiagnosticScreenRowHeight * row + 48;
+}
+
 inline int32_t diagnostic_screen_content_height()
 {
-    return Screen::kDiagnosticScreenRowHeight * Screen::kDiagnosticScreenRowCount;
+    return diagnostic_screen_get_ypos_for_row(Screen::kDiagnosticScreenRowCount) + 10;
 }
 
 inline int32_t diagnostic_screen_scroll_max_lines(int32_t viewportHeight)
@@ -29,7 +39,7 @@ lv_obj_t *diagnostic_screen_create_label(lv_obj_t *parent, lv_coord_t width, int
     lv_obj_t *label = lv_label_create(parent);
     lv_obj_set_style_text_color(label, lv_color_white(), LV_PART_MAIN);
     lv_obj_set_style_text_font(label, Screen::kDiagnosticsScreenLabelFont, LV_PART_MAIN);
-    lv_obj_set_pos(label, 0, Screen::kDiagnosticScreenRowHeight * row);
+    lv_obj_set_pos(label, 0, diagnostic_screen_get_ypos_for_row(row));
     lv_obj_set_width(label, width);
     lv_label_set_long_mode(label, LV_LABEL_LONG_CLIP);
     return label;
@@ -37,7 +47,7 @@ lv_obj_t *diagnostic_screen_create_label(lv_obj_t *parent, lv_coord_t width, int
 
 inline void diagnostic_screen_set_label_row(lv_obj_t *label, int32_t row, int32_t scrollOffset)
 {
-    lv_obj_set_y(label, (Screen::kDiagnosticScreenRowHeight * row) - scrollOffset);
+    lv_obj_set_y(label, diagnostic_screen_get_ypos_for_row(row) - scrollOffset);
 }
 
 void start_screen_update_top_status_labels(lv_obj_t *voltageLabel, lv_obj_t *currentLabel, lv_obj_t *motorTempLabel, lv_obj_t *mosfetTempLabel)
@@ -426,9 +436,12 @@ void DiagnosticsScreen::load()
 
     // Firmware label
     firmwareLabel = diagnostic_screen_create_label(content, textWidth, 0);
-    char buf[64];
-    snprintf(buf, sizeof(buf) - 1, "Firmware %u.%u.%u PCB Rev %u.%u",  VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, PCB_REV_MAJOR, PCB_REV_MINOR);
-    lv_label_set_text(firmwareLabel, buf);
+    {
+        char buf[128];
+        snprintf(buf, sizeof(buf) - 1, "Firmware %u.%u.%u\nPCB Rev %u.%u\nBuild " __DATE__ " " __TIME__  "\nEEPROM cycle #%u",  VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, PCB_REV_MAJOR, PCB_REV_MINOR, (unsigned)eeprom.getData().sequence);
+        lv_label_set_text(firmwareLabel, buf);
+    }
+
 
     // VCC label
     vccLabel = diagnostic_screen_create_label(content, textWidth, 1);
@@ -516,14 +529,14 @@ void DiagnosticsScreen::_refreshVisuals()
     );
     lv_label_set_text(currentLabel, buf);
 
-    snprintf(buf, sizeof(buf) - 1, "Motor %dC (%dC/%dC)",
+    snprintf(buf, sizeof(buf) - 1, "Motor %d" DEGREE_UTF8 "C (%d" DEGREE_UTF8 "C/%d" DEGREE_UTF8 "C)",
         stats.motorTemp,
         stats.min.motorTemp,
         stats.max.motorTemp
     );
     lv_label_set_text(motorTempLabel, buf);
 
-    snprintf(buf, sizeof(buf) - 1, "MOSFETs %dC (%dC/%dC)",
+    snprintf(buf, sizeof(buf) - 1, "MOSFETs %d" DEGREE_UTF8 "C (%d" DEGREE_UTF8 "C/%d" DEGREE_UTF8 "C)",
         stats.mosfetTemp,
         stats.min.mosfetTemp,
         stats.max.mosfetTemp
