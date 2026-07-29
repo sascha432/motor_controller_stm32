@@ -687,8 +687,9 @@ void DashboardScreen::_refreshVisuals()
 
     lv_label_set_text_fmt(pwmLabel, "PWM %u%%", (unsigned)pwmPercent);
 
-    const lv_coord_t fillWidth = static_cast<lv_coord_t>((kDashboardScreenContainerWidth * pid.stats.pwm.get()) / pid.kMaxPWMLevel);
-    lv_obj_set_size(pwmBarFill, fillWidth, 16);
+    // TODO this is slow
+    // const lv_coord_t fillWidth = static_cast<lv_coord_t>((kDashboardScreenContainerWidth * pid.stats.pwm.get()) / pid.kMaxPWMLevel);
+    // lv_obj_set_size(pwmBarFill, fillWidth, 16);
 }
 
 // === Start Screen ===

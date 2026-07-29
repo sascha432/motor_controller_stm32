@@ -56,6 +56,11 @@ static void setup()
     eeprom.init();
     eeprom.read();
 
+//TODO SWO output crashes when the SWO buffer is full, so disable it for now
+if (eeprom.getPidTuning() == EEPROM::kPidTuningSWO) {
+    eeprom.setPidTuning(EEPROM::kPidTuningDisabled);
+}
+
     // LEDs
     LEDs::init();
 
@@ -260,6 +265,8 @@ extern "C" void EXTI15_10_IRQHandler(void)
         pid.faults.drv8701Fault = (digitalPinToGPIO<DRV8701_FAULT_PIN>()->IDR & (1 << digitalPinToBit(DRV8701_FAULT_PIN))) == 0;
         if (!fault && pid.faults.drv8701Fault) {
             LEDs::onLEDError(); // turn fault LED on, main loop resets it after the fault has cleared
+//TODO handle softfail
+pid.setErrorCode(PidController::ErrorCodeType::FAULT);
         }
     }
     if (pending & (1 << 12)) {
@@ -373,6 +380,7 @@ extern "C" void Error_Handler(void)
     // turn motor off
     PID_WRITE_MOTOR_PWM_OFF();
     #if DEBUG
+    #if DEBUG_OUTPUT == DEBUG_OUTPUT_SWD
     // report error type via SWO
     switch(interruptErrorType) {
         case InterruptErrorType::ERROR_HANDLER:
@@ -397,6 +405,7 @@ extern "C" void Error_Handler(void)
             SWO::write(0, "WD\n", sizeof("WD\n") - 1);
             break;
     }
+    #endif
     #endif
     __disable_irq();
     while (1) {

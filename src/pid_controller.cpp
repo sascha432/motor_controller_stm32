@@ -197,11 +197,9 @@ bool PidController::motorToggle()
 {
     if (running) {
         motorOff();
-        eeprom.write(); // save changes after motor is turned off
         return false;
     }
     else {
-        eeprom.write(); // save changes before motor is turned on
         motorOn();
         return true;
     }

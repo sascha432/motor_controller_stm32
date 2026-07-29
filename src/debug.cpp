@@ -178,7 +178,7 @@ void debug_swd_printf(const char *fmt, ...)
     vsnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);
 
-    //if (strstr(buf, "EEPROM") || strstr(buf, "I2CHelper"))  
+    //if (strstr(buf, "EEPROM") || strstr(buf, "I2CHelper"))
     {
         debug_swd_write(buf);
     }
@@ -186,7 +186,7 @@ void debug_swd_printf(const char *fmt, ...)
 
 #endif
 
-void debug_init(void) 
+void debug_init(void)
 {
     #if DEBUG_OUTPUT == DEBUG_OUTPUT_SWD
         debug_swd_init();

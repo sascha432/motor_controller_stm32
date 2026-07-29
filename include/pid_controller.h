@@ -19,7 +19,7 @@ struct PidController
     static constexpr uint32_t kPIDInterval = 5;                                     // PID update rate in millis
     static constexpr uint32_t kAntiWindupFactor = 100;                              // anti-windup factor
     static constexpr uint32_t kAntiWindupReduction = 0.97f * kAntiWindupFactor;     // reduce integral if error is out of range (97%)
-    static constexpr uint32_t kIntegralTimeLimit = 1000;                            // anti windup integral time limit in milliseconds
+    static constexpr uint32_t kIntegralTimeLimit = 2500;                            // anti windup integral time limit in milliseconds
     static constexpr bool kProgramPPR = false;                                      // set to true to program the MT6701 encoder during boot over i2c
 
     // PID scaling factors
@@ -441,14 +441,14 @@ struct PidController
                 return snprintf(buf, bufSize, "OVP");
             case ErrorCodeType::OCP:
                 return snprintf(buf, bufSize, "OCP");
+            case ErrorCodeType::FAULT:
+                return snprintf(buf, bufSize, "DRV8701 FAULT");
             default:
                 break;
-            // case ErrorCodeType::FAULT:
-            //     return snprintf(buf, bufSize, "FAULT");
             // case ErrorCodeType::OCP:
             //     return snprintf(buf, bufSize, "OCP");
             // case ErrorCodeType::SNSOUT:
-            //     return snprintf(buf, bufSize, "MOTOR OCP");
+            //     return snprintf(buf, bufSize, "DRV8701 SNSOUT");
         }
         return snprintf(buf, bufSize, "ERROR #%d", static_cast<int>(errorCode));
     }
