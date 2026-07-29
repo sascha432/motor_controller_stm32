@@ -19,27 +19,34 @@ struct PidController
     static constexpr uint32_t kPIDInterval = 5;                                     // PID update rate in millis
     static constexpr uint32_t kAntiWindupFactor = 100;                              // anti-windup factor
     static constexpr uint32_t kAntiWindupReduction = 0.97f * kAntiWindupFactor;     // reduce integral if error is out of range (97%)
-    static constexpr uint32_t kIntegralTimeLimit = 2000;                            // anti windup integral time limit in milliseconds
-    static constexpr float kPWMScaleMultiplier = 1.0 / (100.0 / kMaxPWMLevel);
-    static constexpr int32_t kScaleFactor =                                         // scale factor for PID calculations
-        static_cast<int32_t>(
-            16384.0f *
-            (kCPR / 4096.0f) *
-            (5.0f / kPIDInterval) *
-            (1800.0f / kMaxPWMLevel) *
-            (18.0f / kPWMScaleMultiplier)
-        );
-    static constexpr bool kProgramPPR = false;                              // set to true to program the MT6701 encoder during boot over i2c
+    static constexpr uint32_t kIntegralTimeLimit = 1000;                            // anti windup integral time limit in milliseconds
+    static constexpr bool kProgramPPR = false;                                      // set to true to program the MT6701 encoder during boot over i2c
 
-    /*
-        the kScaleFactor calculation gives the following range for tuning PID values (Kp, Ki, Kd)
+    // PID scaling factors
+    static constexpr float kPWMScaleMultiplier = 1.0 / (100.0 / kMaxPWMLevel);      // convert pwm level to percentage
+    static constexpr int32_t kScaleFactor = 4096;                                   // scale factor for fixed point PID calculations
+    static constexpr float kPulsesPerRPMPerInterval = (kCPR) / (60000 / kPIDIntervalFloat);
+    static constexpr float kPIDScaleFactor = (kScaleFactor / kPulsesPerRPMPerInterval) * kPWMScaleMultiplier;
+    static constexpr float kKpScaleFactor = kPIDScaleFactor;                                        // scale_factor
+    static constexpr float kKiScaleFactor = kPIDScaleFactor * (kPIDInterval / 1000.0);              // scale_factor * dt
+    static constexpr float kKdScaleFactor = kPIDScaleFactor * (1.0 / (kPIDInterval / 1000.0));      // scale_factor / dt
 
-        | Gain   | Minimum Kx (`PreCalc=10`) | Maximum Kx (`PreCalc=max int32`) |
-        | ------ | ------------------------: | -------------------------------: |
-        | **Kp** |                  0.000026 |                             5655 |
-        | **Ki** |                    0.0053 |                          1131000 |
-        | **Kd** |                0.00000013 |                               28 |
-    */
+    // useable min/max values for fixed point calculation
+    static constexpr float kMinKpValue = 10.0 / kKpScaleFactor;
+    static constexpr float kMaxKpValue = UINT32_MAX / kKpScaleFactor;
+    static constexpr float kMinKiValue = 10.0 / kKiScaleFactor;
+    static constexpr float kMaxKiValue = UINT32_MAX / kKiScaleFactor;
+    static constexpr float kMinKdValue = 10.0 / kKdScaleFactor;
+    static constexpr float kMaxKdValue = UINT32_MAX / kKdScaleFactor;
+
+    // assert possible ranges
+    // TODO limit values in the UI
+    static_assert(kMinKpValue < 0.0001, "kMinKpValue");
+    static_assert(kMaxKpValue > 1000, "kMaxKpValue");
+    static_assert(kMinKiValue < 0.005, "kMinKiValue");
+    static_assert(kMaxKiValue > 10000, "kMaxKiValue");
+    static_assert(kMinKdValue < 0.000001, "kMinKdValue");
+    static_assert(kMaxKdValue > 50, "kMaxKdValue");
 
     // convert counts/RPM for 200Hz/5ms interval
     template<int32_t VALUE>
@@ -48,7 +55,7 @@ struct PidController
     }
 
     static constexpr int32_t kIntCountsToRPM(int32_t value) {
-        return (value * (60000 / kPIDIntervalFloat)) / kCPR;
+        return (value * (uint32_t)(60000 / kPIDIntervalFloat)) / kCPR;
     }
 
     enum class ErrorCodeType : int32_t {
@@ -109,15 +116,7 @@ struct PidController
     inline void setKp(float value)
     {
         Kp = value;
-        // pre calculate Kp to reduce calculations to 3 multiplications in the PID loop
-        // scale value and reduce CPR
-        // KpPreCalc = value * kFPScale / (kRPMToIntCounts(kCPR) / (float)kMaxPWMLevel);
-        // output to pwm scaler
-        // KiPreCalc = KiPreCalc * kPWMScaleMultiplier;
-
-        // optimized version using double precision inside the constexpr and a single float multiplication operation
-        KpPreCalc = value * static_cast<float>(kScaleFactor / ((kRPMToIntCountsT<kCPR>() / static_cast<double>(kMaxPWMLevel)) / static_cast<double>(kPWMScaleMultiplier)));
-        // PID tuning via SWO
+        KpPreCalc = value * kKpScaleFactor;
         SWO::data.Kp = value;
     }
 
@@ -129,14 +128,7 @@ struct PidController
     inline void setKi(float value)
     {
         Ki = value;
-        // scale value and reduce CPR
-        // KiPreCalc = value * kFPScale / (kRPMToIntCounts(kCPR) / (float)kMaxPWMLevel);
-        // add dt into precalc
-        // KiPreCalc = KiPreCalc * kPIDInterval / 1000; // KiPreCalc = KiPreCalc * dt
-        // output to pwm scaler
-        // KiPreCalc = KiPreCalc * kPWMScaleMultiplier;
-        KiPreCalc = value * static_cast<float>(kScaleFactor * kPIDInterval / ((kRPMToIntCountsT<kCPR>() * 1000 / static_cast<double>(kMaxPWMLevel)) / static_cast<double>(kPWMScaleMultiplier)));
-        // PID tuning via SWO
+        KiPreCalc = value * kKiScaleFactor;
         SWO::data.Ki = value;
     }
 
@@ -148,24 +140,26 @@ struct PidController
     inline void setKd(float value)
     {
         Kd = value;
-        // scale value and reduce CPR
-        // KdPreCalc = value * kFPScale / (kRPMToIntCounts(kCPR) / (float)kMaxPWMLevel);
-        // add dt into precalc
-        // KdPreCalc = KdPreCalc * 1000 / kPIDInterval; // KdInt = KdInt / dt
-        // output to pwm scaler
-        // KdPreCalc = KdPreCalc * kPWMScaleMultiplier;
-        KdPreCalc = value * static_cast<float>(kScaleFactor * 1000 / ((kRPMToIntCountsT<kCPR>() * kPIDInterval / static_cast<double>(kMaxPWMLevel)) / static_cast<double>(kPWMScaleMultiplier)));
-        // PID tuning via SWO
+        KdPreCalc = value * kKdScaleFactor;
         SWO::data.Kd = value;
     }
 
     inline int32_t calcPWMLevel(int32_t error, int32_t integral, int32_t derivative) const
     {
-        return (
-            (error * (int64_t)KpPreCalc) +
-            (integral * (int64_t)KiPreCalc) +
-            (derivative * (int64_t)KdPreCalc)
-        ) / kScaleFactor;
+        #if 0
+            // floating point version for testing
+            const float Kp = this->Kp * (kKpScaleFactor / kScaleFactor);
+            const float Ki = this->Ki * (kKiScaleFactor / kScaleFactor);
+            const float Kd = this->Kd * (kKdScaleFactor / kScaleFactor);
+            return static_cast<int32_t>((error * Kp) + (integral * Ki) + (derivative * Kd));
+        #else
+            // FP version kScaleFactor
+            return (
+                (error * (int64_t)KpPreCalc) +
+                (integral * (int64_t)KiPreCalc) +
+                (derivative * (int64_t)KdPreCalc)
+            ) / kScaleFactor;
+        #endif
     }
 
     inline int32_t clampPWMLevel(int32_t value) const
@@ -185,9 +179,9 @@ struct PidController
         // rev. per minute
         rpm = value;
         // to counts per interval
-        cpi = (rpm * kCPR) / (60000 / kPIDInterval);
+        cpi = (rpm * kCPR) / (int32_t)(60000 / kPIDIntervalFloat);
         // anti windup limit for integral term
-        cpiIntegralLimit = cpi * (kIntegralTimeLimit * kPIDInterval / 1000);
+        cpiIntegralLimit = cpi * (int32_t)(kIntegralTimeLimit * kPIDIntervalFloat / 1000.0f);
     }
 
     /**
@@ -198,7 +192,6 @@ struct PidController
     inline void setAntiWindupReduction(uint16_t value)
     {
         antiWindupReduction = value;
-        // PID tuning via SWO
         SWO::data.antiWindupReduction = value / (float)UIConstants::kAntiWindupFactor;
     }
 

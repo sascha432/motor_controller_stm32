@@ -248,7 +248,7 @@ void PidController::isr()
             setIntegral((getIntegral() * 800) / 1024); // strong anti windup reduction during OCP condition
         }
         else if (antiWindupReduction) {
-            if (pwmLevel != clampedPwmLevel) {
+            if (pwmLevel < -kMaxPWMLevel || pwmLevel > (kMaxPWMLevel * 2)) {
                 setIntegral((getIntegral() * antiWindupReduction) / kAntiWindupFactor);
             }
         }
@@ -335,8 +335,8 @@ void PidController::ocp_isr()
 {
     ocp.counter++;
     if (ocp.state == OcpStateType::TRIGGERED) {
-        if (adc.getISenseOcpFilteredValue() < ((faults.isenseMax * 900) / 1024)) {
-            // start recovery after the current dropped to ~90% of the limit
+        if (adc.getISenseOcpFilteredValue() < ((faults.isenseMax * 800) / 1024)) {
+            // start recovery after the current dropped to ~80% of the limit
             ocp.state = OcpStateType::RECOVERY;
             ocp.counter = 0;
         }
