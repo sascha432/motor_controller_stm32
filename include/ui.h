@@ -20,8 +20,8 @@ static constexpr bool kUIKeepScreenObjectsInMemory = false;
 
 #define COLOR_PALETTE_WHITE                     lv_color_make(255, 255, 255)
 #define COLOR_PALETTE_BLACK                     lv_color_make(0, 0, 0)
-#define COLOR_PALETTE_DARK_GRAY                 lv_color_make(24, 24, 24)
-#define COLOR_PALETTE_LIGHT_GRAY                lv_color_make(128, 128, 128)
+#define COLOR_PALETTE_DARK_GRAY                 lv_color_make(8, 8, 8)
+#define COLOR_PALETTE_LIGHT_GRAY                lv_color_make(64, 64, 64)
 #define COLOR_PALETTE_RED                       lv_color_make(255, 0, 0)
 #define COLOR_PALETTE_GREEN                     lv_color_make(0, 255, 0)
 #define COLOR_PALETTE_YELLOW                    lv_color_make(255, 255, 0)
@@ -29,7 +29,6 @@ static constexpr bool kUIKeepScreenObjectsInMemory = false;
 #define COLOR_PALETTE_PURPLE                    lv_color_make(255, 0, 255)
 #define COLOR_PALETTE_DARK_PURPLE               lv_color_make(128, 0, 128)
 #define COLOR_PALETTE_BLUE                      lv_color_make(0, 0, 128)
-#define COLOR_PALETTE_LIGHT_BLUE                lv_color_make(0, 128, 255)
 
 #define SCREEN_COLOR_TEXT                       COLOR_PALETTE_LIGHT_GRAY
 #define SCREEN_COLOR_BG                         COLOR_PALETTE_BLACK
@@ -41,7 +40,7 @@ static constexpr bool kUIKeepScreenObjectsInMemory = false;
 
 #define DIAGNOSTICSCREEN_COLOR_TEXT             COLOR_PALETTE_CYAN
 #define DIAGNOSTICSCREEN_COLOR_SCROLLBAR_BG     COLOR_PALETTE_DARK_GRAY
-#define DIAGNOSTICSCREEN_COLOR_SCROLLBAR_THUMB  COLOR_PALETTE_CYAN
+#define DIAGNOSTICSCREEN_COLOR_SCROLLBAR_THUMB  COLOR_PALETTE_LIGHT_GRAY
 
 #define STARTSCREEN_COLOR_START_LABEL           SCREEN_COLOR_TEXT
 #define STARTSCREEN_COLOR_SPEED                 COLOR_PALETTE_PURPLE
@@ -49,7 +48,7 @@ static constexpr bool kUIKeepScreenObjectsInMemory = false;
 #define STARTSCREEN_COLOR_CURRENT               SCREEN_COLOR_CURRENT
 #define STARTSCREEN_COLOR_TEMPERATURE           SCREEN_COLOR_TEMPERATURE
 
-#define MENUSCREEN_COLOR_ITEM                   COLOR_PALETTE_DARK_GRAY
+#define MENUSCREEN_COLOR_ITEM                   COLOR_PALETTE_LIGHT_GRAY
 #define MENUSCREEN_COLOR_BG                     COLOR_PALETTE_BLACK
 #define MENUSCREEN_COLOR_SELECTED_ITEM          COLOR_PALETTE_LIGHT_GRAY
 #define MENUSCREEN_COLOR_SELECTED_BG            COLOR_PALETTE_BLUE
