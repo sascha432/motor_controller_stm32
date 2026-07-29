@@ -150,8 +150,8 @@ struct PidController
      */
     inline void setAntiWindup(uint16_t value)
     {
-        antiWindup = value / (float)UIConstants::kAntiWindupFactor;
-        SWO::data.antiWindup = antiWindup; //value / (float)UIConstants::kAntiWindupFactor;
+        antiWindup = std::clamp<float>(value / (UIConstants::kAntiWindupFactor * 100.0f), 0.5f, 1.0f);
+        SWO::data.antiWindup = antiWindup;
     }
 
     /**
