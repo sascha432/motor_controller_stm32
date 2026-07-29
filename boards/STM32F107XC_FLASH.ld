@@ -110,6 +110,16 @@ SECTIONS
     __bss_end__ = _ebss;
   } >RAM
 
+  .ram_fixed (NOLOAD) :
+  {
+    . = ORIGIN(RAM) + LENGTH(RAM) - 0x1000;
+    . = ALIGN(4);
+    __ram_fixed_start__ = .;
+    KEEP(*(.ram_fixed))
+    . = ALIGN(4);
+    __ram_fixed_end__ = .;
+  } >RAM
+
   ._user_heap_stack :
   {
     . = ALIGN(8);

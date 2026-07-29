@@ -10,7 +10,7 @@ struct EEPROM;
 struct ScreenFlow;
 
 // === Menu class ===
-struct Menu 
+struct Menu
 {
     Menu();
 
@@ -34,7 +34,7 @@ struct Menu
 
     bool isAnyButtonDown();
     void clearUserInput();
-    
+
     void saveEEPROMChanges();
     void applyEEPROMSettings();
     void applyPIDTuningSettings();

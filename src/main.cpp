@@ -56,11 +56,6 @@ static void setup()
     eeprom.init();
     eeprom.read();
 
-//TODO SWO output crashes when the SWO buffer is full, so disable it for now
-if (eeprom.getPidTuning() == EEPROM::kPidTuningSWO) {
-    eeprom.setPidTuning(EEPROM::kPidTuningDisabled);
-}
-
     // LEDs
     LEDs::init();
 
@@ -180,27 +175,25 @@ static void loop()
         lastLvHandler = HAL_GetTick();
     }
 
-    if (eeprom.getPidTuning() != EEPROM::kPidTuningDisabled) {
+    if (SWO::data.enabled) {
         // send PID tuning data
         PidController::PidLoopType item;
         static constexpr char kPidFrameMagic[] = {'P', 'I', 'D', '1'};
         while (pid.pidLoopBuffer.pop(item)) {
-            if (eeprom.getPidTuning() == EEPROM::kPidTuningSWO) {
-                #if 1
-                // don't check writes
-                SWO::write(1, kPidFrameMagic, sizeof(kPidFrameMagic));
-                SWO::writeObject<1>(item);
-                #else
-                if (
-                    (SWO::write(1, kPidFrameMagic, sizeof(kPidFrameMagic)) != sizeof(kPidFrameMagic)) ||
-                    (SWO::writeObject<1>(item) != sizeof(item))
-                ) {
-                    // if the SWO buffer is full, clear the buffer to avoid blocking the PID loop
-                    pid.pidLoopBuffer.clear();
-                    break;
-                }
-                #endif
+            #if 1
+            // don't check writes
+            SWO::write(1, kPidFrameMagic, sizeof(kPidFrameMagic));
+            SWO::writeObject<1>(item);
+            #else
+            if (
+                (SWO::write(1, kPidFrameMagic, sizeof(kPidFrameMagic)) != sizeof(kPidFrameMagic)) ||
+                (SWO::writeObject<1>(item) != sizeof(item))
+            ) {
+                // if the SWO buffer is full, clear the buffer to avoid blocking the PID loop
+                pid.pidLoopBuffer.clear();
+                break;
             }
+            #endif
         }
     }
 }

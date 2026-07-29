@@ -31,7 +31,7 @@ static void debug_swd_init()
 }
 
 bool SWO::state = false;
-SWO::DataType SWO::data;
+__attribute__((used, section(".ram_fixed"))) SWO::DataType SWO::data;
 
 void SWO::init()
 {

@@ -103,7 +103,7 @@ struct Screen
         MOTOR_SPEED,
         DIAGNOSTICS,
         DASHBOARD,
-        PID_TUNING,
+        // PID_TUNING,
         PID_PARAMETERS,
         PID_KP,
         PID_KI,
@@ -120,13 +120,8 @@ struct Screen
 
     // menu screen style constants
     static constexpr lv_coord_t kMenuScreenVisibleItems = 5;
-    #if TFT_DIM_HEIGHT == 135
-        static constexpr const lv_font_t *kMenuScreenLabelFont = &lv_font_montserrat_18;
-        static constexpr lv_coord_t kMenuScreenItemHeight = 26;
-    #else
-        static constexpr const lv_font_t *kMenuScreenLabelFont = &lv_font_montserrat_14;
-        static constexpr lv_coord_t kMenuScreenItemHeight = 20;
-    #endif
+    static constexpr const lv_font_t *kMenuScreenLabelFont = &lv_font_montserrat_18;
+    static constexpr lv_coord_t kMenuScreenItemHeight = 26;
     static constexpr lv_coord_t kMenuScreenStartX = 10;
     static constexpr lv_coord_t kMenuScreenStartY = TFT_DIM_HEIGHT - (kMenuScreenVisibleItems * kMenuScreenItemHeight) - 1;
     static constexpr lv_coord_t kMenuScreenItemStartX = 8;
@@ -140,11 +135,7 @@ struct Screen
     static constexpr const lv_font_t *kSliderScreenLabelFontBig = &lv_font_montserrat_18;
     static constexpr const lv_font_t *kSliderScreenValueFont = &lv_font_montserrat_18;
     static constexpr lv_coord_t kSliderScreenContainerX = 16;
-    #if TFT_DIM_HEIGHT == 135
-        static constexpr lv_coord_t kSliderScreenContainerY = 20;
-    #else
-        static constexpr lv_coord_t kSliderScreenContainerY = 27;
-    #endif
+    static constexpr lv_coord_t kSliderScreenContainerY = 20;
     static constexpr lv_coord_t kSliderScreenContainerWidth = TFT_DIM_WIDTH - 24;
     static constexpr lv_coord_t kSliderScreenContainerHeight = TFT_DIM_HEIGHT - kSliderScreenContainerY;
     static constexpr lv_coord_t kSliderScreenTitleBottomGap = 35;

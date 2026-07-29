@@ -301,10 +301,9 @@ void PidController::isr()
     stats.counter.loop++;
 
     // send PID tuning data if enabled
-    if (eeprom.getPidTuning() != EEPROM::kPidTuningDisabled) {
+    if (SWO::data.enabled) {
         PidLoopType item;
         item.sequence = stats.counter.loop;
-        item.dataAddress = reinterpret_cast<uint32_t>(&SWO::data);
         item.rpm = static_cast<uint16_t>(deltaRPM);
         item.pwmLevel = static_cast<uint16_t>(clampedPwmLevel);
         item.voltage = adc.getVSenseValue();
@@ -314,7 +313,9 @@ void PidController::isr()
         item.mosfetTemperature = adc.getMosfetNTCValue();
         item.dacMotorCurrent = DAC_GET_MOTOR_CURRENT();
         item.dacInputCurrent =  DAC_GET_INPUT_CURRENT();
+        item.error = getLastError();
         item.integral = getIntegral();
+        item.derivative = getLastDerivative();
         item.running = running ? 1U : 0U;
         item.drv8701Fault = faults.drv8701Fault ? 1U : 0U;
         item.ocpFault = (ocp.state != OcpStateType::NONE) ? 1U : 0U;
@@ -327,7 +328,7 @@ void PidController::isr()
             eeprom.setKp(SWO::data.Kp);
             eeprom.setKi(SWO::data.Ki);
             eeprom.setMotorRPM(SWO::data.rpm);
-            eeprom.setAntiWindupReduction(SWO::data.antiWindupReduction * UIConstants::kAntiWindupFactor);
+            eeprom.setAntiWindupReduction(SWO::data.antiWindup * UIConstants::kAntiWindupFactor);
             SWO::data.changed = false;
 
             // apply to PID controller

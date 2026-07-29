@@ -11,6 +11,8 @@
 #include <string.h>
 #include <stm32f1xx.h>
 
+#define SWO_DATA_FIXED_RAM_ADDRESS 0x2000F000UL
+
 struct SWO {
     static void init();
     static void deinit();
@@ -24,14 +26,14 @@ struct SWO {
 
     static bool state;
     struct DataType {
-        float Kp;
-        float Ki;
-        float Kd;
-        float antiWindupReduction;
-        uint16_t rpm;
-        bool changed;
-
-        DataType() : Kp(0), Ki(0), Kd(0), antiWindupReduction(0), rpm(0), changed(false) {}
+        volatile float Kp;
+        volatile float Ki;
+        volatile float Kd;
+        volatile float antiWindup;
+        volatile uint16_t rpm;
+        volatile bool enabled;
+        volatile bool changed;
+        DataType() : Kp(0), Ki(0), Kd(0), antiWindup(0), rpm(0), enabled(false), changed(false) {}
     };
     static DataType data;
 };

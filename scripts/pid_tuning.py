@@ -48,7 +48,6 @@ NTC_NOMINAL_TEMP_C = 25.0
 @dataclass
 class Sample:
     sequence: int
-    data_address: int
     rpm: int
     pwm_level: int
     voltage_adc: int
@@ -65,7 +64,9 @@ class Sample:
     motor_temp_c: float
     mosfet_temp_adc: int
     mosfet_temp_c: float
+    error: float
     integral: float
+    derivative: float
     running: int
     drv_fault: int
     ocp_fault: int
@@ -87,8 +88,9 @@ class AppConfig:
 
 
 PID_FRAME_MAGIC = b"PID1"
-PID_ITEM_SIZE = 36
+PID_ITEM_SIZE = struct.calcsize("<I9HfffI")
 PID_PWM_MAX_LEVEL = 3599.0
+SWO_DATA_FIXED_RAM_ADDRESS = 0x2000F000
 
 
 @dataclass
@@ -147,18 +149,15 @@ def decode_pid_item(payload: bytes) -> Optional[Sample]:
     if len(payload) != PID_ITEM_SIZE:
         return None
 
-    sequence, data_address, rpm, pwm, voltage, i_ocp, i_avg, motor_ntc, mosfet_ntc, dac_motor, dac_input, integral, faults = struct.unpack(
-        "<II9H2xfI", payload
+    sequence, rpm, pwm, voltage, i_ocp, i_avg, motor_ntc, mosfet_ntc, dac_motor, dac_input, error, integral, derivative, faults = struct.unpack(
+        "<I9HfffI", payload
     )
-    # if integral > 0x7FFFFFFF: # make signed
-    #     integral -= 0x100000000
-    if rpm > 55000: # RPM might go negative due to small vibrations when the motor is stalled and the sensor limit is 55k RPM
+    if rpm > 55000:  # RPM might go negative due to small vibrations when the motor is stalled and the sensor limit is 55k RPM
         rpm = 0
 
     running, drv_fault, ocp_fault, snsout_fault = decode_fault_word(faults)
     return Sample(
         sequence=sequence,
-        data_address=data_address,
         rpm=rpm,
         pwm_level=pwm,
         voltage_adc=voltage,
@@ -175,7 +174,9 @@ def decode_pid_item(payload: bytes) -> Optional[Sample]:
         motor_temp_c=convert_ntc_celsius(motor_ntc),
         mosfet_temp_adc=mosfet_ntc,
         mosfet_temp_c=convert_ntc_celsius(mosfet_ntc),
+        error=error,
         integral=integral,
+        derivative=derivative,
         running=running,
         drv_fault=drv_fault,
         ocp_fault=ocp_fault,
@@ -203,9 +204,6 @@ def is_plausible_sample(sample: Sample, last_sequence: Optional[int]) -> bool:
     if sample.ocp_fault not in (0, 1):
         return False
     if sample.snsout_fault not in (0, 1):
-        return False
-
-    if sample.data_address and not (0x20000000 <= sample.data_address <= 0x20020000):
         return False
 
     if last_sequence is None:
@@ -637,7 +635,7 @@ class PIDTuningApp:
         self._last_loaded_swo_data: Optional[SWOData] = None
         self._install_pid_field_traces()
 
-        self.data_address: Optional[int] = None
+        self.data_address: Optional[int] = SWO_DATA_FIXED_RAM_ADDRESS
         self.pending_initial_sync = False
         self.sync_in_progress = False
         self.start_packet_deadline: Optional[float] = None
@@ -850,21 +848,22 @@ class PIDTuningApp:
             justify=tk.LEFT,
         ).grid(row=3, column=0, columnspan=2, sticky="w", pady=(6, 0))
 
-    def _pack_swo_data(self, data: SWOData) -> bytes:
+    def _pack_swo_data(self, data: SWOData, enabled: bool = False, changed: bool = True) -> bytes:
         # C++ layout: float Kp, float Ki, float Kd, float antiWindupReduction,
-        # uint16_t rpm, bool changed, 1-byte pad.
+        # uint16_t rpm, bool enabled, bool changed.
         return struct.pack(
-            "<ffffH?x",
+            "<ffffH??",
             data.kp,
             data.ki,
             data.kd,
             data.anti_windup_reduction,
             data.rpm,
-            data.changed,
+            enabled,
+            changed,
         )
 
     def _unpack_swo_data(self, payload: bytes) -> SWOData:
-        kp, ki, kd, anti_windup_reduction, rpm, changed = struct.unpack("<ffffH?x", payload)
+        kp, ki, kd, anti_windup_reduction, rpm, _enabled, changed = struct.unpack("<ffffH??", payload)
         return SWOData(
             kp=kp,
             ki=ki,
@@ -898,6 +897,23 @@ class PIDTuningApp:
 
     def _set_sync_enabled(self, enabled: bool) -> None:
         self.sync_button.configure(state=(tk.NORMAL if enabled else tk.DISABLED))
+
+    def _set_target_enabled(self, enabled: bool) -> None:
+        if self.data_address is None:
+            return
+
+        def worker() -> None:
+            try:
+                payload = self.gdb_mem.read_memory(self.data_address, 20)
+                if len(payload) < 20:
+                    raise RuntimeError("SWO::data read returned too few bytes")
+                data = bytearray(payload)
+                data[18] = 1 if enabled else 0
+                self.gdb_mem.write_memory(self.data_address, bytes(data))
+            except Exception as exc:
+                self.event_queue.put(("log", f"Set SWO::data.enabled failed: {exc}"))
+
+        threading.Thread(target=worker, daemon=True).start()
 
     def _cancel_startup_sync_job(self) -> None:
         if self._startup_sync_job is None:
@@ -979,7 +995,12 @@ class PIDTuningApp:
 
         def worker() -> None:
             try:
-                self.gdb_mem.write_memory(self.data_address, self._pack_swo_data(data))
+                current_payload = self.gdb_mem.read_memory(self.data_address, 20)
+                enabled_state = bool(current_payload[18]) if len(current_payload) >= 20 else False
+                self.gdb_mem.write_memory(
+                    self.data_address,
+                    self._pack_swo_data(data, enabled=enabled_state, changed=True),
+                )
                 self.event_queue.put(("log", "Synced PID params to SWO::data (changed=true)"))
                 # Read back once after write for confirmation.
                 payload = self.gdb_mem.read_memory(self.data_address, 20)
@@ -1016,7 +1037,9 @@ class PIDTuningApp:
         self.voltage_mv = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
         self.motor_temp_c = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
         self.mosfet_temp_c = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
+        self.error = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
         self.integral = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
+        self.derivative = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
 
     def _build_plot_lines(self) -> None:
         ax0, ax1, ax2, ax3, ax4, ax5 = self.axes
@@ -1056,25 +1079,15 @@ class PIDTuningApp:
         (self.line_mosfet_t,) = ax4.plot(self.x_values, self.mosfet_temp_c, label="MOSFET", color="#FB5607")
         ax4.legend(loc="upper left")
 
+        (self.line_error,) = ax5.plot(self.x_values, self.error, label="Error", color="#E76F51")
         (self.line_integral,) = ax5.plot(self.x_values, self.integral, label="Integral", color="#6A4C93")
+        (self.line_derivative,) = ax5.plot(self.x_values, self.derivative, label="Derivative", color="#2A9D8F")
         ax5.legend(loc="upper left")
 
     def _append_value(self, series: List[float], value: float) -> None:
         series.append(value)
 
     def _handle_sample(self, sample: Sample) -> None:
-        if sample.data_address and self.data_address != sample.data_address:
-            self.data_address = sample.data_address
-            self._append_log(f"SWO::data address discovered: 0x{self.data_address:08X}")
-
-        if self.pending_initial_sync and self.data_address:
-            if self._startup_sync_job is None and not self.sync_in_progress:
-                self._append_log(f"First PID packet seen. Scheduling startup PID sync in {self.STARTUP_SYNC_DELAY_MS}ms")
-                self._startup_sync_job = self.root.after(
-                    self.STARTUP_SYNC_DELAY_MS,
-                    self._run_scheduled_startup_sync,
-                )
-
         self.filled = min(self.filled + 1, self.samples_per_window)
 
         pwm_percent = (float(sample.pwm_level) * 100.0) / PID_PWM_MAX_LEVEL
@@ -1095,7 +1108,9 @@ class PIDTuningApp:
         self._append_value(self.voltage_mv, float(sample.voltage_mv))
         self._append_value(self.motor_temp_c, float(sample.motor_temp_c))
         self._append_value(self.mosfet_temp_c, float(sample.mosfet_temp_c))
+        self._append_value(self.error, float(sample.error))
         self._append_value(self.integral, float(sample.integral))
+        self._append_value(self.derivative, float(sample.derivative))
 
         self._set_fault_indicator(self.ocp_indicator, bool(sample.ocp_fault))
         self._set_fault_indicator(self.driver_fault_indicator, bool(sample.drv_fault))
@@ -1124,7 +1139,9 @@ class PIDTuningApp:
         self.line_u_mv.set_data(self.x_values, self.voltage_mv)
         self.line_motor_t.set_data(self.x_values, self.motor_temp_c)
         self.line_mosfet_t.set_data(self.x_values, self.mosfet_temp_c)
+        self.line_error.set_data(self.x_values, self.error)
         self.line_integral.set_data(self.x_values, self.integral)
+        self.line_derivative.set_data(self.x_values, self.derivative)
 
         for axis in self.axes:
             axis.set_xlim(self.x_values[0], self.x_values[-1])
@@ -1146,6 +1163,7 @@ class PIDTuningApp:
     def _toggle_start_stop(self) -> None:
         if self.backend.running:
             self._cancel_startup_sync_job()
+            self._set_target_enabled(False)
             self.backend.stop()
             self.start_stop_button.configure(text="Start")
             self.status_var.set("Stopped")
@@ -1172,12 +1190,19 @@ class PIDTuningApp:
         self._start_wait_next_log_at = None
         started = self.backend.start(reset_run=False)
         if started:
+            self._set_target_enabled(True)
             self.start_stop_button.configure(text="Stop")
             self.status_var.set("Running")
             self.pending_initial_sync = True
             self.sync_in_progress = False
-            self._append_log("Waiting for first PID packet...")
+            self.start_packet_seen = False
+            self.start_reset_retried = False
+            self._start_wait_armed = True
+            self.start_packet_deadline = time.monotonic() + 5.1
+            self._start_wait_next_log_at = time.monotonic()
+            self._append_log("Waiting for SWO::data read...")
             self._append_log("Started")
+            self._request_read_swo_data("startup")
         else:
             self.status_var.set("Error")
 
@@ -1210,16 +1235,9 @@ class PIDTuningApp:
             if kind == "log":
                 text = str(payload)
                 self._append_log(text)
-                if text.startswith("Connected to SWV raw stream on tcp://127.0.0.1:") and not self.start_packet_seen:
-                    self._start_wait_armed = True
-                    self.start_packet_deadline = time.monotonic() + 5.1
-                    self._start_wait_next_log_at = time.monotonic()
             elif kind == "sample":
                 self._handle_sample(payload)  # type: ignore[arg-type]
                 got_sample = True
-                self.start_packet_seen = True
-                self._start_wait_armed = False
-                self._start_wait_next_log_at = None
             elif kind == "swo-read":
                 data, reason = payload  # type: ignore[misc]
                 self._set_pid_fields(data)
@@ -1229,6 +1247,10 @@ class PIDTuningApp:
                     f"AWR={data.anti_windup_reduction:.2f}% RPM={data.rpm} changed={int(data.changed)}"
                 )
                 self._set_sync_enabled(True)
+                self.start_packet_seen = True
+                self._start_wait_armed = False
+                self._start_wait_next_log_at = None
+                self.start_packet_deadline = None
                 if reason == "startup":
                     self.pending_initial_sync = False
                 self.sync_in_progress = False
@@ -1253,7 +1275,7 @@ class PIDTuningApp:
             and now >= self._start_wait_next_log_at
         ):
             remaining = max(0.0, self.start_packet_deadline - now)
-            self._append_log(f"Waiting for PID packets... {remaining:.0f}s remaining")
+            self._append_log(f"Waiting for SWO::data read... {remaining:.0f}s remaining")
             self._start_wait_next_log_at = now + 1.0
 
         if (
@@ -1263,7 +1285,7 @@ class PIDTuningApp:
             and not self.start_reset_retried
             and now >= self.start_packet_deadline
         ):
-            self._append_log("No PID packets seen for 5000ms, resetting firmware once")
+            self._append_log("SWO::data read failed for 5000ms, resetting firmware once")
             self.backend.stop()
             if self.backend.reset_target() and self.backend.start(reset_run=False):
                 self._cancel_startup_sync_job()
@@ -1274,7 +1296,7 @@ class PIDTuningApp:
                 self.start_packet_deadline = None
                 self._start_wait_armed = False
                 self._start_wait_next_log_at = None
-                self._append_log("Waiting for first PID packet...")
+                self._append_log("Waiting for SWO::data read...")
                 self._append_log("Firmware reset/restarted")
             else:
                 self.status_var.set("Error")
@@ -1289,7 +1311,7 @@ class PIDTuningApp:
             and self.start_reset_retried
             and now >= self.start_packet_deadline
         ):
-            self._append_log("No PID packets seen after one auto-reset; keeping target running")
+            self._append_log("SWO::data read still failed after one auto-reset; keeping target running")
             self.start_packet_deadline = None
             self._start_wait_armed = False
             self._start_wait_next_log_at = None

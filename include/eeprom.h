@@ -351,15 +351,15 @@ struct EEPROM
         return data.control_mode == kControlModePID ? getMotorRPM() : getMotorPWM();
     }
 
-    uint8_t getPidTuning() const
-    {
-        return data.pid_tuning;
-    }
+    // uint8_t getPidTuning() const
+    // {
+    //     return data.pid_tuning;
+    // }
 
-    void setPidTuning(uint8_t value)
-    {
-        data.pid_tuning = value;
-    }
+    // void setPidTuning(uint8_t value)
+    // {
+    //     data.pid_tuning = value;
+    // }
 
     void setKp(float value)
     {

@@ -151,7 +151,7 @@ struct PidController
     inline void setAntiWindup(uint16_t value)
     {
         antiWindup = value / (float)UIConstants::kAntiWindupFactor;
-        SWO::data.antiWindupReduction = antiWindup; //value / (float)UIConstants::kAntiWindupFactor;
+        SWO::data.antiWindup = antiWindup; //value / (float)UIConstants::kAntiWindupFactor;
     }
 
     /**
@@ -454,7 +454,6 @@ public:
     struct PidLoopType
     {
         uint32_t sequence;
-        uint32_t dataAddress;
         uint16_t rpm;
         uint16_t pwmLevel;
         uint16_t voltage;
@@ -464,16 +463,13 @@ public:
         uint16_t mosfetTemperature;
         uint16_t dacMotorCurrent;
         uint16_t dacInputCurrent;
+        float error;
         float integral;
+        float derivative;
         uint32_t running: 1;
         uint32_t drv8701Fault : 1;
         uint32_t ocpFault : 1;
         uint32_t snsoutFault : 1;
-
-        PidLoopType() :
-            dataAddress(reinterpret_cast<uint32_t>(&SWO::data))
-        {
-        }
     };
     static constexpr size_t kPidLoopTypeSize = sizeof(PidLoopType);
 

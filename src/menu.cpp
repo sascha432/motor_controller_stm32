@@ -33,13 +33,13 @@ static const char *kAdvancedMenuItems[] = {
     "Motor RPM Settings",       // 3
     "Motor Direction",          // 4
     "Sensor Direction",         // 5
-    "PID Tuning",               // 6
-    "PID Parameters",           // 7
-    "OVP Protection",           // 8
-    "Diagnostics",              // 9
-    "Back"                      // 10
+    "PID Parameters",           // 6
+    "OVP Protection",           // 7
+    "Diagnostics",              // 8
+    "Back"                      // 9
 };
 
+#if 0
 static const char *kPIDTuningItems[] = {
     "Disabled",                 // 0
     "SWO",                      // 1
@@ -47,6 +47,7 @@ static const char *kPIDTuningItems[] = {
     "USB",                      // 2
 #endif
 };
+#endif
 
 static const char *kPIDParametersItems[] = {
     "Kp",                       // 0
@@ -302,18 +303,18 @@ void Menu::applyEEPROMSettings()
  */
 void Menu::applyPIDTuningSettings()
 {
-    // disable SWO
-    SWO::deinit();
-    switch(eeprom.getPidTuning()) {
-        case EEPROM::kPidTuningSWO:
-            // enable SWO
-            SWO::init();
-            break;
-        // not implemented or disabled
-        default:
-        case EEPROM::kPidTuningDisabled:
-            break;
-    }
+    // // disable SWO
+    // SWO::deinit();
+    // switch(eeprom.getPidTuning()) {
+    //     case EEPROM::kPidTuningSWO:
+    //         // enable SWO
+    //         SWO::init();
+    //         break;
+    //     // not implemented or disabled
+    //     default:
+    //     case EEPROM::kPidTuningDisabled:
+    //         break;
+    // }
 }
 
 /**
@@ -514,15 +515,15 @@ void Menu::handleButtonPress()
                     ));
                     setValue(eeprom.getSensorDirection());
                     break;
-                case 6: // PID Tuning
-                    screenFlow.next(new MenuScreen(
-                        Screen::Type::PID_TUNING,
-                        kPIDTuningItems,
-                        sizeof_array(kPIDTuningItems)
-                    ));
-                    setValue(eeprom.getPidTuning());
-                    break;
-                case 7: // PID Parameters
+                // case 6: // PID Tuning
+                //     screenFlow.next(new MenuScreen(
+                //         Screen::Type::PID_TUNING,
+                //         kPIDTuningItems,
+                //         sizeof_array(kPIDTuningItems)
+                //     ));
+                //     setValue(eeprom.getPidTuning());
+                //     break;
+                case 6: // PID Parameters
                     screenFlow.next(new MenuScreen(
                         Screen::Type::PID_PARAMETERS,
                         kPIDParametersItems,
@@ -530,7 +531,7 @@ void Menu::handleButtonPress()
                     ));
                     setValue(0);
                     break;
-                case 8: // OVP Protection
+                case 7: // OVP Protection
                     screenFlow.next(new SliderScreen(
                         Screen::Type::OVP_PROTECTION,
                         "OVP Protection",
@@ -541,7 +542,7 @@ void Menu::handleButtonPress()
                     ));
                     setValue(eeprom.getOvpProtection());
                     break;
-                case 9: // Diagnostics
+                case 8: // Diagnostics
                     screenFlow.next(new DiagnosticsScreen(Screen::Type::DIAGNOSTICS));
                     setValue(0);
                     break;
@@ -660,7 +661,7 @@ void Menu::handleButtonPress()
         case Screen::Type::MOTOR_STALL_TIMEOUT:
         case Screen::Type::CONTROL_MODE:
         case Screen::Type::DIAGNOSTICS:
-        case Screen::Type::PID_TUNING:
+        // case Screen::Type::PID_TUNING:
         case Screen::Type::PID_KP:
         case Screen::Type::PID_KI:
         case Screen::Type::PID_KD:
@@ -797,9 +798,9 @@ int32_t Menu::updateRotaryValue(int32_t value)
         case Screen::Type::MOTOR_STALL_TIMEOUT:
             eeprom.setMotorStallTimeout(getValue());
             break;
-        case Screen::Type::PID_TUNING:
-            eeprom.setPidTuning(getValue());
-            break;
+        // case Screen::Type::PID_TUNING:
+        //     eeprom.setPidTuning(getValue());
+        //     break;
         case Screen::Type::PID_KP:
             eeprom.setKp(EEPROM::kUint32ToPIDParam(getValue()));
             pid.applyPIDParams(); // apply or live tuning otherwise only a reset will apply the new values
