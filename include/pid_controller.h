@@ -12,41 +12,15 @@
 
 struct PidController
 {
-    static constexpr uint16_t kMaxPWMLevel = kPWMFrequencyToARR<20000>();           // Motor PWM 20Khz
-    static constexpr uint16_t kPPR = 1024;                                          // MT6701 PPR
-    static constexpr uint16_t kCPR = kPPR * 4;                                      // 4x Mode PPR to CPR
-    static constexpr float kPIDIntervalFloat = 5.12f;                               // PID update rate in millis used for precise RPM calculation
-    static constexpr uint32_t kPIDInterval = 5;                                     // PID update rate in millis
-    static constexpr uint32_t kAntiWindupFactor = 100;                              // anti-windup factor
-    static constexpr uint32_t kAntiWindupReduction = 0.97f * kAntiWindupFactor;     // reduce integral if error is out of range (97%)
-    static constexpr uint32_t kIntegralTimeLimit = 2500;                            // anti windup integral time limit in milliseconds
-    static constexpr bool kProgramPPR = false;                                      // set to true to program the MT6701 encoder during boot over i2c
-
-    // PID scaling factors
-    static constexpr float kPWMScaleMultiplier = 1.0 / (100.0 / kMaxPWMLevel);      // convert pwm level to percentage
-    static constexpr int32_t kScaleFactor = 4096;                                   // scale factor for fixed point PID calculations
-    static constexpr float kPulsesPerRPMPerInterval = (kCPR) / (60000 / kPIDIntervalFloat);
-    static constexpr float kPIDScaleFactor = (kScaleFactor / kPulsesPerRPMPerInterval) * kPWMScaleMultiplier;
-    static constexpr float kKpScaleFactor = kPIDScaleFactor;                                        // scale_factor
-    static constexpr float kKiScaleFactor = kPIDScaleFactor * (kPIDInterval / 1000.0);              // scale_factor * dt
-    static constexpr float kKdScaleFactor = kPIDScaleFactor * (1.0 / (kPIDInterval / 1000.0));      // scale_factor / dt
-
-    // useable min/max values for fixed point calculation
-    static constexpr float kMinKpValue = 10.0 / kKpScaleFactor;
-    static constexpr float kMaxKpValue = UINT32_MAX / kKpScaleFactor;
-    static constexpr float kMinKiValue = 10.0 / kKiScaleFactor;
-    static constexpr float kMaxKiValue = UINT32_MAX / kKiScaleFactor;
-    static constexpr float kMinKdValue = 10.0 / kKdScaleFactor;
-    static constexpr float kMaxKdValue = UINT32_MAX / kKdScaleFactor;
-
-    // assert possible ranges
-    // TODO limit values in the UI
-    static_assert(kMinKpValue < 0.0001, "kMinKpValue");
-    static_assert(kMaxKpValue > 1000, "kMaxKpValue");
-    static_assert(kMinKiValue < 0.005, "kMinKiValue");
-    static_assert(kMaxKiValue > 10000, "kMaxKiValue");
-    static_assert(kMinKdValue < 0.000001, "kMinKdValue");
-    static_assert(kMaxKdValue > 50, "kMaxKdValue");
+    static constexpr uint16_t kMaxPWMLevel = kPWMFrequencyToARR<20000>();               // Motor PWM 20Khz
+    static constexpr uint16_t kPPR = 1024;                                              // MT6701 PPR
+    static constexpr uint16_t kCPR = kPPR * 4;                                          // 4x Mode PPR to CPR
+    static constexpr float kPIDIntervalFloat = 5.12f;                                   // PID update rate in millis used for precise RPM calculation
+    static constexpr uint32_t kPIDInterval = 5;                                         // PID update rate in millis
+    static constexpr float kAntiWindup = 0.97f;                                         // reduce integral if error is out of range (97%)
+    static constexpr bool kProgramPPR = false;                                          // set to true to program the MT6701 encoder during boot over i2c
+    static constexpr uint32_t kMaxRPM = 55000;                                          // max. supported RPM by the encoder
+    static constexpr float kMaxError = kCPR / (60000 / kPIDIntervalFloat) * kMaxRPM;    // factor to reduce error to a value between -1.0 and 1.0 for the PID loop
 
     // convert counts/RPM for 200Hz/5ms interval
     template<int32_t VALUE>
@@ -78,12 +52,12 @@ struct PidController
     PidController() :
         rpm(0),
         motorDirection(EEPROM::kMotorDirectionForward),
-        antiWindupReduction(kAntiWindupReduction),
+        antiWindup(kAntiWindup),
         errorCode(ErrorCodeType::NONE),
         running(false)
     {
         setKp(1.0f);
-        setKi(0.5f);
+        setKi(1.0f);
         setKd(0.0f);
     }
 
@@ -116,7 +90,7 @@ struct PidController
     inline void setKp(float value)
     {
         Kp = value;
-        KpPreCalc = value * kKpScaleFactor;
+        KpPreCalc = value * kMaxPWMLevel;
         SWO::data.Kp = value;
     }
 
@@ -128,7 +102,7 @@ struct PidController
     inline void setKi(float value)
     {
         Ki = value;
-        KiPreCalc = value * kKiScaleFactor;
+        KiPreCalc = value * kMaxPWMLevel;
         SWO::data.Ki = value;
     }
 
@@ -140,26 +114,13 @@ struct PidController
     inline void setKd(float value)
     {
         Kd = value;
-        KdPreCalc = value * kKdScaleFactor;
+        KdPreCalc = value * kMaxPWMLevel;
         SWO::data.Kd = value;
     }
 
-    inline int32_t calcPWMLevel(int32_t error, int32_t integral, int32_t derivative) const
+    inline int32_t calcPWMLevel(float error, float integral, float derivative) const
     {
-        #if 0
-            // floating point version for testing
-            const float Kp = this->Kp * (kKpScaleFactor / kScaleFactor);
-            const float Ki = this->Ki * (kKiScaleFactor / kScaleFactor);
-            const float Kd = this->Kd * (kKdScaleFactor / kScaleFactor);
-            return static_cast<int32_t>((error * Kp) + (integral * Ki) + (derivative * Kd));
-        #else
-            // FP version kScaleFactor
-            return (
-                (error * (int64_t)KpPreCalc) +
-                (integral * (int64_t)KiPreCalc) +
-                (derivative * (int64_t)KdPreCalc)
-            ) / kScaleFactor;
-        #endif
+        return (error * KpPreCalc + integral * KiPreCalc + derivative * KdPreCalc);
     }
 
     inline int32_t clampPWMLevel(int32_t value) const
@@ -178,21 +139,19 @@ struct PidController
         SWO::data.rpm = value;
         // rev. per minute
         rpm = value;
-        // to counts per interval
-        cpi = (rpm * kCPR) / (int32_t)(60000 / kPIDIntervalFloat);
-        // anti windup limit for integral term
-        cpiIntegralLimit = cpi * (int32_t)(kIntegralTimeLimit * kPIDIntervalFloat / 1000.0f);
+        // RPM to counts per PID interval
+        countsPerInterval = (rpm * kCPR) / (int32_t)(60000 / kPIDIntervalFloat);
     }
 
     /**
      * @brief Set the Anti Windup Reduction
      *
-     * @param value
+     * @param value Anti-windup reduction factor as EEPROM value not percent
      */
-    inline void setAntiWindupReduction(uint16_t value)
+    inline void setAntiWindup(uint16_t value)
     {
-        antiWindupReduction = value;
-        SWO::data.antiWindupReduction = value / (float)UIConstants::kAntiWindupFactor;
+        antiWindup = value / (float)UIConstants::kAntiWindupFactor;
+        SWO::data.antiWindupReduction = antiWindup; //value / (float)UIConstants::kAntiWindupFactor;
     }
 
     /**
@@ -242,7 +201,7 @@ struct PidController
      */
     inline uint32_t clampRPM(int32_t value) const
     {
-        return std::clamp<int32_t>(value, 0, 55000);
+        return std::clamp<int32_t>(value, 0, kMaxRPM);
     }
 
     /**
@@ -251,7 +210,7 @@ struct PidController
      * @param counter The current encoder counter value
      * @return int32_t The delta since the last call
      */
-    inline int32_t getDelta(uint32_t counter)
+    inline int32_t getCountsDelta(uint32_t counter)
     {
         int16_t delta = (int16_t)counter - (int16_t)lastEncoderCounter;
         lastEncoderCounter = counter;
@@ -264,41 +223,32 @@ struct PidController
      */
     void reset();
 
-    void setIntegral(int32_t value)
+    inline void setIntegral(float value)
     {
-        // cap the integral
-        if (value > cpiIntegralLimit) {
-            integral = cpiIntegralLimit;
-        }
-        else if (value < -cpiIntegralLimit) {
-            integral = -cpiIntegralLimit;
-        }
-        else {
-            integral = value;
-        }
+        integral = std::clamp<float>(value, -1.0f, 1.0f);
     }
 
-    inline int32_t getIntegral() const
+    inline float getIntegral() const
     {
         return integral;
     }
 
-    inline void updateIntegral(int32_t error)
+    inline void updateIntegral(float error)
     {
         setIntegral(integral + error);
     }
 
-    inline void setLastError(int32_t value)
+    inline void setLastError(float value)
     {
         lastError = value;
     }
 
-    inline int32_t getLastError() const
+    inline float getLastError() const
     {
         return lastError;
     }
 
-    inline void setLastDerivative(int32_t value)
+    inline void setLastDerivative(float value)
     {
         lastDerivative = value;
     }
@@ -310,7 +260,7 @@ struct PidController
 
     inline int32_t getCountsPerInterval() const
     {
-        return cpi;
+        return countsPerInterval;
     }
 
     /**
@@ -353,7 +303,7 @@ struct PidController
         setKp(eeprom.getKp());
         setKi(eeprom.getKi());
         setKd(eeprom.getKd());
-        setAntiWindupReduction(eeprom.getAntiWindupReduction());
+        setAntiWindup(eeprom.getAntiWindupReduction());
         setRPM(eeprom.getMotorRPM());
     }
 
@@ -443,12 +393,10 @@ struct PidController
                 return snprintf(buf, bufSize, "OCP");
             case ErrorCodeType::FAULT:
                 return snprintf(buf, bufSize, "DRV8701 FAULT");
+            case ErrorCodeType::SNSOUT:
+                return snprintf(buf, bufSize, "DRV8701 SNSOUT");
             default:
                 break;
-            // case ErrorCodeType::OCP:
-            //     return snprintf(buf, bufSize, "OCP");
-            // case ErrorCodeType::SNSOUT:
-            //     return snprintf(buf, bufSize, "DRV8701 SNSOUT");
         }
         return snprintf(buf, bufSize, "ERROR #%d", static_cast<int>(errorCode));
     }
@@ -516,7 +464,7 @@ public:
         uint16_t mosfetTemperature;
         uint16_t dacMotorCurrent;
         uint16_t dacInputCurrent;
-        uint32_t integral;
+        float integral;
         uint32_t running: 1;
         uint32_t drv8701Fault : 1;
         uint32_t ocpFault : 1;
@@ -570,18 +518,17 @@ public:
     float Kd;
     uint32_t rpm;                       // target RPM
     uint32_t motorDirection;            // motor direction
-    uint16_t antiWindupReduction;       // anti-windup reduction factor
+    float antiWindup;       // anti-windup reduction factor
 
     uint32_t lastEncoderCounter;        // last encoder counter value
-    int32_t integral;                   // PID variables
-    int32_t lastError;
-    int32_t lastDerivative;
+    float integral;                   // PID variables
+    float lastError;
+    float lastDerivative;
 
-    int32_t KpPreCalc;                  // fixed point pre-calculated K-values for PID loop
-    int32_t KiPreCalc;
-    int32_t KdPreCalc;
-    int32_t cpi;                        // counts per interval (RPM)
-    int32_t cpiIntegralLimit;           // cpi integral limit to avoid windup
+    float KpPreCalc;                  // fixed point pre-calculated K-values for PID loop
+    float KiPreCalc;
+    float KdPreCalc;
+    int32_t countsPerInterval;                        // counts per interval (RPM)
 
     uint32_t lastRpmCounter;
     uint32_t lastRpmCounterUpdated;

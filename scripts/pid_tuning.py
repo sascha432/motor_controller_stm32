@@ -65,7 +65,7 @@ class Sample:
     motor_temp_c: float
     mosfet_temp_adc: int
     mosfet_temp_c: float
-    integral: int
+    integral: float
     running: int
     drv_fault: int
     ocp_fault: int
@@ -148,10 +148,10 @@ def decode_pid_item(payload: bytes) -> Optional[Sample]:
         return None
 
     sequence, data_address, rpm, pwm, voltage, i_ocp, i_avg, motor_ntc, mosfet_ntc, dac_motor, dac_input, integral, faults = struct.unpack(
-        "<II9H2xII", payload
+        "<II9H2xfI", payload
     )
-    if integral > 0x7FFFFFFF: # make signed
-        integral -= 0x100000000
+    # if integral > 0x7FFFFFFF: # make signed
+    #     integral -= 0x100000000
     if rpm > 55000: # RPM might go negative due to small vibrations when the motor is stalled and the sensor limit is 55k RPM
         rpm = 0
 

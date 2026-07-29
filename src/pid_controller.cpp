@@ -29,13 +29,12 @@ void PidController::reset()
     applyPIDParams();
 
     #if DEBUG
-    char pBuf[32];
-    char iBuf[32];
-    char dBuf[32];
+    char pBuf[24], iBuf[24], dBuf[24], aBuf[24];
     FloatToString::convertTrimmed(pBuf, sizeof(pBuf), Kp, 6);
     FloatToString::convertTrimmed(iBuf, sizeof(iBuf), Ki, 6);
     FloatToString::convertTrimmed(dBuf, sizeof(dBuf), Kd, 6);
-    DEBUG_PRINT(DEBUG_DEBUG, "Kp=%s Ki=%s Kd=%s RPM=%u antiWindupReduction=%u", pBuf, iBuf, dBuf, rpm, antiWindupReduction);
+    FloatToString::convertTrimmed(aBuf, sizeof(aBuf), antiWindup, 6);
+    DEBUG_PRINT(DEBUG_DEBUG, "Kp=%s Ki=%s Kd=%s RPM=%u windup=%s", pBuf, iBuf, dBuf, rpm, aBuf);
     #endif
 }
 
@@ -209,7 +208,7 @@ bool PidController::motorToggle()
 void PidController::isr()
 {
     // most timers are 16bit counters only
-    int32_t delta = getDelta(PID_READ_ENCODER_COUNTER());
+    int32_t delta = getCountsDelta(PID_READ_ENCODER_COUNTER());
     // apply fixed sensor, motor and selected motor direction to delta
     if (
         eeprom.isForwardMotorDirection() ?
@@ -224,8 +223,8 @@ void PidController::isr()
 
     if (eeprom.isPIDMode()) {
         // calculate error and derivative
-        int32_t error = (getCountsPerInterval() - delta);
-        int32_t derivative = (error - getLastError());
+        float error = (getCountsPerInterval() - delta) / kMaxError;
+        float derivative = (error - getLastError());
         setLastError(error);
 
         // apply filter
@@ -242,16 +241,21 @@ void PidController::isr()
         pwmLevel = eeprom.getMotorPWM() * kMaxPWMLevel / 100;
     }
 
+    // char buf1[16], buf2[16];
+    // FloatToString::convert(buf1, sizeof(buf1), getLastError(), 6);
+    // FloatToString::convert(buf2, sizeof(buf2), getIntegral(), 6);
+    // DEBUG_PRINT_MSG(DEBUG_DEBUG, "pwm=%d e=%s i=%s", pwmLevel, buf1, buf2);
+
     // clamp pwm level to max. allowed value
     int32_t clampedPwmLevel = clampPWMLevel(pwmLevel);
 
     if (eeprom.isPIDMode()) {
         if (ocp.state != OcpStateType::NONE) {
-            setIntegral((getIntegral() * 800) / 1024); // strong anti windup reduction during OCP condition
+            setIntegral(getIntegral() * 0.8f); // strong anti windup reduction during OCP condition
         }
-        else if (antiWindupReduction) {
-            if (pwmLevel < -kMaxPWMLevel || pwmLevel > (kMaxPWMLevel * 2)) {
-                setIntegral((getIntegral() * antiWindupReduction) / kAntiWindupFactor);
+        else if (antiWindup) {
+            if (pwmLevel < (int32_t)(kMaxPWMLevel * -1.1f) || pwmLevel > (int32_t)(kMaxPWMLevel * 1.1f)) {
+                setIntegral(getIntegral() * antiWindup);
             }
         }
     }
@@ -331,7 +335,7 @@ void PidController::isr()
             pid.setKd(eeprom.getKd());
             pid.setKi(eeprom.getKi());
             pid.setRPM(eeprom.getMotorRPM());
-            pid.setAntiWindupReduction(eeprom.getAntiWindupReduction());
+            pid.setAntiWindup(eeprom.getAntiWindupReduction());
 
             #if DEBUG
                 char bufKp[16], bufKi[16], bufKd[16];

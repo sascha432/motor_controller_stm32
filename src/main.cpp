@@ -265,8 +265,6 @@ extern "C" void EXTI15_10_IRQHandler(void)
         pid.faults.drv8701Fault = (digitalPinToGPIO<DRV8701_FAULT_PIN>()->IDR & (1 << digitalPinToBit(DRV8701_FAULT_PIN))) == 0;
         if (!fault && pid.faults.drv8701Fault) {
             LEDs::onLEDError(); // turn fault LED on, main loop resets it after the fault has cleared
-//TODO handle softfail
-pid.setErrorCode(PidController::ErrorCodeType::FAULT);
         }
     }
     if (pending & (1 << 12)) {

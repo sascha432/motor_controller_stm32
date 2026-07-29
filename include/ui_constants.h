@@ -65,7 +65,7 @@ struct UIConstants
     static constexpr uint8_t kDefaultMotorPWM = 20;                     // Default motor PWM value in percentage (0-100)
     static constexpr uint16_t kDefaultMotorRPM = 250;                   // Default motor RPM value in RPM
     static constexpr float kDefaultKp = 1.0f;                           // Default PID Kp value
-    static constexpr float kDefaultKi = 0.5f;                           // Default PID Ki value
+    static constexpr float kDefaultKi = 1.0f;                           // Default PID Ki value
     static constexpr float kDefaultKd = 0.0f;                           // Default PID Kd value
     static constexpr uint16_t kAntiWindupReduction = 97 * kAntiWindupFactor; // Default PID anti-windup reduction in percentage (0-100) * kMinAntiWindupFactor
     static constexpr uint16_t kDefaultOvpProtection = 38500;             // Default OVP protection in millivolts
