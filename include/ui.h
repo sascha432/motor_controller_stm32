@@ -40,6 +40,8 @@ static constexpr bool kUIKeepScreenObjectsInMemory = false;
 #define INFOSCREEN_COLOR_TEXT                   SCREEN_COLOR_TEXT
 
 #define DIAGNOSTICSCREEN_COLOR_TEXT             COLOR_PALETTE_CYAN
+#define DIAGNOSTICSCREEN_COLOR_SCROLLBAR_BG     COLOR_PALETTE_DARK_GRAY
+#define DIAGNOSTICSCREEN_COLOR_SCROLLBAR_THUMB  COLOR_PALETTE_CYAN
 
 #define STARTSCREEN_COLOR_START_LABEL           SCREEN_COLOR_TEXT
 #define STARTSCREEN_COLOR_SPEED                 COLOR_PALETTE_PURPLE
@@ -63,10 +65,11 @@ static constexpr bool kUIKeepScreenObjectsInMemory = false;
 
 #define SLIDERSCREEN_COLOR_LABEL                SCREEN_COLOR_TEXT
 #define SLIDERSCREEN_COLOR_VALUE                COLOR_PALETTE_CYAN
-#define SLIDERSCREEN_COLOR_SLIDER_BG            COLOR_PALETTE_DARK_GRAY
-#define SLIDERSCREEN_COLOR_SLIDER_FILL          COLOR_PALETTE_LIGHT_GRAY
+#define SLIDERSCREEN_COLOR_SLIDER_BG            COLOR_PALETTE_BLACK
+#define SLIDERSCREEN_COLOR_SLIDER_FILL          COLOR_PALETTE_DARK_GRAY
+#define SLIDERSCREEN_COLOR_SLIDER_FILL_ACTIVE   COLOR_PALETTE_BLUE
 #define SLIDERSCREEN_COLOR_SLIDER_BORDER        COLOR_PALETTE_BLACK
-#define SLIDERSCREEN_COLOR_SLIDER_KNOB          COLOR_PALETTE_CYAN
+#define SLIDERSCREEN_COLOR_SLIDER_KNOB          COLOR_PALETTE_BLUE
 #define SLIDERSCREEN_COLOR_SLIDER_KNOB_BORDER   COLOR_PALETTE_BLACK
 
 // === Base Screen class ===
@@ -292,6 +295,8 @@ struct SliderScreen : public Screen
         label(label),
         unit(unit),
         sliderFill(nullptr),
+        sliderFillAfterActive(nullptr),
+        sliderFillAfter(nullptr),
         sliderKnob(nullptr),
         valueLabel(nullptr),
         formatCallback(callback)
@@ -313,6 +318,8 @@ private:
     const char *label;
     const char *unit;
     lv_obj_t *sliderFill;
+    lv_obj_t *sliderFillAfterActive;
+    lv_obj_t *sliderFillAfter;
     lv_obj_t *sliderKnob;
     lv_obj_t *valueLabel;
     FormatCallbackType formatCallback;

@@ -322,10 +322,13 @@ void SliderScreen::load()
     lv_obj_set_pos(titleObj, 0, 0);
     lv_label_set_long_mode(titleObj, LV_LABEL_LONG_SCROLL_CIRCULAR);
 
+    const lv_coord_t sliderVisualHeight = std::max<lv_coord_t>(kSliderScreenSliderHeight, kSliderScreenKnobSize + 4);
+    const lv_coord_t sliderFillHeight = std::max<lv_coord_t>(6, kSliderScreenSliderHeight - 8);
+
     lv_obj_t *slider = lv_obj_create(container);
     lv_obj_remove_style_all(slider);
     lv_obj_set_pos(slider, 0, lv_obj_get_height(titleRow) + kSliderScreenTitleBottomGap);
-    lv_obj_set_size(slider, kSliderScreenContainerWidth, kSliderScreenSliderHeight);
+    lv_obj_set_size(slider, kSliderScreenContainerWidth, sliderVisualHeight);
     lv_obj_set_style_bg_color(slider, SLIDERSCREEN_COLOR_SLIDER_BG, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(slider, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_radius(slider, kSliderScreenSliderRadius, LV_PART_MAIN);
@@ -335,12 +338,30 @@ void SliderScreen::load()
 
     sliderFill = lv_obj_create(slider);
     lv_obj_remove_style_all(sliderFill);
-    lv_obj_set_pos(sliderFill, 0, 0);
-    lv_obj_set_size(sliderFill, 0, kSliderScreenSliderHeight);
-    lv_obj_set_style_bg_color(sliderFill, SLIDERSCREEN_COLOR_SLIDER_FILL, LV_PART_MAIN);
+    lv_obj_set_pos(sliderFill, 0, (sliderVisualHeight - sliderFillHeight) / 2);
+    lv_obj_set_size(sliderFill, 0, sliderFillHeight);
+    lv_obj_set_style_bg_color(sliderFill, SLIDERSCREEN_COLOR_SLIDER_FILL_ACTIVE, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(sliderFill, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_radius(sliderFill, kSliderScreenSliderRadius, LV_PART_MAIN);
     lv_obj_set_style_border_width(sliderFill, 0, LV_PART_MAIN);
+
+    sliderFillAfterActive = lv_obj_create(slider);
+    lv_obj_remove_style_all(sliderFillAfterActive);
+    lv_obj_set_pos(sliderFillAfterActive, 0, (sliderVisualHeight - sliderFillHeight) / 2);
+    lv_obj_set_size(sliderFillAfterActive, 0, sliderFillHeight);
+    lv_obj_set_style_bg_color(sliderFillAfterActive, SLIDERSCREEN_COLOR_SLIDER_FILL_ACTIVE, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(sliderFillAfterActive, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_radius(sliderFillAfterActive, kSliderScreenSliderRadius, LV_PART_MAIN);
+    lv_obj_set_style_border_width(sliderFillAfterActive, 0, LV_PART_MAIN);
+
+    sliderFillAfter = lv_obj_create(slider);
+    lv_obj_remove_style_all(sliderFillAfter);
+    lv_obj_set_pos(sliderFillAfter, 0, (sliderVisualHeight - sliderFillHeight) / 2);
+    lv_obj_set_size(sliderFillAfter, 0, sliderFillHeight);
+    lv_obj_set_style_bg_color(sliderFillAfter, SLIDERSCREEN_COLOR_SLIDER_FILL, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(sliderFillAfter, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_radius(sliderFillAfter, kSliderScreenSliderRadius, LV_PART_MAIN);
+    lv_obj_set_style_border_width(sliderFillAfter, 0, LV_PART_MAIN);
 
     sliderKnob = lv_obj_create(slider);
     lv_obj_remove_style_all(sliderKnob);
@@ -350,7 +371,7 @@ void SliderScreen::load()
     lv_obj_set_style_radius(sliderKnob, LV_RADIUS_CIRCLE, LV_PART_MAIN);
     lv_obj_set_style_border_width(sliderKnob, 2, LV_PART_MAIN);
     lv_obj_set_style_border_color(sliderKnob, SLIDERSCREEN_COLOR_SLIDER_KNOB_BORDER, LV_PART_MAIN);
-    lv_obj_set_pos(sliderKnob, -(kSliderScreenKnobSize / 2), -((kSliderScreenKnobSize - kSliderScreenSliderHeight) / 2));
+    lv_obj_set_pos(sliderKnob, 0, (sliderVisualHeight - kSliderScreenKnobSize) / 2);
 
     valueLabel = lv_label_create(container);
     lv_obj_set_style_text_color(valueLabel, SLIDERSCREEN_COLOR_VALUE, LV_PART_MAIN);
@@ -366,24 +387,40 @@ void SliderScreen::load()
 
 void SliderScreen::_refreshVisuals()
 {
-    const uint32_t clampedValue =  std::clamp<uint32_t>(value, minValue, maxValue);
     const uint32_t range = (maxValue > minValue) ? (maxValue - minValue) : 1;
-    const uint32_t percent = ((clampedValue - minValue) * 100U) / range;
+    const uint32_t percent = ((value - minValue) * 100U) / range;
+    const lv_coord_t sliderVisualHeight = std::max<lv_coord_t>(kSliderScreenSliderHeight, kSliderScreenKnobSize + 4);
+    const lv_coord_t sliderFillHeight = std::max<lv_coord_t>(6, kSliderScreenSliderHeight - 8);
 
-    const lv_coord_t fillWidth = static_cast<lv_coord_t>((static_cast<uint32_t>(kSliderScreenContainerWidth) * percent) / 100U);
-    lv_obj_set_size(sliderFill, fillWidth, kSliderScreenSliderHeight);
+    const lv_coord_t knobTravel = std::max<lv_coord_t>(0, kSliderScreenContainerWidth - kSliderScreenKnobSize);
+    lv_coord_t knobX = static_cast<lv_coord_t>((static_cast<uint32_t>(knobTravel) * percent) / 100U);
 
-    lv_coord_t knobX = fillWidth - (kSliderScreenKnobSize / 2);
-    knobX = std::clamp<lv_coord_t>(knobX, -(kSliderScreenKnobSize / 2), kSliderScreenContainerWidth - (kSliderScreenKnobSize / 2));
+    const lv_coord_t fillWidth = std::min<lv_coord_t>(kSliderScreenContainerWidth, knobX + (kSliderScreenKnobSize / 2));
+    lv_obj_set_pos(sliderFill, 0, (sliderVisualHeight - sliderFillHeight) / 2);
+    lv_obj_set_size(sliderFill, fillWidth, sliderFillHeight);
 
-    lv_obj_set_x(sliderKnob, knobX);
+    const lv_coord_t knobRight = std::min<lv_coord_t>(kSliderScreenContainerWidth, knobX + kSliderScreenKnobSize);
+    const lv_coord_t trackWidth = kSliderScreenContainerWidth;
+
+    lv_obj_set_x(sliderKnob, knobX - 1);
+
+    // Desired rendering: blue active segment, then knob, then gray remainder.
+    const lv_coord_t afterStart = knobRight;
+    const lv_coord_t remaining = std::max<lv_coord_t>(0, trackWidth - afterStart);
+    const lv_coord_t activeAfterWidth = 0;
+
+    lv_obj_set_pos(sliderFillAfterActive, afterStart, (sliderVisualHeight - sliderFillHeight) / 2);
+    lv_obj_set_size(sliderFillAfterActive, activeAfterWidth, sliderFillHeight);
+
+    lv_obj_set_pos(sliderFillAfter, afterStart + activeAfterWidth - 8, (sliderVisualHeight - sliderFillHeight) / 2);
+    lv_obj_set_size(sliderFillAfter, remaining + 8 - 2, sliderFillHeight);
 
     if (formatCallback) {
         char buf[32];
-        lv_label_set_text(valueLabel, formatCallback(clampedValue, buf, sizeof(buf) - 1));
+        lv_label_set_text(valueLabel, formatCallback(value, buf, sizeof(buf) - 1));
     }
     else {
-        lv_label_set_text_fmt(valueLabel, "%u%s", static_cast<unsigned>(clampedValue), unit);
+        lv_label_set_text_fmt(valueLabel, "%u%s", static_cast<unsigned>(value), unit);
     }
 }
 
@@ -423,7 +460,7 @@ void DiagnosticsScreen::load()
     lv_obj_remove_style_all(scrollbarTrack);
     lv_obj_set_size(scrollbarTrack, kDiagnosticScreenScrollbarWidth, viewportHeight);
     lv_obj_set_pos(scrollbarTrack, viewportWidth - kDiagnosticScreenScrollbarWidth, 0);
-    lv_obj_set_style_bg_color(scrollbarTrack, lv_palette_darken(LV_PALETTE_GREY, 3), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(scrollbarTrack, DIAGNOSTICSCREEN_COLOR_SCROLLBAR_BG, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(scrollbarTrack, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_radius(scrollbarTrack, 2, LV_PART_MAIN);
 
@@ -431,7 +468,7 @@ void DiagnosticsScreen::load()
     lv_obj_remove_style_all(scrollbarThumb);
     lv_obj_set_size(scrollbarThumb, kDiagnosticScreenScrollbarWidth, 16);
     lv_obj_set_pos(scrollbarThumb, 0, 0);
-    lv_obj_set_style_bg_color(scrollbarThumb, lv_color_white(), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(scrollbarThumb, DIAGNOSTICSCREEN_COLOR_SCROLLBAR_THUMB, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(scrollbarThumb, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_radius(scrollbarThumb, 2, LV_PART_MAIN);
 

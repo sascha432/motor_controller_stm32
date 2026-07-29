@@ -19,8 +19,8 @@
 #define LV_TICK_CUSTOM_SYS_TIME_EXPR (HAL_GetTick())
 #define LV_DISP_DEF_REFR_PERIOD 30
 
-/* Keep drawing simple on STM32F103 */
-#define LV_DRAW_COMPLEX 0
+/* Rounded corners/circles require complex drawing */
+#define LV_DRAW_COMPLEX 1
 
 /* Logging and asserts */
 #define LV_USE_LOG 0
