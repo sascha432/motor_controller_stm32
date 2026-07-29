@@ -345,30 +345,6 @@ inline volatile uint32_t &GPIO_CRx_REG(GPIO_TypeDef *gpio_port, uint32_t pin)
 }
 
 /**
- * @brief get configuration register for GPIO pin
- *
- * @param gpio_addr GPIOx_BASE address
- * @param pin Arduino PIN number
- * @return volatile uint32_t&
- */
-inline volatile uint32_t &GPIO_CRx_REG(uint32_t gpio_addr, uint32_t pin)
-{
-    return GPIO_CRx_REG(reinterpret_cast<GPIO_TypeDef *>(gpio_addr), pin);
-}
-
-/**
- * @brief get configuration register for GPIO pin
- *
- * @tparam Arduino PIN number (PA0, PB10, PD7, etc.)
- * @return volatile uint32_t&
- */
-template<uint32_t PIN>
-inline volatile uint32_t &GPIO_CRx_REG()
-{
-    return GPIO_CRx_REG(digitalPinToGPIO<PIN>(), PIN);
-}
-
-/**
  * @brief calculate the auto-reload register value for a given PWM frequency with no prescaler (PSC=0)
  *
  * @tparam FREQUENCY PWM frequency in Hz

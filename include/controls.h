@@ -10,60 +10,68 @@
 
 /**
  * @brief Button template for handling GPIO buttons with debounce and interrupt support
- * 
+ *
  * @tparam GPIO_PIN  GPIO pin number, e.g. PB10, PA0, etc.
  * @tparam GPIO_PORT_ADDR GPIO port address, e.g. GPIOA_BASE, GPIOB_BASE, etc.
  * @tparam ACTIVE_STATE false for active low, true for active high
  */
 template<uint8_t GPIO_PIN, bool ACTIVE_STATE, uint32_t kDebounceTimeMs = 50>
-struct Button 
+struct Button
 {
     void init();
 
     /**
      * @brief remove pressed state
-     * 
+     *
      */
-    inline void clear()
+    inline void reset()
     {
-        isPressed();
+        __disable_irq();
+        lastDebounceTime = 0;
+        state = readState();;
+        pressed = (state == ACTIVE_STATE);
+        released = !pressed;
+        waitForReleased = pressed;
+        __enable_irq();
     }
 
     /**
      * @brief check if the button has been released
-     * 
-     * This method can be used to detect a single button release event.
-     * 
+     *
+     * This method can be used to detect a single button release event
+     *
      * @return true if the button has been released
      * @return false otherwise
      */
-    inline bool isReleased() 
+    inline bool isReleased()
     {
         __disable_irq();
         // check if the button has been pressed and released
         if (released && pressed) {
             pressed = false; // clear pressed flag
+            waitForReleased = false;
             __enable_irq();
             return true;
         }
         __enable_irq();
-        return false;        
+        return false;
     }
 
     /**
-     * @brief check if the button has been pressed
-     * 
-     * This method can be used to detect a single button press event.
-     * 
-     * @return true if the button has been pressed
-     * @return false otherwise
+     * @brief Check if the button has been pressed since the last call to this method
+     *
+     * This method can be used to detect a single button press event
+     *
+     * @return true
+     * @return false
      */
-    inline bool isPressed() 
+    inline bool hasBeenPressed()
     {
         __disable_irq();
-        bool result = !released && pressed;
+        bool result = !waitForReleased && pressed;
         if (result) {
             pressed = false; // clear pressed flag
+            waitForReleased = true;
         }
         __enable_irq();
         return result;
@@ -71,44 +79,37 @@ struct Button
 
     /**
      * @brief get button pressed state
-     * 
+     *
      * @return true if the button is down/pressed
      * @return false otherwise
      */
-    inline bool isDown() 
+    inline bool isDown()
     {
-        __disable_irq();
-        bool result = !released && pressed;
-        __enable_irq();
-        return result;
+        return (state == ACTIVE_STATE);
     }
 
-    inline constexpr GPIO_TypeDef *getGPIOPort() const 
-    { 
-        return digitalPinToGPIO<GPIO_PIN>(); 
-    }
-
-    inline bool readState() 
+    inline bool readState()
     {
-        return getGPIOPort()->IDR & (1 << digitalPinToBit<GPIO_PIN>());
+        return digitalPinToGPIO<GPIO_PIN>()->IDR & (1 << digitalPinToBit<GPIO_PIN>());
     }
 
     void isr(uint32_t idr);
 
-    inline void isr() 
+    inline void isr()
     {
-        isr(getGPIOPort()->IDR);
+        isr(digitalPinToGPIO<GPIO_PIN>()->IDR);
     }
 
     volatile uint32_t lastDebounceTime;
     volatile bool state;
     volatile bool pressed;
     volatile bool released;
+    volatile bool waitForReleased;
 };
 
 /**
  * @brief Rotary encoder
- * 
+ *
  * @tparam PIN_A bit for pin A in the GPIO IDR register
  * @tparam PIN_B bit for pin B in the GPIO IDR register
  * @tparam GPIO_PORT_ADDR address of the GPIO port, pin A and pin B must be on the same port
@@ -116,22 +117,22 @@ struct Button
 template<uint8_t GPIO_PIN_A, uint8_t GPIO_PIN_B>
 struct RotaryEncoder {
 
-    RotaryEncoder() : 
+    RotaryEncoder() :
         maxAcceleration(1),
         position(0)
     {}
 
     void init();
-    void clear();
+    void reset();
 
     void isr();
 
     /**
      * @brief Get the Delta Position object and clean up the position counter
-     * 
-     * @return int32_t 
+     *
+     * @return int32_t
      */
-    inline int32_t getDeltaPosition() 
+    inline int32_t getDeltaPosition()
     {
         __disable_irq();
         int32_t tmpDelta = (position / 2); // full rotations only
@@ -142,10 +143,10 @@ struct RotaryEncoder {
 
     /**
      * @brief Set the acceleration factor
-     * 
-     * @param acceleration 
+     *
+     * @param acceleration
      */
-    inline void setMaxAcceleration(uint32_t acceleration) 
+    inline void setMaxAcceleration(uint32_t acceleration)
     {
         maxAcceleration = acceleration + 1;
     }

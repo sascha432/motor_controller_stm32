@@ -259,24 +259,11 @@ bool Menu::isAnyButtonDown()
 
 void Menu::clearUserInput()
 {
-    // wait until all buttons are released
-    #if DEBUG
-    uint32_t start = HAL_GetTick();
-    #endif
-    while (isAnyButtonDown()) {
-        #if DEBUG
-        if (HAL_GetTick() - start > 5000) {
-            DEBUG_PRINT(DEBUG_ERROR, "5000ms button release timeout");
-            break;
-        }
-        #endif
-        WatchDog::feed();
-    }
     // clear states
-    knobButton.clear();
-    backButton.clear();
-    startButton.clear();
-    knob.clear();
+    knobButton.reset();
+    backButton.reset();
+    startButton.reset();
+    knob.reset();
 }
 
 /**

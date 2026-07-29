@@ -144,6 +144,7 @@
 			"EXTI",
 			"EXTICR",
 			"FTSR",
+			"GPIOE",
 			"hpcd",
 			"htim",
 			"hwwdg",

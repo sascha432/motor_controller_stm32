@@ -101,3 +101,7 @@
 // macros to read encoder pulse counter and rpm counter
 #define PID_READ_ENCODER_COUNTER()                  ((uint16_t)TIM4->CNT) // QDEC on MT6701_I2C_SCL_PIN/MT6701_I2C_SDA_PIN
 #define PID_READ_RPM_COUNTER()                      ((uint16_t)TIM5->CNT) // falling edge counter on ENC1_ANALOG_PIN
+
+// rotary encoder macros
+#define UI_READ_ROTARY_KNOB_COUNTER()               ((uint16_t)TIM3->CNT) // rotary encoder on ROTARY_ENCODER_PIN_A/ROTARY_ENCODER_PIN_B
+#define UI_WRITE_ROTARY_KNOB_COUNTER(value)         (TIM3->CNT = (value))

@@ -22,17 +22,13 @@ void Button<GPIO_PIN, ACTIVE_STATE, kDebounceTimeMs>::init()
     GPIO_InitStruct.Pull = GPIO_PULLUP;
     HAL_GPIO_Init(digitalPinToGPIO<GPIO_PIN>(), &GPIO_InitStruct);
 
-    // Initial state
-    lastDebounceTime = 0;
-    state = readState();;
-    pressed = (state == ACTIVE_STATE);
-    released = !pressed;
+    reset();
 }
 
 template <uint8_t GPIO_PIN, bool ACTIVE_STATE, uint32_t kDebounceTimeMs>
 void Button<GPIO_PIN, ACTIVE_STATE, kDebounceTimeMs>::isr(uint32_t idr)
 {
-    bool buttonState = idr & (1 << digitalPinToBit(GPIO_PIN));
+    bool buttonState = idr & (1 << digitalPinToBit<GPIO_PIN>());
     // check if the state has changed
     if (buttonState != state) {
         uint32_t now = HAL_GetTick();
@@ -48,6 +44,7 @@ void Button<GPIO_PIN, ACTIVE_STATE, kDebounceTimeMs>::isr(uint32_t idr)
             else {
                 // once the button is released, set released to true
                 released = true;
+                waitForReleased = false;
             }
         }
     }
@@ -93,31 +90,33 @@ void RotaryEncoder<GPIO_PIN_A, GPIO_PIN_B>::init()
     sEncoderConfig.IC2Filter = 0;
 
     HAL_TIM_Encoder_Init(&tim3, &sEncoderConfig);
-    HAL_TIM_Encoder_Start(&tim3, TIM_CHANNEL_ALL);    
+    HAL_TIM_Encoder_Start(&tim3, TIM_CHANNEL_ALL);
 }
 
 template <uint8_t GPIO_PIN_A, uint8_t GPIO_PIN_B>
-void RotaryEncoder<GPIO_PIN_A, GPIO_PIN_B>::clear()
+void RotaryEncoder<GPIO_PIN_A, GPIO_PIN_B>::reset()
 {
+    __disable_irq();
     position = 0;
     acceleration = 0;
+    __enable_irq();
 }
 
 template <uint8_t GPIO_PIN_A, uint8_t GPIO_PIN_B>
 void RotaryEncoder<GPIO_PIN_A, GPIO_PIN_B>::isr()
 {
-    int16_t value = TIM3->CNT;
+    int16_t value = UI_READ_ROTARY_KNOB_COUNTER();
     if (!value) {
         // decay
-        acceleration -= (acceleration >> 2) + 1; 
+        acceleration -= (acceleration >> 2) + 1;
         if (acceleration < 0) {
             acceleration = 0;
         }
     }
     else {
-        TIM3->CNT = 0;
+        UI_WRITE_ROTARY_KNOB_COUNTER(0);
         // acceleration
-        acceleration += value * value * 2; 
+        acceleration += value * value * 2;
         if (acceleration > static_cast<int32_t>(maxAcceleration)) {
             acceleration = maxAcceleration;
         }

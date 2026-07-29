@@ -117,13 +117,13 @@ static void loop()
     WatchDog::feed();
 
     // handle buttons
-    if (knobButton.isPressed()) {
+    if (knobButton.hasBeenPressed()) {
         menu.handleButtonPress();
     }
-    if (backButton.isPressed()) {
+    if (backButton.hasBeenPressed()) {
         menu.handleBackButtonPress();
     }
-    if (startButton.isPressed()) {
+    if (startButton.hasBeenPressed()) {
         menu.handleStartButtonPress();
     }
 
