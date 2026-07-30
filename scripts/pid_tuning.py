@@ -370,9 +370,15 @@ class SWOBackend:
                 stderr=subprocess.STDOUT,
                 text=True,
                 check=False,
+                timeout=8.0,
             )
         except FileNotFoundError:
             self.log("pyOCD not found. Install with: pip install pyocd")
+            return False
+        except subprocess.TimeoutExpired as exc:
+            self.log("Firmware reset timed out after 8s")
+            if exc.stdout:
+                self.log(str(exc.stdout).rstrip())
             return False
         except Exception as exc:  # pragma: no cover - defensive path
             self.log(f"Failed to reset firmware: {exc}")
@@ -646,11 +652,8 @@ class PIDTuningApp:
         self.data_address: Optional[int] = SWO_DATA_FIXED_RAM_ADDRESS
         self.pending_initial_sync = False
         self.sync_in_progress = False
-        self.start_packet_deadline: Optional[float] = None
-        self.start_packet_seen = False
         self.start_reset_retried = False
-        self._start_wait_armed = False
-        self._start_wait_next_log_at: Optional[float] = None
+        self.reset_in_progress = False
         self._startup_sync_job: Optional[str] = None
         self.gdb_mem = GDBMemoryClient(config)
 
@@ -884,6 +887,49 @@ class PIDTuningApp:
             changed=changed,
         )
 
+    @staticmethod
+    def _is_invalid_swo_default_signature(data: SWOData) -> bool:
+        return (
+            not data.changed
+            and abs(data.kp - 1.0) < 1e-6
+            and abs(data.ki - 1.0) < 1e-6
+            and abs(data.kd - 0.0) < 1e-6
+            and abs(data.anti_windup_reduction - 0.0) < 1e-6
+            and data.rpm == 0
+        )
+
+    def _validate_swo_payload(self, payload: bytes) -> Tuple[SWOData, int]:
+        if len(payload) < SWO_DATA_SIZE:
+            raise RuntimeError(f"SWO::data read returned too few bytes ({len(payload)} < {SWO_DATA_SIZE})")
+
+        data = self._unpack_swo_data(payload)
+        enabled_state = payload[SWO_DATA_ENABLED_OFFSET]
+
+        if enabled_state not in (SWO_ENABLE_DISABLED, SWO_ENABLE_SWO, SWO_ENABLE_USB):
+            raise RuntimeError(f"Invalid SWO::data enabled state: {enabled_state}")
+
+        for name, value in (
+            ("Kp", data.kp),
+            ("Ki", data.ki),
+            ("Kd", data.kd),
+            ("AntiWindup", data.anti_windup_reduction),
+        ):
+            if not math.isfinite(value):
+                raise RuntimeError(f"Invalid SWO::data {name}: not finite")
+
+        if not (0 <= data.rpm <= 65535):
+            raise RuntimeError(f"Invalid SWO::data RPM: {data.rpm}")
+
+        if not (0.0 <= data.anti_windup_reduction <= 100.0):
+            raise RuntimeError(
+                f"Invalid SWO::data anti-windup reduction: {data.anti_windup_reduction}"
+            )
+
+        if self._is_invalid_swo_default_signature(data):
+            raise RuntimeError("Invalid SWO::data signature detected")
+
+        return data, enabled_state
+
     def _install_pid_field_traces(self) -> None:
         for var in (self.kp_var, self.ki_var, self.kd_var, self.anti_windup_var, self.rpm_var):
             var.trace_add("write", self._on_pid_field_edited)
@@ -916,8 +962,7 @@ class PIDTuningApp:
         def worker() -> None:
             try:
                 payload = self.gdb_mem.read_memory(self.data_address, SWO_DATA_SIZE)
-                if len(payload) < SWO_DATA_SIZE:
-                    raise RuntimeError("SWO::data read returned too few bytes")
+                _, _enabled_state = self._validate_swo_payload(payload)
                 data = bytearray(payload)
                 data[SWO_DATA_ENABLED_OFFSET] = SWO_ENABLE_SWO if enabled else SWO_ENABLE_DISABLED
                 self.gdb_mem.write_memory(self.data_address, bytes(data))
@@ -957,9 +1002,11 @@ class PIDTuningApp:
         def worker() -> None:
             try:
                 payload = self.gdb_mem.read_memory(self.data_address, SWO_DATA_SIZE)
-                self.event_queue.put(("swo-read", (self._unpack_swo_data(payload), reason)))
+                data, _enabled_state = self._validate_swo_payload(payload)
+                self.event_queue.put(("swo-read", (data, reason)))
             except Exception as exc:
                 self.event_queue.put(("log", f"Read SWO::data failed: {exc}"))
+                self.event_queue.put(("swo-read-invalid", reason))
                 if reason == "startup":
                     self.event_queue.put(("startup-sync-retry", None))
                 self.event_queue.put(("sync-done", None))
@@ -1007,11 +1054,7 @@ class PIDTuningApp:
         def worker() -> None:
             try:
                 current_payload = self.gdb_mem.read_memory(self.data_address, SWO_DATA_SIZE)
-                enabled_state = (
-                    current_payload[SWO_DATA_ENABLED_OFFSET]
-                    if len(current_payload) >= SWO_DATA_SIZE
-                    else SWO_ENABLE_DISABLED
-                )
+                _, enabled_state = self._validate_swo_payload(current_payload)
                 self.gdb_mem.write_memory(
                     self.data_address,
                     self._pack_swo_data(data, enabled_state=enabled_state, changed=True),
@@ -1019,7 +1062,8 @@ class PIDTuningApp:
                 self.event_queue.put(("log", "Synced PID params to SWO::data (changed=true)"))
                 # Read back once after write for confirmation.
                 payload = self.gdb_mem.read_memory(self.data_address, SWO_DATA_SIZE)
-                self.event_queue.put(("swo-read", (self._unpack_swo_data(payload), "after write")))
+                data_verify, _enabled_state_verify = self._validate_swo_payload(payload)
+                self.event_queue.put(("swo-read", (data_verify, "after write")))
             except Exception as exc:
                 self.event_queue.put(("log", f"Write SWO::data failed: {exc}"))
                 self.event_queue.put(("sync-done", None))
@@ -1148,6 +1192,7 @@ class PIDTuningApp:
         self.line_pwm.set_data(self.x_values, self.pwm)
         self.line_pwm_avg.set_data(self.x_values, self.pwm_avg)
         self.line_i_avg.set_data(self.x_values, self.current_avg_ma)
+
         self.line_i_ocp.set_data(self.x_values, self.current_ocp_ma)
         self.line_i_motor_limit.set_data(self.x_values, self.dac_motor_current_ma)
         self.line_i_input_limit.set_data(self.x_values, self.dac_input_current_ma)
@@ -1175,6 +1220,24 @@ class PIDTuningApp:
         self.log_text.see(tk.END)
         self.log_text.configure(state=tk.DISABLED)
 
+    def _reset_backend_after_invalid_swo_data(self, context: str) -> None:
+        if self.reset_in_progress:
+            self._append_log("Firmware reset already in progress")
+            return
+
+        self.reset_in_progress = True
+        self._append_log(f"Invalid SWO::data detected ({context}); resetting firmware once")
+        self.status_var.set("Resetting")
+        self.backend.stop()
+        self._cancel_startup_sync_job()
+        self._set_sync_enabled(False)
+
+        def worker() -> None:
+            success = self.backend.reset_target()
+            self.event_queue.put(("firmware-reset-complete", success))
+
+        threading.Thread(target=worker, daemon=True).start()
+
     def _toggle_start_stop(self) -> None:
         if self.backend.running:
             self._cancel_startup_sync_job()
@@ -1186,11 +1249,7 @@ class PIDTuningApp:
             self.pending_initial_sync = False
             self.sync_in_progress = False
             self._set_sync_enabled(False)
-            self.start_packet_deadline = None
-            self.start_packet_seen = False
             self.start_reset_retried = False
-            self._start_wait_armed = False
-            self._start_wait_next_log_at = None
             self._set_fault_indicator(self.ocp_indicator, False)
             self._set_fault_indicator(self.driver_fault_indicator, False)
             self._set_fault_indicator(self.driver_ocp_indicator, False)
@@ -1198,11 +1257,7 @@ class PIDTuningApp:
 
         self._cancel_startup_sync_job()
         self._set_sync_enabled(False)
-        self.start_packet_seen = False
         self.start_reset_retried = False
-        self._start_wait_armed = False
-        self.start_packet_deadline = None
-        self._start_wait_next_log_at = None
         started = self.backend.start(reset_run=False)
         if started:
             self._set_target_enabled(True)
@@ -1210,11 +1265,7 @@ class PIDTuningApp:
             self.status_var.set("Running")
             self.pending_initial_sync = True
             self.sync_in_progress = False
-            self.start_packet_seen = False
             self.start_reset_retried = False
-            self._start_wait_armed = True
-            self.start_packet_deadline = time.monotonic() + 5.1
-            self._start_wait_next_log_at = time.monotonic()
             self._append_log("Waiting for SWO::data read...")
             self._append_log("Started")
             self._request_read_swo_data("startup")
@@ -1262,13 +1313,29 @@ class PIDTuningApp:
                     f"AWR={data.anti_windup_reduction:.2f}% RPM={data.rpm} changed={int(data.changed)}"
                 )
                 self._set_sync_enabled(True)
-                self.start_packet_seen = True
-                self._start_wait_armed = False
-                self._start_wait_next_log_at = None
-                self.start_packet_deadline = None
                 if reason == "startup":
                     self.pending_initial_sync = False
                 self.sync_in_progress = False
+            elif kind == "swo-read-invalid":
+                reason = str(payload)
+                if reason == "startup":
+                    self._reset_backend_after_invalid_swo_data(reason)
+            elif kind == "firmware-reset-complete":
+                self.reset_in_progress = False
+                reset_ok = bool(payload)
+                if reset_ok:
+                    self.start_stop_button.configure(text="Start")
+                    self.status_var.set("Stopped")
+                    self.start_reset_retried = False
+                    self.pending_initial_sync = False
+                    self.sync_in_progress = False
+                    self._set_fault_indicator(self.ocp_indicator, False)
+                    self._set_fault_indicator(self.driver_fault_indicator, False)
+                    self._set_fault_indicator(self.driver_ocp_indicator, False)
+                    self._append_log('Firmware ready. Press "Start" to connect and run.')
+                else:
+                    self.status_var.set("Error")
+                    self._append_log("Firmware reset failed; check pyOCD/probe connection")
             elif kind == "sync-done":
                 self.sync_in_progress = False
             elif kind == "startup-sync-retry":
@@ -1279,57 +1346,6 @@ class PIDTuningApp:
         if got_sample and (now - self._last_plot_refresh) >= 0.10:
             self._refresh_plot()
             self._last_plot_refresh = now
-
-        if (
-            self.start_packet_deadline is not None
-            and self._start_wait_armed
-            and not self.start_packet_seen
-            and not self.start_reset_retried
-            and now < self.start_packet_deadline
-            and self._start_wait_next_log_at is not None
-            and now >= self._start_wait_next_log_at
-        ):
-            remaining = max(0.0, self.start_packet_deadline - now)
-            self._append_log(f"Waiting for SWO::data read... {remaining:.0f}s remaining")
-            self._start_wait_next_log_at = now + 1.0
-
-        if (
-            self.start_packet_deadline is not None
-            and self._start_wait_armed
-            and not self.start_packet_seen
-            and not self.start_reset_retried
-            and now >= self.start_packet_deadline
-        ):
-            self._append_log("SWO::data read failed for 5000ms, resetting firmware once")
-            self.backend.stop()
-            if self.backend.reset_target() and self.backend.start(reset_run=False):
-                self._cancel_startup_sync_job()
-                self._set_sync_enabled(False)
-                self.start_reset_retried = True
-                self.pending_initial_sync = True
-                self.sync_in_progress = False
-                self.start_packet_deadline = None
-                self._start_wait_armed = False
-                self._start_wait_next_log_at = None
-                self._append_log("Waiting for SWO::data read...")
-                self._append_log("Firmware reset/restarted")
-            else:
-                self.status_var.set("Error")
-                self.start_packet_deadline = None
-                self._start_wait_armed = False
-                self._start_wait_next_log_at = None
-
-        if (
-            self.start_packet_deadline is not None
-            and self._start_wait_armed
-            and not self.start_packet_seen
-            and self.start_reset_retried
-            and now >= self.start_packet_deadline
-        ):
-            self._append_log("SWO::data read still failed after one auto-reset; keeping target running")
-            self.start_packet_deadline = None
-            self._start_wait_armed = False
-            self._start_wait_next_log_at = None
 
         if not self.backend.running and self.start_stop_button.cget("text") == "Stop":
             self.start_stop_button.configure(text="Start")
