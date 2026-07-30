@@ -11,17 +11,26 @@
 #include <string.h>
 #include <stm32f1xx.h>
 
+// === data for SWD PID tuning ===
+
 #define SWO_DATA_FIXED_RAM_ADDRESS 0x2000F000UL
 
-struct SWO {
+/**
+ * @brief SWO class for sending debug output and PID tuning data via SWO
+ *
+ */
+struct SWO
+{
     static void init();
     static void deinit();
     static size_t write(uint8_t port, const void *data, size_t size);
 
-    template<uint8_t Port, typename T>
-    static size_t writeObject(const T &value)
+    static bool waitReadyPort(uint32_t port);
+
+    template<typename T>
+    static size_t write(uint8_t port, const T &value)
     {
-        return write(Port, &value, sizeof(value));
+        return write(port, &value, sizeof(value));
     }
 
     static bool state;

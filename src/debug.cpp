@@ -26,8 +26,14 @@ static void debug_swd_init()
     // Enable ITM and set the trace bus ID
     ITM->TCR = ITM_TCR_ITMENA_Msk | ITM_TCR_SYNCENA_Msk | ITM_TCR_TSENA_Msk | (1U << 16);
 
-    // Enable stimulus ports 0 (text logs) and 1 (binary sample stream).
-    ITM->TER |= (1UL << 0) | (1UL << 1);
+    #if DEBUG_OUTPUT == DEBUG_OUTPUT_SWD
+        // Enable stimulus ports 0 (text logs) and 1 (binary sample stream).
+        ITM->TER |= (1UL << 0) | (1UL << 1);
+    #else
+        // Enable stimulus 1 (binary sample stream).
+        ITM->TER |= (1UL << 1);
+    #endif
+
 }
 
 bool SWO::state = false;
@@ -62,37 +68,33 @@ void SWO::deinit()
     #endif
 }
 
+
+bool SWO::waitReadyPort(uint32_t port)
+{
+    constexpr uint32_t kMaxReadyPolls = 50000U;
+    volatile uint32_t polls = 0;
+    while (ITM->PORT[port].u32 == 0U) {
+        if (++polls >= kMaxReadyPolls) {
+            return false;
+        }
+    }
+    return true;
+}
+
 size_t SWO::write(uint8_t port, const void *data, size_t size)
 {
-    if (!data || size == 0 || port > 31U) {
+    if (!state) { // SWO not enabled
         return 0;
     }
-    if ((CoreDebug->DEMCR & CoreDebug_DEMCR_TRCENA_Msk) == 0U) {
-        return 0;
-    }
-    if ((ITM->TCR & ITM_TCR_ITMENA_Msk) == 0U || (ITM->TER & (1UL << port)) == 0U) {
+    if ((ITM->TCR & ITM_TCR_ITMENA_Msk) == 0U || (ITM->TER & (1UL << port)) == 0U) { // ITM Port not enabled
         return 0;
     }
 
     const uint8_t *bytes = static_cast<const uint8_t *>(data);
     size_t sent = 0;
 
-    // Avoid stalling the firmware indefinitely when the debugger is too slow
-    // to consume trace data (common under heavy runtime load).
-    constexpr uint32_t kMaxReadyPolls = 50000U;
-
-    auto wait_port_ready = [port]() -> bool {
-        uint32_t polls = 0;
-        while (ITM->PORT[port].u32 == 0U) {
-            if (++polls >= kMaxReadyPolls) {
-                return false;
-            }
-        }
-        return true;
-    };
-
     while (sent < size) {
-        if (!wait_port_ready()) {
+        if (!waitReadyPort(port)) {
             break;
         }
 
@@ -152,20 +154,28 @@ const char *debug_function_name(const char *signature, char *out, size_t outSize
 
 #if DEBUG_OUTPUT == DEBUG_OUTPUT_SWD
 
+static inline void debug_swd_write_ITM_SendChar(uint32_t ch)
+{
+    if (((ITM->TCR & ITM_TCR_ITMENA_Msk) != 0UL) && /* ITM enabled */
+        ((ITM->TER & 1UL) != 0UL))                  /* ITM Port #0 enabled */
+    {
+        if (!SWO::waitReadyPort(ch)) {
+            return;
+        }
+        ITM->PORT[0U].u8 = (uint8_t)ch;
+    }
+}
+
 static void debug_swd_write(const char *msg)
 {
     if (!msg) {
         return;
     }
-    if ((CoreDebug->DEMCR & CoreDebug_DEMCR_TRCENA_Msk) == 0U) {
+    if (!SWO::state) { // SWO not enabled
         return;
     }
-    if ((ITM->TCR & ITM_TCR_ITMENA_Msk) == 0U || (ITM->TER & 1UL) == 0U) {
-        return;
-    }
-
     while (*msg) {
-        ITM_SendChar(static_cast<uint32_t>(*msg++));
+        debug_swd_write_ITM_SendChar(static_cast<uint32_t>(*msg++));
     }
 }
 
