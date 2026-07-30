@@ -105,32 +105,3 @@ void ADC::initDAC()
     // Enable DAC channel 1 and channel 2
     DAC->CR |= DAC_CR_EN1 | DAC_CR_EN2;
 }
-
-// DMA1_Channel1_IRQHandler is the interrupt handler for the DMA1 Channel 1. It is called when a DMA transfer is complete
-extern "C" void DMA1_Channel1_IRQHandler()
-{
-    if (DMA1->ISR & DMA_ISR_TCIF1)
-    {
-        // clear transfer complete
-        DMA1->IFCR = DMA_IFCR_CTCIF1;
-
-        // hard fault if the have a OVP condition, mostly likely due to reverse currents while braking
-        if (adc.getVSenseValue() > pid.faults.vsenseMax) {
-            if (pid.errorCode != PidController::ErrorCodeType::OVP) {
-                pid.setErrorCode(PidController::ErrorCodeType::OVP);
-                LEDs::onLEDError();
-            }
-        }
-
-        auto value = adc.getISenseValue();
-        // store average for display
-        adc.isenseSum += value;
-        if (++adc.isenseCount >= ADC::kISenseCountMax) {
-            // reduce by 6.5% to avoid overflow in rolling average
-            adc.isenseSum -= adc.isenseSum / 16;
-            adc.isenseCount -= adc.isenseCount / 16;
-        }
-        // store filtered value for fast OCP detection
-        adc.isenseOcpFiltered = (adc.isenseOcpFiltered + value) / 2;
-    }
-}

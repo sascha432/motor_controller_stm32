@@ -94,16 +94,7 @@ void float_to_string_convert(char *buffer, size_t size, float value, uint8_t pre
 
 // === WatchDog implementation ===
 
-WWDG_HandleTypeDef WatchDog::watchdog;
 volatile uint32_t WatchDog::ticks;
-
-extern "C" void HAL_WWDG_MspInit(WWDG_HandleTypeDef *hwwdg)
-{
-    (void)hwwdg;
-    __HAL_RCC_WWDG_CLK_ENABLE();
-    HAL_NVIC_SetPriority(WWDG_IRQn, 0, 0);
-    HAL_NVIC_EnableIRQ(WWDG_IRQn);
-}
 
 void WatchDog::init()
 {
