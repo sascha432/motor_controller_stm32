@@ -40,7 +40,9 @@ struct ADC {
     ADC() :
         isenseSum(0),
         isenseCount(0),
-        isenseOcpFiltered(0)
+        isenseOcpFiltered(0),
+        motorTemperatureFiltered(0),
+        mosfetTemperatureFiltered(0)
     {
     }
 
@@ -121,8 +123,9 @@ struct ADC {
     }
 
     /**
-     * @brief Get the Input Current value in ADC units
+     * @brief Get the Input Current value
      *
+     * @return uint16_t Current in ADC units
      */
     inline uint16_t getISenseValue() const
     {
@@ -130,9 +133,9 @@ struct ADC {
     }
 
     /**
-     * @brief Get the Input Current average value in ADC units. Used to display stable current values.
+     * @brief Get the Input Current average value. Used to display stable current values.
      *
-     * @return uint16_t
+     * @return uint16_t Average current in ADC units
      */
     inline uint16_t getISenseAverageValue() const
     {
@@ -140,9 +143,9 @@ struct ADC {
     }
 
     /**
-     * @brief Get the Input Current average value for OCP in ADC units
+     * @brief Get the Input Current average value for OCP
      *
-     * @return uint16_t
+     * @return uint16_t Filtered current in ADC units
      */
     inline uint16_t getISenseOcpFilteredValue() const
     {
@@ -150,8 +153,9 @@ struct ADC {
     }
 
     /**
-     * @brief Get the Input Voltage value in ADC units
+     * @brief Get the Input Voltage value
      *
+     * @return uint16_t Voltage in ADC units
      */
     inline uint16_t getVSenseValue() const
     {
@@ -159,9 +163,9 @@ struct ADC {
     }
 
     /**
-     * @brief Get the Motor NTC value in ADC units
+     * @brief Get the Motor NTC value
      *
-     * @return uint16_t
+     * @return uint16_t Temperature in ADC units
      */
     inline uint16_t getMotorNTCValue() const
     {
@@ -169,19 +173,41 @@ struct ADC {
     }
 
     /**
-     * @brief Get the Mosfet NTC value in ADC units
+     * @brief Get the Motor Temperature Filtered
      *
-     * @return uint16_t
+     * @return uint16_t Temperature in ADC units
+     */
+    inline uint16_t getMotorTemperatureFiltered() const
+    {
+        return motorTemperatureFiltered;
+    }
+
+    /**
+     * @brief Get the Mosfet NTC value
+     *
+     * @return uint16_t Temperature in ADC units
      */
     inline uint16_t getMosfetNTCValue() const
     {
         return adc_buffer[3];
     }
 
+    /**
+     * @brief Get the Mosfet Temperature Filtered
+     *
+     * @return uint16_t Temperature in ADC units
+     */
+    inline uint16_t getMosfetTemperatureFiltered() const
+    {
+        return mosfetTemperatureFiltered;
+    }
+
     volatile uint16_t adc_buffer[kNumConversions];
     volatile uint32_t isenseSum;
     volatile uint16_t isenseCount;
     volatile uint32_t isenseOcpFiltered;
+    volatile uint16_t motorTemperatureFiltered;
+    volatile uint16_t mosfetTemperatureFiltered;
 };
 
 extern ADC adc;

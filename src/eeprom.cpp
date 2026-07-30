@@ -100,7 +100,7 @@ void EEPROM::updateTemperatureLimits()
 //------------------------------------------------------------------
 bool eepromWaitReady(void)
 {
-    uint32_t retries = EEPROM_WAIT_RETRIES;
+    volatile uint32_t retries = EEPROM_WAIT_RETRIES;
     while (!i2c.sendByte(EEPROM_ADDRESS, 0x00, true)) {
         if (--retries == 0) {
             return false;

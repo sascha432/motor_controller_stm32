@@ -614,7 +614,7 @@ void Menu::handleButtonPress()
         // === diagnostics screen ===
         case Screen::Type::DASHBOARD:
             {
-                auto &dashboard = *reinterpret_cast<DashboardScreen *>(screenFlow.getScreen());
+                DashboardScreen &dashboard = *reinterpret_cast<DashboardScreen *>(screenFlow.getScreen());
                 switch(dashboard.incrSelectedValue()) {
                     case DashboardScreen::SelectedValueType::SPEED:
                         dashboard.setMaxAcceleration(eeprom.isPIDMode() ? 50 : 1);

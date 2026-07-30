@@ -106,7 +106,7 @@ struct EEPROM
         {
             magic = 0xcccccccc;
             version = 0xcccccccc;
-            sequence = 0xcccccccc;
+            sequence = 0;
         }
     };
 

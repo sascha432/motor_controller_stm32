@@ -317,8 +317,8 @@ void PidController::isr()
         item.voltage = adc.getVSenseValue();
         item.currentOcp = adc.getISenseOcpFilteredValue();
         item.currentAverage = adc.getISenseAverageValue();
-        item.motorTemperature = adc.getMotorNTCValue();
-        item.mosfetTemperature = adc.getMosfetNTCValue();
+        item.motorTemperature = adc.getMotorTemperatureFiltered();
+        item.mosfetTemperature = adc.getMosfetTemperatureFiltered();
         item.dacMotorCurrent = DAC_GET_MOTOR_CURRENT();
         item.dacInputCurrent =  DAC_GET_INPUT_CURRENT();
         item.error = getLastError();

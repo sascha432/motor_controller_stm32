@@ -6,10 +6,14 @@
 #include "pid_controller.h"
 #include "controls.h"
 
-// === interrupt handlers ===
+// === global variables ===
 
 TIM_HandleTypeDef tim6;
 uint32_t timer6Counter = 0;
+WWDG_HandleTypeDef WatchDog::watchdog;
+InterruptErrorType interruptErrorType;
+
+// === interrupt handlers ===
 
 extern "C" void TIM6_IRQHandler(void)
 {
@@ -83,11 +87,10 @@ extern "C" void DMA1_Channel1_IRQHandler()
         if (adc.getVSenseValue() > pid.faults.vsenseMax) {
             if (pid.errorCode != PidController::ErrorCodeType::OVP) {
                 pid.setErrorCode(PidController::ErrorCodeType::OVP);
-                LEDs::onLEDError();
             }
         }
 
-        auto value = adc.getISenseValue();
+        uint16_t value = adc.getISenseValue();
         // store average for display
         adc.isenseSum += value;
         if (++adc.isenseCount >= ADC::kISenseCountMax) {
@@ -97,10 +100,12 @@ extern "C" void DMA1_Channel1_IRQHandler()
         }
         // store filtered value for fast OCP detection
         adc.isenseOcpFiltered = (adc.isenseOcpFiltered + value) / 2;
+
+        // update filtered temperature values
+        adc.motorTemperatureFiltered = (adc.motorTemperatureFiltered * 15 + adc.getMotorNTCValue()) / 16;
+        adc.mosfetTemperatureFiltered = (adc.mosfetTemperatureFiltered * 15 + adc.getMosfetNTCValue()) / 16;
     }
 }
-
-WWDG_HandleTypeDef WatchDog::watchdog;
 
 extern "C" void HAL_WWDG_MspInit(WWDG_HandleTypeDef *hwwdg)
 {
@@ -109,7 +114,6 @@ extern "C" void HAL_WWDG_MspInit(WWDG_HandleTypeDef *hwwdg)
     HAL_NVIC_SetPriority(WWDG_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(WWDG_IRQn);
 }
-
 
 // === interrupt handlers ===
 
@@ -122,9 +126,7 @@ extern "C" void SysTick_Handler(void)
     WatchDog::tickHandler();
 }
 
-InterruptErrorType interruptErrorType;
-
-// for disabled interrupts
+// for disabled interrupts, not precise
 static void delay_ms(uint32_t ms)
 {
     volatile uint32_t count = ms * 5000;
@@ -169,8 +171,11 @@ extern "C" void Error_Handler(void)
     }
     #endif
     #endif
+    // disable watchdog
     WatchDog::stop();
+    // disable interrupts
     __disable_irq();
+    // infinite loop to signal error via LED flashes
     while (1) {
         LEDs::onLEDError();
         delay_ms(1000);

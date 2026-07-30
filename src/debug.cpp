@@ -154,16 +154,18 @@ const char *debug_function_name(const char *signature, char *out, size_t outSize
 
 #if DEBUG_OUTPUT == DEBUG_OUTPUT_SWD
 
-static inline void debug_swd_write_ITM_SendChar(uint32_t ch)
+static inline bool debug_swd_write_ITM_SendChar(uint32_t ch)
 {
     if (((ITM->TCR & ITM_TCR_ITMENA_Msk) != 0UL) && /* ITM enabled */
         ((ITM->TER & 1UL) != 0UL))                  /* ITM Port #0 enabled */
     {
-        if (!SWO::waitReadyPort(ch)) {
-            return;
+        if (!SWO::waitReadyPort(0)) {
+            return false;
         }
         ITM->PORT[0U].u8 = (uint8_t)ch;
+        return true;
     }
+    return false;
 }
 
 static void debug_swd_write(const char *msg)
@@ -175,7 +177,9 @@ static void debug_swd_write(const char *msg)
         return;
     }
     while (*msg) {
-        debug_swd_write_ITM_SendChar(static_cast<uint32_t>(*msg++));
+        if (!debug_swd_write_ITM_SendChar(static_cast<uint32_t>(*msg++))) {
+            break;
+        }
     }
 }
 
@@ -195,9 +199,7 @@ void debug_swd_printf(const char *fmt, ...)
 
 void debug_init(void)
 {
-    #if DEBUG_OUTPUT == DEBUG_OUTPUT_SWD
-        debug_swd_init();
-    #elif DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL || DEBUG_OUTPUT == DEBUG_OUTPUT_USB
+    #if DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL || DEBUG_OUTPUT == DEBUG_OUTPUT_USB
         Serial.begin(115200);
     #elif DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL4
         Serial4.begin(115200);

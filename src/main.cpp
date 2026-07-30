@@ -50,6 +50,7 @@ static void debug_usb_otg_state(const char *tag)
 static void setup()
 {
     // Initialize debug output
+    SWO::init();
     debug_init();
 
     // Initialize and read EEPROM on I2C1 on PB8/9
@@ -114,6 +115,7 @@ static void user_setup()
 
 static void loop()
 {
+    // feed the dog
     WatchDog::feed();
 
     // handle buttons
@@ -127,10 +129,13 @@ static void loop()
         menu.handleStartButtonPress();
     }
 
-    // LED 1 signals fault or driver ocp
+    // LED 1 signals fault or error
     if (LEDs::isErrorLEDOn()) {
-        // check if faults have cleared
-        if (!pid.faults.drv8701Fault) {//} && !pid.faults.snsoutFault) {
+        // check if fault/errors have cleared
+        if (
+            !pid.faults.drv8701Fault &&
+            (pid.getErrorCode() == PidController::ErrorCodeType::NONE)
+        ) {
             // turn LEDs off
             LEDs::off();
         }
@@ -147,7 +152,7 @@ static void loop()
             DEBUG_PRINT(DebugType::UI, "menu=%d delta=%d", newPosition, delta);
         }
         // handle LVGL updates
-        auto &screenFlow = menu.getScreenFlow();
+        ScreenFlow &screenFlow = menu.getScreenFlow();
         switch(screenFlow->getId()) {
             case Screen::Type::START:
             case Screen::Type::DASHBOARD:
@@ -159,18 +164,18 @@ static void loop()
                 break;
         }
         // check NTC sensors, not time critical and a couple times per seconds is enough
-        if (adc.getMotorNTCValue() < eeprom.getMotorTemperatureLimitADC()) {
+        if (adc.getMotorTemperatureFiltered() < eeprom.getMotorTemperatureLimitADC()) {
             if (pid.running) {
                 pid.setErrorCode(PidController::ErrorCodeType::MOTOR_OVER_TEMPERATURE);
             }
         }
-        if (adc.getMosfetNTCValue() < eeprom.getMosfetTemperatureLimitADC()) {
+        if (adc.getMosfetTemperatureFiltered() < eeprom.getMosfetTemperatureLimitADC()) {
             if (pid.running) {
                 pid.setErrorCode(PidController::ErrorCodeType::MOSFET_OVER_TEMPERATURE);
             }
         }
 
-        // update UI
+        // update UI, this might take a couple 100ms
         lv_timer_handler();
         lastLvHandler = HAL_GetTick();
     }
@@ -189,6 +194,9 @@ static void loop()
                     pid.pidLoopBuffer.clear();
                     break;
                 }
+            }
+            else if (SWO::data.enabled == SWO::EnableState::USB) {
+                // not implemented yet
             }
         }
     }
