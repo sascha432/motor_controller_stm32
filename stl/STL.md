@@ -31,6 +31,6 @@ https://www.tinkercad.com/things/fNIPaWNxDLo-motor-controller-enclosure
 
 ![PCB front](pcb1.JPG)
 
-![PCB back](pcb2.JPG)
+![PCB back](pcb2.jpg)
 
 ![Enclosure and motor](enclosure_and_motor.jpg)
