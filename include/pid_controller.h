@@ -21,6 +21,7 @@ struct PidController
     static constexpr bool kProgramPPR = false;                                          // set to true to program the MT6701 encoder during boot over i2c
     static constexpr uint32_t kMaxRPM = 55000;                                          // max. supported RPM by the encoder
     static constexpr float kMaxError = kCPR / (60000 / kPIDIntervalFloat) * kMaxRPM;    // factor to reduce error to a value between -1.0 and 1.0 for the PID loop
+    static constexpr uint32_t kReleaseBreakTime = 5000;                                 // time in ms to release the break after motor is turned off
 
     // convert RPM to counts per PID interval
     static constexpr uint32_t kRPMToIntCounts(uint32_t value)
@@ -62,7 +63,8 @@ struct PidController
         motorDirection(EEPROM::kMotorDirectionForward),
         antiWindup(kAntiWindup),
         errorCode(ErrorCodeType::NONE),
-        running(false)
+        running(false),
+        releaseBreakCounter(0)
     {
         setKp(1.0f);
         setKi(1.0f);
@@ -82,11 +84,6 @@ struct PidController
         setKi(Ki);
         setKd(Kd);
     }
-
-    /**
-     * @brief initialize PID controller
-     */
-    void init();
 
     /**
      * @brief Set the Kp value and pre-calculate KpPreCalc for PID loop
@@ -237,12 +234,6 @@ struct PidController
         return delta;
     }
 
-    /**
-     * @brief Reset controller
-     *
-     */
-    void reset();
-
     inline void setIntegral(float value)
     {
         integral = std::clamp<float>(value, -1.0f, 1.0f);
@@ -284,26 +275,6 @@ struct PidController
     }
 
     /**
-     * @brief Interrupt service routine for the PID controller.
-     *
-     * This function should be called at a fixed interval defined by kPIDInterval.
-     * It reads the encoder counter, calculates the error, derivative, and integral,
-     * updates the PWM output, and handles anti-windup.
-     */
-    void isr();
-
-    /**
-     * @brief OCP interrupt service routine for the PID controller
-     *
-     */
-    void ocp_isr();
-
-    /**
-     * @brief Trigger OCP event
-     */
-    void trigger_ocp();
-
-    /**
      * @brief Update internal fault states
      *
      */
@@ -329,6 +300,73 @@ struct PidController
     }
 
     /**
+     * @brief Set the Error Code and stop PID controller
+     *
+     * @param code
+     */
+    void setErrorCode(ErrorCodeType code)
+    {
+        PID_WRITE_MOTOR_PWM_OFF();
+        running = false;
+        errorCode = code;
+        if (code != ErrorCodeType::NONE) {
+            LEDs::onLEDError();
+        }
+    }
+
+    /**
+     * @brief Get the Error Code
+     *
+     * @return ErrorCodeType
+     */
+    inline ErrorCodeType getErrorCode() const
+    {
+        return errorCode;
+    }
+
+    /**
+     * @brief Return true if an error code is set, false otherwise
+     *
+     * @return true
+     * @return false
+     */
+    inline bool hasErrorCode() const
+    {
+        return errorCode != ErrorCodeType::NONE;
+    }
+
+    /**
+     * @brief initialize PID controller
+     */
+    void init();
+
+    /**
+     * @brief Reset controller
+     *
+     */
+    void reset();
+
+    /**
+     * @brief Interrupt service routine for the PID controller.
+     *
+     * This function should be called at a fixed interval defined by kPIDInterval.
+     * It reads the encoder counter, calculates the error, derivative, and integral,
+     * updates the PWM output, and handles anti-windup.
+     */
+    void isr();
+
+    /**
+     * @brief OCP interrupt service routine for the PID controller
+     *
+     */
+    void ocp_isr();
+
+    /**
+     * @brief Trigger OCP event
+     */
+    void trigger_ocp();
+
+    /**
      * @brief Turn motor on in the specified direction
      *
      * @param direction
@@ -351,78 +389,15 @@ struct PidController
     bool motorToggle();
 
     /**
-     * @brief Set the Error Code and stop PID controller
-     *
-     * @param code
-     */
-    void setErrorCode(ErrorCodeType code)
-    {
-        PID_WRITE_MOTOR_PWM_OFF();
-        running = false;
-        errorCode = code;
-        if (code != ErrorCodeType::NONE) {
-            LEDs::onLEDError();
-        }
-    }
-
-    /**
-     * @brief Get the Error Code
-     *
-     * @return ErrorCodeType
-     */
-    ErrorCodeType getErrorCode() const
-    {
-        return errorCode;
-    }
-
-    /**
-     * @brief Return true if an error code is set, false otherwise
-     *
-     * @return true
-     * @return false
-     */
-    bool hasErrorCode() const
-    {
-        return errorCode != ErrorCodeType::NONE;
-    }
-
-    /**
      * @brief Print the current error code as a string into the provided buffer.
      *
      * @param buf Buffer to store the error string.
      * @param bufSize Size of the buffer.
      * @return size_t Number of characters written.
      */
-    size_t errorPrintf(char *buf, size_t bufSize) const
-    {
-        switch(errorCode) {
-            case ErrorCodeType::NONE:
-                return snprintf(buf, bufSize, "NONE");
-            case ErrorCodeType::STALL:
-                return snprintf(buf, bufSize, "STALL");
-            case ErrorCodeType::SENSOR:
-                return snprintf(buf, bufSize, "SENSOR");
-            case ErrorCodeType::SENSOR_REVERSE:
-                return snprintf(buf, bufSize, "SENSOR REVERSE");
-            case ErrorCodeType::MOTOR_OVER_TEMPERATURE:
-                return snprintf(buf, bufSize, "MOTOR %d" DEGREE_UTF8 "C", ::stats.motorTemp);
-            case ErrorCodeType::MOSFET_OVER_TEMPERATURE:
-                return snprintf(buf, bufSize, "MOSFET %d" DEGREE_UTF8 "C", ::stats.mosfetTemp);
-            case ErrorCodeType::OVP:
-                return snprintf(buf, bufSize, "OVP");
-            case ErrorCodeType::OCP:
-                return snprintf(buf, bufSize, "OCP");
-            case ErrorCodeType::FAULT:
-                return snprintf(buf, bufSize, "DRV8701 FAULT");
-            case ErrorCodeType::SNSOUT:
-                return snprintf(buf, bufSize, "DRV8701 SNSOUT");
-            default:
-                break;
-        }
-        return snprintf(buf, bufSize, "ERROR #%d", static_cast<int>(errorCode));
-    }
+    size_t errorPrintf(char *buf, size_t bufSize) const;
 
-public:
+    public:
     // === Fault states data structure ===
 
     struct FaultStates
@@ -530,34 +505,35 @@ public:
     };
 
 public:
-    float Kp;                           // PID K-values
+    float Kp;                                       // PID K-values
     float Ki;
     float Kd;
-    uint32_t rpm;                       // target RPM
-    uint32_t motorDirection;            // motor direction
-    float antiWindup;       // anti-windup reduction factor
+    uint32_t rpm;                                   // target RPM
+    uint32_t motorDirection;                        // motor direction
+    float antiWindup;                               // anti-windup reduction factor
 
-    uint32_t lastEncoderCounter;        // last encoder counter value
-    float integral;                   // PID variables
+    uint32_t lastEncoderCounter;                    // last encoder counter value
+    float integral;                                 // PID variables
     float lastError;
     float lastDerivative;
 
-    float KpPreCalc;                  // fixed point pre-calculated K-values for PID loop
+    float KpPreCalc;                                // pre-calculated K-values for PID loop
     float KiPreCalc;
     float KdPreCalc;
-    int32_t countsPerInterval;                        // counts per interval (RPM)
+    int32_t countsPerInterval;                      // counts per interval (RPM)
 
     uint32_t lastRpmCounter;
     uint32_t lastRpmCounterUpdated;
 
-    StatsType stats;                    // statistics
-    FaultStates faults;                 // DRV8701 and ocp faults
-    OcpState ocp;                       // OCP state machine
+    StatsType stats;                                // statistics
+    FaultStates faults;                             // DRV8701 and ocp faults
+    OcpState ocp;                                   // OCP state machine
 
-    ErrorCodeType errorCode;            // last error
-    RingBuffer<PidLoopType, 8> pidLoopBuffer; // buffer for PID loop data for PID tuning
+    ErrorCodeType errorCode;                        // last error
+    RingBuffer<PidLoopType, 8> pidLoopBuffer;       // buffer for PID loop data for PID tuning
 
-    volatile bool running;              // true if the PID controller is running
+    volatile bool running;                          // true if the PID controller is running
+    uint32_t releaseBreakCounter;                   // counter for releasing the brake after motor off
 };
 
 extern PidController pid;

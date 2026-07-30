@@ -9,35 +9,6 @@
 PidController pid;
 MotorEncoder motorEncoder;
 
-void PidController::reset()
-{
-    lastEncoderCounter = PID_READ_ENCODER_COUNTER();
-    lastError = 0;
-    lastDerivative = 0;
-    integral = 0;
-    stats.reset(PID_READ_RPM_COUNTER());
-    errorCode = ErrorCodeType::NONE;
-    faults.reset();
-    faults.isenseMax = ADC::_currentLimitValueToDAC(eeprom.getInputCurrentLimit());
-    faults.vsenseMax = ADCConverter::Voltage::reverse(eeprom.getOvpProtection());
-    adc.setMotorCurrentLimit(eeprom.getMotorCurrentLimit());
-    adc.setInputCurrentLimit(eeprom.getInputCurrentLimit());
-    lastRpmCounter = PID_READ_RPM_COUNTER();
-    lastRpmCounterUpdated = HAL_GetTick();
-    ocp.reset();
-    resetFaults();
-    applyPIDParams();
-
-    #if DEBUG
-    char pBuf[16], iBuf[16], dBuf[16], aBuf[16];
-    FloatToString::convertTrimmed(pBuf, sizeof(pBuf), Kp, 6);
-    FloatToString::convertTrimmed(iBuf, sizeof(iBuf), Ki, 6);
-    FloatToString::convertTrimmed(dBuf, sizeof(dBuf), Kd, 6);
-    FloatToString::convertTrimmed(aBuf, sizeof(aBuf), antiWindup, 6);
-    DEBUG_PRINT(DebugType::PID, "Kp=%s Ki=%s Kd=%s RPM=%u windup=%s OCP=%u/%u OVP=%u", pBuf, iBuf, dBuf, rpm, aBuf, eeprom.getInputCurrentLimit(), eeprom.getMotorCurrentLimit(), eeprom.getOvpProtection());
-    #endif
-}
-
 void PidController::init()
 {
     // // === PWM on TIM1 CH1 (PA8, PA9) ===
@@ -161,14 +132,44 @@ void PidController::init()
     HAL_GPIO_Init(digitalPinToGPIO<DRV_SNSOUT_PIN>(), &GPIO_InitStruct);
 }
 
+void PidController::reset()
+{
+    lastEncoderCounter = PID_READ_ENCODER_COUNTER();
+    lastError = 0;
+    lastDerivative = 0;
+    integral = 0;
+    stats.reset(PID_READ_RPM_COUNTER());
+    errorCode = ErrorCodeType::NONE;
+    releaseBreakCounter = 0;
+    faults.reset();
+    faults.isenseMax = ADC::_currentLimitValueToDAC(eeprom.getInputCurrentLimit());
+    faults.vsenseMax = ADCConverter::Voltage::reverse(eeprom.getOvpProtection());
+    adc.setMotorCurrentLimit(eeprom.getMotorCurrentLimit());
+    adc.setInputCurrentLimit(eeprom.getInputCurrentLimit());
+    lastRpmCounter = PID_READ_RPM_COUNTER();
+    lastRpmCounterUpdated = HAL_GetTick();
+    ocp.reset();
+    resetFaults();
+    applyPIDParams();
+
+    #if DEBUG
+    char pBuf[16], iBuf[16], dBuf[16], aBuf[16];
+    FloatToString::convertTrimmed(pBuf, sizeof(pBuf), Kp, 6);
+    FloatToString::convertTrimmed(iBuf, sizeof(iBuf), Ki, 6);
+    FloatToString::convertTrimmed(dBuf, sizeof(dBuf), Kd, 6);
+    FloatToString::convertTrimmed(aBuf, sizeof(aBuf), antiWindup, 6);
+    DEBUG_PRINT(DebugType::PID, "Kp=%s Ki=%s Kd=%s RPM=%u windup=%s OCP=%u/%u OVP=%u", pBuf, iBuf, dBuf, rpm, aBuf, eeprom.getInputCurrentLimit(), eeprom.getMotorCurrentLimit(), eeprom.getOvpProtection());
+    #endif
+}
+
 void PidController::motorOn()
 {
     __disable_irq();
     if (!running) {
         PID_WRITE_MOTOR_PWM_OFF();
+        reset();
         running = true;
         __enable_irq();
-        reset();
     }
     else {
         __enable_irq();
@@ -184,6 +185,7 @@ void PidController::motorOff()
         running = false;
         uint32_t level = clampPWMLevel(eeprom.getMotorBrake() * kMaxPWMLevel / 100);
         PID_WRITE_MOTOR_PWM_BREAK(level);
+        releaseBreakCounter = (kReleaseBreakTime / kPIDIntervalFloat) + 1;
         __enable_irq();
     }
     else {
@@ -259,6 +261,12 @@ void PidController::isr()
     // apply new PWM level if motor is running
     if (running) {
         PID_WRITE_MOTOR_PWM_ON(clampedPwmLevel, motorDirection);
+    }
+    else if (releaseBreakCounter) {
+        // countdown once set
+        if (--releaseBreakCounter == 0) {
+            PID_WRITE_MOTOR_PWM_OFF();
+        }
     }
 
     // update pwm stats
@@ -405,4 +413,32 @@ void PidController::trigger_ocp()
             DAC_SET_MOTOR_CURRENT(value);
         }
     }
+}
+
+size_t PidController::errorPrintf(char *buf, size_t bufSize) const
+{
+    switch(errorCode) {
+        case ErrorCodeType::STALL:
+            return snprintf(buf, bufSize, "MOTOR STALL");
+        case ErrorCodeType::SENSOR:
+            return snprintf(buf, bufSize, "SENSOR ERROR");
+        case ErrorCodeType::SENSOR_REVERSE:
+            return snprintf(buf, bufSize, "SENSOR REVERSE");
+        case ErrorCodeType::MOTOR_OVER_TEMPERATURE:
+            return snprintf(buf, bufSize, "MOTOR %d" DEGREE_UTF8 "C", ::stats.motorTemp);
+        case ErrorCodeType::MOSFET_OVER_TEMPERATURE:
+            return snprintf(buf, bufSize, "MOSFET %d" DEGREE_UTF8 "C", ::stats.mosfetTemp);
+        case ErrorCodeType::OVP:
+            return snprintf(buf, bufSize, "OVP");
+        case ErrorCodeType::OCP:
+            return snprintf(buf, bufSize, "OCP");
+        case ErrorCodeType::FAULT:
+            return snprintf(buf, bufSize, "DRV8701 FAULT");
+        case ErrorCodeType::SNSOUT:
+            return snprintf(buf, bufSize, "DRV8701 SNSOUT");
+        case ErrorCodeType::NONE:
+        default:
+            break;
+    }
+    return snprintf(buf, bufSize, "ERROR #%d", static_cast<int>(errorCode));
 }

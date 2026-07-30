@@ -84,6 +84,8 @@ static void setup()
 
 // === user setup runs after core setup ===
 
+static void TIM6_start_interrupt_timer();
+
 static void user_setup()
 {
     // Initialize display driver
@@ -108,6 +110,8 @@ static void user_setup()
     }
 
     menu.loadStartScreen();
+
+    TIM6_start_interrupt_timer();
 }
 
 // === main loop ===
@@ -330,9 +334,13 @@ static void TIM7_TIM6_Init()
     tim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
     __HAL_RCC_TIM6_CLK_ENABLE();
     HAL_TIM_Base_Init(&tim6);
-    HAL_TIM_Base_Start_IT(&tim6);
     HAL_NVIC_SetPriority(TIM6_IRQn, 1, 0);
     HAL_NVIC_EnableIRQ(TIM6_IRQn);
+}
+
+static void TIM6_start_interrupt_timer()
+{
+    HAL_TIM_Base_Start_IT(&tim6);
 }
 
 // === interrupt handlers ===
