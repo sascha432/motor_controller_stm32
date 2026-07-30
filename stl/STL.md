@@ -29,8 +29,10 @@ https://www.tinkercad.com/things/fNIPaWNxDLo-motor-controller-enclosure
 
 ![MT6701 Module](mt6701.png)
 
-![PCB front](pcb1.jpg)
+![PCB front](pcb_front.jpg)
 
-![PCB back](pcb2.jpg)
+![PCB back](pcb_back.jpg)
 
 ![Enclosure and motor](enclosure_and_motor.jpg)
+
+![PID tuning](pid_tuning.png)

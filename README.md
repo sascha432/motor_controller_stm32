@@ -23,7 +23,7 @@
 
 - 8-36V, 20A continuous, 40A peak
 - Adjustable cycle by cycle motor current limit (0.5-40A)
-- Adjustable max. current with signal LED (0.5-40A)
+- Adjustable current limit with signal LED (0.5-40A)
 - 1.14" 135x240 TFT display, rotary encoder and 3 buttons for easy navigation
 - Support for magnetic encoder MT6701 in A/B mode up to 1024PPR (55000 RPM)
 - Dimmable LED with CC driver 3-26V/350mA/5W
@@ -39,10 +39,12 @@ https://oshwlab.com/sascha23095123423/project_dzierqaj
 
 ## Some pictures
 
+![Enclosure and motor](stl/enclosure_and_motor.jpg)
+
+![PCB front](stl/pcb_front.jpg)
+
+![PCB back](stl/pcb_back.jpg)
+
 ![STL files and MT6701](stl/stl_files.png)
 
-![PCB front](stl/pcb1.jpg)
-
-![PCB back](stl/pcb2.jpg)
-
-![Enclosure and motor](stl/enclosure_and_motor.jpg)
+![PID tuning](stl/pid_tuning.png)

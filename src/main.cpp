@@ -178,9 +178,9 @@ static void loop()
     if (SWO::data.enabled != SWO::EnableState::DISABLED) {
         // send PID tuning data
         PidController::PidLoopType item;
-        static constexpr char kPidFrameMagic[] = {'P', 'I', 'D', '1'};
         while (pid.pidLoopBuffer.pop(item)) {
             if (SWO::data.enabled == SWO::EnableState::SWO) {
+                static constexpr char kPidFrameMagic[] = {'P', 'I', 'D', '1'};
                 SWO::write(1, kPidFrameMagic, sizeof(kPidFrameMagic));
                 SWO::writeObject<1>(item);
             }
