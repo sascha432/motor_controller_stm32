@@ -144,7 +144,7 @@ static void loop()
         int32_t delta = knob.getDeltaPosition();
         if (delta) {
             newPosition = menu.updateRotaryValue(delta);
-            DEBUG_PRINT(DEBUG_DEBUG, "menu=%d delta=%d", newPosition, delta);
+            DEBUG_PRINT(DebugType::UI, "menu=%d delta=%d", newPosition, delta);
         }
         // handle LVGL updates
         auto &screenFlow = menu.getScreenFlow();

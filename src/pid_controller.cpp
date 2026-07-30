@@ -28,13 +28,13 @@ void PidController::reset()
     resetFaults();
     applyPIDParams();
 
-    #if 0
-    char pBuf[24], iBuf[24], dBuf[24], aBuf[24];
+    #if DEBUG
+    char pBuf[16], iBuf[16], dBuf[16], aBuf[16];
     FloatToString::convertTrimmed(pBuf, sizeof(pBuf), Kp, 6);
     FloatToString::convertTrimmed(iBuf, sizeof(iBuf), Ki, 6);
     FloatToString::convertTrimmed(dBuf, sizeof(dBuf), Kd, 6);
     FloatToString::convertTrimmed(aBuf, sizeof(aBuf), antiWindup, 6);
-    DEBUG_PRINT(DEBUG_DEBUG, "Kp=%s Ki=%s Kd=%s RPM=%u windup=%s", pBuf, iBuf, dBuf, rpm, aBuf);
+    DEBUG_PRINT(DebugType::PID, "Kp=%s Ki=%s Kd=%s RPM=%u windup=%s OCP=%u/%u OVP=%u", pBuf, iBuf, dBuf, rpm, aBuf, eeprom.getInputCurrentLimit(), eeprom.getMotorCurrentLimit(), eeprom.getOvpProtection());
     #endif
 }
 
@@ -172,7 +172,7 @@ void PidController::motorOn()
     }
     else {
         __enable_irq();
-        DEBUG_PRINT(DEBUG_ERROR, "MOTOR RUNNING");
+        DEBUG_PRINT(DebugType::ERROR, "MOTOR RUNNING");
     }
 }
 
@@ -188,7 +188,7 @@ void PidController::motorOff()
     }
     else {
         __enable_irq();
-        DEBUG_PRINT(DEBUG_ERROR, "MOTOR NOT RUNNING");
+        DEBUG_PRINT(DebugType::ERROR, "MOTOR NOT RUNNING");
     }
 }
 
@@ -219,7 +219,8 @@ void PidController::isr()
     }
     stats.counter.pulse += delta;
 
-    int32_t pwmLevel;
+    // calculate PWM level based on PID or fixed PWM value
+    int32_t pwmLevel, clampedPwmLevel;
 
     if (eeprom.isPIDMode()) {
         // calculate error and derivative
@@ -238,16 +239,11 @@ void PidController::isr()
         pwmLevel = calcPWMLevel(error, getIntegral(), derivative);
     }
     else {
-        pwmLevel = eeprom.getMotorPWM() * kMaxPWMLevel / 100;
+        pwmLevel = (eeprom.getMotorPWM() * kMaxPWMLevel) / 100;
     }
 
-    // char buf1[16], buf2[16];
-    // FloatToString::convert(buf1, sizeof(buf1), getLastError(), 6);
-    // FloatToString::convert(buf2, sizeof(buf2), getIntegral(), 6);
-    // DEBUG_PRINT_MSG(DEBUG_DEBUG, "pwm=%d e=%s i=%s", pwmLevel, buf1, buf2);
-
     // clamp pwm level to max. allowed value
-    int32_t clampedPwmLevel = clampPWMLevel(pwmLevel);
+    clampedPwmLevel = clampPWMLevel(pwmLevel);
 
     if (eeprom.isPIDMode()) {
         if (ocp.state != OcpStateType::NONE) {
@@ -343,7 +339,7 @@ void PidController::isr()
                 FloatToString::convertTrimmed(bufKp, sizeof(bufKp), SWO::data.Kp, 6);
                 FloatToString::convertTrimmed(bufKi, sizeof(bufKi), SWO::data.Ki, 6);
                 FloatToString::convertTrimmed(bufKd, sizeof(bufKd), SWO::data.Kd, 6);
-                DEBUG_PRINT(DEBUG_DEBUG, "PID tuning via SWO: Kp=%s Ki=%s Kd=%s RPM=%u", bufKp, bufKi, bufKd, SWO::data.rpm);
+                DEBUG_PRINT(DebugType::PID, "PID tuning via SWO: Kp=%s Ki=%s Kd=%s RPM=%u", bufKp, bufKi, bufKd, SWO::data.rpm);
             #endif
         }
     }

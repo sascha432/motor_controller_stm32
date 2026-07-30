@@ -79,12 +79,12 @@ Screen::Screen(Type id) :
     steps(1),
     value(0)
 {
-    DEBUG_PRINT(DEBUG_DEBUG, "ctor");
+    DEBUG_PRINT(DebugType::UI, "ctor");
 }
 
 Screen::~Screen()
 {
-    DEBUG_PRINT(DEBUG_DEBUG, "screen=%p", screen);
+    DEBUG_PRINT(DebugType::UI, "screen=%p", screen);
      if (screen) {
         lv_scr_load(emptyScreen);
         lv_obj_del(screen);
@@ -93,7 +93,7 @@ Screen::~Screen()
 
 void Screen::load()
 {
-    DEBUG_PRINT(DEBUG_DEBUG, "screen=%p", screen);
+    DEBUG_PRINT(DebugType::UI, "screen=%p", screen);
     if (screen) {
         auto tmp = screen;
         screen = lv_obj_create(nullptr);
@@ -109,7 +109,7 @@ void Screen::load()
 
 void Screen::update()
 {
-    DEBUG_PRINT(DEBUG_DEBUG, "screen=%p", screen);
+    DEBUG_PRINT(DebugType::UI, "screen=%p", screen);
 }
 
 Screen::Type Screen::getId() const
@@ -133,7 +133,7 @@ void Screen::_fatal_error(const char *msg)
     while (true) {
         WatchDog::delay(100);
         if (num++ % 10 == 0) {
-            DEBUG_PRINT(DEBUG_ERROR, "UI ERROR: %s", msg);
+            DEBUG_PRINT(DebugType::ERROR, "UI ERROR: %s", msg);
         }
     }
 }
@@ -160,7 +160,7 @@ WelcomeScreen::WelcomeScreen() :
 
 void InfoScreen::load()
 {
-    DEBUG_PRINT(DEBUG_NOTICE, "message=%s", message ? message : "<NULL>");
+    DEBUG_PRINT(DebugType::UI, "message=%s", message ? message : "<NULL>");
     Screen::load();
     label = lv_label_create(screen);
     if (message) {
@@ -189,7 +189,7 @@ MenuScreen::MenuScreen(Type id, const char **itemLabels, size_t itemCount) :
 
 void MenuScreen::load()
 {
-    DEBUG_PRINT(DEBUG_NOTICE, "items=%u selected=%u", count, selected);
+    DEBUG_PRINT(DebugType::UI, "items=%u selected=%u", count, selected);
     Screen::load();
     lv_obj_t *menu = lv_obj_create(screen);
 
@@ -287,7 +287,7 @@ lv_obj_t *MenuScreen::_style_create_menu_label(lv_obj_t *parent, const char *tex
 
 void SliderScreen::load()
 {
-    DEBUG_PRINT(DEBUG_NOTICE, "range=%u-%u value=%u label=%s unit=%s", minValue, maxValue, value, label, unit ? unit : "<NULL>");
+    DEBUG_PRINT(DebugType::UI, "range=%u-%u value=%u label=%s unit=%s", minValue, maxValue, value, label, unit ? unit : "<NULL>");
     Screen::load();
 
     lv_obj_t *container = lv_obj_create(screen);
@@ -671,7 +671,7 @@ void DashboardScreen::_refreshVisuals()
 {
     char buf[32];
 
-    uint32_t pwmPercent = pid.stats.pwm.get() * 100 / pid.kMaxPWMLevel;
+    uint32_t pwmPercent = (pid.stats.pwm.get() * 100 / (pid.kMaxPWMLevel - 1));
     start_screen_update_top_status_labels(voltageLabel, currentLabel, motorTempLabel, mosfetTempLabel);
 
     if (pid.hasErrorCode()) {

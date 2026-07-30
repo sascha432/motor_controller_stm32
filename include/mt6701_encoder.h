@@ -183,12 +183,12 @@ struct MT6701Encoder {
             auto result = config.setPPR(ppr);
             if (result && writeEEPROM) {
                 result = config.writeEEPROM();
-                DEBUG_PRINT(DEBUG_DEBUG, "write EEPROM=%u", result);
+                DEBUG_PRINT(DebugType::NOTICE, "write EEPROM=%u", result);
             }
-            DEBUG_PRINT(DEBUG_DEBUG, "PPR=%u", config.getPPR());
+            DEBUG_PRINT(DebugType::INFO, "PPR=%u", config.getPPR());
         }
         else {
-            DEBUG_PRINT(DEBUG_DEBUG, "MT6701 not detected at address 0x%02x", MT6701Config::MT6701_ADDR);
+            DEBUG_PRINT(DebugType::ERROR, "MT6701 not detected at address 0x%02x", MT6701Config::MT6701_ADDR);
         }
 
         setI2CEnablePin(ACTIVE_LOW_I2C);

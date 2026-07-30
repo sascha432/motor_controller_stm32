@@ -312,6 +312,7 @@ struct PidController
         faults.drv8701Fault = !digitalRead<DRV8701_FAULT_PIN>();
         faults.ocpFault = !digitalRead<OCP_INT_PIN>();
         faults.snsoutFault = !digitalRead<DRV_SNSOUT_PIN>();
+        DEBUG_PRINT(DebugType::PID, "drv8701=%d ocp=%d snsout=%d", faults.drv8701Fault, faults.ocpFault, faults.snsoutFault);
     }
 
     /**

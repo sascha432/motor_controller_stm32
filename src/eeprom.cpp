@@ -30,7 +30,7 @@ void EEPROM::init()
 {
     i2c.initI2C1Remapped();
     bool res = i2c.sendBytes(EEPROM_ADDRESS, nullptr, 0);
-    DEBUG_PRINT(DEBUG_DEBUG, "EEPROM detected=%u", (int)res);
+    DEBUG_PRINT(DebugType::INFO, "EEPROM detected=%u", (int)res);
 }
 
 void EEPROM::read()
@@ -38,7 +38,7 @@ void EEPROM::read()
     Data tmp;
     tmp.invalidate();
     bool result = eepromReadBytes(0, reinterpret_cast<uint8_t *>(&tmp), sizeof(tmp));
-    DEBUG_PRINT(DEBUG_WARNING, "read=%u magic=%08x version=%d sequence=%d", (int)result, tmp.magic, tmp.version, tmp.sequence);
+    DEBUG_PRINT(DebugType::INFO, "read=%u magic=%08x version=%d sequence=%d", (int)result, tmp.magic, tmp.version, tmp.sequence);
 
     if (!result || tmp.magic != kMagic || tmp.version != kVersion) {
         resetDefaults();
@@ -56,12 +56,12 @@ bool EEPROM::write()
     bool result = eepromReadBytes(0, reinterpret_cast<uint8_t *>(&tmp), sizeof(tmp));
     if (result) {
         if (tmp == data) {
-            DEBUG_PRINT(DEBUG_DEBUG, "EEPROM write skipped, no changes");
+            DEBUG_PRINT(DebugType::NOTICE, "EEPROM write skipped, no changes");
             return false;
         }
     }
     else if (!result) {
-        DEBUG_PRINT(DEBUG_WARNING, "EEPROM read failed");
+        DEBUG_PRINT(DebugType::ERROR, "EEPROM read failed");
     }
 
     // write data to EEPROM
@@ -70,12 +70,12 @@ bool EEPROM::write()
     if (!result) {
         data.sequence--;
     }
-    DEBUG_PRINT(DEBUG_ERROR, "write=%u magic=%08x version=%d sequence=%d", (int)result, data.magic, data.version, data.sequence);
+    DEBUG_PRINT(DebugType::ERROR, "write=%u magic=%08x version=%d sequence=%d", (int)result, data.magic, data.version, data.sequence);
 
     #if EEPROM_VALIDATE_WRITE
         tmp.invalidate();
         result = eepromReadBytes(0, reinterpret_cast<uint8_t *>(&tmp), sizeof(tmp));
-        DEBUG_PRINT(DEBUG_DEBUG, "verify=%u magic=%08x version=%d sequence=%d", result, tmp.magic, tmp.version, tmp.sequence);
+        DEBUG_PRINT(DebugType::NOTICE, "verify=%u magic=%08x version=%d sequence=%d", result, tmp.magic, tmp.version, tmp.sequence);
     #endif
     return result;
 }
