@@ -540,6 +540,22 @@ extern "C" void SystemClock_Config(void)
   __HAL_RCC_PLLI2S_ENABLE();
 }
 
+#if 0
+CRC_HandleTypeDef hcrc;
+
+void MX_CRC_Init(void)
+{
+    __HAL_RCC_CRC_CLK_ENABLE();
+
+    hcrc.Instance = CRC;
+
+    if (HAL_CRC_Init(&hcrc) != HAL_OK)
+    {
+        Error_Handler();
+    }
+}
+#endif
+
 // === main ===
 
 int main(void)
@@ -547,6 +563,7 @@ int main(void)
     // system init
     HAL_Init();
     SystemClock_Config();
+    // MX_CRC_Init();
     TIM7_TIM6_Init();
     #if HAVE_USB_DEVICE
         /*

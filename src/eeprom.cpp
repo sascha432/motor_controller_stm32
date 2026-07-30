@@ -62,7 +62,7 @@ bool EEPROM::write()
     bool result = eepromReadBytes(EEPROM_DEFAULT_OFFSET, reinterpret_cast<uint8_t *>(&tmp), sizeof(tmp));
     if (result) {
         if (tmp == data) {
-            DEBUG_PRINT(DebugType::NOTICE, "EEPROM write skipped, no changes");
+            DEBUG_PRINT(DebugType::INFO, "EEPROM write skipped, no changes");
             return false;
         }
     }
@@ -76,7 +76,7 @@ bool EEPROM::write()
     if (!result) {
         data.sequence--;
     }
-    DEBUG_PRINT(DebugType::ERROR, "write=%u magic=%08x version=%d sequence=%d", (int)result, data.magic, data.version, data.sequence);
+    DEBUG_PRINT(result ? DebugType::INFO : DebugType::ERROR, "write=%u magic=%08x version=%d sequence=%d", (int)result, data.magic, data.version, data.sequence);
 
     #if EEPROM_VALIDATE_WRITE
         tmp.invalidate();

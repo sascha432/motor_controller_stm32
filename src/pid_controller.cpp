@@ -351,6 +351,7 @@ void PidController::isr()
                 FloatToString::convertTrimmed(bufKp, sizeof(bufKp), SWO::data.Kp, 6);
                 FloatToString::convertTrimmed(bufKi, sizeof(bufKi), SWO::data.Ki, 6);
                 FloatToString::convertTrimmed(bufKd, sizeof(bufKd), SWO::data.Kd, 6);
+                __enable_irq();
                 DEBUG_PRINT(DebugType::PID, "PID tuning via SWO: Kp=%s Ki=%s Kd=%s RPM=%u", bufKp, bufKi, bufKd, SWO::data.rpm);
             #endif
         }

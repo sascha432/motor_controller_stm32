@@ -44,7 +44,10 @@ struct UIConstants
     static constexpr uint32_t kMaxKi = kMaxKp;                          // Max. PID Ki value
     static constexpr uint32_t kMinKd = kMinKp;                          // Min. PID Kd value
     static constexpr uint32_t kMaxKd = kMaxKp;                          // Max. PID Kd value
-    static constexpr uint32_t kMaxPIDParamAcceleration = 1000000;       // Max. PID parameter acceleration in uint32_t units per second
+    static constexpr uint32_t kMaxPIDParamAcceleration = 100000;        // Max. PID parameter acceleration in uint32_t units per second
+    static constexpr uint32_t kSelectKpSteps = 10;                      // Steps for Kp selection
+    static constexpr uint32_t kSelectKiSteps = 10;                      // Steps for Ki selection
+    static constexpr uint32_t kSelectKdSteps = 1;                       // Steps for Kd selection
     static constexpr uint32_t kAntiWindupFactor = 100;                  // anti-windup factor
     static constexpr uint32_t kMinAntiWindupReduction = 0;              // Min. PID anti-windup reduction in percentage (0-100) * 100
     static constexpr uint32_t kMaxAntiWindupReduction = 100 * kAntiWindupFactor; // Max. PID anti-windup reduction in percentage (0-100) * kAntiWindupFactor
@@ -72,8 +75,8 @@ struct UIConstants
     static constexpr uint16_t kDefaultOvpProtection = 38500;             // Default OVP protection in millivolts
 
     // ui menu timeouts
-    static constexpr uint32_t kWelcomeScreenTimeout = 3000;             // WelcomeScreen timeout in milliseconds
-    static constexpr uint32_t kInfoScreenTimeout = 2500;                // Default InfoScreen timeout in milliseconds
+    static constexpr uint32_t kWelcomeScreenTimeout = 2000;             // WelcomeScreen timeout in milliseconds
+    static constexpr uint32_t kInfoScreenTimeout = 1500;                // Default InfoScreen timeout in milliseconds
 
     static constexpr bool kEnableIlluminationLEDFading = true;          // Enable fading of the illumination LED on the welcome screen
 };

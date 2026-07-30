@@ -187,6 +187,9 @@ void Menu::loadStartScreen()
 {
     screenFlow.setScreen(new StartScreen());
     setValue(eeprom.getSpeed());
+    bool success = eeprom.write();
+    (void)success;
+    DEBUG_PRINT(DebugType::UI, "eeprom.write()=%d", success);
     clearUserInput();
 }
 
@@ -550,6 +553,7 @@ void Menu::handleButtonPress()
                         UIConstants::kMaxKp,
                         pid_parameter_format_callback
                     ));
+                    screenFlow->setSteps(UIConstants::kSelectKpSteps);
                     setValue(EEPROM::kPIDParamToUint32(eeprom.getKp()));
                     break;
                 case 1: // Ki
@@ -560,6 +564,7 @@ void Menu::handleButtonPress()
                         UIConstants::kMaxKi,
                         pid_parameter_format_callback
                     ));
+                    screenFlow->setSteps(UIConstants::kSelectKiSteps);
                     setValue(EEPROM::kPIDParamToUint32(eeprom.getKi()));
                     break;
                 case 2: // Kd
@@ -570,6 +575,7 @@ void Menu::handleButtonPress()
                         UIConstants::kMaxKd,
                         pid_parameter_format_callback
                     ));
+                    screenFlow->setSteps(UIConstants::kSelectKdSteps);
                     setValue(EEPROM::kPIDParamToUint32(eeprom.getKd()));
                     break;
                 case 3: // Anti-Windup Reduction
@@ -616,14 +622,17 @@ void Menu::handleButtonPress()
                         break;
                     case DashboardScreen::SelectedValueType::KP:
                         dashboard.setMaxAcceleration(UIConstants::kMaxPIDParamAcceleration);
+                        screenFlow->setSteps(UIConstants::kSelectKpSteps);
                         setValue(EEPROM::kPIDParamToUint32(eeprom.getKp()));
                         break;
                     case DashboardScreen::SelectedValueType::KI:
                         dashboard.setMaxAcceleration(UIConstants::kMaxPIDParamAcceleration);
+                        screenFlow->setSteps(UIConstants::kSelectKiSteps);
                         setValue(EEPROM::kPIDParamToUint32(eeprom.getKi()));
                         break;
                     case DashboardScreen::SelectedValueType::KD:
                         dashboard.setMaxAcceleration(UIConstants::kMaxPIDParamAcceleration);
+                        screenFlow->setSteps(UIConstants::kSelectKdSteps);
                         setValue(EEPROM::kPIDParamToUint32(eeprom.getKd()));
                         break;
                     case DashboardScreen::SelectedValueType::ANTI_WINDUP:
@@ -729,6 +738,7 @@ void Menu::handleStartButtonPress()
  */
 int32_t Menu::updateRotaryValue(int32_t value)
 {
+    int32_t clampedValue;
     screenFlow->setValue(screenFlow->getValue() + (value * screenFlow->getSteps()));
     switch(screenFlow->getId()) {
         case Screen::Type::DASHBOARD:
@@ -737,20 +747,28 @@ int32_t Menu::updateRotaryValue(int32_t value)
                     updateSpeedValue();
                     break;
                 case DashboardScreen::SelectedValueType::KP:
-                    eeprom.setKp(EEPROM::kUint32ToPIDParam(getValue()));
+                    clampedValue = std::clamp<int32_t>(getValue(), UIConstants::kMinKp, UIConstants::kMaxKp); // clamp value, usually done in the slider screen
+                    eeprom.setKp(EEPROM::kUint32ToPIDParam(clampedValue));
                     pid.applyPIDParams(); // apply or live tuning otherwise only a reset will apply the new values
+                    setValue(clampedValue);
                     break;
                 case DashboardScreen::SelectedValueType::KI:
-                    eeprom.setKi(EEPROM::kUint32ToPIDParam(getValue()));
+                    clampedValue = std::clamp<int32_t>(getValue(), UIConstants::kMinKi, UIConstants::kMaxKi);
+                    eeprom.setKi(EEPROM::kUint32ToPIDParam(clampedValue));
                     pid.applyPIDParams();
+                    setValue(clampedValue);
                     break;
                 case DashboardScreen::SelectedValueType::KD:
-                    eeprom.setKd(EEPROM::kUint32ToPIDParam(getValue()));
+                    clampedValue = std::clamp<int32_t>(getValue(), UIConstants::kMinKd, UIConstants::kMaxKd);
+                    eeprom.setKd(EEPROM::kUint32ToPIDParam(clampedValue));
                     pid.applyPIDParams();
+                    setValue(clampedValue);
                     break;
                 case DashboardScreen::SelectedValueType::ANTI_WINDUP:
-                    eeprom.setAntiWindupReduction(getValue());
+                    clampedValue = std::clamp<int32_t>(getValue(), UIConstants::kMinAntiWindupReduction, UIConstants::kMaxAntiWindupReduction);
+                    eeprom.setAntiWindupReduction(clampedValue);
                     pid.applyPIDParams();
+                    setValue(clampedValue);
                     break;
                 case DashboardScreen::SelectedValueType::MAX:
                     break;
@@ -806,7 +824,7 @@ int32_t Menu::updateRotaryValue(int32_t value)
             eeprom.setMotorStallTimeout(getValue());
             break;
         case Screen::Type::PID_KP:
-            eeprom.setKp(EEPROM::kUint32ToPIDParam(getValue()));
+            eeprom.setKp(EEPROM::kUint32ToPIDParam(value));
             pid.applyPIDParams(); // apply or live tuning otherwise only a reset will apply the new values
             break;
         case Screen::Type::PID_KI:
@@ -849,11 +867,16 @@ int32_t Menu::updateRotaryValue(int32_t value)
  */
 void Menu::updateSpeedValue()
 {
+    int32_t clampedValue;
     if (eeprom.isPIDMode()) {
-        eeprom.setSpeed(std::clamp<int32_t>(menu.getValue(), eeprom.getMinRPM(), eeprom.getMaxRPM()));
+        clampedValue = std::clamp<int32_t>(getValue(), eeprom.getMinRPM(), eeprom.getMaxRPM());
+        eeprom.setSpeed(clampedValue);
         pid.setRPM(eeprom.getSpeed());
     }
     else {
-        eeprom.setSpeed(std::clamp<int32_t>(menu.getValue(), 0, eeprom.getMaxPWM() * pid.kMaxPWMLevel / 100));
+        clampedValue = std::clamp<int32_t>(getValue(), 0, eeprom.getMaxPWM() * pid.kMaxPWMLevel / 100);
+        eeprom.setSpeed(clampedValue);
     }
+    // set clamped value
+    setValue(clampedValue);
 }

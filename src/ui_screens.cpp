@@ -633,7 +633,7 @@ void DashboardScreen::load()
     lv_obj_set_style_text_font(rpmLabel, kDashboardScreenBigFont, LV_PART_MAIN);
     lv_obj_set_width(rpmLabel, kDashboardScreenContainerWidth);
     lv_obj_set_style_text_align(rpmLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    lv_obj_set_pos(rpmLabel, 0, (TFT_DIM_HEIGHT / 2) - 22);
+    lv_obj_set_pos(rpmLabel, 0, (TFT_DIM_HEIGHT / 2) - 12);
 
     valueLabel = lv_label_create(container);
     lv_obj_set_style_text_color(valueLabel, DASHBOARDSCREEN_COLOR_PWM_LABEL, LV_PART_MAIN);
