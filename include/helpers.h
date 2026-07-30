@@ -460,6 +460,7 @@ inline void call_default_error_handler(InterruptErrorType type)
 struct WatchDog
 {
     static void init();
+    static void stop();
     static void feed();
     static void delay(uint32_t ms);
     static void tickHandler();

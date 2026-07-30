@@ -117,3 +117,9 @@ void WatchDog::init()
         Error_Handler();
     }
 }
+
+void WatchDog::stop()
+{
+    __HAL_RCC_WWDG_CLK_DISABLE();
+    HAL_NVIC_DisableIRQ(WWDG_IRQn);
+}

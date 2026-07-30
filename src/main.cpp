@@ -356,6 +356,15 @@ extern "C" void SysTick_Handler(void)
 
 InterruptErrorType interruptErrorType;
 
+// for disabled interrupts
+static void delay_ms(uint32_t ms)
+{
+    volatile uint32_t count = ms * 18000;
+    while (count--) {
+        __NOP();
+    }
+}
+
 /**
   * @brief  This function is executed in case of error occurrence.
   * @retval None
@@ -392,8 +401,19 @@ extern "C" void Error_Handler(void)
     }
     #endif
     #endif
+    WatchDog::stop();
     __disable_irq();
     while (1) {
+        LEDs::onLEDError();
+        delay_ms(1000);
+        // signal error type via LED flashes
+        for(int i = 0; i <= (int)interruptErrorType; i++) {
+            LEDs::off();
+            delay_ms(500);
+            LEDs::onLEDWarning();
+            delay_ms(500);
+        }
+        delay_ms(500);
     }
 }
 
