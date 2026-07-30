@@ -605,6 +605,36 @@ void Menu::handleButtonPress()
                     break;
             }
             break;
+        // === diagnostics screen ===
+        case Screen::Type::DASHBOARD:
+            {
+                auto &dashboard = *reinterpret_cast<DashboardScreen *>(screenFlow.getScreen());
+                switch(dashboard.incrSelectedValue()) {
+                    case DashboardScreen::SelectedValueType::SPEED:
+                        dashboard.setMaxAcceleration(eeprom.isPIDMode() ? 50 : 1);
+                        setValue(eeprom.getSpeed());
+                        break;
+                    case DashboardScreen::SelectedValueType::KP:
+                        dashboard.setMaxAcceleration(UIConstants::kMaxPIDParamAcceleration);
+                        setValue(EEPROM::kPIDParamToUint32(eeprom.getKp()));
+                        break;
+                    case DashboardScreen::SelectedValueType::KI:
+                        dashboard.setMaxAcceleration(UIConstants::kMaxPIDParamAcceleration);
+                        setValue(EEPROM::kPIDParamToUint32(eeprom.getKi()));
+                        break;
+                    case DashboardScreen::SelectedValueType::KD:
+                        dashboard.setMaxAcceleration(UIConstants::kMaxPIDParamAcceleration);
+                        setValue(EEPROM::kPIDParamToUint32(eeprom.getKd()));
+                        break;
+                    case DashboardScreen::SelectedValueType::ANTI_WINDUP:
+                        dashboard.setMaxAcceleration(sqrt(UIConstants::kMaxAntiWindupReduction - UIConstants::kMinAntiWindupReduction));
+                        setValue(eeprom.getAntiWindupReduction());
+                        break;
+                    case DashboardScreen::SelectedValueType::MAX:
+                        break;
+                }
+            }
+            break;
         // === mixed menus ===
         case Screen::Type::MOTOR_DIRECTION:
         case Screen::Type::SENSOR_DIRECTION:
@@ -651,7 +681,6 @@ void Menu::handleBackButtonPress()
             pid.toggleMotorDirection();
             break;
         case Screen::Type::WELCOME:
-        // case Screen::Type::DASHBOARD:
             // no back button available
             break;
         case Screen::Type::MAIN_MENU:
@@ -692,6 +721,7 @@ void Menu::handleStartButtonPress()
     DEBUG_PRINT(DebugType::UI, "leave screen=%p id=%d value=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), getValue());
 }
 
+
 /**
  * @brief Call to update menu position from rotary encoder
  *
@@ -701,15 +731,33 @@ int32_t Menu::updateRotaryValue(int32_t value)
 {
     screenFlow->setValue(screenFlow->getValue() + (value * screenFlow->getSteps()));
     switch(screenFlow->getId()) {
-        case Screen::Type::START:
         case Screen::Type::DASHBOARD:
-            if (eeprom.isPIDMode()) {
-                eeprom.setSpeed(std::clamp<int32_t>(getValue(), eeprom.getMinRPM(), eeprom.getMaxRPM()));
-                pid.setRPM(eeprom.getSpeed());
+            switch(reinterpret_cast<DashboardScreen *>(screenFlow.getScreen())->getSelectedValue()) {
+                case DashboardScreen::SelectedValueType::SPEED:
+                    updateSpeedValue();
+                    break;
+                case DashboardScreen::SelectedValueType::KP:
+                    eeprom.setKp(EEPROM::kUint32ToPIDParam(getValue()));
+                    pid.applyPIDParams(); // apply or live tuning otherwise only a reset will apply the new values
+                    break;
+                case DashboardScreen::SelectedValueType::KI:
+                    eeprom.setKi(EEPROM::kUint32ToPIDParam(getValue()));
+                    pid.applyPIDParams();
+                    break;
+                case DashboardScreen::SelectedValueType::KD:
+                    eeprom.setKd(EEPROM::kUint32ToPIDParam(getValue()));
+                    pid.applyPIDParams();
+                    break;
+                case DashboardScreen::SelectedValueType::ANTI_WINDUP:
+                    eeprom.setAntiWindupReduction(getValue());
+                    pid.applyPIDParams();
+                    break;
+                case DashboardScreen::SelectedValueType::MAX:
+                    break;
             }
-            else {
-                eeprom.setSpeed(std::clamp<int32_t>(getValue(), 0, eeprom.getMaxPWM() * pid.kMaxPWMLevel / 100));
-            }
+            break;
+        case Screen::Type::START:
+            updateSpeedValue();
             break;
         case Screen::Type::TFT_BRIGHTNESS:
             eeprom.setTFTBrightness(getValue());
@@ -793,4 +841,19 @@ int32_t Menu::updateRotaryValue(int32_t value)
     }
 
     return getValue();
+}
+
+/**
+ * @brief Update RPM or PWM value
+ *
+ */
+void Menu::updateSpeedValue()
+{
+    if (eeprom.isPIDMode()) {
+        eeprom.setSpeed(std::clamp<int32_t>(menu.getValue(), eeprom.getMinRPM(), eeprom.getMaxRPM()));
+        pid.setRPM(eeprom.getSpeed());
+    }
+    else {
+        eeprom.setSpeed(std::clamp<int32_t>(menu.getValue(), 0, eeprom.getMaxPWM() * pid.kMaxPWMLevel / 100));
+    }
 }

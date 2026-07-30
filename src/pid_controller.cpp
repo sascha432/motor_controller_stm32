@@ -134,6 +134,8 @@ void PidController::init()
 
 void PidController::reset()
 {
+    LEDs::off();
+    running = false;
     lastEncoderCounter = PID_READ_ENCODER_COUNTER();
     lastError = 0;
     lastDerivative = 0;
@@ -158,6 +160,7 @@ void PidController::reset()
     FloatToString::convertTrimmed(iBuf, sizeof(iBuf), Ki, 6);
     FloatToString::convertTrimmed(dBuf, sizeof(dBuf), Kd, 6);
     FloatToString::convertTrimmed(aBuf, sizeof(aBuf), antiWindup, 6);
+    __enable_irq();
     DEBUG_PRINT(DebugType::PID, "Kp=%s Ki=%s Kd=%s RPM=%u windup=%s OCP=%u/%u OVP=%u", pBuf, iBuf, dBuf, rpm, aBuf, eeprom.getInputCurrentLimit(), eeprom.getMotorCurrentLimit(), eeprom.getOvpProtection());
     #endif
 }
@@ -266,6 +269,7 @@ void PidController::isr()
         // countdown once set
         if (--releaseBreakCounter == 0) {
             PID_WRITE_MOTOR_PWM_OFF();
+            DEBUG_PRINT(DebugType::PID, "Brake released");
         }
     }
 

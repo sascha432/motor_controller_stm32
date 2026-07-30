@@ -635,32 +635,12 @@ void DashboardScreen::load()
     lv_obj_set_style_text_align(rpmLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     lv_obj_set_pos(rpmLabel, 0, (TFT_DIM_HEIGHT / 2) - 22);
 
-    pwmBarBackground = lv_obj_create(container);
-    lv_obj_remove_style_all(pwmBarBackground);
-    lv_obj_set_size(pwmBarBackground, kDashboardScreenContainerWidth, 16);
-    lv_obj_set_pos(pwmBarBackground, 0, kDashboardScreenContainerHeight - 24);
-    lv_obj_set_style_bg_color(pwmBarBackground, DASHBOARDSCREEN_COLOR_PWM_BG, LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(pwmBarBackground, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_radius(pwmBarBackground, 4, LV_PART_MAIN);
-    lv_obj_set_style_border_width(pwmBarBackground, 1, LV_PART_MAIN);
-    lv_obj_set_style_border_color(pwmBarBackground, DASHBOARDSCREEN_COLOR_PWM_BORDER, LV_PART_MAIN);
-    lv_obj_set_style_pad_all(pwmBarBackground, 0, LV_PART_MAIN);
-
-    pwmBarFill = lv_obj_create(pwmBarBackground);
-    lv_obj_remove_style_all(pwmBarFill);
-    lv_obj_set_size(pwmBarFill, 0, 16);
-    lv_obj_set_pos(pwmBarFill, 0, 0);
-    lv_obj_set_style_bg_color(pwmBarFill, DASHBOARDSCREEN_COLOR_PWM_FILL, LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(pwmBarFill, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_radius(pwmBarFill, 4, LV_PART_MAIN);
-    lv_obj_set_style_border_width(pwmBarFill, 0, LV_PART_MAIN);
-
-    pwmLabel = lv_label_create(container);
-    lv_obj_set_style_text_color(pwmLabel, DASHBOARDSCREEN_COLOR_PWM_LABEL, LV_PART_MAIN);
-    lv_obj_set_style_text_font(pwmLabel, kDashboardScreenFont, LV_PART_MAIN);
-    lv_obj_set_width(pwmLabel, kDashboardScreenContainerWidth);
-    lv_obj_set_style_text_align(pwmLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    lv_obj_align_to(pwmLabel, pwmBarBackground, LV_ALIGN_OUT_TOP_MID, 0, -4);
+    valueLabel = lv_label_create(container);
+    lv_obj_set_style_text_color(valueLabel, DASHBOARDSCREEN_COLOR_PWM_LABEL, LV_PART_MAIN);
+    lv_obj_set_style_text_font(valueLabel, kDashboardScreenFont, LV_PART_MAIN);
+    lv_obj_set_width(valueLabel, kDashboardScreenContainerWidth);
+    lv_obj_set_style_text_align(valueLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+    lv_obj_set_pos(valueLabel, 0, kDashboardScreenContainerHeight - 24);
 
     _refreshVisuals();
 
@@ -671,25 +651,54 @@ void DashboardScreen::_refreshVisuals()
 {
     char buf[32];
 
-    uint32_t pwmPercent = (pid.stats.pwm.get() * 100 / (pid.kMaxPWMLevel - 1));
     start_screen_update_top_status_labels(voltageLabel, currentLabel, motorTempLabel, mosfetTempLabel);
 
-    if (pid.hasErrorCode()) {
+    // blink any errors
+    bool showError;
+    if (((HAL_GetTick() / 512) & 0x01) == 0 && pid.hasErrorCode()) {
+        showError = true;
         pid.errorPrintf(buf, sizeof(buf) - 1);
-    }
-    else if (eeprom.isPIDMode()) {
-        snprintf(buf, sizeof(buf) - 1, "%u RPM (%u)", (unsigned)pid.clampRPM(pid.stats.rpm.get()), (unsigned)pid.getRPM());
+        lv_obj_set_style_text_color(rpmLabel, DASHBOARDSCREEN_COLOR_ERROR, LV_PART_MAIN);
     }
     else {
-        snprintf(buf, sizeof(buf) - 1, "%u RPM", (unsigned)pid.clampRPM(pid.stats.rpm.get()));
+        showError = false;
+        lv_obj_set_style_text_color(rpmLabel, DASHBOARDSCREEN_COLOR_SPEED, LV_PART_MAIN);
+    }
+
+    if (!showError) {
+        if (eeprom.isPIDMode()) {
+            snprintf(buf, sizeof(buf) - 1, "%u RPM (%u)", (unsigned)pid.clampRPM(pid.stats.rpm.get()), (unsigned)pid.getRPM());
+        }
+        else {
+            snprintf(buf, sizeof(buf) - 1, "%u RPM", (unsigned)pid.clampRPM(pid.stats.rpm.get()));
+        }
     }
     lv_label_set_text(rpmLabel, buf);
 
-    lv_label_set_text_fmt(pwmLabel, "PWM %u%%", (unsigned)pwmPercent);
+    switch(getSelectedValue()) {
+        case SelectedValueType::SPEED:
+            lv_label_set_text_fmt(valueLabel, "PWM %u%%", (unsigned)((pid.stats.pwm.get() * 100 / pid.kMaxPWMLevel) + 1));
+            break;
+        case SelectedValueType::KP:
+            FloatToString::convertTrimmed(buf, sizeof(buf) - 1, eeprom.getKp(), 6);
+            lv_label_set_text_fmt(valueLabel, "Kp %s", buf);
+            break;
+        case SelectedValueType::KI:
+            FloatToString::convertTrimmed(buf, sizeof(buf) - 1, eeprom.getKi(), 6);
+            lv_label_set_text_fmt(valueLabel, "Ki %s", buf);
+            break;
+        case SelectedValueType::KD:
+            FloatToString::convertTrimmed(buf, sizeof(buf) - 1, eeprom.getKd(), 6);
+            lv_label_set_text_fmt(valueLabel, "Kd %s", buf);
+            break;
+        case SelectedValueType::ANTI_WINDUP:
+            FloatToString::convertTrimmed(buf, sizeof(buf) - 1, eeprom.getAntiWindupReduction() / (float)UIConstants::kAntiWindupFactor, 2);
+            lv_label_set_text_fmt(valueLabel, "Anti-windup %s%%", buf);
+            break;
+        case SelectedValueType::MAX:
+            break;
+    }
 
-    // TODO this is slow
-    // const lv_coord_t fillWidth = static_cast<lv_coord_t>((kDashboardScreenContainerWidth * pid.stats.pwm.get()) / pid.kMaxPWMLevel);
-    // lv_obj_set_size(pwmBarFill, fillWidth, 16);
 }
 
 // === Start Screen ===

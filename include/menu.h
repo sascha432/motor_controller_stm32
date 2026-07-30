@@ -37,6 +37,8 @@ struct Menu
 
     void saveEEPROMChanges();
     void applyEEPROMSettings();
+
+    void updateSpeedValue();
 };
 
 extern Menu menu;

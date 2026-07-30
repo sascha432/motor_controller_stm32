@@ -78,7 +78,8 @@ enum class DebugType : uint32_t
 
 // debug level to output
 // #define DEBUG_LEVEL             static_cast<DebugType>((uint32_t)DebugType::ERROR|(uint32_t)DebugType::WARNING|(uint32_t)DebugType::NOTICE)
-#define DEBUG_LEVEL             static_cast<DebugType>((uint32_t)DebugType::ALL&~(uint32_t)DebugType::UI)
+// #define DEBUG_LEVEL             static_cast<DebugType>((uint32_t)DebugType::ALL&~(uint32_t)DebugType::UI)
+#define DEBUG_LEVEL             static_cast<DebugType>((uint32_t)DebugType::ALL)
 
 inline const char *debugLevelToString(DebugType level)
 {

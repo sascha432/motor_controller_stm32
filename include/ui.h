@@ -57,9 +57,7 @@ static constexpr bool kUIKeepScreenObjectsInMemory = false;
 #define DASHBOARDSCREEN_COLOR_CURRENT           SCREEN_COLOR_CURRENT
 #define DASHBOARDSCREEN_COLOR_TEMPERATURE       SCREEN_COLOR_TEMPERATURE
 #define DASHBOARDSCREEN_COLOR_SPEED             COLOR_PALETTE_PURPLE
-#define DASHBOARDSCREEN_COLOR_PWM_BG            COLOR_PALETTE_DARK_GRAY
-#define DASHBOARDSCREEN_COLOR_PWM_BORDER        COLOR_PALETTE_CYAN
-#define DASHBOARDSCREEN_COLOR_PWM_FILL          COLOR_PALETTE_LIGHT_GRAY
+#define DASHBOARDSCREEN_COLOR_ERROR             COLOR_PALETTE_RED
 #define DASHBOARDSCREEN_COLOR_PWM_LABEL         COLOR_PALETTE_CYAN
 
 #define SLIDERSCREEN_COLOR_LABEL                SCREEN_COLOR_TEXT
@@ -321,7 +319,7 @@ struct PidSliderScreen : public SliderScreen
     PidSliderScreen(Type id, const char *label, uint32_t minValue, uint32_t maxValue, FormatCallbackType callback) :
         SliderScreen(id, label, minValue, maxValue, "", callback)
     {
-        maxAcceleration = 100000;
+        maxAcceleration = UIConstants::kMaxPIDParamAcceleration;
     }
 };
 
@@ -375,6 +373,15 @@ private:
 
 struct DashboardScreen : public Screen
 {
+    enum class SelectedValueType : uint32_t {
+        SPEED,
+        KP,
+        KI,
+        KD,
+        ANTI_WINDUP,
+        MAX
+    };
+
     DashboardScreen(Type id = Screen::Type::DASHBOARD) :
         Screen(id),
         voltageLabel(nullptr),
@@ -382,9 +389,8 @@ struct DashboardScreen : public Screen
         motorTempLabel(nullptr),
         mosfetTempLabel(nullptr),
         rpmLabel(nullptr),
-        pwmLabel(nullptr),
-        pwmBarBackground(nullptr),
-        pwmBarFill(nullptr)
+        valueLabel(nullptr),
+        selectedValue(SelectedValueType::SPEED)
     {
         maxAcceleration = eeprom.isPIDMode() ? 50 : 1;
     }
@@ -395,6 +401,22 @@ struct DashboardScreen : public Screen
 
     virtual void load() override;
 
+    SelectedValueType getSelectedValue() const
+    {
+        return selectedValue;
+    }
+
+    void setSelectedValue(SelectedValueType value)
+    {
+        selectedValue = value;
+    }
+
+    SelectedValueType incrSelectedValue()
+    {
+        selectedValue = static_cast<SelectedValueType>((static_cast<uint32_t>(selectedValue) + 1) % static_cast<uint32_t>(SelectedValueType::MAX));
+        return selectedValue;
+    }
+
 protected:
     void _refreshVisuals();
 
@@ -404,9 +426,8 @@ protected:
     lv_obj_t *motorTempLabel;
     lv_obj_t *mosfetTempLabel;
     lv_obj_t *rpmLabel;
-    lv_obj_t *pwmLabel;
-    lv_obj_t *pwmBarBackground;
-    lv_obj_t *pwmBarFill;
+    lv_obj_t *valueLabel;
+    SelectedValueType selectedValue;
 };
 
 // === Start Screen ===
