@@ -691,10 +691,11 @@ void DashboardScreen::_refreshVisuals()
             FloatToString::convertTrimmed(buf, sizeof(buf) - 1, eeprom.getKd(), 6);
             lv_label_set_text_fmt(valueLabel, "Kd %s", buf);
             break;
-        case SelectedValueType::ANTI_WINDUP:
-            FloatToString::convertTrimmed(buf, sizeof(buf) - 1, eeprom.getAntiWindupReduction() / (float)UIConstants::kAntiWindupFactor, 2);
-            lv_label_set_text_fmt(valueLabel, "Anti-windup %s%%", buf);
+        case SelectedValueType::ANTI_WINDUP: {
+            const uint32_t reduction = eeprom.getAntiWindupReduction() * (1000 / UIConstants::kAntiWindupFactor);
+            lv_label_set_text_fmt(valueLabel, "Anti-windup " SPRINTF_FP2_FMT "%%", CONVERT_TO_FP2(reduction));
             break;
+        }
         case SelectedValueType::MAX:
             break;
     }
