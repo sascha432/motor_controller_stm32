@@ -28,3 +28,9 @@ https://www.tinkercad.com/things/fNIPaWNxDLo-motor-controller-enclosure
 ![MT6701 Motor Mount](mt6701_mount.png)
 
 ![MT6701 Module](mt6701.png)
+
+![PCB front](pcb1.JPG)
+
+![PCB back](pcb2.JPG)
+
+![Enclosure and motor](enclosure_and_motor.jpg)

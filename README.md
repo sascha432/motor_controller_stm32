@@ -4,6 +4,7 @@
 
  - Implement USB stack
  - PID tuning over USB and/or UART
+ - open loop simple pwm speed is not implemented fully
 
 ## Software Features
 
@@ -31,3 +32,17 @@
 ## Controller schematics and PCB
 
 https://oshwlab.com/sascha23095123423/project_dzierqaj
+
+## STL files for motor mount and enclosure
+
+[STL files](stl/STL.md)
+
+## Some pictures
+
+![STL files and MT6701](stl/stl_files.png)
+
+![PCB front](stl/pcb1.JPG)
+
+![PCB back](stl/pcb2.JPG)
+
+![Enclosure and motor](stl/enclosure_and_motor.jpg)
