@@ -28,7 +28,7 @@ void PidController::reset()
     resetFaults();
     applyPIDParams();
 
-    #if DEBUG
+    #if 0
     char pBuf[24], iBuf[24], dBuf[24], aBuf[24];
     FloatToString::convertTrimmed(pBuf, sizeof(pBuf), Kp, 6);
     FloatToString::convertTrimmed(iBuf, sizeof(iBuf), Ki, 6);

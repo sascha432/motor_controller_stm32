@@ -22,14 +22,22 @@ struct PidController
     static constexpr uint32_t kMaxRPM = 55000;                                          // max. supported RPM by the encoder
     static constexpr float kMaxError = kCPR / (60000 / kPIDIntervalFloat) * kMaxRPM;    // factor to reduce error to a value between -1.0 and 1.0 for the PID loop
 
-    // convert counts/RPM for 200Hz/5ms interval
-    template<int32_t VALUE>
-    static constexpr uint32_t kRPMToIntCountsT() {
-        return (VALUE * kCPR) / (60000 / kPIDIntervalFloat);
+    // convert RPM to counts per PID interval
+    static constexpr uint32_t kRPMToIntCounts(uint32_t value)
+    {
+        return static_cast<uint32_t>((value * kCPR) / static_cast<uint32_t>(60000 / kPIDIntervalFloat));
     }
 
-    static constexpr int32_t kIntCountsToRPM(int32_t value) {
-        return (value * (uint32_t)(60000 / kPIDIntervalFloat)) / kCPR;
+    template<int32_t VALUE>
+    static constexpr uint32_t kRPMToIntCountsT()
+    {
+        return kRPMToIntCounts(VALUE);
+    }
+
+    // convert counts per PID interval to RPM
+    static constexpr int32_t kIntCountsToRPM(int32_t value)
+    {
+        return static_cast<int32_t>((value * static_cast<uint32_t>(60000 / kPIDIntervalFloat)) / kCPR);
     }
 
     enum class ErrorCodeType : int32_t {
@@ -77,15 +85,13 @@ struct PidController
 
     /**
      * @brief initialize PID controller
-     *
-     * @param callback PID loop callback
      */
     void init();
 
     /**
      * @brief Set the Kp value and pre-calculate KpPreCalc for PID loop
      *
-     * @param value
+     * @param value The new Kp value
      */
     inline void setKp(float value)
     {
@@ -97,7 +103,7 @@ struct PidController
     /**
      * @brief Set the Ki value and pre-calculate KiPreCalc for PID loop
      *
-     * @param value
+     * @param value The new Ki value
      */
     inline void setKi(float value)
     {
@@ -109,7 +115,7 @@ struct PidController
     /**
      * @brief Set the Kd value and pre-calculate KdPreCalc for PID loop
      *
-     * @param value
+     * @param value The new Kd value
      */
     inline void setKd(float value)
     {
@@ -118,14 +124,39 @@ struct PidController
         SWO::data.Kd = value;
     }
 
+    /**
+     * @brief Calculate the PWM level based on the PID error, integral, and derivative values.
+     *
+     * @param error The current error value
+     * @param integral The integral of the error
+     * @param derivative The derivative of the error
+     * @return int32_t The calculated PWM level
+     */
     inline int32_t calcPWMLevel(float error, float integral, float derivative) const
     {
         return (error * KpPreCalc + integral * KiPreCalc + derivative * KdPreCalc);
     }
 
+    /**
+     * @brief Clamp the PWM level to the valid range
+     *
+     * @param value The PWM level to clamp
+     * @return int32_t The clamped PWM level
+     */
     inline int32_t clampPWMLevel(int32_t value) const
     {
-        return std::clamp<int32_t>(value, 0, kMaxPWMLevel);
+        return std::clamp<int32_t>(value, 0, kMaxPWMLevel - 1);
+    }
+
+    /**
+     * @brief Clamp RPM
+     *
+     * @param value The RPM value to clamp
+     * @return uint32_t The clamped RPM value
+     */
+    inline uint32_t clampRPM(int32_t value) const
+    {
+        return std::clamp<int32_t>(value, 0, kMaxRPM);
     }
 
     /**
@@ -140,7 +171,7 @@ struct PidController
         // rev. per minute
         rpm = value;
         // RPM to counts per PID interval
-        countsPerInterval = (rpm * kCPR) / (int32_t)(60000 / kPIDIntervalFloat);
+        countsPerInterval = kRPMToIntCounts(rpm);
     }
 
     /**
@@ -191,17 +222,6 @@ struct PidController
     void toggleMotorDirection()
     {
         motorDirection = (motorDirection == EEPROM::kMotorDirectionForward) ? EEPROM::kMotorDirectionReverse : EEPROM::kMotorDirectionForward;
-    }
-
-    /**
-     * @brief Clamp RPM
-     *
-     * @param value
-     * @return uint32_t
-     */
-    inline uint32_t clampRPM(int32_t value) const
-    {
-        return std::clamp<int32_t>(value, 0, kMaxRPM);
     }
 
     /**
@@ -289,9 +309,9 @@ struct PidController
      */
     void resetFaults()
     {
-        faults.drv8701Fault = (digitalPinToGPIO<DRV8701_FAULT_PIN>()->IDR & (1 << digitalPinToBit(DRV8701_FAULT_PIN))) == 0;
-        faults.ocpFault = (digitalPinToGPIO<OCP_INT_PIN>()->IDR & (1 << digitalPinToBit(OCP_INT_PIN))) == 0;
-        faults.snsoutFault = (digitalPinToGPIO<DRV_SNSOUT_PIN>()->IDR & (1 << digitalPinToBit(DRV_SNSOUT_PIN))) == 0;
+        faults.drv8701Fault = !digitalRead<DRV8701_FAULT_PIN>();
+        faults.ocpFault = !digitalRead<OCP_INT_PIN>();
+        faults.snsoutFault = !digitalRead<DRV_SNSOUT_PIN>();
     }
 
     /**

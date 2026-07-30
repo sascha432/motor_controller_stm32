@@ -68,7 +68,7 @@ struct Button
 
     inline bool readState()
     {
-        return digitalPinToGPIO<GPIO_PIN>()->IDR & (1 << digitalPinToBit<GPIO_PIN>());
+        return digitalRead<GPIO_PIN>();
     }
 
     void isr(uint32_t idr);
