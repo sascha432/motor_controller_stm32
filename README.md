@@ -4,7 +4,6 @@
 
  - Implement USB stack
  - PID tuning over USB and/or UART
- - open loop simple pwm speed is not implemented fully
 
 ## Software Features
 
@@ -31,7 +30,13 @@
 
 ## Controller schematics and PCB
 
-https://oshwlab.com/sascha23095123423/project_dzierqaj
+[Schematics & PCB](https://oshwlab.com/sascha23095123423/project_dzierqaj)
+
+[Schematics PDF](docs/schematic_dc-motor-controller_rev11.pdf)
+
+<a href="docs/schematic_dc-motor-controller_rev11.pdf">
+	<img src="docs/schematics_rev11.png" alt="Schematic thumbnail" width="640" />
+</a>
 
 ## STL files for motor mount and enclosure
 
