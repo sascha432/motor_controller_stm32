@@ -623,6 +623,10 @@ class PIDTuningApp:
     PRESETS = (5, 10, 20, 30)
     STARTUP_SYNC_DELAY_MS = 200
 
+    @staticmethod
+    def _make_series(length: int) -> deque[float]:
+        return deque([math.nan] * length, maxlen=length)
+
     def __init__(self, config: AppConfig) -> None:
         self.config = config
         self.event_queue: queue.Queue[Tuple[str, object]] = queue.Queue()
@@ -1085,20 +1089,20 @@ class PIDTuningApp:
         else:
             self.x_values = [0.0]
 
-        self.rpm = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
-        self.rpm_avg = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
-        self.pwm = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
-        self.pwm_avg = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
-        self.current_avg_ma = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
-        self.current_ocp_ma = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
-        self.dac_motor_current_ma = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
-        self.dac_input_current_ma = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
-        self.voltage_mv = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
-        self.motor_temp_c = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
-        self.mosfet_temp_c = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
-        self.error = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
-        self.integral = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
-        self.derivative = deque([0.0] * self.samples_per_window, maxlen=self.samples_per_window)
+        self.rpm = self._make_series(self.samples_per_window)
+        self.rpm_avg = self._make_series(self.samples_per_window)
+        self.pwm = self._make_series(self.samples_per_window)
+        self.pwm_avg = self._make_series(self.samples_per_window)
+        self.current_avg_ma = self._make_series(self.samples_per_window)
+        self.current_ocp_ma = self._make_series(self.samples_per_window)
+        self.dac_motor_current_ma = self._make_series(self.samples_per_window)
+        self.dac_input_current_ma = self._make_series(self.samples_per_window)
+        self.voltage_mv = self._make_series(self.samples_per_window)
+        self.motor_temp_c = self._make_series(self.samples_per_window)
+        self.mosfet_temp_c = self._make_series(self.samples_per_window)
+        self.error = self._make_series(self.samples_per_window)
+        self.integral = self._make_series(self.samples_per_window)
+        self.derivative = self._make_series(self.samples_per_window)
 
     def _build_plot_lines(self) -> None:
         ax0, ax1, ax2, ax3, ax4, ax5 = self.axes
@@ -1155,8 +1159,10 @@ class PIDTuningApp:
             self._rpm_sum += float(sample.rpm)
             self._pwm_sum += pwm_percent
         else:
-            self._rpm_sum += float(sample.rpm) - self.rpm[0]
-            self._pwm_sum += pwm_percent - self.pwm[0]
+            oldest_rpm = self.rpm[0]
+            oldest_pwm = self.pwm[0]
+            self._rpm_sum += float(sample.rpm) - (0.0 if math.isnan(oldest_rpm) else oldest_rpm)
+            self._pwm_sum += pwm_percent - (0.0 if math.isnan(oldest_pwm) else oldest_pwm)
 
         self._append_value(self.rpm, float(sample.rpm))
         self._append_value(self.pwm, pwm_percent)
@@ -1179,8 +1185,15 @@ class PIDTuningApp:
         rpm_mean = self._rpm_sum / float(current_count)
         pwm_mean = self._pwm_sum / float(current_count)
 
-        self.rpm_avg = deque([rpm_mean] * self.samples_per_window, maxlen=self.samples_per_window)
-        self.pwm_avg = deque([pwm_mean] * self.samples_per_window, maxlen=self.samples_per_window)
+        missing = self.samples_per_window - self.filled
+        self.rpm_avg = deque(
+            ([math.nan] * missing) + ([rpm_mean] * self.filled),
+            maxlen=self.samples_per_window,
+        )
+        self.pwm_avg = deque(
+            ([math.nan] * missing) + ([pwm_mean] * self.filled),
+            maxlen=self.samples_per_window,
+        )
         self._plot_dirty = True
 
     def _refresh_plot(self) -> None:
