@@ -77,8 +77,8 @@ enum class DebugType : uint32_t
 #define DEBUG_ALL               DebugType::ALL
 
 // debug level to output
-// #define DEBUG_LEVEL             DebugType::ERROR|DebugType::WARNING|DebugType::NOTICE
-#define DEBUG_LEVEL             DebugType::ALL
+// #define DEBUG_LEVEL             static_cast<DebugType>((uint32_t)DebugType::ERROR|(uint32_t)DebugType::WARNING|(uint32_t)DebugType::NOTICE)
+#define DEBUG_LEVEL             static_cast<DebugType>((uint32_t)DebugType::ALL&~(uint32_t)DebugType::UI)
 
 inline const char *debugLevelToString(DebugType level)
 {
@@ -129,7 +129,7 @@ void debug_init(void);
         do { \
             if ((uint32_t)DEBUG_LEVEL & (uint32_t)level) { \
                 char _debug_function[96]; \
-                Serial.printf("[%06lu] %s %s " msg "\n", HAL_GetTick(), debug_function_name(DEBUG_FUNCTION_SIG, _debug_function, sizeof(_debug_function)), debugLevelToString(level), ##__VA_ARGS__); \
+                Serial.printf("[%06lu] %s %s " msg "\n", HAL_GetTick(), debugLevelToString(level), debug_function_name(DEBUG_FUNCTION_SIG, _debug_function, sizeof(_debug_function)), ##__VA_ARGS__); \
             } \
         } while(0)
 
@@ -146,7 +146,7 @@ void debug_init(void);
         do { \
             if ((uint32_t)DEBUG_LEVEL & (uint32_t)level) { \
                 char _debug_function[96]; \
-                Serial4.printf("[%06lu] %s %s " msg "\n", HAL_GetTick(), debug_function_name(DEBUG_FUNCTION_SIG, _debug_function, sizeof(_debug_function)), debugLevelToString(level), ##__VA_ARGS__); \
+                Serial4.printf("[%06lu] %s %s " msg "\n", HAL_GetTick(), debugLevelToString(level), debug_function_name(DEBUG_FUNCTION_SIG, _debug_function, sizeof(_debug_function)), ##__VA_ARGS__); \
             } \
         } while(0)
 
@@ -165,7 +165,7 @@ void debug_init(void);
         do { \
             if ((uint32_t)DEBUG_LEVEL & (uint32_t)level) { \
                 char _debug_function[96]; \
-                debug_swd_printf("[%06lu] %s %s " msg "\n", HAL_GetTick(), debug_function_name(DEBUG_FUNCTION_SIG, _debug_function, sizeof(_debug_function)), debugLevelToString(level), ##__VA_ARGS__); \
+                debug_swd_printf("[%06lu] %s %s " msg "\n", HAL_GetTick(), debugLevelToString(level), debug_function_name(DEBUG_FUNCTION_SIG, _debug_function, sizeof(_debug_function)), ##__VA_ARGS__); \
             } \
         } while(0)
 

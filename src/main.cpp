@@ -236,11 +236,7 @@ extern "C" void EXTI15_10_IRQHandler(void)
     }
     if (pending & (1 << 11)) {
         // DRV_SNSOUT_PIN/PD11 changed
-        // auto fault = pid.faults.snsoutFault;
         pid.faults.snsoutFault = !digitalRead<DRV_SNSOUT_PIN>();
-        // if (!fault && pid.faults.snsoutFault) {
-        //     LEDs::onLED1(); // turn fault LED on, main loop resets it after the fault has cleared
-        // }
     }
     if (pending & (1 << 14)) {
         // DRV8701_FAULT_PIN/PB14 changed

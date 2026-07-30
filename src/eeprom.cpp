@@ -14,6 +14,12 @@
 #define EEPROM_WRITE_MS         5u          // typical write cycle time
 #define EEPROM_WAIT_RETRIES     1000u       // number of retries for waiting for write cycle to complete
 #define EEPROM_VALIDATE_WRITE   0
+#if DEBUG
+// use different offset during debugging
+#define EEPROM_DEFAULT_OFFSET   128
+#else
+#define EEPROM_DEFAULT_OFFSET   0
+#endif
 
 I2CHelper i2c;
 EEPROM eeprom;
@@ -37,7 +43,7 @@ void EEPROM::read()
 {
     Data tmp;
     tmp.invalidate();
-    bool result = eepromReadBytes(0, reinterpret_cast<uint8_t *>(&tmp), sizeof(tmp));
+    bool result = eepromReadBytes(EEPROM_DEFAULT_OFFSET, reinterpret_cast<uint8_t *>(&tmp), sizeof(tmp));
     DEBUG_PRINT(DebugType::INFO, "read=%u magic=%08x version=%d sequence=%d", (int)result, tmp.magic, tmp.version, tmp.sequence);
 
     if (!result || tmp.magic != kMagic || tmp.version != kVersion) {
@@ -53,7 +59,7 @@ bool EEPROM::write()
     // read EEPROM and compare with current data to avoid unnecessary writes
     Data tmp;
     tmp.invalidate();
-    bool result = eepromReadBytes(0, reinterpret_cast<uint8_t *>(&tmp), sizeof(tmp));
+    bool result = eepromReadBytes(EEPROM_DEFAULT_OFFSET, reinterpret_cast<uint8_t *>(&tmp), sizeof(tmp));
     if (result) {
         if (tmp == data) {
             DEBUG_PRINT(DebugType::NOTICE, "EEPROM write skipped, no changes");
@@ -66,7 +72,7 @@ bool EEPROM::write()
 
     // write data to EEPROM
     data.sequence++;
-    result = eepromWriteBytes(0, reinterpret_cast<uint8_t *>(&data), sizeof(data));
+    result = eepromWriteBytes(EEPROM_DEFAULT_OFFSET, reinterpret_cast<uint8_t *>(&data), sizeof(data));
     if (!result) {
         data.sequence--;
     }
@@ -74,7 +80,7 @@ bool EEPROM::write()
 
     #if EEPROM_VALIDATE_WRITE
         tmp.invalidate();
-        result = eepromReadBytes(0, reinterpret_cast<uint8_t *>(&tmp), sizeof(tmp));
+        result = eepromReadBytes(EEPROM_DEFAULT_OFFSET, reinterpret_cast<uint8_t *>(&tmp), sizeof(tmp));
         DEBUG_PRINT(DebugType::NOTICE, "verify=%u magic=%08x version=%d sequence=%d", result, tmp.magic, tmp.version, tmp.sequence);
     #endif
     return result;
