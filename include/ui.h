@@ -316,10 +316,11 @@ private:
 
 struct PidSliderScreen : public SliderScreen
 {
-    PidSliderScreen(Type id, const char *label, uint32_t minValue, uint32_t maxValue, FormatCallbackType callback) :
+    PidSliderScreen(Type id, const char *label, uint32_t minValue, uint32_t maxValue, FormatCallbackType callback, int32_t steps) :
         SliderScreen(id, label, minValue, maxValue, "", callback)
     {
         maxAcceleration = UIConstants::kMaxPIDParamAcceleration;
+        setSteps(steps);
     }
 };
 

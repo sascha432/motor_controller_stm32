@@ -551,9 +551,9 @@ void Menu::handleButtonPress()
                         "Kp Parameter",
                         UIConstants::kMinKp,
                         UIConstants::kMaxKp,
-                        pid_parameter_format_callback
+                        pid_parameter_format_callback,
+                        UIConstants::kSelectKpSteps
                     ));
-                    screenFlow->setSteps(UIConstants::kSelectKpSteps);
                     setValue(EEPROM::kPIDParamToUint32(eeprom.getKp()));
                     break;
                 case 1: // Ki
@@ -562,9 +562,9 @@ void Menu::handleButtonPress()
                         "Ki Parameter",
                         UIConstants::kMinKi,
                         UIConstants::kMaxKi,
-                        pid_parameter_format_callback
+                        pid_parameter_format_callback,
+                        UIConstants::kSelectKiSteps
                     ));
-                    screenFlow->setSteps(UIConstants::kSelectKiSteps);
                     setValue(EEPROM::kPIDParamToUint32(eeprom.getKi()));
                     break;
                 case 2: // Kd
@@ -573,9 +573,9 @@ void Menu::handleButtonPress()
                         "Kd Parameter",
                         UIConstants::kMinKd,
                         UIConstants::kMaxKd,
-                        pid_parameter_format_callback
+                        pid_parameter_format_callback,
+                        UIConstants::kSelectKdSteps
                     ));
-                    screenFlow->setSteps(UIConstants::kSelectKdSteps);
                     setValue(EEPROM::kPIDParamToUint32(eeprom.getKd()));
                     break;
                 case 3: // Anti-Windup Reduction
