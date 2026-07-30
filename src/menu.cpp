@@ -187,6 +187,7 @@ void Menu::loadStartScreen()
 {
     screenFlow.setScreen(new StartScreen());
     setValue(eeprom.getSpeed());
+    // save any changes when returning to start screen
     bool success = eeprom.write();
     (void)success;
     DEBUG_PRINT(DebugType::UI, "eeprom.write()=%d", success);
@@ -713,10 +714,6 @@ void Menu::handleStartButtonPress()
         case Screen::Type::START:
             if (pid.motorToggle()) {
                 loadDashboardScreen();
-            }
-            if (!pid.running) {
-                // save changes after stopping
-                eeprom.write();
             }
             break;
         case Screen::Type::DASHBOARD:

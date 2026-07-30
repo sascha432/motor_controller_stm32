@@ -39,6 +39,10 @@ void EEPROM::init()
     DEBUG_PRINT(DebugType::INFO, "EEPROM detected=%u", (int)res);
 }
 
+/**
+ * @brief Read EEPROM configuration or restore defaults settings on failure
+ *
+ */
 void EEPROM::read()
 {
     Data tmp;
@@ -54,6 +58,12 @@ void EEPROM::read()
     updateTemperatureLimits();
 }
 
+/**
+ * @brief Write configuration data to EEPROM, only if it has changed since the last read/write operation.
+ *
+ * @return true data written
+ * @return false data the same or failure
+ */
 bool EEPROM::write()
 {
     // read EEPROM and compare with current data to avoid unnecessary writes
