@@ -376,7 +376,7 @@ void PidController::ocp_isr()
             uint32_t value = DAC_GET_MOTOR_CURRENT();
             value = value + (value / kOcpCurrentRampUp);
             if (value > ocp.dacMotorCurrent) {
-                // once the motor current limit is back to the original value, we can reset the OCP state
+                // once the motor current limit is back to the original value, we can reset the OCP condition
                 value = ocp.dacMotorCurrent;
                 ocp.state = OcpStateType::NONE;
                 ocp.counter = 0;
@@ -396,7 +396,6 @@ void PidController::trigger_ocp()
             ocp.counter = 0;
             ocp.lastCounter = 0;
             uint16_t value = ocp.dacMotorCurrent;
-            // start with a max. of 8x the input current limit or the current motor current limit, whichever is lower
             if (value > ocp.dacInputCurrent * kOcpInputToMotorCurrentRatio) {
                 value = ocp.dacInputCurrent * kOcpInputToMotorCurrentRatio;
             }
@@ -408,7 +407,6 @@ void PidController::trigger_ocp()
         }
     }
     else if (ocp.state == OcpStateType::TRIGGERED) {
-        // the DAC needs about 3us to update
         if (ocp.counter >= ocp.lastCounter + kOcpRetriggerTimeout) {
             ocp.lastCounter = ocp.counter;
             // reduce motor current every time we trigger input OCP
