@@ -43,7 +43,7 @@ static const char *kPIDParametersItems[] = {
     "Kp",                       // 0
     "Ki",                       // 1
     "Kd",                       // 2
-    "Anti-Windup Reduction",    // 3
+    "Anti-Windup",              // 3
     "Back"                      // 4
 };
 
@@ -77,16 +77,15 @@ static const char *kRestoreDefaultsMenuItems[] = {
 // custom format for current and conversion from uint16_t to float
 static const char *current_slider_format_callback(uint32_t value, char *buf, size_t bufSize)
 {
-    const uint32_t current = value * (uint32_t)(1000.0f / UIConstants::kCurrentToInt16Factor);
-    snprintf(buf, bufSize, SPRINTF_FP1_FMT " A", CONVERT_TO_FP1(current));
+    snprintf(buf, bufSize, SPRINTF_FP1_FMT " A", CONVERT_TO_FP1(value));
     return buf;
 }
 
 // custom format for current and conversion from uint16_t to float
-static const char *anti_windup_reduction_format_callback(uint32_t value, char *buf, size_t bufSize)
+static const char *anti_windup_format_callback(uint32_t value, char *buf, size_t bufSize)
 {
-    const uint32_t reduction = value * (1000 / UIConstants::kAntiWindupFactor); // value = percentage * 100, so multiply by 10 to get percentage * 1000
-    snprintf(buf, bufSize, SPRINTF_FP2_FMT " %%", CONVERT_TO_FP2(reduction));
+    const uint32_t antiWindup = value * (1000 / UIConstants::kAntiWindupFactor); // value = percentage * 100, so multiply by 10 to get percentage * 1000
+    snprintf(buf, bufSize, SPRINTF_FP2_FMT " %%", CONVERT_TO_FP2(antiWindup));
     return buf;
 }
 
@@ -190,7 +189,7 @@ void Menu::loadStartScreen()
     // save any changes when returning to start screen
     bool success = eeprom.write();
     (void)success;
-    DEBUG_PRINT(DebugType::UI, "eeprom.write()=%d", success);
+    DEBUG_PRINT(DebugType::UI, "eeprom.write=%d", success);
     clearUserInput();
 }
 
@@ -307,8 +306,8 @@ void Menu::handleButtonPress()
         case Screen::Type::MAIN_MENU:
             switch(getValue()) {
                 case 0: // Speed
-                    switch(eeprom.getControlMode() == EEPROM::kControlModePID) {
-                        case true: // PID mode
+                    switch(eeprom.getControlMode()) {
+                        case EEPROM::kControlModePID:
                             screenFlow.next(new SliderScreen(
                                 Screen::Type::MOTOR_SPEED,
                                 "Motor Speed",
@@ -317,7 +316,7 @@ void Menu::handleButtonPress()
                                 "RPM"
                             ));
                             break;
-                        case false: // PWM mode
+                        case EEPROM::kControlModePWM:
                             screenFlow.next(new SliderScreen(
                                 Screen::Type::MOTOR_SPEED,
                                 "Motor Speed",
@@ -404,12 +403,12 @@ void Menu::handleButtonPress()
                     screen = new SliderScreen(
                         Screen::Type::INPUT_CURRENT_LIMIT,
                         "Input Current Limit",
-                        eeprom.kCurrentToUint16(UIConstants::kMinInputCurrent),
-                        eeprom.kCurrentToUint16(UIConstants::kMaxInputCurrent),
+                        UIConstants::kMinInputCurrent,
+                        UIConstants::kMaxInputCurrent,
                         "A",
                         current_slider_format_callback
                     );
-                    screen->setSteps(500 * UIConstants::kStepInputCurrent);
+                    screen->setSteps(UIConstants::kStepInputCurrent);
                     screenFlow.next(screen);
                     setValue(eeprom.getInputCurrentLimit());
                     break;
@@ -417,12 +416,12 @@ void Menu::handleButtonPress()
                     screen = new SliderScreen(
                         Screen::Type::MOTOR_CURRENT_LIMIT,
                         "Motor Current Limit",
-                        eeprom.kCurrentToUint16(UIConstants::kMinMotorCurrent),
-                        eeprom.kCurrentToUint16(UIConstants::kMaxMotorCurrent),
+                        UIConstants::kMinMotorCurrent,
+                        UIConstants::kMaxMotorCurrent,
                         "A",
                         current_slider_format_callback
                     );
-                    screen->setSteps(500 * UIConstants::kStepMotorCurrent);
+                    screen->setSteps(UIConstants::kStepMotorCurrent);
                     screenFlow.next(screen);
                     setValue(eeprom.getMotorCurrentLimit());
                     break;
@@ -579,16 +578,16 @@ void Menu::handleButtonPress()
                     ));
                     setValue(EEPROM::kPIDParamToUint32(eeprom.getKd()));
                     break;
-                case 3: // Anti-Windup Reduction
+                case 3: // Anti-Windup
                     screenFlow.next(new SliderScreen(
-                        Screen::Type::PID_ANTI_WINDUP_REDUCTION,
-                        "Anti-Windup Reduction",
-                        UIConstants::kMinAntiWindupReduction,
-                        UIConstants::kMaxAntiWindupReduction,
+                        Screen::Type::PID_ANTI_WINDUP,
+                        "Anti-Windup",
+                        UIConstants::kMinAntiWindup,
+                        UIConstants::kMaxAntiWindup,
                         "%",
-                        anti_windup_reduction_format_callback
+                        anti_windup_format_callback
                     ));
-                    setValue(eeprom.getAntiWindupReduction());
+                    setValue(eeprom.getAntiWindup());
                     break;
                 default: // Back
                     restorePreviousMenu();
@@ -637,8 +636,8 @@ void Menu::handleButtonPress()
                         setValue(EEPROM::kPIDParamToUint32(eeprom.getKd()));
                         break;
                     case DashboardScreen::SelectedValueType::ANTI_WINDUP:
-                        dashboard.setMaxAcceleration(sqrt(UIConstants::kMaxAntiWindupReduction - UIConstants::kMinAntiWindupReduction));
-                        setValue(eeprom.getAntiWindupReduction());
+                        dashboard.setMaxAcceleration(sqrt(UIConstants::kMaxAntiWindup - UIConstants::kMinAntiWindup));
+                        setValue(eeprom.getAntiWindup());
                         break;
                     case DashboardScreen::SelectedValueType::MAX:
                         break;
@@ -664,7 +663,7 @@ void Menu::handleButtonPress()
         case Screen::Type::PID_KP:
         case Screen::Type::PID_KI:
         case Screen::Type::PID_KD:
-        case Screen::Type::PID_ANTI_WINDUP_REDUCTION:
+        case Screen::Type::PID_ANTI_WINDUP:
         case Screen::Type::OVP_PROTECTION:
             restorePreviousMenu();
             break;
@@ -762,8 +761,8 @@ int32_t Menu::updateRotaryValue(int32_t value)
                     setValue(clampedValue);
                     break;
                 case DashboardScreen::SelectedValueType::ANTI_WINDUP:
-                    clampedValue = std::clamp<int32_t>(getValue(), UIConstants::kMinAntiWindupReduction, UIConstants::kMaxAntiWindupReduction);
-                    eeprom.setAntiWindupReduction(clampedValue);
+                    clampedValue = std::clamp<int32_t>(getValue(), UIConstants::kMinAntiWindup, UIConstants::kMaxAntiWindup);
+                    eeprom.setAntiWindup(clampedValue);
                     pid.applyPIDParams();
                     setValue(clampedValue);
                     break;
@@ -832,8 +831,8 @@ int32_t Menu::updateRotaryValue(int32_t value)
             eeprom.setKd(EEPROM::kUint32ToPIDParam(getValue()));
             pid.applyPIDParams();
             break;
-        case Screen::Type::PID_ANTI_WINDUP_REDUCTION:
-            eeprom.setAntiWindupReduction(getValue());
+        case Screen::Type::PID_ANTI_WINDUP:
+            eeprom.setAntiWindup(getValue());
             pid.applyPIDParams();
             break;
         case Screen::Type::OVP_PROTECTION:

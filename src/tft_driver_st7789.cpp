@@ -13,7 +13,7 @@
 #define ST7789_COL_OFS              40
 #define ST7789_ROW_OFS              53
 
-// Display color modes 
+// Display color modes
 #define ST7789_COLMOD_65K           0x05
 #define ST7789_COLMOD_262K          0x06
 
@@ -32,7 +32,7 @@
 #define ST7789_DISPON               0x29
 #define ST7789_CASET                0x2A
 #define ST7789_RASET                0x2B
-#define ST7789_RAMWR                0x2C     
+#define ST7789_RAMWR                0x2C
 #define ST7789_COLMOD               0x3A
 #define ST7789_FRMCTR1              0xB1
 #define ST7789_MADCTL               0x36
@@ -53,7 +53,7 @@ static void set_row(uint16_t y0, uint16_t y1);
 /**
  * Write repeated RGB565 color pixels using chunked DMA transfers.
  */
-static void write_color_pixels(uint16_t color, uint32_t pixels) 
+static void write_color_pixels(uint16_t color, uint32_t pixels)
 {
     uint8_t high = (uint8_t)((color >> 8) & 0xFF);
     uint8_t low = (uint8_t)(color & 0xFF);
@@ -80,7 +80,7 @@ static void write_color_pixels(uint16_t color, uint32_t pixels)
 /**
  * Write an RGB565 pixel buffer as big-endian bytes using chunked DMA transfers.
  */
-static void write_pixel_buffer_rgb565(const uint16_t *pixels, uint32_t pixel_count) 
+static void write_pixel_buffer_rgb565(const uint16_t *pixels, uint32_t pixel_count)
 {
     if (!pixels || pixel_count == 0) {
         return;
@@ -110,7 +110,7 @@ static void write_pixel_buffer_rgb565(const uint16_t *pixels, uint32_t pixel_cou
     TFT_PIN_CS_HIGH();
 }
 
-void tft_write_window_pixels(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, const uint16_t *pixels, uint32_t pixel_count) 
+void tft_write_window_pixels(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, const uint16_t *pixels, uint32_t pixel_count)
 {
     set_column(x0, x1);
     set_row(y0, y1);
@@ -121,7 +121,7 @@ void tft_write_window_pixels(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1,
 /**
  * Set column address range
  */
-static void set_column(uint16_t x0, uint16_t x1) 
+static void set_column(uint16_t x0, uint16_t x1)
 {
     #if ST7789_ROW_OFS != 0
         x0 += ST7789_COL_OFS;
@@ -135,7 +135,7 @@ static void set_column(uint16_t x0, uint16_t x1)
 /**
  * Set row address range
  */
-static void set_row(uint16_t y0, uint16_t y1) 
+static void set_row(uint16_t y0, uint16_t y1)
 {
     #if ST7789_ROW_OFS != 0
         y0 += ST7789_ROW_OFS;
@@ -149,7 +149,7 @@ static void set_row(uint16_t y0, uint16_t y1)
 /**
  * Initialize ST7789 display
  */
-static void ST7789_init(void) 
+static void ST7789_init(void)
 {
     /* Hardware reset */
     TFT_PIN_RST_LOW();
@@ -222,7 +222,7 @@ static void ST7789_init(void)
 /**
  * Clear display
  */
-void tft_clear_display(uint16_t color) 
+void tft_clear_display(uint16_t color)
 {
     set_column(0, TFT_DIM_WIDTH - 1);
     set_row(0, TFT_DIM_HEIGHT - 1);
@@ -234,7 +234,7 @@ void tft_clear_display(uint16_t color)
 /**
  * Initialize driver
  */
-void tft_driver_init(void) 
+void tft_driver_init(void)
 {
     // === Display setup ===
     ST7789_init();

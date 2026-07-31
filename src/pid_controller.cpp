@@ -144,7 +144,7 @@ void PidController::reset()
     errorCode = ErrorCodeType::NONE;
     releaseBreakCounter = 0;
     faults.reset();
-    faults.isenseMax = ADC::_currentLimitValueToDAC(eeprom.getInputCurrentLimit());
+    faults.isenseMax = ADCConverter::Current::reverse(eeprom.getInputCurrentLimit());
     faults.vsenseMax = ADCConverter::Voltage::reverse(eeprom.getOvpProtection());
     adc.setMotorCurrentLimit(eeprom.getMotorCurrentLimit());
     adc.setInputCurrentLimit(eeprom.getInputCurrentLimit());
@@ -252,7 +252,7 @@ void PidController::isr()
 
     if (eeprom.isPIDMode()) {
         if (ocp.state != OcpStateType::NONE) {
-            setIntegral(getIntegral() * 0.8f); // strong anti windup reduction during OCP condition
+            setIntegral(getIntegral() * 0.8f); // strong anti windup during OCP condition
         }
         else if (antiWindup) {
             if (pwmLevel < (int32_t)(kMaxPWMLevel * -1.1f) || pwmLevel > (int32_t)(kMaxPWMLevel * 1.1f)) {
@@ -269,7 +269,10 @@ void PidController::isr()
         // countdown once set
         if (--releaseBreakCounter == 0) {
             PID_WRITE_MOTOR_PWM_OFF();
+            #if DEBUG
+            __enable_irq();
             DEBUG_PRINT(DebugType::PID, "Brake released");
+            #endif
         }
     }
 
@@ -336,7 +339,7 @@ void PidController::isr()
             eeprom.setKp(SWO::data.Kp);
             eeprom.setKi(SWO::data.Ki);
             eeprom.setMotorRPM(SWO::data.rpm);
-            eeprom.setAntiWindupReduction(SWO::data.antiWindup * UIConstants::kAntiWindupFactor);
+            eeprom.setAntiWindup(SWO::data.antiWindup * UIConstants::kAntiWindupFactor);
             SWO::data.changed = false;
 
             // apply to PID controller
@@ -344,7 +347,7 @@ void PidController::isr()
             pid.setKd(eeprom.getKd());
             pid.setKi(eeprom.getKi());
             pid.setRPM(eeprom.getMotorRPM());
-            pid.setAntiWindup(eeprom.getAntiWindupReduction());
+            pid.setAntiWindup(eeprom.getAntiWindup());
 
             #if DEBUG
                 char bufKp[16], bufKi[16], bufKd[16];

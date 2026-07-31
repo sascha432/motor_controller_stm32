@@ -18,8 +18,8 @@ void Stats::update()
     // get adc values and update stats
     auto v = adc.readAll();
     minMax.vcc.update(v.vsense);
-    minMax.motorTemp.update(v.motor_ntc);
-    minMax.mosfetTemp.update(v.driver_ntc);
+    minMax.motorTemp.update(adc.getMotorTemperatureFiltered());
+    minMax.mosfetTemp.update(adc.getMosfetTemperatureFiltered());
     auto isenseAvg = adc.getISenseAverageValue();
     minMax.current.update(isenseAvg);
 

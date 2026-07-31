@@ -27,13 +27,14 @@ struct ADCConverter {
         static constexpr uint32_t kDividerRatio = kAVRef * (static_cast<float>(kResistorTop + kResistorBottom) / static_cast<float>(kResistorBottom));
         static constexpr uint32_t kADCMax = ADC_MAX;
 
-        static constexpr uint32_t convert(uint16_t adcValue) {
+        static constexpr uint32_t convert(uint16_t adcValue)
+        {
             return (adcValue * kDividerRatio) / kADCMax;
         }
 
-        static constexpr uint16_t reverse(uint32_t millivolt) {
-            uint32_t adc = (millivolt * kADCMax) / kDividerRatio;
-            return static_cast<uint16_t>(adc > kADCMax ? kADCMax : adc);
+        static constexpr uint16_t reverse(uint32_t millivolt)
+        {
+            return static_cast<uint16_t>(std::min<uint32_t>((millivolt * kADCMax) / kDividerRatio, kADCMax));
         }
     };
 
@@ -56,18 +57,31 @@ struct ADCConverter {
         static constexpr uint32_t kADCMax = ADC_MAX;
 
         /**
-         * @brief Convert ADC reading to current
+         * @brief Convert ADC value to current
+         *
+         * @param adcValue ADC value
          * @return Current in milliamps
          */
         static constexpr uint32_t convert(uint16_t adcValue)
         {
-            return adcValue * (kAVRef * 1000U / 4095U) / (kShunt * kGain);
+            return (adcValue * (kAVRef * 1000U / kADCMax)) / (kShunt * kGain);
+        }
+
+        /**
+         * @brief Convert current to ADC value
+         *
+         * @param milliamps Current in milliamps
+         * @return uint16_t ADC value
+         */
+        static constexpr uint16_t reverse(uint32_t milliamps)
+        {
+            return static_cast<uint16_t>(std::min<uint32_t>((milliamps * (kShunt * kGain * kADCMax / 1000U)) / kAVRef, kADCMax));
         }
     };
 
     /**
      * @brief Convert ADC readings to temperature in Celsius using NTC thermistor
-     * 
+     *
      * @tparam NTC_SERIES_RESISTANCE    Series resistor value in ohms
      * @tparam NTC_NOMINAL_RESISTANCE   Nominal resistance of the NTC thermistor in ohms
      * @tparam NTC_BETA_COEFF           Beta coefficient of the NTC thermistor
@@ -142,7 +156,7 @@ struct ADCConverter {
                     (resistance + kSeriesResistance);
             }
             return static_cast<uint16_t>(adc);
-        }    
+        }
     };
 
     using Voltage = VoltageConverterT<100000, 9100, 3300>;

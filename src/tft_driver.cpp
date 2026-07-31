@@ -13,9 +13,9 @@ lv_disp_drv_t s_lvgl_disp_drv;
 
 /**
  * @brief init GPIO pins for the SPI TFT display and backlight PWM
- * 
+ *
  * This code does not use the PIN macros and needs to modified manually if the pinout is changed
- * 
+ *
  */
 void tft_driver_gpio_init(void)
 {
@@ -36,7 +36,7 @@ void tft_driver_gpio_init(void)
     GPIO_InitStruct.Pin = GPIO_PIN_15;
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);    
+    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
     // set pins to default state
     TFT_PIN_CS_HIGH();
@@ -76,7 +76,7 @@ void tft_driver_gpio_init(void)
 
     // Start PWM outputs
     HAL_TIM_PWM_Start(&tim2, TIM_CHANNEL_3);
-    HAL_TIM_PWM_Start(&tim2, TIM_CHANNEL_4);    
+    HAL_TIM_PWM_Start(&tim2, TIM_CHANNEL_4);
 }
 
 /**
@@ -119,10 +119,10 @@ void tft_driver_spi_init(void)
 
 /**
  * @brief Set the raw PWM value for the backlight
- * 
+ *
  * @param value PWM value (0-999)
  */
-void tft_backlight_pwm_set_raw(uint16_t value) 
+void tft_backlight_pwm_set_raw(uint16_t value)
 {
     if (value > 999) {
         value = 999;
@@ -132,10 +132,10 @@ void tft_backlight_pwm_set_raw(uint16_t value)
 
 /**
  * @brief Set the PWM value for the backlight
- * 
+ *
  * @param value PWM value (0-100)
  */
-void tft_backlight_pwm_set(uint8_t value) 
+void tft_backlight_pwm_set(uint8_t value)
 {
     tft_backlight_pwm_set_raw(value * 10U);
 }
@@ -143,7 +143,7 @@ void tft_backlight_pwm_set(uint8_t value)
 /**
  * Send data buffer via SPI2 TX DMA with CS already asserted.
  */
-void tft_driver_spi_send_buffer_dma_raw(const uint8_t *data, uint16_t len) 
+void tft_driver_spi_send_buffer_dma_raw(const uint8_t *data, uint16_t len)
 {
     if (!data || len == 0) {
         return;
@@ -187,12 +187,11 @@ void tft_driver_spi_send_buffer_dma_raw(const uint8_t *data, uint16_t len)
 /**
  * Send single SPI byte (DMA)
  */
-void tft_driver_spi_send_byte(uint8_t byte) 
+void tft_driver_spi_send_byte(uint8_t byte)
 {
     /* Pull CS low before transfer */
     TFT_PIN_CS_LOW();
     tft_driver_delay();
-    
 
     tft_driver_spi_send_buffer_dma_raw(&byte, 1);
 
@@ -204,7 +203,7 @@ void tft_driver_spi_send_byte(uint8_t byte)
 /**
  * Send data buffer via SPI (DMA)
  */
-void tft_driver_spi_send_buffer(const uint8_t *data, uint16_t len) 
+void tft_driver_spi_send_buffer(const uint8_t *data, uint16_t len)
 {
     TFT_PIN_CS_LOW();
     tft_driver_delay();
@@ -216,7 +215,7 @@ void tft_driver_spi_send_buffer(const uint8_t *data, uint16_t len)
 /**
  * Send SPI command byte (with RS=0)
  */
-void tft_driver_send_command(uint8_t cmd) 
+void tft_driver_send_command(uint8_t cmd)
 {
     TFT_PIN_RS_LOW();
     tft_driver_delay();
@@ -228,7 +227,7 @@ void tft_driver_send_command(uint8_t cmd)
 /**
  * Send SPI data bytes (with RS=1)
  */
-void tft_driver_send_data(const uint8_t *data, uint16_t len) 
+void tft_driver_send_data(const uint8_t *data, uint16_t len)
 {
     TFT_PIN_RS_HIGH();
     tft_driver_spi_send_buffer(data, len);
@@ -237,7 +236,7 @@ void tft_driver_send_data(const uint8_t *data, uint16_t len)
 /**
  * Flush callback for LVGL
  */
-void tft_driver_lvgl_flush_cb(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p) 
+void tft_driver_lvgl_flush_cb(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p)
 {
     uint16_t x0 = (uint16_t)area->x1;
     uint16_t y0 = (uint16_t)area->y1;

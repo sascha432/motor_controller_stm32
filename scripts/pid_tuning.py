@@ -106,7 +106,7 @@ class SWOData:
     kp: float
     ki: float
     kd: float
-    anti_windup_reduction: float
+    anti_windup: float
     rpm: int
     changed: bool
 
@@ -119,12 +119,6 @@ def convert_voltage_mv(adc_value: int) -> int:
 def convert_current_ma(adc_value: int) -> int:
     mv_per_lsb_times_1000 = (VREF_MV * 1000) // ADC_MAX
     return (adc_value * mv_per_lsb_times_1000) // (CURRENT_SHUNT_MOHM * CURRENT_GAIN)
-
-
-def convert_current_limit_dac_to_ma(dac_value: int) -> int:
-    # Exact reverse helper from firmware: ADC::_DACtoMilliAmps.
-    return (dac_value * 10073 + 500) // 1000
-
 
 def convert_ntc_celsius(adc_value: int) -> float:
     if adc_value <= 0 or adc_value >= ADC_MAX:
@@ -175,9 +169,9 @@ def decode_pid_item(payload: bytes) -> Optional[Sample]:
         current_avg_adc=i_avg,
         current_avg_ma=convert_current_ma(i_avg),
         dac_motor_current=dac_motor,
-        dac_motor_current_ma=convert_current_limit_dac_to_ma(dac_motor),
+        dac_motor_current_ma=convert_current_ma(dac_motor),
         dac_input_current=dac_input,
-        dac_input_current_ma=convert_current_limit_dac_to_ma(dac_input),
+        dac_input_current_ma=convert_current_ma(dac_input),
         motor_temp_adc=motor_ntc,
         motor_temp_c=convert_ntc_celsius(motor_ntc),
         mosfet_temp_adc=mosfet_ntc,
@@ -846,7 +840,7 @@ class PIDTuningApp:
         ttk.Label(pid_group, text="Kd:").grid(row=2, column=0, padx=6, pady=4, sticky="w")
         ttk.Entry(pid_group, textvariable=self.kd_var, width=14).grid(row=2, column=1, padx=6, pady=4, sticky="ew")
 
-        ttk.Label(pid_group, text="Anti-Windup Reduction (%):").grid(row=3, column=0, padx=6, pady=4, sticky="w")
+        ttk.Label(pid_group, text="Anti-Windup (%):").grid(row=3, column=0, padx=6, pady=4, sticky="w")
         ttk.Entry(pid_group, textvariable=self.anti_windup_var, width=14).grid(row=3, column=1, padx=6, pady=4, sticky="ew")
 
         ttk.Label(pid_group, text="RPM:").grid(row=4, column=0, padx=6, pady=4, sticky="w")
@@ -871,14 +865,14 @@ class PIDTuningApp:
             data.kp,
             data.ki,
             data.kd,
-            data.anti_windup_reduction,
+            data.anti_windup,
             data.rpm,
             enabled_state & 0xFF,
             changed,
         )
 
     def _unpack_swo_data(self, payload: bytes) -> SWOData:
-        kp, ki, kd, anti_windup_reduction, rpm, _enabled_state, changed = struct.unpack(
+        kp, ki, kd, anti_windup, rpm, _enabled_state, changed = struct.unpack(
             SWO_DATA_STRUCT,
             payload[:SWO_DATA_SIZE],
         )
@@ -886,7 +880,7 @@ class PIDTuningApp:
             kp=kp,
             ki=ki,
             kd=kd,
-            anti_windup_reduction=anti_windup_reduction,
+            anti_windup=anti_windup,
             rpm=rpm,
             changed=changed,
         )
@@ -898,7 +892,7 @@ class PIDTuningApp:
             and abs(data.kp - 1.0) < 1e-6
             and abs(data.ki - 1.0) < 1e-6
             and abs(data.kd - 0.0) < 1e-6
-            and abs(data.anti_windup_reduction - 0.0) < 1e-6
+            and abs(data.anti_windup - 0.0) < 1e-6
             and data.rpm == 0
         )
 
@@ -916,7 +910,7 @@ class PIDTuningApp:
             ("Kp", data.kp),
             ("Ki", data.ki),
             ("Kd", data.kd),
-            ("AntiWindup", data.anti_windup_reduction),
+            ("AntiWindup", data.anti_windup),
         ):
             if not math.isfinite(value):
                 raise RuntimeError(f"Invalid SWO::data {name}: not finite")
@@ -924,9 +918,9 @@ class PIDTuningApp:
         if not (0 <= data.rpm <= 65535):
             raise RuntimeError(f"Invalid SWO::data RPM: {data.rpm}")
 
-        if not (0.0 <= data.anti_windup_reduction <= 100.0):
+        if not (0.0 <= data.anti_windup <= 100.0):
             raise RuntimeError(
-                f"Invalid SWO::data anti-windup reduction: {data.anti_windup_reduction}"
+                f"Invalid SWO::data anti-windup: {data.anti_windup}"
             )
 
         if self._is_invalid_swo_default_signature(data):
@@ -949,7 +943,7 @@ class PIDTuningApp:
             self.kp_var.set(f"{data.kp:.6f}")
             self.ki_var.set(f"{data.ki:.6f}")
             self.kd_var.set(f"{data.kd:.6f}")
-            self.anti_windup_var.set(f"{data.anti_windup_reduction:.2f}")
+            self.anti_windup_var.set(f"{data.anti_windup:.2f}")
             self.rpm_var.set(str(data.rpm))
             self._last_loaded_swo_data = data
             self._pid_fields_dirty = False
@@ -1035,9 +1029,9 @@ class PIDTuningApp:
             kp = float(self.kp_var.get().strip())
             ki = float(self.ki_var.get().strip())
             kd = float(self.kd_var.get().strip())
-            anti_windup_reduction = float(self.anti_windup_var.get().strip())
-            if anti_windup_reduction < 0.0 or anti_windup_reduction > 100.0:
-                raise ValueError("Anti-windup reduction out of range (0.00..100.00)")
+            anti_windup = float(self.anti_windup_var.get().strip())
+            if anti_windup < 0.0 or anti_windup > 100.0:
+                raise ValueError("Anti-windup out of range (0.00..100.00)")
             rpm = int(self.rpm_var.get().strip())
             if rpm < 0 or rpm > 65535:
                 raise ValueError("RPM out of range (0..65535)")
@@ -1050,7 +1044,7 @@ class PIDTuningApp:
             kp=kp,
             ki=ki,
             kd=kd,
-            anti_windup_reduction=anti_windup_reduction,
+            anti_windup=anti_windup,
             rpm=rpm,
             changed=True,
         )
@@ -1323,7 +1317,7 @@ class PIDTuningApp:
                 self._append_log(
                     f"Loaded SWO::data ({reason}): "
                     f"Kp={data.kp:.6f} Ki={data.ki:.6f} Kd={data.kd:.6f} "
-                    f"AWR={data.anti_windup_reduction:.2f}% RPM={data.rpm} changed={int(data.changed)}"
+                    f"AWR={data.anti_windup:.2f}% RPM={data.rpm} changed={int(data.changed)}"
                 )
                 self._set_sync_enabled(True)
                 if reason == "startup":

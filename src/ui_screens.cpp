@@ -655,7 +655,7 @@ void DashboardScreen::_refreshVisuals()
 
     // blink any errors
     bool showError;
-    if (((HAL_GetTick() / 512) & 0x01) == 0 && pid.hasErrorCode()) {
+    if (((HAL_GetTick() / 1024) & 0x01) == 0 && pid.hasErrorCode()) {
         showError = true;
         pid.errorPrintf(buf, sizeof(buf) - 1);
         lv_obj_set_style_text_color(rpmLabel, DASHBOARDSCREEN_COLOR_ERROR, LV_PART_MAIN);
@@ -692,8 +692,8 @@ void DashboardScreen::_refreshVisuals()
             lv_label_set_text_fmt(valueLabel, "Kd %s", buf);
             break;
         case SelectedValueType::ANTI_WINDUP: {
-            const uint32_t reduction = eeprom.getAntiWindupReduction() * (1000 / UIConstants::kAntiWindupFactor);
-            lv_label_set_text_fmt(valueLabel, "Anti-windup " SPRINTF_FP2_FMT "%%", CONVERT_TO_FP2(reduction));
+            const uint32_t antiWindup = eeprom.getAntiWindup() * (1000 / UIConstants::kAntiWindupFactor);
+            lv_label_set_text_fmt(valueLabel, "Anti-windup " SPRINTF_FP2_FMT "%%", CONVERT_TO_FP2(antiWindup));
             break;
         }
         case SelectedValueType::MAX:

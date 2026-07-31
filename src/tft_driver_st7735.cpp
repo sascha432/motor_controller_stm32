@@ -28,7 +28,7 @@
 #define ST7735_DISPON 0x29
 #define ST7735_CASET 0x2A
 #define ST7735_RASET 0x2B
-#define ST7735_RAMWR 0x2C 
+#define ST7735_RAMWR 0x2C
 #define ST7735_COLMOD 0x3A
 #define ST7735_FRMCTR1 0xB1
 #define ST7735_MADCTL 0x36
@@ -49,7 +49,7 @@ static void set_row(uint16_t y0, uint16_t y1);
 /**
  * Write repeated RGB565 color pixels using chunked DMA transfers.
  */
-static void write_color_pixels(uint16_t color, uint32_t pixels) 
+static void write_color_pixels(uint16_t color, uint32_t pixels)
 {
     uint8_t high = (uint8_t)((color >> 8) & 0xFF);
     uint8_t low = (uint8_t)(color & 0xFF);
@@ -76,7 +76,7 @@ static void write_color_pixels(uint16_t color, uint32_t pixels)
 /**
  * Write an RGB565 pixel buffer as big-endian bytes using chunked DMA transfers.
  */
-static void write_pixel_buffer_rgb565(const uint16_t *pixels, uint32_t pixel_count) 
+static void write_pixel_buffer_rgb565(const uint16_t *pixels, uint32_t pixel_count)
 {
     if (!pixels || pixel_count == 0) {
         return;
@@ -106,7 +106,7 @@ static void write_pixel_buffer_rgb565(const uint16_t *pixels, uint32_t pixel_cou
     TFT_PIN_CS_HIGH();
 }
 
-void tft_write_window_pixels(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, const uint16_t *pixels, uint32_t pixel_count) 
+void tft_write_window_pixels(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, const uint16_t *pixels, uint32_t pixel_count)
 {
     set_column(x0, x1);
     set_row(y0, y1);
@@ -117,9 +117,9 @@ void tft_write_window_pixels(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1,
 /**
  * Set column address range
  */
-static void set_column(uint16_t x0, uint16_t x1) 
+static void set_column(uint16_t x0, uint16_t x1)
 {
-    uint8_t data[4] = {(uint8_t)(x0 >> 8), (uint8_t)(x0 & 0xFF), 
+    uint8_t data[4] = {(uint8_t)(x0 >> 8), (uint8_t)(x0 & 0xFF),
                        (uint8_t)(x1 >> 8), (uint8_t)(x1 & 0xFF)};
     tft_driver_send_command(ST7735_CASET);
     tft_driver_send_data(data, 4);
@@ -128,9 +128,9 @@ static void set_column(uint16_t x0, uint16_t x1)
 /**
  * Set row address range
  */
-static void set_row(uint16_t y0, uint16_t y1) 
+static void set_row(uint16_t y0, uint16_t y1)
 {
-    uint8_t data[4] = {(uint8_t)(y0 >> 8), (uint8_t)(y0 & 0xFF), 
+    uint8_t data[4] = {(uint8_t)(y0 >> 8), (uint8_t)(y0 & 0xFF),
                        (uint8_t)(y1 >> 8), (uint8_t)(y1 & 0xFF)};
     tft_driver_send_command(ST7735_RASET);
     tft_driver_send_data(data, 4);
@@ -139,7 +139,7 @@ static void set_row(uint16_t y0, uint16_t y1)
 /**
  * Initialize ST7735 display
  */
-static void st7735_init(void) 
+static void st7735_init(void)
 {
     /* Hardware reset */
     TFT_PIN_RST_LOW();
@@ -212,7 +212,7 @@ static void st7735_init(void)
 /**
  * Initialize driver
  */
-void tft_driver_init(void) 
+void tft_driver_init(void)
 {
     // === Display setup ===
     st7735_init();
@@ -221,7 +221,7 @@ void tft_driver_init(void)
 /**
  * Clear display
  */
-void tft_clear_display(uint16_t color) 
+void tft_clear_display(uint16_t color)
 {
     set_column(0, TFT_DIM_WIDTH - 1);
     set_row(0, TFT_DIM_HEIGHT - 1);

@@ -25,29 +25,6 @@ struct ADC {
     static constexpr uint16_t kISenseCountMax = (((47619 * 1.065) / kNumConversions) / (1<<4U)) * (1<<4) / 2; // round down to multiple of 16
 
     /**
-     * @brief convert eeprom values (current * 500) to DAC values based on the 3.3V vref, 4mΩ shunt and 20x gain
-     *
-     * @param limit
-     * @return ** constexpr uint16_t
-     */
-    static constexpr uint16_t _currentLimitValueToDAC(uint16_t limit)
-    {
-        uint32_t dac = ((uint32_t)limit * 1985) / 10000 + 62;
-        return std::min<uint32_t>(dac, 4095);
-    }
-
-    /**
-     * @brief Convert DAC value to milliamps based on the 3.3V vref, 4mΩ shunt and 20x gain
-     *
-     * @param dac
-     * @return constexpr uint32_t
-     */
-    static constexpr uint32_t _DACtoMilliAmps(uint16_t dac)
-    {
-        return (dac * 10073u + 500u) / 1000u;
-    }
-
-    /**
      * @brief struct to access the ADC buffer values
      *
      */
@@ -91,7 +68,7 @@ struct ADC {
      */
     inline void setMotorCurrentLimit(uint16_t value)
     {
-        DAC_SET_MOTOR_CURRENT(_currentLimitValueToDAC(value));
+        DAC_SET_MOTOR_CURRENT(ADCConverter::Current::reverse(value));
     }
 
     /**
@@ -101,7 +78,7 @@ struct ADC {
      */
     inline void setInputCurrentLimit(uint16_t value)
     {
-        DAC_SET_INPUT_CURRENT(_currentLimitValueToDAC(value));
+        DAC_SET_INPUT_CURRENT(ADCConverter::Current::reverse(value));
     }
 
     /**

@@ -14,15 +14,6 @@ struct EEPROM
     static constexpr uint32_t kMagic = 0xDEADBEEF;
     static constexpr uint32_t kVersion = 4;
 
-    // ~130A max.
-    static constexpr uint16_t kCurrentToUint16(float current) {
-        return static_cast<uint16_t>(current * UIConstants::kCurrentToInt16Factor);
-    }
-
-    static constexpr float kUint16ToCurrent(uint16_t value) {
-        return static_cast<float>(value) / UIConstants::kCurrentToInt16Factor;
-    }
-
     static constexpr uint32_t kPIDParamToUint32(float value) {
         return static_cast<uint32_t>(value * UIConstants::kPIDParamFactor);
     }
@@ -63,7 +54,7 @@ struct EEPROM
         float Kp;
         float Ki;
         float Kd;
-        uint16_t anti_windup_reduction;
+        uint16_t anti_windup;
         uint16_t ovp_protection;
 
         Data() :
@@ -72,8 +63,8 @@ struct EEPROM
             sequence(1),
             tft_brightness(UIConstants::kDefaultTFTBrightness),
             led_brightness(UIConstants::kDefaultLEDBrightness),
-            input_current_limit(kCurrentToUint16(UIConstants::kDefaultInputCurrent)),
-            motor_current_limit(kCurrentToUint16(UIConstants::kDefaultMotorCurrent)),
+            input_current_limit(UIConstants::kDefaultInputCurrent),
+            motor_current_limit(UIConstants::kDefaultMotorCurrent),
             min_rpm(UIConstants::kDefaultMinRPM),
             max_rpm(UIConstants::kDefaultMaxRPM),
             motor_stall_timeout(UIConstants::kDefaultMotorStallTimeout),
@@ -89,7 +80,7 @@ struct EEPROM
             Kp(UIConstants::kDefaultKp),
             Ki(UIConstants::kDefaultKi),
             Kd(UIConstants::kDefaultKd),
-            anti_windup_reduction(UIConstants::kAntiWindupReduction),
+            anti_windup(UIConstants::kDefaultAntiWindup),
             ovp_protection(UIConstants::kDefaultOvpProtection)
         {}
 
@@ -372,14 +363,14 @@ struct EEPROM
         return data.Kd;
     }
 
-    void setAntiWindupReduction(uint16_t value)
+    void setAntiWindup(uint16_t value)
     {
-        data.anti_windup_reduction = value;
+        data.anti_windup = value;
     }
 
-    uint16_t getAntiWindupReduction() const
+    uint16_t getAntiWindup() const
     {
-        return data.anti_windup_reduction;
+        return data.anti_windup;
     }
 
     void setOvpProtection(uint16_t value)

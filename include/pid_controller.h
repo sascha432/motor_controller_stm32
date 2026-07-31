@@ -172,9 +172,9 @@ struct PidController
     }
 
     /**
-     * @brief Set the Anti Windup Reduction
+     * @brief Set the Anti Windup
      *
-     * @param value Anti-windup reduction factor as EEPROM value not percent
+     * @param value Anti-windup factor as EEPROM value not percent
      */
     inline void setAntiWindup(uint16_t value)
     {
@@ -295,7 +295,7 @@ struct PidController
         setKp(eeprom.getKp());
         setKi(eeprom.getKi());
         setKd(eeprom.getKd());
-        setAntiWindup(eeprom.getAntiWindupReduction());
+        setAntiWindup(eeprom.getAntiWindup());
         setRPM(eeprom.getMotorRPM());
     }
 
@@ -510,7 +510,7 @@ public:
     float Kd;
     uint32_t rpm;                                   // target RPM
     uint32_t motorDirection;                        // motor direction
-    float antiWindup;                               // anti-windup reduction factor
+    float antiWindup;                               // anti-windup factor
 
     uint32_t lastEncoderCounter;                    // last encoder counter value
     float integral;                                 // PID variables

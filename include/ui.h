@@ -105,7 +105,7 @@ struct Screen
         PID_KP,
         PID_KI,
         PID_KD,
-        PID_ANTI_WINDUP_REDUCTION,
+        PID_ANTI_WINDUP,
         OVP_PROTECTION,
     };
 
