@@ -7,9 +7,13 @@
 
 // static range checks to void overflows in internal calculations, need to be updated if constants are changed
 static_assert(ADCConverter::Voltage::convert(100) == 966, "static check failed");
-static_assert(ADCConverter::Voltage::convert(4095) == 39563, "static check failed, uint32_t overflow?");
+static_assert(ADCConverter::Voltage::reverse(996) == 103, "static check failed");
+static_assert(ADCConverter::Voltage::convert(4095) == 39563, "static check failed");
+static_assert(ADCConverter::Voltage::reverse(39563) == 4095, "static check failed");
 static_assert(ADCConverter::Current::convert(100) == 1006, "static check failed");
+static_assert(ADCConverter::Current::reverse(1010) == 100, "static check failed");
 static_assert(ADCConverter::Current::convert(4095) == 41205, "static check failed");
+static_assert(ADCConverter::Current::reverse(41205) == 4083, "static check failed");
 
 Stats stats;
 
