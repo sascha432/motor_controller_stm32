@@ -78,8 +78,7 @@ extern "C" void EXTI15_10_IRQHandler(void)
 // DMA1_Channel1_IRQHandler is the interrupt handler for the DMA1 Channel 1. It is called when a DMA transfer is complete
 extern "C" void DMA1_Channel1_IRQHandler()
 {
-    if (DMA1->ISR & DMA_ISR_TCIF1)
-    {
+    if (DMA1->ISR & DMA_ISR_TCIF1) {
         // clear transfer complete
         DMA1->IFCR = DMA_IFCR_CTCIF1;
 

@@ -160,6 +160,7 @@
 			"ICSELECTION",
 			"itface",
 			"IWDG",
+			"kOCPISenseThreshold",
 			"lvgl",
 			"milliamps",
 			"MILLIOHM",

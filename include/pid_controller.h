@@ -466,10 +466,19 @@ struct PidController
         uint32_t drv8701Fault : 1;
         uint32_t ocpFault : 1;
         uint32_t snsoutFault : 1;
+        uint32_t ___reserved : 28;
     };
     static constexpr size_t kPidLoopTypeSize = sizeof(PidLoopType);
 
-    // === OCP state machine ===
+    // === OCP state machine and constants ===
+
+    static constexpr uint32_t kOcpTickInterval = 5;                                     // 5us tick interval
+    static constexpr uint32_t kOcpISenseThreshold = 80;                                 // lower threshold in percent before the OCP condition is cleared
+    static constexpr uint32_t kOcpRecoveryInterval = 15 / kOcpTickInterval;             // 15us interval
+    static constexpr uint32_t kOcpRetriggerTimeout = 5 / kOcpTickInterval;              // 5us timeout
+    static constexpr uint32_t kOcpCurrentRampUp = 8;                                    // increase current by 1/8 every step
+    static constexpr uint32_t kOcpCurrentRampDown = 8;                                  // reduce current by 1/8 every step
+    static constexpr uint32_t kOcpInputToMotorCurrentRatio = 8;                         // if the motor current limit is higher than x the input current limit, it will be reduced to x the input current limit, before ramping it down further
 
     enum class OcpStateType : uint32_t {
         NONE = 0,           // no OCP condition

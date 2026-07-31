@@ -365,17 +365,16 @@ void PidController::ocp_isr()
 {
     ocp.counter++;
     if (ocp.state == OcpStateType::TRIGGERED) {
-        if (adc.getISenseOcpFilteredValue() < ((faults.isenseMax * 800) / 1024)) {
-            // start recovery after the current dropped to ~80% of the limit
+        if (adc.getISenseOcpFilteredValue() < ((faults.isenseMax * (kOcpISenseThreshold * 1024 / 100)) / 1024)) {
+            // start recovery after the current dropped to 90% of the limit
             ocp.state = OcpStateType::RECOVERY;
             ocp.counter = 0;
         }
     }
     if (ocp.state == OcpStateType::RECOVERY) {
-        // every 20us
-        if ((ocp.counter & 0x03) == 0) {
+        if ((ocp.counter % kOcpRecoveryInterval) == 0) {
             uint32_t value = DAC_GET_MOTOR_CURRENT();
-            value = value + (value / 8);
+            value = value + (value / kOcpCurrentRampUp);
             if (value > ocp.dacMotorCurrent) {
                 // once the motor current limit is back to the original value, we can reset the OCP state
                 value = ocp.dacMotorCurrent;
@@ -397,24 +396,24 @@ void PidController::trigger_ocp()
             ocp.counter = 0;
             ocp.lastCounter = 0;
             uint16_t value = ocp.dacMotorCurrent;
-            // start with a max. of 4x the input current limit or the current motor current limit, whichever is lower
-            if (value > ocp.dacInputCurrent * 4U) {
-                value = ocp.dacInputCurrent * 4U;
+            // start with a max. of 8x the input current limit or the current motor current limit, whichever is lower
+            if (value > ocp.dacInputCurrent * kOcpInputToMotorCurrentRatio) {
+                value = ocp.dacInputCurrent * kOcpInputToMotorCurrentRatio;
             }
             else {
-                value = value - (value / 8);
+                value = value - (value / kOcpCurrentRampDown);
             }
             DAC_SET_MOTOR_CURRENT(value);
             LEDs::onLEDWarning();
         }
     }
     else if (ocp.state == OcpStateType::TRIGGERED) {
-        // limit to min. 20us
-        if (ocp.counter >= ocp.lastCounter + 4) {
+        // the DAC needs about 3us to update
+        if (ocp.counter >= ocp.lastCounter + kOcpRetriggerTimeout) {
             ocp.lastCounter = ocp.counter;
             // reduce motor current every time we trigger input OCP
             uint16_t value = DAC_GET_MOTOR_CURRENT();
-            value = value - (value / 8);
+            value = value - (value / kOcpCurrentRampDown);
             if (value < ocp.dacInputCurrent) {
                 value = ocp.dacInputCurrent;
             }
