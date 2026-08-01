@@ -10,8 +10,11 @@
 #include "stats.h"
 #include "leds.h"
 
-// use floating point math for PID calculations, otherwise fixed point math is used
-#define PID_USE_FLOATING_POINT_MATH     0
+// 32bit floating point ~1800 clock cycles
+// int64_t fixed point ~580 clock cycles
+#ifndef PID_USE_FLOATING_POINT_MATH
+#define PID_USE_FLOATING_POINT_MATH 0
+#endif
 
 struct PidController
 {
@@ -572,5 +575,13 @@ public:
     volatile bool running;                          // true if the PID controller is running
     uint32_t releaseBreakCounter;                   // counter for releasing the brake after motor off
 };
+
+#ifdef PID_CYCLE_MEASUREMENT
+extern volatile uint32_t pidIsrCycles;
+extern volatile uint32_t pidIsrCyclesAccumulated;
+extern volatile uint32_t pidIsrCycleCount;
+extern volatile uint32_t pidIsrCyclesPerSecond;
+extern volatile uint32_t pidIsrCyclesMax;
+#endif
 
 extern PidController pid;

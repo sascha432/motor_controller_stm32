@@ -141,6 +141,21 @@ static void loop()
         }
     }
 
+#ifdef PID_CYCLE_MEASUREMENT
+    static uint32_t lastCycleReportTick = 0;
+    if (HAL_GetTick() - lastCycleReportTick >= 1000) {
+        pidIsrCyclesPerSecond = pidIsrCyclesAccumulated;
+        const uint32_t calls = pidIsrCycleCount;
+        const uint32_t totalCycles = pidIsrCyclesAccumulated;
+        const uint32_t averageCycles = calls ? (totalCycles / calls) : 0;
+        DEBUG_PRINT(DebugType::PID, "PID cycles: last=%u, avg=%u, max=%u, total/s=%u, calls/s=%u", pidIsrCycles, averageCycles, pidIsrCyclesMax, totalCycles, calls);
+        pidIsrCyclesAccumulated = 0;
+        pidIsrCycleCount = 0;
+        pidIsrCyclesMax = 0;
+        lastCycleReportTick = HAL_GetTick();
+    }
+#endif
+
     if (pid.running) {
         // check NTC sensors, not time critical and a couple times per seconds is enough
         if (ADCConverter::NTC::compare(adc.getMotorTemperatureFiltered(), eeprom.getMotorTemperatureLimitADC()) > 0) {
