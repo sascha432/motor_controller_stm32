@@ -6,6 +6,11 @@
 #include "pid_controller.h"
 #include "controls.h"
 
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC push_options
+#pragma GCC optimize("O3")
+#endif
+
 // === global variables ===
 
 TIM_HandleTypeDef tim6;
@@ -75,11 +80,6 @@ extern "C" void EXTI15_10_IRQHandler(void)
     }
 }
 
-#if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC push_options
-#pragma GCC optimize("O3")
-#endif
-
 // DMA1_Channel1_IRQHandler is the interrupt handler for the DMA1 Channel 1. It is called when a DMA transfer is complete
 extern "C" void DMA1_Channel1_IRQHandler()
 {
@@ -111,10 +111,6 @@ extern "C" void DMA1_Channel1_IRQHandler()
     }
 }
 
-#if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC pop_options
-#endif
-
 extern "C" void HAL_WWDG_MspInit(WWDG_HandleTypeDef *hwwdg)
 {
     (void)hwwdg;
@@ -128,15 +124,72 @@ extern "C" void HAL_WWDG_MspInit(WWDG_HandleTypeDef *hwwdg)
 /**
   * @brief This function handles System tick timer.
   */
-#if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC push_options
-#pragma GCC optimize("O3")
-#endif
 extern "C" void SysTick_Handler(void)
 {
     HAL_IncTick();
     WatchDog::tickHandler();
 }
+
+/**
+  * @brief This function handles Non maskable interrupt.
+  */
+extern "C" void NMI_Handler(void)
+{
+    call_default_error_handler(InterruptErrorType::NMI_HANDLER);
+}
+
+/**
+  * @brief This function handles Hard fault interrupt.
+  */
+extern "C" void HardFault_Handler(void)
+{
+    call_default_error_handler(InterruptErrorType::HARD_FAULT_HANDLER);
+}
+
+/**
+  * @brief This function handles Memory management fault.
+  */
+extern "C" void MemManage_Handler(void)
+{
+    call_default_error_handler(InterruptErrorType::MEM_MANAGE_HANDLER);
+}
+
+/**
+  * @brief This function handles Prefetch fault, memory access fault.
+  */
+extern "C" void BusFault_Handler(void)
+{
+    call_default_error_handler(InterruptErrorType::BUS_FAULT_HANDLER);
+}
+
+/**
+ * @brief This function handles Usage fault interrupt
+ *
+ */
+extern "C" void UsageFault_Handler(void)
+{
+    call_default_error_handler(InterruptErrorType::USAGE_FAULT_HANDLER);
+}
+
+/**
+ * @brief This function handles the Window Watchdog interrupt
+ */
+extern "C" void WWDG_IRQHandler(void)
+{
+    HAL_WWDG_IRQHandler(&WatchDog::watchdog);
+}
+
+/**
+ * @brief Handle watchdog timeouts
+ */
+extern "C" void HAL_WWDG_EarlyWakeupCallback(WWDG_HandleTypeDef *hwwdg)
+{
+    if (hwwdg != &WatchDog::watchdog) {
+        return;
+    }
+    call_default_error_handler(InterruptErrorType::WATCHDOG_TIMEOUT);
+}
+
 #if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC pop_options
 #endif
@@ -204,64 +257,4 @@ extern "C" void Error_Handler(void)
         LEDs::off();
         delay_ms(500);
     }
-}
-
-/**
-  * @brief This function handles Non maskable interrupt.
-  */
-extern "C" void NMI_Handler(void)
-{
-    call_default_error_handler(InterruptErrorType::NMI_HANDLER);
-}
-
-/**
-  * @brief This function handles Hard fault interrupt.
-  */
-extern "C" void HardFault_Handler(void)
-{
-    call_default_error_handler(InterruptErrorType::HARD_FAULT_HANDLER);
-}
-
-/**
-  * @brief This function handles Memory management fault.
-  */
-extern "C" void MemManage_Handler(void)
-{
-    call_default_error_handler(InterruptErrorType::MEM_MANAGE_HANDLER);
-}
-
-/**
-  * @brief This function handles Prefetch fault, memory access fault.
-  */
-extern "C" void BusFault_Handler(void)
-{
-    call_default_error_handler(InterruptErrorType::BUS_FAULT_HANDLER);
-}
-
-/**
- * @brief This function handles Usage fault interrupt
- *
- */
-extern "C" void UsageFault_Handler(void)
-{
-    call_default_error_handler(InterruptErrorType::USAGE_FAULT_HANDLER);
-}
-
-/**
- * @brief This function handles the Window Watchdog interrupt
- */
-extern "C" void WWDG_IRQHandler(void)
-{
-    HAL_WWDG_IRQHandler(&WatchDog::watchdog);
-}
-
-/**
- * @brief Handle watchdog timeouts
- */
-extern "C" void HAL_WWDG_EarlyWakeupCallback(WWDG_HandleTypeDef *hwwdg)
-{
-    if (hwwdg != &WatchDog::watchdog) {
-        return;
-    }
-    call_default_error_handler(InterruptErrorType::WATCHDOG_TIMEOUT);
 }
