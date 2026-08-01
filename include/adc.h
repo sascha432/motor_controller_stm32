@@ -10,19 +10,48 @@
 
 extern "C" void DMA1_Channel1_IRQHandler();
 
+static constexpr float kADCClockMHz = 12.0f;    // ADC clock in MHz
+
+static constexpr float kAdcSampleTimeUs(uint32_t sampleBits)
+{
+    switch (sampleBits & 0x07) {
+        case 0: return (1.5f   + 12.5f) / kADCClockMHz;
+        case 1: return (7.5f   + 12.5f) / kADCClockMHz;
+        case 2: return (13.5f  + 12.5f) / kADCClockMHz;
+        case 3: return (28.5f  + 12.5f) / kADCClockMHz;
+        case 4: return (41.5f  + 12.5f) / kADCClockMHz;
+        case 5: return (55.5f  + 12.5f) / kADCClockMHz;
+        case 6: return (71.5f  + 12.5f) / kADCClockMHz;
+        case 7: return (239.5f + 12.5f) / kADCClockMHz;
+    }
+    return 0.0f;
+}
+
 /**
  * @brief ADC class to read multiple channels using DMA
  *
  */
 struct ADC {
 
-    static constexpr uint32_t kNumConversions = 4;                              // number of channels
-    /**
-     * 4 channels @ 12MHz ADC clock
-     * 21µs per conversion, 47619 total conversions per second
-     * rolling average over ~0.5 second (+-3.25%)
-     */
-    static constexpr uint16_t kISenseCountMax = (((47619 * 1.065) / kNumConversions) / (1<<4U)) * (1<<4) / 2; // round down to multiple of 16
+    static constexpr uint32_t kADC_SampleTime_1_5Cycles   = 0;
+    static constexpr uint32_t kADC_SampleTime_7_5Cycles   = 1;
+    static constexpr uint32_t kADC_SampleTime_13_5Cycles  = 2;
+    static constexpr uint32_t kADC_SampleTime_28_5Cycles  = 3;
+    static constexpr uint32_t kADC_SampleTime_41_5Cycles  = 4;
+    static constexpr uint32_t kADC_SampleTime_55_5Cycles  = 5;
+    static constexpr uint32_t kADC_SampleTime_71_5Cycles  = 6;
+    static constexpr uint32_t kADC_SampleTime_239_5Cycles = 7;
+
+    static constexpr uint32_t kNumConversions = 4;                                  // number of channels
+    static constexpr uint32_t kSampleTimeCH2 = kADC_SampleTime_239_5Cycles;         // isense
+    static constexpr uint32_t kSampleTimeCH3 = kADC_SampleTime_239_5Cycles;         // vsense
+    static constexpr uint32_t kSampleTimeCH14 = kADC_SampleTime_239_5Cycles;        // motor ntc
+    static constexpr uint32_t kSampleTimeCH15 = kADC_SampleTime_239_5Cycles;        // mosfet ntc
+
+    static constexpr float kTotalSampleTime = kAdcSampleTimeUs(kSampleTimeCH2) + kAdcSampleTimeUs(kSampleTimeCH3) + kAdcSampleTimeUs(kSampleTimeCH14) + kAdcSampleTimeUs(kSampleTimeCH15); // sum of sample time per channel
+    static constexpr float kTotalSamplesPerSecond = 1000000.0f / kTotalSampleTime;  // samples per second for all channels
+
+    static constexpr uint16_t kISenseCountMax = (uint32_t)(((kTotalSamplesPerSecond * 1.0f * 1.065f) / kNumConversions) / 16) * 16; // rolling average over ~1.0 second (+-3.25%), round down to multiple of 16
 
     /**
      * @brief struct to access the ADC buffer values
@@ -30,10 +59,10 @@ struct ADC {
      */
     struct BufferType
     {
-        uint16_t isense;
-        uint16_t vsense;
-        uint16_t motor_ntc;
-        uint16_t driver_ntc;
+        uint16_t isense;            // CH2
+        uint16_t vsense;            // CH3
+        uint16_t motor_ntc;         // CH14
+        uint16_t driver_ntc;        // CH15
     };
 
     /**
@@ -176,11 +205,11 @@ protected:
 
 protected:
     volatile uint16_t adc_buffer[kNumConversions];
-    volatile uint32_t isenseSum;
-    volatile uint16_t isenseCount;
-    volatile uint32_t isenseOcpFiltered;
-    volatile uint16_t motorTemperatureFiltered;
-    volatile uint16_t mosfetTemperatureFiltered;
+    uint32_t isenseSum;
+    uint16_t isenseCount;
+    uint32_t isenseOcpFiltered;
+    uint16_t motorTemperatureFiltered;
+    uint16_t mosfetTemperatureFiltered;
 };
 
 extern ADC adc;

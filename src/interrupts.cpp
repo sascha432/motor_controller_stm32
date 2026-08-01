@@ -76,6 +76,10 @@ extern "C" void EXTI15_10_IRQHandler(void)
 }
 
 // DMA1_Channel1_IRQHandler is the interrupt handler for the DMA1 Channel 1. It is called when a DMA transfer is complete
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC push_options
+#pragma GCC optimize("O3")
+#endif
 extern "C" void DMA1_Channel1_IRQHandler()
 {
     if (DMA1->ISR & DMA_ISR_TCIF1) {
@@ -101,10 +105,13 @@ extern "C" void DMA1_Channel1_IRQHandler()
         adc.isenseOcpFiltered = (adc.isenseOcpFiltered + value) / 2;
 
         // update filtered temperature values
-        adc.motorTemperatureFiltered = (adc.motorTemperatureFiltered * 15 + adc.getMotorNTCValue()) / 16;
-        adc.mosfetTemperatureFiltered = (adc.mosfetTemperatureFiltered * 15 + adc.getMosfetNTCValue()) / 16;
+        adc.motorTemperatureFiltered = (adc.motorTemperatureFiltered * 16 - adc.motorTemperatureFiltered + adc.getMotorNTCValue()) / 16;
+        adc.mosfetTemperatureFiltered = (adc.mosfetTemperatureFiltered * 16 - adc.mosfetTemperatureFiltered + adc.getMosfetNTCValue()) / 16;
     }
 }
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC pop_options
+#endif
 
 extern "C" void HAL_WWDG_MspInit(WWDG_HandleTypeDef *hwwdg)
 {
@@ -119,11 +126,18 @@ extern "C" void HAL_WWDG_MspInit(WWDG_HandleTypeDef *hwwdg)
 /**
   * @brief This function handles System tick timer.
   */
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC push_options
+#pragma GCC optimize("O3")
+#endif
 extern "C" void SysTick_Handler(void)
 {
     HAL_IncTick();
     WatchDog::tickHandler();
 }
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC pop_options
+#endif
 
 // for disabled interrupts, not precise
 static void delay_ms(uint32_t ms)

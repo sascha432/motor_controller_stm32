@@ -14,11 +14,12 @@ void ADC::init()
     // Enable GPIOA/GPIOC and ADC1 clocks
     RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_IOPCEN | RCC_APB2ENR_ADC1EN;
 
-    // Configure analog mode
-    GPIOA->CRL &= ~(0xF << (2 * 4));   // PA2 analog
-    GPIOA->CRL &= ~(0xF << (3 * 4));   // PA3 analog
-    GPIOC->CRL &= ~(0xF << (4 * 4));   // PC4 analog
-    GPIOC->CRL &= ~(0xF << (5 * 4));   // PC5 analog
+    GPIO_InitTypeDef GPIO_InitStruct = {};
+    GPIO_InitStruct.Pin = digitalPinToHAL<PA2>()|digitalPinToHAL<PA3>();
+    GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+    GPIO_InitStruct.Pin = digitalPinToHAL<PC4>()|digitalPinToHAL<PC5>();
+    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
     // ADC scan mode (multiple channels)
     ADC1->CR1 |= ADC_CR1_SCAN;
@@ -33,17 +34,17 @@ void ADC::init()
 
     // Clear and set ADC clock divider
     RCC->CFGR &= ~RCC_CFGR_ADCPRE;
-    RCC->CFGR |= RCC_CFGR_ADCPRE_DIV6;   // 72MHz / 6 = 12MHz ADC clock
-
-    // sampling time 239.5 cycles = about 20 microseconds per conversion
+    RCC->CFGR |= RCC_CFGR_ADCPRE_DIV6;   // 72MHz / 6 = 12MHz ADC clock (kADCClockMHz)
 
     // PA2, PA3 in SMPR2
-    ADC1->SMPR2 |= (7 << (2 * 3));   // CH2
-    ADC1->SMPR2 |= (7 << (3 * 3));   // CH3
+    ADC1->SMPR2 &= ~((0x07 << (2 * 3)) | (0x07 << (3 * 3))); // clear
+    ADC1->SMPR2 |= (kSampleTimeCH2 << (2 * 3));   // CH2
+    ADC1->SMPR2 |= (kSampleTimeCH3 << (3 * 3));   // CH3
 
     // PC4, PC5 in SMPR1
-    ADC1->SMPR1 |= (7 << ((14 - 10) * 3)); // CH14
-    ADC1->SMPR1 |= (7 << ((15 - 10) * 3)); // CH15
+    ADC1->SMPR1 &= ~((0x07 << ((14 - 10) * 3)) | (0x07 << ((15 - 10) * 3))); // clear
+    ADC1->SMPR1 |= (kSampleTimeCH14 << ((14 - 10) * 3)); // CH14
+    ADC1->SMPR1 |= (kSampleTimeCH15 << ((15 - 10) * 3)); // CH15
 
     // enable DMA
     RCC->AHBENR |= RCC_AHBENR_DMA1EN;

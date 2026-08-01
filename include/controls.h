@@ -78,7 +78,7 @@ struct Button
         isr(digitalPinToGPIO<GPIO_PIN>()->IDR);
     }
 
-    volatile uint32_t lastDebounceTime;
+    uint32_t lastDebounceTime;
     volatile bool state;
     volatile bool pressed;
     volatile bool released;
@@ -130,7 +130,7 @@ struct RotaryEncoder {
 
     uint32_t maxAcceleration;
     volatile int32_t position;
-    volatile int32_t acceleration;
+    int32_t acceleration;
 };
 
 using RotaryEncoderKnob = RotaryEncoder<ROTARY_ENCODER_PIN_A, ROTARY_ENCODER_PIN_B>;

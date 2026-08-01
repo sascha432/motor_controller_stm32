@@ -261,4 +261,3 @@ void tft_driver_lvgl_init(void)
     s_lvgl_disp_drv.draw_buf = &s_lvgl_draw_buf;
     lv_disp_drv_register(&s_lvgl_disp_drv);
 }
-
