@@ -2,7 +2,7 @@
 
 ## TODOs
 
- - Implement USB stack
+ - Implement USB CDC device
  - PID tuning over USB and/or UART
 
 ## Software Features

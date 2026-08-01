@@ -183,9 +183,6 @@ struct Screen
     virtual void load();
     virtual void update();
 
-    void _style_screen(lv_obj_t *screen);
-    void _fatal_error(const char *msg);
-
 protected:
     friend struct ScreenFlow;
 
@@ -238,9 +235,6 @@ struct MenuScreen : public Screen
 
 private:
     uint8_t _first_visible_start_index(uint8_t selected_index);
-    void _style_menu_row(lv_obj_t *row, bool selected);
-    void _style_menu_label(lv_obj_t *label, bool selected);
-    lv_obj_t *_style_create_menu_label(lv_obj_t *parent, const char *text, bool selected);
 
 protected:
     void _refreshMenuScreen();

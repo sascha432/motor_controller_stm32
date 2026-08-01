@@ -13,7 +13,15 @@
 
 // === Helpers ===
 
-inline lv_coord_t diagnostic_screen_get_ypos_for_row(int32_t row)
+void screen_style_screen(lv_obj_t *screen)
+{
+    lv_obj_set_style_bg_color(screen, SCREEN_COLOR_BG, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_border_width(screen, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(screen, 0, LV_PART_MAIN);
+}
+
+inline constexpr lv_coord_t diagnostic_screen_get_ypos_for_row(int32_t row)
 {
     switch(row) {
         case 0: return 0;
@@ -23,7 +31,7 @@ inline lv_coord_t diagnostic_screen_get_ypos_for_row(int32_t row)
     return Screen::kDiagnosticScreenRowHeight * row + (Screen::kDiagnosticScreenRowHeight * 3);
 }
 
-inline int32_t diagnostic_screen_content_height()
+inline constexpr int32_t diagnostic_screen_content_height()
 {
     return diagnostic_screen_get_ypos_for_row(Screen::kDiagnosticScreenRowCount) + 10;
 }
@@ -67,6 +75,37 @@ void start_screen_update_top_status_labels(lv_obj_t *voltageLabel, lv_obj_t *cur
     lv_label_set_text(mosfetTempLabel, buf);
 }
 
+void menuscreen_style_menu_row(lv_obj_t *row, bool selected)
+{
+    lv_obj_set_size(row, Screen::kMenuScreenItemWidth, Screen::kMenuScreenItemHeight);
+    lv_obj_set_style_radius(row, Screen::kMenuScreenCornerRadius, LV_PART_MAIN);
+    lv_obj_set_style_border_width(row, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(row, 0, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(row, selected ? LV_OPA_COVER : LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(row, selected ? MENUSCREEN_COLOR_SELECTED_BG : MENUSCREEN_COLOR_BG, LV_PART_MAIN);
+}
+
+void menuscreen_style_menu_label(lv_obj_t *label, bool selected)
+{
+    lv_obj_set_style_text_color(label, selected ? MENUSCREEN_COLOR_SELECTED_ITEM : MENUSCREEN_COLOR_ITEM, LV_PART_MAIN);
+    lv_obj_set_style_text_font(label, Screen::kMenuScreenLabelFont, LV_PART_MAIN);
+    lv_label_set_long_mode(label, selected ? LV_LABEL_LONG_SCROLL_CIRCULAR : LV_LABEL_LONG_CLIP);
+}
+
+lv_obj_t *menuscreen_create_menu_label(lv_obj_t *parent, const char *text, bool selected)
+{
+    lv_obj_t *label = lv_label_create(parent);
+    lv_label_set_text_static(label, text);
+    menuscreen_style_menu_label(label, selected);
+    // row boundaries and settings for label/clipping scrolling
+    lv_obj_set_style_anim_speed(label, Screen::kMenuScreenItemScrollSpeed, LV_PART_MAIN);
+    lv_obj_set_width(label, Screen::kMenuScreenItemWidth - (2 * Screen::kMenuScreenItemStartX));
+    lv_label_set_long_mode(label, LV_LABEL_LONG_CLIP);
+    // position in the row
+    lv_obj_set_pos(label, Screen::kMenuScreenItemStartX, Screen::kMenuScreenItemStartY);
+    return label;
+}
+
 // === Base Screen ===
 
 lv_obj_t *Screen::emptyScreen = nullptr;
@@ -103,7 +142,7 @@ void Screen::load()
     else {
         screen = lv_obj_create(nullptr);
     }
-    _style_screen(screen);
+    screen_style_screen(screen);
     knob.setMaxAcceleration(maxAcceleration);
 }
 
@@ -125,25 +164,6 @@ void Screen::setValue(uint32_t value)
 uint32_t Screen::getValue() const
 {
     return value;
-}
-
-void Screen::_fatal_error(const char *msg)
-{
-    uint32_t num = 0;
-    while (true) {
-        WatchDog::delay(100);
-        if (num++ % 10 == 0) {
-            DEBUG_PRINT(DebugType::ERROR, "UI ERROR: %s", msg);
-        }
-    }
-}
-
-void Screen::_style_screen(lv_obj_t *screen)
-{
-    lv_obj_set_style_bg_color(screen, SCREEN_COLOR_BG, LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_border_width(screen, 0, LV_PART_MAIN);
-    lv_obj_set_style_pad_all(screen, 0, LV_PART_MAIN);
 }
 
 // === Welcome Screen ===
@@ -205,9 +225,9 @@ void MenuScreen::load()
         const bool isSelected = (i == 0);
         rows[i] = lv_obj_create(menu);
         lv_obj_remove_style_all(rows[i]);
-        _style_menu_row(rows[i], isSelected);
-        lv_obj_set_pos(rows[i], 0, i * kMenuScreenItemHeight);
-        labels[i] = _style_create_menu_label(rows[i], itemLabels[i], isSelected);
+        menuscreen_style_menu_row(rows[i], isSelected);
+        lv_obj_set_pos(rows[i], 0, i * Screen::kMenuScreenItemHeight);
+        labels[i] = menuscreen_create_menu_label(rows[i], itemLabels[i], isSelected);
     }
 
     _refreshMenuScreen();
@@ -229,9 +249,9 @@ void MenuScreen::_refreshMenuScreen()
     for (uint8_t i = 0; i < kMenuScreenVisibleItems && i < count; ++i) {
         const uint8_t item_index = first_index + i;
         const bool selected = (item_index == this->selected);
-        _style_menu_row(rows[i], selected);
+        menuscreen_style_menu_row(rows[i], selected);
         lv_label_set_text_static(labels[i], itemLabels[item_index]);
-        _style_menu_label(labels[i], selected);
+        menuscreen_style_menu_label(labels[i], selected);
     }
 }
 
@@ -250,37 +270,6 @@ void MenuScreen::setValue(uint32_t index)
 uint32_t MenuScreen::getValue() const
 {
     return selected;
-}
-
-void MenuScreen::_style_menu_row(lv_obj_t *row, bool selected)
-{
-    lv_obj_set_size(row, kMenuScreenItemWidth, kMenuScreenItemHeight);
-    lv_obj_set_style_radius(row, kMenuScreenCornerRadius, LV_PART_MAIN);
-    lv_obj_set_style_border_width(row, 0, LV_PART_MAIN);
-    lv_obj_set_style_pad_all(row, 0, LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(row, selected ? LV_OPA_COVER : LV_OPA_TRANSP, LV_PART_MAIN);
-    lv_obj_set_style_bg_color(row, selected ? MENUSCREEN_COLOR_SELECTED_BG : MENUSCREEN_COLOR_BG, LV_PART_MAIN);
-}
-
-void MenuScreen::_style_menu_label(lv_obj_t *label, bool selected)
-{
-    lv_obj_set_style_text_color(label, selected ? MENUSCREEN_COLOR_SELECTED_ITEM : MENUSCREEN_COLOR_ITEM, LV_PART_MAIN);
-    lv_obj_set_style_text_font(label, kMenuScreenLabelFont, LV_PART_MAIN);
-    lv_label_set_long_mode(label, selected ? LV_LABEL_LONG_SCROLL_CIRCULAR : LV_LABEL_LONG_CLIP);
-}
-
-lv_obj_t *MenuScreen::_style_create_menu_label(lv_obj_t *parent, const char *text, bool selected)
-{
-    lv_obj_t *label = lv_label_create(parent);
-    lv_label_set_text_static(label, text);
-    _style_menu_label(label, selected);
-    // row boundaries and settings for label/clipping scrolling
-    lv_obj_set_style_anim_speed(label, kMenuScreenItemScrollSpeed, LV_PART_MAIN);
-    lv_obj_set_width(label, kMenuScreenItemWidth - (2 * kMenuScreenItemStartX));
-    lv_label_set_long_mode(label, LV_LABEL_LONG_CLIP);
-    // position in the row
-    lv_obj_set_pos(label, kMenuScreenItemStartX, kMenuScreenItemStartY);
-    return label;
 }
 
 // === Slider Screen ===
@@ -416,7 +405,7 @@ void SliderScreen::_refreshVisuals()
     lv_obj_set_size(sliderFillAfter, remaining + 8 - 2, sliderFillHeight);
 
     if (formatCallback) {
-        char buf[32];
+        char buf[64];
         lv_label_set_text(valueLabel, formatCallback(value, buf, sizeof(buf) - 1));
     }
     else {
@@ -704,7 +693,6 @@ void DashboardScreen::_refreshVisuals()
         case SelectedValueType::MAX:
             break;
     }
-
 }
 
 // === Start Screen ===
