@@ -37,7 +37,8 @@ struct SWO
     enum class EnableState : uint8_t {
         DISABLED = 0,
         SWO = 1,
-        USB = 2
+        USB = 2,
+        SERIAL = 3,
     };
     struct DataType {
         volatile float Kp;
@@ -47,7 +48,11 @@ struct SWO
         volatile uint16_t rpm;
         volatile EnableState enabled;
         volatile bool changed;
-        DataType() : Kp(0), Ki(0), Kd(0), antiWindup(0), rpm(0), enabled(EnableState::DISABLED), changed(false) {}
+        struct {
+            volatile uint32_t address;
+            volatile bool commit;
+        } EEPROM;
+        DataType() : Kp(0), Ki(0), Kd(0), antiWindup(0), rpm(0), enabled(EnableState::DISABLED), changed(false), EEPROM{0, false} {}
     };
     static DataType data;
 };

@@ -151,6 +151,14 @@ static void loop()
         }
     }
 
+    if (SWO::data.EEPROM.commit) {
+        SWO::data.EEPROM.commit = false;
+        bool result = eeprom.write();
+        (void)result;
+        DEBUG_PRINT(DebugType::INFO, "SWO EEPROM write=%u", result);
+        menu.applyEEPROMSettings();
+    }
+
     // handle ui updates and rotary encoder
     static uint32_t lastLvHandler = 0;
     if (HAL_GetTick() - lastLvHandler >= 5) {

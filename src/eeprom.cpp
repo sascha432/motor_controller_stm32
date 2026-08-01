@@ -34,6 +34,7 @@ bool eepromWaitReady(void);
 
 void EEPROM::init()
 {
+    SWO::data.EEPROM.address = (uint32_t)&this->data;
     i2c.initI2C1Remapped();
     bool res = i2c.sendBytes(EEPROM_ADDRESS, nullptr, 0);
     DEBUG_PRINT(DebugType::INFO, "EEPROM detected=%u", (int)res);

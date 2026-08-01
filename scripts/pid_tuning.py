@@ -96,9 +96,13 @@ SWO_DATA_FIXED_RAM_ADDRESS = 0x2000F000
 SWO_ENABLE_DISABLED = 0
 SWO_ENABLE_SWO = 1
 SWO_ENABLE_USB = 2
-SWO_DATA_STRUCT = "<ffffHB?"
+SWO_DATA_EEPROM_ADDRESS_OFFSET = 20
+SWO_DATA_EEPROM_COMMIT_OFFSET = 24
+SWO_DATA_STRUCT = "<ffffHB?I?xxx"
 SWO_DATA_SIZE = struct.calcsize(SWO_DATA_STRUCT)
 SWO_DATA_ENABLED_OFFSET = struct.calcsize("<ffffH")
+EEPROM_DATA_STRUCT = "<IIIBBHHHHHBBBBBBBBHxxfffHH"
+EEPROM_DATA_SIZE = struct.calcsize(EEPROM_DATA_STRUCT)
 
 
 @dataclass
@@ -109,6 +113,61 @@ class SWOData:
     anti_windup: float
     rpm: int
     changed: bool
+    eeprom_address: int
+    eeprom_commit: bool
+
+
+@dataclass
+class EEPROMData:
+    magic: int
+    version: int
+    sequence: int
+    tft_brightness: int
+    led_brightness: int
+    input_current_limit: int
+    motor_current_limit: int
+    min_rpm: int
+    max_rpm: int
+    motor_stall_timeout: int
+    motor_direction: int
+    sensor_direction: int
+    motor_brake: int
+    control_mode: int
+    mosfet_temperature_limit: int
+    motor_temperature_limit: int
+    max_pwm: int
+    motor_pwm: int
+    motor_rpm: int
+    kp: float
+    ki: float
+    kd: float
+    anti_windup: int
+    ovp_protection: int
+
+
+EEPROM_FIELD_SPECS = (
+    ("TFT Brightness", "tft_brightness", "int", 5, 100, None),
+    ("LED Brightness", "led_brightness", "int", 0, 100, None),
+    ("Input Current (mA)", "input_current_limit", "int", 500, 40000, None),
+    ("Motor Current (mA)", "motor_current_limit", "int", 500, 40000, None),
+    ("Min RPM", "min_rpm", "int", 10, 55000, None),
+    ("Max RPM", "max_rpm", "int", 10, 55000, None),
+    ("Stall Timeout (ms)", "motor_stall_timeout", "int", 250, 10000, None),
+    ("Motor Direction", "motor_direction", "choice", None, None, (("Forward", 0), ("Reverse", 1))),
+    ("Sensor Direction", "sensor_direction", "choice", None, None, (("Forward", 0), ("Reverse", 1))),
+    ("Motor Brake (%)", "motor_brake", "int", 0, 100, None),
+    ("Control Mode", "control_mode", "choice", None, None, (("PWM / Open Loop", 0), ("PID / Closed Loop", 1))),
+    ("MOSFET Temp Limit (C)", "mosfet_temperature_limit", "int", 25, 125, None),
+    ("Motor Temp Limit (C)", "motor_temperature_limit", "int", 25, 85, None),
+    ("Max PWM (%)", "max_pwm", "int", 0, 100, None),
+    ("Motor PWM (%)", "motor_pwm", "int", 0, 100, None),
+    ("Motor RPM", "motor_rpm", "int", 0, 65535, None),
+    ("Kp", "kp", "float", 0.0, 1000.0, None),
+    ("Ki", "ki", "float", 0.0, 1000.0, None),
+    ("Kd", "kd", "float", 0.0, 1000.0, None),
+    ("Anti-Windup (%)", "anti_windup", "percent", 0.0, 100.0, None),
+    ("OVP Protection (mV)", "ovp_protection", "int", 8000, 40000, None),
+)
 
 
 def convert_voltage_mv(adc_value: int) -> int:
@@ -645,6 +704,15 @@ class PIDTuningApp:
         self._pid_fields_updating = False
         self._pid_fields_dirty = False
         self._last_loaded_swo_data: Optional[SWOData] = None
+        self._target_running = False
+        self._eeprom_dialog: Optional[tk.Toplevel] = None
+        self._eeprom_dialog_status_var: Optional[tk.StringVar] = None
+        self._eeprom_dialog_vars: dict[str, tk.StringVar] = {}
+        self._eeprom_dialog_widgets: list[tuple[tk.Widget, str]] = []
+        self._eeprom_dialog_summary_vars: dict[str, tk.StringVar] = {}
+        self._eeprom_dialog_commit_button: Optional[ttk.Button] = None
+        self._eeprom_dialog_source: Optional[EEPROMData] = None
+        self._eeprom_dialog_address: Optional[int] = None
         self._install_pid_field_traces()
 
         self.data_address: Optional[int] = SWO_DATA_FIXED_RAM_ADDRESS
@@ -657,6 +725,8 @@ class PIDTuningApp:
 
         self._initial_sash_done = False
         self._build_layout()
+        self._update_control_button_states()
+        self.root.after_idle(self._update_control_button_states)
         self._init_buffers(window_seconds=10)
         self._build_plot_lines()
         self._refresh_plot()
@@ -851,15 +921,26 @@ class PIDTuningApp:
             row=5, column=0, columnspan=2, padx=6, pady=(8, 6), sticky="ew"
         )
 
+        self.eeprom_button = ttk.Button(pid_group, text="EEPROM...", command=self._open_eeprom_dialog, state=tk.DISABLED)
+        self.eeprom_button.grid(row=6, column=0, columnspan=2, padx=6, pady=(0, 6), sticky="ew")
+
         ttk.Label(
             outer,
             text="Panels are resizable; drag separators to adjust Graph / Logs / Faults / Controls.",
             justify=tk.LEFT,
         ).grid(row=3, column=0, columnspan=2, sticky="w", pady=(6, 0))
 
-    def _pack_swo_data(self, data: SWOData, enabled_state: int = SWO_ENABLE_DISABLED, changed: bool = True) -> bytes:
+    def _pack_swo_data(
+        self,
+        data: SWOData,
+        eeprom_address: int,
+        eeprom_commit: bool,
+        enabled_state: int = SWO_ENABLE_DISABLED,
+        changed: bool = True,
+    ) -> bytes:
         # C++ layout: float Kp, float Ki, float Kd, float antiWindup,
-        # uint16_t rpm, enum class EnableState : uint8_t enabled, bool changed.
+        # uint16_t rpm, enum class EnableState : uint8_t enabled, bool changed,
+        # struct { uint32_t address; bool commit; } EEPROM.
         return struct.pack(
             SWO_DATA_STRUCT,
             data.kp,
@@ -869,10 +950,12 @@ class PIDTuningApp:
             data.rpm,
             enabled_state & 0xFF,
             changed,
+            eeprom_address,
+            eeprom_commit,
         )
 
     def _unpack_swo_data(self, payload: bytes) -> SWOData:
-        kp, ki, kd, anti_windup, rpm, _enabled_state, changed = struct.unpack(
+        kp, ki, kd, anti_windup, rpm, _enabled_state, changed, eeprom_address, eeprom_commit = struct.unpack(
             SWO_DATA_STRUCT,
             payload[:SWO_DATA_SIZE],
         )
@@ -883,7 +966,42 @@ class PIDTuningApp:
             anti_windup=anti_windup,
             rpm=rpm,
             changed=changed,
+            eeprom_address=eeprom_address,
+            eeprom_commit=eeprom_commit,
         )
+
+    def _pack_eeprom_data(self, data: EEPROMData) -> bytes:
+        return struct.pack(
+            EEPROM_DATA_STRUCT,
+            data.magic,
+            data.version,
+            data.sequence,
+            data.tft_brightness,
+            data.led_brightness,
+            data.input_current_limit,
+            data.motor_current_limit,
+            data.min_rpm,
+            data.max_rpm,
+            data.motor_stall_timeout,
+            data.motor_direction,
+            data.sensor_direction,
+            data.motor_brake,
+            data.control_mode,
+            data.mosfet_temperature_limit,
+            data.motor_temperature_limit,
+            data.max_pwm,
+            data.motor_pwm,
+            data.motor_rpm,
+            data.kp,
+            data.ki,
+            data.kd,
+            data.anti_windup,
+            data.ovp_protection,
+        )
+
+    def _unpack_eeprom_data(self, payload: bytes) -> EEPROMData:
+        values = struct.unpack(EEPROM_DATA_STRUCT, payload[:EEPROM_DATA_SIZE])
+        return EEPROMData(*values)
 
     @staticmethod
     def _is_invalid_swo_default_signature(data: SWOData) -> bool:
@@ -923,6 +1041,9 @@ class PIDTuningApp:
                 f"Invalid SWO::data anti-windup: {data.anti_windup}"
             )
 
+        if data.eeprom_address == 0:
+            raise RuntimeError("Invalid SWO::data EEPROM address: 0")
+
         if self._is_invalid_swo_default_signature(data):
             raise RuntimeError("Invalid SWO::data signature detected")
 
@@ -953,6 +1074,12 @@ class PIDTuningApp:
     def _set_sync_enabled(self, enabled: bool) -> None:
         self.sync_button.configure(state=(tk.NORMAL if enabled else tk.DISABLED))
 
+    def _set_eeprom_button_enabled(self, enabled: bool) -> None:
+        self.eeprom_button.configure(state=(tk.NORMAL if enabled else tk.DISABLED))
+
+    def _update_control_button_states(self) -> None:
+        self._set_eeprom_button_enabled(self.backend.running and self._eeprom_dialog is None)
+
     def _set_target_enabled(self, enabled: bool) -> None:
         if self.data_address is None:
             return
@@ -960,12 +1087,298 @@ class PIDTuningApp:
         def worker() -> None:
             try:
                 payload = self.gdb_mem.read_memory(self.data_address, SWO_DATA_SIZE)
-                _, _enabled_state = self._validate_swo_payload(payload)
+                current_data, _enabled_state = self._validate_swo_payload(payload)
                 data = bytearray(payload)
                 data[SWO_DATA_ENABLED_OFFSET] = SWO_ENABLE_SWO if enabled else SWO_ENABLE_DISABLED
+                data[SWO_DATA_EEPROM_ADDRESS_OFFSET:SWO_DATA_EEPROM_ADDRESS_OFFSET + 4] = struct.pack(
+                    "<I",
+                    current_data.eeprom_address,
+                )
+                data[SWO_DATA_EEPROM_COMMIT_OFFSET] = 1 if current_data.eeprom_commit else 0
                 self.gdb_mem.write_memory(self.data_address, bytes(data))
             except Exception as exc:
                 self.event_queue.put(("log", f"Set SWO::data.enabled failed: {exc}"))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _format_eeprom_field_value(self, spec: tuple[str, str, str, Optional[float], Optional[float], Optional[tuple[tuple[str, int], ...]]], data: EEPROMData) -> str:
+        _, field_name, field_kind, _, _, choices = spec
+        value = getattr(data, field_name)
+
+        if field_kind == "choice" and choices is not None:
+            for label, candidate in choices:
+                if candidate == value:
+                    return label
+            return str(value)
+
+        if field_kind == "float":
+            return f"{float(value):.6f}"
+
+        if field_kind == "percent":
+            return f"{float(value) / 100.0:.2f}"
+
+        return str(int(value))
+
+    def _set_eeprom_dialog_editable(self, enabled: bool) -> None:
+        state = tk.NORMAL if enabled else tk.DISABLED
+        combo_state = "readonly" if enabled else tk.DISABLED
+
+        for widget, widget_kind in self._eeprom_dialog_widgets:
+            widget.configure(state=(combo_state if widget_kind == "choice" else state))
+
+        if self._eeprom_dialog_commit_button is not None:
+            self._eeprom_dialog_commit_button.configure(state=(tk.NORMAL if enabled else tk.DISABLED))
+
+    def _close_eeprom_dialog(self) -> None:
+        if self._eeprom_dialog is not None:
+            try:
+                self._eeprom_dialog.grab_release()
+            except Exception:
+                pass
+            try:
+                self._eeprom_dialog.destroy()
+            except Exception:
+                pass
+
+        self._eeprom_dialog = None
+        self._eeprom_dialog_status_var = None
+        self._eeprom_dialog_vars = {}
+        self._eeprom_dialog_widgets = []
+        self._eeprom_dialog_summary_vars = {}
+        self._eeprom_dialog_commit_button = None
+        self._eeprom_dialog_source = None
+        self._eeprom_dialog_address = None
+        self._update_control_button_states()
+
+    def _populate_eeprom_dialog(self, swo_data: SWOData, data: EEPROMData) -> None:
+        if self._eeprom_dialog is None:
+            return
+
+        self._eeprom_dialog_source = data
+        self._eeprom_dialog_address = swo_data.eeprom_address
+
+        summary_vars = self._eeprom_dialog_summary_vars
+        summary_vars["magic"].set(f"0x{data.magic:08X}")
+        summary_vars["version"].set(str(data.version))
+        summary_vars["sequence"].set(str(data.sequence))
+        summary_vars["address"].set(f"0x{self._eeprom_dialog_address:08X}")
+        summary_vars["commit"].set("set" if swo_data.eeprom_commit else "clear")
+
+        for spec in EEPROM_FIELD_SPECS:
+            _, field_name, _, _, _, _ = spec
+            self._eeprom_dialog_vars[field_name].set(self._format_eeprom_field_value(spec, data))
+
+        if self._eeprom_dialog_status_var is not None:
+            self._eeprom_dialog_status_var.set("Loaded EEPROM data")
+
+        self._set_eeprom_dialog_editable(True)
+
+    def _read_eeprom_dialog_values(self) -> EEPROMData:
+        if self._eeprom_dialog_source is None:
+            raise RuntimeError("EEPROM data not loaded yet")
+
+        values = {
+            "magic": self._eeprom_dialog_source.magic,
+            "version": self._eeprom_dialog_source.version,
+            "sequence": self._eeprom_dialog_source.sequence,
+        }
+
+        for spec in EEPROM_FIELD_SPECS:
+            _, field_name, field_kind, minimum, maximum, choices = spec
+            raw_text = self._eeprom_dialog_vars[field_name].get().strip()
+
+            if field_kind == "choice":
+                if choices is None:
+                    raise RuntimeError(f"No choices defined for {field_name}")
+                mapping = {label: value for label, value in choices}
+                if raw_text not in mapping:
+                    raise ValueError(f"Invalid value for {field_name}: {raw_text}")
+                values[field_name] = mapping[raw_text]
+                continue
+
+            if field_kind == "float":
+                parsed_value = float(raw_text)
+            elif field_kind == "percent":
+                parsed_percent = float(raw_text)
+                if minimum is not None and parsed_percent < minimum:
+                    raise ValueError(f"{field_name} below minimum {minimum}")
+                if maximum is not None and parsed_percent > maximum:
+                    raise ValueError(f"{field_name} above maximum {maximum}")
+                values[field_name] = int(round(parsed_percent * 100.0))
+                continue
+            else:
+                parsed_value = int(raw_text)
+
+            if minimum is not None and parsed_value < minimum:
+                raise ValueError(f"{field_name} below minimum {minimum}")
+            if maximum is not None and parsed_value > maximum:
+                raise ValueError(f"{field_name} above maximum {maximum}")
+
+            values[field_name] = parsed_value
+
+        return EEPROMData(**values)
+
+    def _position_dialog_centered(self, dialog: tk.Toplevel, width: int, height: int) -> None:
+        # Place modal near the parent window center so it does not appear at desktop origin.
+        self.root.update_idletasks()
+        root_width = self.root.winfo_width()
+        root_height = self.root.winfo_height()
+        root_x = self.root.winfo_rootx()
+        root_y = self.root.winfo_rooty()
+
+        if root_width <= 1 or root_height <= 1:
+            # Fallback when root geometry is not available yet.
+            dialog.geometry(f"{width}x{height}")
+            return
+
+        pos_x = root_x + max(0, (root_width - width) // 2)
+        pos_y = root_y + max(0, (root_height - height) // 2)
+        dialog.geometry(f"{width}x{height}+{pos_x}+{pos_y}")
+
+    def _open_eeprom_dialog(self) -> None:
+        if self._eeprom_dialog is not None:
+            self._eeprom_dialog.lift()
+            self._eeprom_dialog.focus_force()
+            return
+
+        if not self.backend.running:
+            self._append_log("EEPROM editor is only available while monitoring is started")
+            return
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title("EEPROM Editor")
+        dialog.transient(self.root)
+        dialog.grab_set()
+        dialog.minsize(980, 560)
+        dialog.geometry("1080x640")
+        dialog.protocol("WM_DELETE_WINDOW", self._close_eeprom_dialog)
+        self._eeprom_dialog = dialog
+
+        self._position_dialog_centered(dialog, width=1080, height=640)
+
+        dialog.columnconfigure(0, weight=1)
+        dialog.rowconfigure(1, weight=1)
+
+        summary_frame = ttk.LabelFrame(dialog, text="EEPROM Header")
+        summary_frame.grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 6))
+        summary_frame.columnconfigure(1, weight=1)
+        summary_frame.columnconfigure(3, weight=1)
+        summary_frame.columnconfigure(5, weight=1)
+
+        self._eeprom_dialog_summary_vars = {
+            "magic": tk.StringVar(value="..."),
+            "version": tk.StringVar(value="..."),
+            "sequence": tk.StringVar(value="..."),
+            "address": tk.StringVar(value="..."),
+            "commit": tk.StringVar(value="..."),
+        }
+
+        header_items = (
+            ("Magic", "magic", 0),
+            ("Version", "version", 2),
+            ("Sequence", "sequence", 4),
+            ("RAM Address", "address", 0),
+            ("Commit Flag", "commit", 2),
+        )
+        for label_text, key, column in header_items[:3]:
+            row = 0
+            ttk.Label(summary_frame, text=f"{label_text}:").grid(row=row, column=column, padx=(8, 4), pady=4, sticky="w")
+            ttk.Label(summary_frame, textvariable=self._eeprom_dialog_summary_vars[key]).grid(row=row, column=column + 1, padx=(0, 12), pady=4, sticky="w")
+        for label_text, key, column in header_items[3:]:
+            row = 1
+            ttk.Label(summary_frame, text=f"{label_text}:").grid(row=row, column=column, padx=(8, 4), pady=4, sticky="w")
+            ttk.Label(summary_frame, textvariable=self._eeprom_dialog_summary_vars[key]).grid(row=row, column=column + 1, padx=(0, 12), pady=4, sticky="w")
+
+        form_frame = ttk.LabelFrame(dialog, text="Editable Fields")
+        form_frame.grid(row=1, column=0, sticky="nsew", padx=12, pady=6)
+        form_frame.columnconfigure(1, weight=1)
+        form_frame.columnconfigure(3, weight=1)
+
+        self._eeprom_dialog_vars = {}
+        self._eeprom_dialog_widgets = []
+
+        for row_index, start_index in enumerate(range(0, len(EEPROM_FIELD_SPECS), 2)):
+            for column_offset, spec in enumerate(EEPROM_FIELD_SPECS[start_index : start_index + 2]):
+                label_text, field_name, field_kind, _, _, choices = spec
+                column = column_offset * 2
+                ttk.Label(form_frame, text=f"{label_text}:").grid(row=row_index, column=column, padx=(8, 4), pady=4, sticky="w")
+
+                field_var = tk.StringVar(value="...")
+                self._eeprom_dialog_vars[field_name] = field_var
+
+                if field_kind == "choice" and choices is not None:
+                    widget = ttk.Combobox(
+                        form_frame,
+                        textvariable=field_var,
+                        values=[label for label, _ in choices],
+                        width=22,
+                        state=tk.DISABLED,
+                    )
+                    widget.configure(state=tk.DISABLED)
+                    widget_kind = "choice"
+                else:
+                    widget = ttk.Entry(form_frame, textvariable=field_var, width=24, state=tk.DISABLED)
+                    widget_kind = "entry"
+
+                widget.grid(row=row_index, column=column + 1, padx=(0, 12), pady=4, sticky="ew")
+                self._eeprom_dialog_widgets.append((widget, widget_kind))
+
+        button_frame = ttk.Frame(dialog)
+        button_frame.grid(row=2, column=0, sticky="ew", padx=12, pady=(6, 12))
+        button_frame.columnconfigure(0, weight=1)
+
+        self._eeprom_dialog_status_var = tk.StringVar(value="Loading EEPROM data...")
+        ttk.Label(button_frame, textvariable=self._eeprom_dialog_status_var).grid(row=0, column=0, sticky="w")
+
+        button_row = ttk.Frame(button_frame)
+        button_row.grid(row=0, column=1, sticky="e")
+        self._eeprom_dialog_commit_button = ttk.Button(button_row, text="Commit", command=self._commit_eeprom_dialog, state=tk.DISABLED)
+        self._eeprom_dialog_commit_button.pack(side=tk.LEFT, padx=(0, 6))
+        ttk.Button(button_row, text="Cancel", command=self._close_eeprom_dialog).pack(side=tk.LEFT)
+
+        self._set_eeprom_dialog_editable(False)
+
+        def worker() -> None:
+            try:
+                swo_payload = self.gdb_mem.read_memory(self.data_address, SWO_DATA_SIZE)
+                swo_data, _enabled_state = self._validate_swo_payload(swo_payload)
+                eeprom_payload = self.gdb_mem.read_memory(swo_data.eeprom_address, EEPROM_DATA_SIZE)
+                eeprom_data = self._unpack_eeprom_data(eeprom_payload)
+                self.event_queue.put(("eeprom-load", (swo_data, eeprom_data)))
+            except Exception as exc:
+                self.event_queue.put(("eeprom-load-error", str(exc)))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _commit_eeprom_dialog(self) -> None:
+        if self._eeprom_dialog_source is None or self._eeprom_dialog_address is None:
+            if self._eeprom_dialog_status_var is not None:
+                self._eeprom_dialog_status_var.set("EEPROM data is not loaded yet")
+            return
+
+        try:
+            eeprom_data = self._read_eeprom_dialog_values()
+        except Exception as exc:
+            if self._eeprom_dialog_status_var is not None:
+                self._eeprom_dialog_status_var.set(f"Invalid EEPROM input: {exc}")
+            return
+
+        self._set_eeprom_dialog_editable(False)
+        if self._eeprom_dialog_status_var is not None:
+            self._eeprom_dialog_status_var.set("Committing EEPROM data...")
+
+        def worker() -> None:
+            try:
+                self.gdb_mem.write_memory(self._eeprom_dialog_address, self._pack_eeprom_data(eeprom_data))
+                if self.data_address is None:
+                    raise RuntimeError("SWO data address not available")
+                self.gdb_mem.write_memory(
+                    self.data_address + SWO_DATA_EEPROM_COMMIT_OFFSET,
+                    b"\x01",
+                )
+                self.event_queue.put(("eeprom-commit-complete", eeprom_data))
+            except Exception as exc:
+                self.event_queue.put(("eeprom-commit-error", str(exc)))
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -1052,10 +1465,16 @@ class PIDTuningApp:
         def worker() -> None:
             try:
                 current_payload = self.gdb_mem.read_memory(self.data_address, SWO_DATA_SIZE)
-                _, enabled_state = self._validate_swo_payload(current_payload)
+                current_data, enabled_state = self._validate_swo_payload(current_payload)
                 self.gdb_mem.write_memory(
                     self.data_address,
-                    self._pack_swo_data(data, enabled_state=enabled_state, changed=True),
+                    self._pack_swo_data(
+                        data,
+                        enabled_state=enabled_state,
+                        changed=True,
+                        eeprom_address=current_data.eeprom_address,
+                        eeprom_commit=current_data.eeprom_commit,
+                    ),
                 )
                 self.event_queue.put(("log", "Synced PID params to SWO::data (changed=true)"))
                 # Read back once after write for confirmation.
@@ -1145,6 +1564,7 @@ class PIDTuningApp:
         series.append(value)
 
     def _handle_sample(self, sample: Sample) -> None:
+        self._target_running = bool(sample.running)
         self.filled = min(self.filled + 1, self.samples_per_window)
 
         pwm_percent = (float(sample.pwm_level) * 100.0) / PID_PWM_MAX_LEVEL
@@ -1174,6 +1594,7 @@ class PIDTuningApp:
         self._set_fault_indicator(self.ocp_indicator, bool(sample.ocp_fault))
         self._set_fault_indicator(self.driver_fault_indicator, bool(sample.drv_fault))
         self._set_fault_indicator(self.driver_ocp_indicator, bool(sample.snsout_fault))
+        self._update_control_button_states()
 
         current_count = max(1, self.filled)
         rpm_mean = self._rpm_sum / float(current_count)
@@ -1249,7 +1670,6 @@ class PIDTuningApp:
         if self.backend.running:
             self._cancel_startup_sync_job()
             self._set_target_enabled(False)
-            self.backend.stop()
             self.start_stop_button.configure(text="Start")
             self.status_var.set("Stopped")
             self._append_log("Stopped")
@@ -1260,6 +1680,8 @@ class PIDTuningApp:
             self._set_fault_indicator(self.ocp_indicator, False)
             self._set_fault_indicator(self.driver_fault_indicator, False)
             self._set_fault_indicator(self.driver_ocp_indicator, False)
+            self._target_running = False
+            self._update_control_button_states()
             return
 
         self._cancel_startup_sync_job()
@@ -1273,11 +1695,13 @@ class PIDTuningApp:
             self.pending_initial_sync = True
             self.sync_in_progress = False
             self.start_reset_retried = False
+            self._update_control_button_states()
             self._append_log("Waiting for SWO::data read...")
             self._append_log("Started")
             self._request_read_swo_data("startup")
         else:
             self.status_var.set("Error")
+            self._update_control_button_states()
 
     def _set_window_preset(self, value: int) -> None:
         self.window_seconds_var.set(str(value))
@@ -1339,6 +1763,8 @@ class PIDTuningApp:
                     self._set_fault_indicator(self.ocp_indicator, False)
                     self._set_fault_indicator(self.driver_fault_indicator, False)
                     self._set_fault_indicator(self.driver_ocp_indicator, False)
+                    self._target_running = False
+                    self._update_control_button_states()
                     self._append_log('Firmware ready. Press "Start" to connect and run.')
                 else:
                     self.status_var.set("Error")
@@ -1348,6 +1774,60 @@ class PIDTuningApp:
             elif kind == "startup-sync-retry":
                 self._startup_sync_job = None
                 self.pending_initial_sync = True
+            elif kind == "eeprom-load":
+                swo_data, eeprom_data = payload  # type: ignore[misc]
+                self._populate_eeprom_dialog(swo_data, eeprom_data)
+            elif kind == "eeprom-load-error":
+                message = str(payload)
+                if self._eeprom_dialog_status_var is not None:
+                    self._eeprom_dialog_status_var.set(f"Failed to load EEPROM data: {message}")
+                self._append_log(f"EEPROM dialog load failed: {message}")
+                self._set_eeprom_dialog_editable(False)
+            elif kind == "eeprom-commit-complete":
+                committed_eeprom_data = payload if isinstance(payload, EEPROMData) else None
+                if self._eeprom_dialog_status_var is not None:
+                    self._eeprom_dialog_status_var.set("EEPROM committed")
+                self._append_log("EEPROM data committed and SWO::data.EEPROM.commit set")
+                if committed_eeprom_data is not None:
+                    # Keep UI input fields in sync with committed EEPROM values without re-reading SWO memory.
+                    self._pid_fields_updating = True
+                    try:
+                        self.kp_var.set(f"{committed_eeprom_data.kp:.6f}")
+                        self.ki_var.set(f"{committed_eeprom_data.ki:.6f}")
+                        self.kd_var.set(f"{committed_eeprom_data.kd:.6f}")
+                        self.anti_windup_var.set(f"{(float(committed_eeprom_data.anti_windup) / 100.0):.2f}")
+                        self.rpm_var.set(str(committed_eeprom_data.motor_rpm))
+                        self._pid_fields_dirty = False
+                    finally:
+                        self._pid_fields_updating = False
+
+                    if self._last_loaded_swo_data is not None:
+                        self._last_loaded_swo_data = SWOData(
+                            kp=committed_eeprom_data.kp,
+                            ki=committed_eeprom_data.ki,
+                            kd=committed_eeprom_data.kd,
+                            anti_windup=float(committed_eeprom_data.anti_windup) / 100.0,
+                            rpm=committed_eeprom_data.motor_rpm,
+                            changed=self._last_loaded_swo_data.changed,
+                            eeprom_address=self._last_loaded_swo_data.eeprom_address,
+                            eeprom_commit=self._last_loaded_swo_data.eeprom_commit,
+                        )
+
+                    self._append_log(
+                        "Updated input fields after EEPROM commit: "
+                        f"Kp={committed_eeprom_data.kp:.6f} Ki={committed_eeprom_data.ki:.6f} "
+                        f"Kd={committed_eeprom_data.kd:.6f} "
+                        f"AWR={(float(committed_eeprom_data.anti_windup) / 100.0):.2f}% "
+                        f"RPM={committed_eeprom_data.motor_rpm}"
+                    )
+                    self._set_sync_enabled(True)
+                self._close_eeprom_dialog()
+            elif kind == "eeprom-commit-error":
+                message = str(payload)
+                if self._eeprom_dialog_status_var is not None:
+                    self._eeprom_dialog_status_var.set(f"EEPROM commit failed: {message}")
+                self._append_log(f"EEPROM commit failed: {message}")
+                self._set_eeprom_dialog_editable(True)
 
         now = time.monotonic()
         if got_sample and (now - self._last_plot_refresh) >= 0.10:
@@ -1357,6 +1837,8 @@ class PIDTuningApp:
         if not self.backend.running and self.start_stop_button.cget("text") == "Stop":
             self.start_stop_button.configure(text="Start")
             self.status_var.set("Stopped")
+            self._target_running = False
+            self._update_control_button_states()
 
         self.root.after(40, self._process_events)
 

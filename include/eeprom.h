@@ -8,6 +8,7 @@
 #include "ui_constants.h"
 #include "adc.h"
 #include "i2c.h"
+#include "adc_converters.h"
 
 struct EEPROM
 {
