@@ -66,12 +66,12 @@ struct MT6701Config {
         if (!writeRegister(REG_ABZ_RES_HIGH, high)) {
             return false;
         }
-        HAL_Delay(10);
+        WatchDog::delay(10);
 
         if (!writeRegister(REG_ABZ_RES_LOW, low)) {
             return false;
         }
-        HAL_Delay(10);
+        WatchDog::delay(10);
 
         return (getPPR() == ppr);
     }
@@ -88,12 +88,12 @@ struct MT6701Config {
         if (!writeRegister(REG_PROG_KEY, CMD_UNLOCK)) {
             return false;
         }
-        HAL_Delay(10);
+        WatchDog::delay(10);
 
         if (!writeRegister(REG_PROG_CMD, CMD_COMMIT)) {
             return false;
         }
-        HAL_Delay(800);  // EEPROM write time
+        WatchDog::delay(800);  // EEPROM write time
         return true;
     }
 
