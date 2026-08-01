@@ -361,6 +361,11 @@ void PidController::isr()
     }
 }
 
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC push_options
+#pragma GCC optimize("O3")
+#endif
+
 void PidController::ocp_isr()
 {
     ocp.counter++;
@@ -419,6 +424,10 @@ void PidController::trigger_ocp()
         }
     }
 }
+
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC pop_options
+#endif
 
 size_t PidController::errorPrintf(char *buf, size_t bufSize) const
 {
