@@ -18,12 +18,12 @@ void PidController::init()
     __HAL_RCC_TIM1_CLK_ENABLE();
 
     // PA8 / PA9 AF push-pull
-    GPIO_InitTypeDef GPIO_InitStructPP = {};
-    GPIO_InitStructPP.Pin = GPIO_PIN_8 | GPIO_PIN_9;
-    GPIO_InitStructPP.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStructPP.Pull = GPIO_NOPULL;
-    GPIO_InitStructPP.Speed = GPIO_SPEED_FREQ_HIGH;
-    HAL_GPIO_Init(GPIOA, &GPIO_InitStructPP);
+    GPIO_InitTypeDef GPIO_InitStruct = {};
+    GPIO_InitStruct.Pin = GPIO_PIN_8 | GPIO_PIN_9;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
     // TIM1 PWM setup
     TIM_HandleTypeDef tim1 = {};
@@ -85,11 +85,11 @@ void PidController::init()
     __HAL_RCC_TIM5_CLK_ENABLE();
 
     // PA1 (TIM5_CH2) input floating
-    GPIO_InitTypeDef GPIO_InitStructNpPullup = {};
-    GPIO_InitStructNpPullup.Pin = GPIO_PIN_1;
-    GPIO_InitStructNpPullup.Mode = GPIO_MODE_INPUT;
-    GPIO_InitStructNpPullup.Pull = GPIO_NOPULL;
-    HAL_GPIO_Init(GPIOA, &GPIO_InitStructNpPullup);
+    GPIO_InitStruct = {};
+    GPIO_InitStruct.Pin = GPIO_PIN_1;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
     // Reset TIM5
     TIM5->CR1 = 0;
@@ -119,10 +119,10 @@ void PidController::init()
     __HAL_RCC_GPIOx_CLK_ENABLE<OCP_INT_PIN>();
     __HAL_RCC_GPIOx_CLK_ENABLE<DRV_SNSOUT_PIN>();
 
-    GPIO_InitTypeDef GPIO_InitStruct = {};
-    GPIO_InitStruct.Pin = digitalPinToHAL<DRV8701_FAULT_PIN>();
+    GPIO_InitStruct = {};
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_PULLUP;
+    GPIO_InitStruct.Pin = digitalPinToHAL<DRV8701_FAULT_PIN>();
     HAL_GPIO_Init(digitalPinToGPIO<DRV8701_FAULT_PIN>(), &GPIO_InitStruct);
 
     GPIO_InitStruct.Pin = digitalPinToHAL<OCP_INT_PIN>();
@@ -155,13 +155,13 @@ void PidController::reset()
     applyPIDParams();
 
     #if DEBUG
-    char pBuf[16], iBuf[16], dBuf[16], aBuf[16];
-    FloatToString::convertTrimmed(pBuf, sizeof(pBuf), Kp, 6);
-    FloatToString::convertTrimmed(iBuf, sizeof(iBuf), Ki, 6);
-    FloatToString::convertTrimmed(dBuf, sizeof(dBuf), Kd, 6);
-    FloatToString::convertTrimmed(aBuf, sizeof(aBuf), antiWindup, 6);
-    __enable_irq();
-    DEBUG_PRINT(DebugType::PID, "Kp=%s Ki=%s Kd=%s RPM=%u windup=%s OCP=%u/%u OVP=%u", pBuf, iBuf, dBuf, rpm, aBuf, eeprom.getInputCurrentLimit(), eeprom.getMotorCurrentLimit(), eeprom.getOvpProtection());
+        char pBuf[16], iBuf[16], dBuf[16], aBuf[16];
+        FloatToString::convertTrimmed(pBuf, sizeof(pBuf), Kp, 6);
+        FloatToString::convertTrimmed(iBuf, sizeof(iBuf), Ki, 6);
+        FloatToString::convertTrimmed(dBuf, sizeof(dBuf), Kd, 6);
+        FloatToString::convertTrimmed(aBuf, sizeof(aBuf), antiWindup, 6);
+        __enable_irq();
+        DEBUG_PRINT(DebugType::PID, "Kp=%s Ki=%s Kd=%s RPM=%u windup=%s OCP=%u/%u OVP=%u", pBuf, iBuf, dBuf, rpm, aBuf, eeprom.getInputCurrentLimit(), eeprom.getMotorCurrentLimit(), eeprom.getOvpProtection());
     #endif
 }
 
@@ -252,7 +252,7 @@ void PidController::isr()
 
     if (eeprom.isPIDMode()) {
         if (ocp.state != OcpStateType::NONE) {
-            setIntegral(getIntegral() * 0.8f); // strong anti windup during OCP condition
+            setIntegral(getIntegral() * kOcpAntiWindUp);
         }
         else if (antiWindup) {
             if (pwmLevel < (int32_t)(kMaxPWMLevel * -1.1f) || pwmLevel > (int32_t)(kMaxPWMLevel * 1.1f)) {

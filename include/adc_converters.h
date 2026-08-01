@@ -96,66 +96,75 @@ struct ADCConverter {
         static constexpr uint32_t kNominalResistance = NTC_NOMINAL_RESISTANCE;
         static constexpr uint32_t kBetaCoefficient = NTC_BETA_COEFF;
         static constexpr uint32_t kNominalTemperature = NTC_NOMINAL_TEMP;
+        static constexpr uint32_t kADCMax = ADC_MAX;
 
+        /**
+         * @brief Convert ADC value to temperature
+         *
+         * @param adcValue ADC value
+         * @return float Temperature in Celsius
+         */
         static float convert(uint16_t adcValue)
         {
-            if (adcValue == 0 || adcValue >= ADC_MAX) {
+            if (adcValue == 0 || adcValue >= kADCMax) {
                 return 0.0f;
             }
-
-            float resistance;
-
+            const float resistance;
             if constexpr (HIGH_SIDE_NTC) {
                 // VCC - NTC - ADC - Rseries - GND
-                resistance =
-                    (static_cast<float>(ADC_MAX) /
-                    static_cast<float>(adcValue) - 1.0f)
-                    * static_cast<float>(kSeriesResistance);
+                resistance = (static_cast<float>(kADCMax) / static_cast<float>(adcValue) - 1.0f) * static_cast<float>(kSeriesResistance);
             }
             else {
                 // VCC - Rseries - ADC - NTC - GND
-                resistance =
-                    static_cast<float>(kSeriesResistance) *
-                    static_cast<float>(adcValue) /
-                    (static_cast<float>(ADC_MAX) - adcValue);
+                resistance = static_cast<float>(kSeriesResistance) * static_cast<float>(adcValue) / (static_cast<float>(kADCMax) - adcValue);
             }
-
-            float temperature = log(resistance / static_cast<float>(kNominalResistance));
+            float temperature = std::log(resistance / static_cast<float>(kNominalResistance));
             temperature /= static_cast<float>(kBetaCoefficient);
             temperature += 1.0f / (static_cast<float>(kNominalTemperature) + 273.15f);
             temperature = 1.0f / temperature;
             return temperature - 273.15f;
         }
 
+        /**
+         * @brief Convert temperature to ADC value
+         *
+         * @param temperature Temperature in Celsius
+         * @return uint16_t ADC value
+         */
         static uint16_t reverse(float temperature)
         {
             // Celsius to Kelvin
             float temperatureK = temperature + 273.15f;
-
             // Calculate NTC resistance
-            float resistance =
-                kNominalResistance *
-                exp(kBetaCoefficient *
-                (1.0f / temperatureK -
-                1.0f / (kNominalTemperature + 273.15f)));
-
-            float adc;
-
+            const float resistance = kNominalResistance * std::exp(kBetaCoefficient * 1.0f / temperatureK - 1.0f / (kNominalTemperature + 273.15f));
             if constexpr (HIGH_SIDE_NTC) {
                 // VCC - NTC - ADC - Rseries - GND
-                adc =
-                    static_cast<float>(ADC_MAX) *
-                    kSeriesResistance /
-                    (resistance + kSeriesResistance);
+                return static_cast<uint16_t>(static_cast<float>(kADCMax) * kSeriesResistance / (resistance + kSeriesResistance));
             }
             else {
                 // VCC - Rseries - ADC - NTC - GND
-                adc =
-                    static_cast<float>(ADC_MAX) *
-                    resistance /
-                    (resistance + kSeriesResistance);
+                return static_cast<uint16_t>(static_cast<float>(kADCMax) * resistance / (resistance + kSeriesResistance));
             }
-            return static_cast<uint16_t>(adc);
+        }
+
+        /**
+         * @brief Compare 2 ADC values
+         *
+         * @return bool True if temperature of adc1 is greater than temperature of adc2
+         */
+        static bool gt(uint16_t adc1, uint16_t adc2)
+        {
+            if constexpr (HIGH_SIDE_NTC) {
+                if (adc1 > adc2) {
+                    return true;
+                }
+            }
+            else {
+                if (adc1 < adc2) {
+                    return true;
+                }
+            }
+            return false;
         }
     };
 

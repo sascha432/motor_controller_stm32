@@ -479,6 +479,7 @@ struct PidController
     static constexpr uint32_t kOcpCurrentRampUp = 32;                                   // increase current by 1/32 every tick
     static constexpr uint32_t kOcpCurrentRampDown = 32;                                 // reduce current by 1/32 every tick
     static constexpr uint32_t kOcpInputToMotorCurrentRatio = 8;                         // if the motor current limit is higher than x the input current limit, it will be reduced to x the input current limit, before ramping it down further
+    static constexpr float kOcpAntiWindUp = 0.8f;                                       // strong anti windup during OCP condition
 
     enum class OcpStateType : uint32_t {
         NONE = 0,           // no OCP condition

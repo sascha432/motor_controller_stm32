@@ -65,7 +65,7 @@ struct LEDs_T {
     static void illuminationLedSetPWM(float value)
     {
         if (value == 0) {
-            TIM2->CCR3 = 0;
+            UI_ILLUMINATION_LED_SET_PWM(0);
             return;
         }
         // get more linear brightness by using a gamma curve and offset to avoid flickering at low brightness
@@ -74,7 +74,7 @@ struct LEDs_T {
         // old int version, not enough steps for fading brightness in and out
         // float brightness = std::clamp<int32_t>(value + 15, 15, 115) / 115.0f;
         brightness = powf(brightness, 2.2f);
-        TIM2->CCR3 = (uint16_t)(brightness * 1000);
+        UI_ILLUMINATION_LED_SET_PWM(brightness * 1000);
     }
 };
 

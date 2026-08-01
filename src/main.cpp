@@ -141,6 +141,16 @@ static void loop()
         }
     }
 
+    if (pid.running) {
+        // check NTC sensors, not time critical and a couple times per seconds is enough
+        if (ADCConverter::NTC::gt(adc.getMotorTemperatureFiltered(), eeprom.getMotorTemperatureLimitADC())) {
+            pid.setErrorCode(PidController::ErrorCodeType::MOTOR_OVER_TEMPERATURE);
+        }
+        else if (ADCConverter::NTC::gt(adc.getMosfetTemperatureFiltered(), eeprom.getMosfetTemperatureLimitADC())) {
+            pid.setErrorCode(PidController::ErrorCodeType::MOSFET_OVER_TEMPERATURE);
+        }
+    }
+
     // handle ui updates and rotary encoder
     static uint32_t lastLvHandler = 0;
     if (HAL_GetTick() - lastLvHandler >= 5) {
@@ -149,6 +159,7 @@ static void loop()
         int32_t delta = knob.getDeltaPosition();
         if (delta) {
             newPosition = menu.updateRotaryValue(delta);
+            (void)newPosition;
             DEBUG_PRINT(DebugType::UI, "menu=%d delta=%d", newPosition, delta);
         }
         // handle LVGL updates
@@ -162,17 +173,6 @@ static void loop()
                 break;
             default:
                 break;
-        }
-        // check NTC sensors, not time critical and a couple times per seconds is enough
-        if (adc.getMotorTemperatureFiltered() < eeprom.getMotorTemperatureLimitADC()) {
-            if (pid.running) {
-                pid.setErrorCode(PidController::ErrorCodeType::MOTOR_OVER_TEMPERATURE);
-            }
-        }
-        if (adc.getMosfetTemperatureFiltered() < eeprom.getMosfetTemperatureLimitADC()) {
-            if (pid.running) {
-                pid.setErrorCode(PidController::ErrorCodeType::MOSFET_OVER_TEMPERATURE);
-            }
         }
 
         // update UI, this might take a couple 100ms

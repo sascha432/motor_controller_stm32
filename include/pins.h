@@ -111,3 +111,9 @@ Timer configurations:
 // rotary encoder macros
 #define UI_READ_ROTARY_KNOB_COUNTER()               ((uint16_t)TIM3->CNT) // rotary encoder on ROTARY_ENCODER_PIN_A/ROTARY_ENCODER_PIN_B
 #define UI_WRITE_ROTARY_KNOB_COUNTER(value)         (TIM3->CNT = (value))
+
+// PWM for the LED CC driver
+#define UI_ILLUMINATION_LED_SET_PWM(value)          (TIM2->CCR3 = (value)) // ILLUMINATION_LED_PIN
+
+// PWM for the TFT backlight
+#define UI_TFT_BACKLIGHT_SET_PWM(value)             (TIM2->CCR4 = (value)) // TFT_PIN_LED

@@ -127,7 +127,7 @@ void tft_backlight_pwm_set_raw(uint16_t value)
     if (value > 999) {
         value = 999;
     }
-    TIM2->CCR4 = value;
+    UI_TFT_BACKLIGHT_SET_PWM(value);
 }
 
 /**
