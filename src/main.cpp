@@ -143,10 +143,10 @@ static void loop()
 
     if (pid.running) {
         // check NTC sensors, not time critical and a couple times per seconds is enough
-        if (ADCConverter::NTC::gt(adc.getMotorTemperatureFiltered(), eeprom.getMotorTemperatureLimitADC())) {
+        if (ADCConverter::NTC::compare(adc.getMotorTemperatureFiltered(), eeprom.getMotorTemperatureLimitADC()) > 0) {
             pid.setErrorCode(PidController::ErrorCodeType::MOTOR_OVER_TEMPERATURE);
         }
-        else if (ADCConverter::NTC::gt(adc.getMosfetTemperatureFiltered(), eeprom.getMosfetTemperatureLimitADC())) {
+        else if (ADCConverter::NTC::compare(adc.getMosfetTemperatureFiltered(), eeprom.getMosfetTemperatureLimitADC()) > 0) {
             pid.setErrorCode(PidController::ErrorCodeType::MOSFET_OVER_TEMPERATURE);
         }
     }

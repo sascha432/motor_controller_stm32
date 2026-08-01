@@ -109,7 +109,7 @@ struct ADCConverter {
             if (adcValue == 0 || adcValue >= kADCMax) {
                 return 0.0f;
             }
-            const float resistance;
+            float resistance;
             if constexpr (HIGH_SIDE_NTC) {
                 // VCC - NTC - ADC - Rseries - GND
                 resistance = (static_cast<float>(kADCMax) / static_cast<float>(adcValue) - 1.0f) * static_cast<float>(kSeriesResistance);
@@ -150,21 +150,27 @@ struct ADCConverter {
         /**
          * @brief Compare 2 ADC values
          *
-         * @return bool True if temperature of adc1 is greater than temperature of adc2
+         * @return int8_t If temperature of adc1 is higher than adc2, return 1, if lower return -1, if equal return 0
          */
-        static bool gt(uint16_t adc1, uint16_t adc2)
+        static int8_t compare(uint16_t adc1, uint16_t adc2)
         {
             if constexpr (HIGH_SIDE_NTC) {
-                if (adc1 > adc2) {
-                    return true;
+                if (adc1 < adc2) {
+                    return 1;
+                }
+                else if (adc1 > adc2) {
+                    return -1;
                 }
             }
             else {
-                if (adc1 < adc2) {
-                    return true;
+                if (adc1 > adc2) {
+                    return 1;
+                }
+                else if (adc1 < adc2) {
+                    return -1;
                 }
             }
-            return false;
+            return 0;
         }
     };
 
