@@ -499,7 +499,8 @@ void Menu::handleButtonPress()
             switch(static_cast<AdvancedMenuItemType>(getValue())) {
                 case AdvancedMenuItemType::TFT_BRIGHTNESS:
                     screenFlow.next(new SliderScreen(
-                        Screen::Type::TFT_BRIGHTNESS, "TFT Brightness",
+                        Screen::Type::TFT_BRIGHTNESS,
+                        "TFT Brightness",
                         UIConstants::kMinTFTBrightness,
                         UIConstants::kMaxTFTBrightness,
                         "%"

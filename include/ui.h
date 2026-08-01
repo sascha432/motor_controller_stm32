@@ -203,33 +203,16 @@ protected:
 
 struct InfoScreen : public Screen
 {
-    InfoScreen(Type id, const char *message, const lv_font_t *font = Screen::kInfoScreenLabelFont) :
+    InfoScreen(Type id, const char *message = nullptr, const lv_font_t *font = Screen::kInfoScreenLabelFont) :
         Screen(id),
-        message(strdup(message)),
+        message(message),
         font(font)
     {}
-
-    InfoScreen(Type id, const lv_font_t *font = Screen::kInfoScreenLabelFont) :
-        Screen(id),
-        message(nullptr),
-        font(font)
-    {}
-
-    virtual ~InfoScreen()
-    {
-        free(message);
-    }
 
     virtual void load() override;
-    void setMessage(const char *message)
-    {
-        if (message) {
-            lv_label_set_text(label, message);
-        }
-    }
 
 protected:
-    char *message;
+    const char *message;
     const lv_font_t *font;
     lv_obj_t *label;
 };
@@ -239,6 +222,8 @@ protected:
 struct WelcomeScreen : public InfoScreen
 {
     WelcomeScreen();
+
+    virtual void load() override;
 };
 
 // === Menu Screen ===

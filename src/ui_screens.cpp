@@ -148,12 +148,14 @@ void Screen::_style_screen(lv_obj_t *screen)
 
 // === Welcome Screen ===
 
-WelcomeScreen::WelcomeScreen() :
-    InfoScreen(Type::WELCOME, kWelcomeScreenLabelFont)
+WelcomeScreen::WelcomeScreen() : InfoScreen(Type::WELCOME, nullptr, kWelcomeScreenLabelFont)
 {
-    char buf[32];
-    snprintf(buf, sizeof(buf) - 1, "Version %u.%u.%u", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
-    message = strdup(buf);
+}
+
+void WelcomeScreen::load()
+{
+    InfoScreen::load();
+    lv_label_set_text_fmt(label, "Version %u.%u.%u", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
 }
 
 // === Info Screen ===
@@ -164,9 +166,7 @@ void InfoScreen::load()
     Screen::load();
     label = lv_label_create(screen);
     if (message) {
-        lv_label_set_text(label, message);
-        free(message);
-        message = nullptr;
+        lv_label_set_text_static(label, message);
     }
     lv_obj_set_style_text_color(label, INFOSCREEN_COLOR_TEXT, LV_PART_MAIN);
     lv_obj_set_style_text_font(label, font, LV_PART_MAIN);
@@ -230,7 +230,7 @@ void MenuScreen::_refreshMenuScreen()
         const uint8_t item_index = first_index + i;
         const bool selected = (item_index == this->selected);
         _style_menu_row(rows[i], selected);
-        lv_label_set_text(labels[i], itemLabels[item_index]);
+        lv_label_set_text_static(labels[i], itemLabels[item_index]);
         _style_menu_label(labels[i], selected);
     }
 }
@@ -272,7 +272,7 @@ void MenuScreen::_style_menu_label(lv_obj_t *label, bool selected)
 lv_obj_t *MenuScreen::_style_create_menu_label(lv_obj_t *parent, const char *text, bool selected)
 {
     lv_obj_t *label = lv_label_create(parent);
-    lv_label_set_text(label, text);
+    lv_label_set_text_static(label, text);
     _style_menu_label(label, selected);
     // row boundaries and settings for label/clipping scrolling
     lv_obj_set_style_anim_speed(label, kMenuScreenItemScrollSpeed, LV_PART_MAIN);
@@ -312,7 +312,7 @@ void SliderScreen::load()
     lv_obj_set_pos(titleRow, 0, 0);
 
     lv_obj_t *titleObj = lv_label_create(titleRow);
-    lv_label_set_text(titleObj, label);
+    lv_label_set_text_static(titleObj, label);
     lv_obj_set_style_text_color(titleObj, SLIDERSCREEN_COLOR_LABEL, LV_PART_MAIN);
     lv_obj_set_style_text_font(titleObj, titleFont, LV_PART_MAIN);
     lv_obj_set_width(titleObj, kSliderScreenContainerWidth);
@@ -774,7 +774,7 @@ void StartScreen::_refreshVisuals()
 
     start_screen_update_top_status_labels(voltageLabel, currentLabel, motorTempLabel, mosfetTempLabel);
 
-    lv_label_set_text(directionLabel, pid.isForwardMotorDirection() ? "START FORWARD" : "START REVERSE");
+    lv_label_set_text_static(directionLabel, pid.isForwardMotorDirection() ? "START FORWARD" : "START REVERSE");
 
     if (eeprom.isPIDMode()) {
         snprintf(buf, sizeof(buf) - 1, "%u RPM", (unsigned)eeprom.getSpeed());
