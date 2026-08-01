@@ -395,7 +395,7 @@ struct DashboardScreen : public Screen
         valueLabel(nullptr),
         selectedValue(SelectedValueType::SPEED)
     {
-        maxAcceleration = eeprom.isPIDMode() ? 50 : 1;
+        maxAcceleration = eeprom.isPIDMode() ? UIConstants::kStepsRPM : UIConstants::kStepsPWM;
     }
 
     void update() {
@@ -446,7 +446,7 @@ struct StartScreen : public Screen
         directionLabel(nullptr),
         speedLabel(nullptr)
     {
-        maxAcceleration = eeprom.isPIDMode() ? 50 : 1;
+        maxAcceleration = eeprom.isPIDMode() ? UIConstants::kStepsRPM : UIConstants::kStepsPWM;
     }
 
     virtual void load() override;

@@ -625,7 +625,7 @@ void Menu::handleButtonPress()
                 DashboardScreen &dashboard = *reinterpret_cast<DashboardScreen *>(screenFlow.getScreen());
                 switch(dashboard.incrSelectedValue()) {
                     case DashboardScreen::SelectedValueType::SPEED:
-                        dashboard.setMaxAcceleration(eeprom.isPIDMode() ? 50 : 1);
+                        dashboard.setMaxAcceleration(eeprom.isPIDMode() ? UIConstants::kStepsRPM : UIConstants::kStepsPWM);
                         setValue(eeprom.getSpeed());
                         break;
                     case DashboardScreen::SelectedValueType::KP:
@@ -883,12 +883,17 @@ void Menu::updateSpeedValue()
     setValue(clampedValue);
 }
 
+/**
+ * @brief Clamp anti-windup value to the allowed range and handle special case for "Disabled" below 50%
+ *
+ * @return int32_t Clamped anti-windup value
+ */
 int32_t Menu::clampAntiWindupValue()
 {
     int32_t clampedValue = std::clamp<int32_t>(getValue(), UIConstants::kMinAntiWindup, UIConstants::kMaxAntiWindup);
-    if (clampedValue < (int32_t)(UIConstants::kMaxAntiWindup / 2)) {
+    if (clampedValue < UIConstants::kLowestAntiWindup) {
         if (eeprom.getAntiWindup() == 0 && clampedValue > 0) {
-            clampedValue = UIConstants::kMaxAntiWindup / 2; // restore 50% of the value is 0
+            clampedValue = UIConstants::kLowestAntiWindup; // restore 50% of the value is 0
         } else {
             clampedValue = 0; // set to 0 if value is less than 50%
         }

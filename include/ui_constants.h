@@ -50,8 +50,11 @@ struct UIConstants
     static constexpr uint32_t kAntiWindupFactor = 100;                      // anti-windup factor
     static constexpr uint32_t kMinAntiWindup = 0;                           // Min. PID anti-windup factor in percentage (0-100) * 100
     static constexpr uint32_t kMaxAntiWindup = 100 * kAntiWindupFactor;     // Max. PID anti-windup factor in percentage (0-100) * kAntiWindupFactor
+    static constexpr int32_t kLowestAntiWindup = kMaxAntiWindup / 2;        // Below 50% disable anti-windup
     static constexpr uint32_t kMinOvpProtection = 8000;                     // Min. OVP protection in millivolts
     static constexpr uint32_t kMaxOvpProtection = 40000;                    // Max. OVP protection in millivolts
+    static constexpr uint32_t kStepsRPM = 50;                               // RPM steps
+    static constexpr uint32_t kStepsPWM = 1;                                // PWM steps
 
     // eeprom default values
     static constexpr uint8_t kDefaultTFTBrightness = 90;                    // Default TFT Brightness
