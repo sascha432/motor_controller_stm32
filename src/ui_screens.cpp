@@ -420,7 +420,12 @@ void SliderScreen::_refreshVisuals()
         lv_label_set_text(valueLabel, formatCallback(value, buf, sizeof(buf) - 1));
     }
     else {
-        lv_label_set_text_fmt(valueLabel, "%u%s", static_cast<unsigned>(value), unit);
+        if (zeroLabel && value == 0) {
+            lv_label_set_text_static(valueLabel, zeroLabel);
+        }
+        else {
+            lv_label_set_text_fmt(valueLabel, "%u%s", static_cast<unsigned>(value), unit);
+        }
     }
 }
 

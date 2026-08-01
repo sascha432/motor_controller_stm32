@@ -274,13 +274,14 @@ struct SliderScreen : public Screen
 {
     typedef const char *(*FormatCallbackType)(uint32_t value, char *buf, size_t bufSize);
 
-    SliderScreen(Type id, const char *label, uint32_t minValue, uint32_t maxValue, const char *unit, FormatCallbackType callback = nullptr) :
+    SliderScreen(Type id, const char *label, uint32_t minValue, uint32_t maxValue, const char *unit, FormatCallbackType callback = nullptr, const char *zeroLabel = nullptr) :
         Screen(id),
         value(minValue),
         minValue(minValue),
         maxValue(maxValue),
         label(label),
         unit(unit),
+        zeroLabel(zeroLabel),
         sliderFill(nullptr),
         sliderFillAfterActive(nullptr),
         sliderFillAfter(nullptr),
@@ -304,6 +305,7 @@ private:
     uint32_t maxValue;
     const char *label;
     const char *unit;
+    const char *zeroLabel;
     lv_obj_t *sliderFill;
     lv_obj_t *sliderFillAfterActive;
     lv_obj_t *sliderFillAfter;

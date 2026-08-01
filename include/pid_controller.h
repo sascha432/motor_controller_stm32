@@ -36,8 +36,10 @@ struct PidController
     static constexpr float kMaxError = kCPR / (60000 / kPIDIntervalFloat) * kMaxRPM;    // factor to reduce error to a value between -1.0 and 1.0 for the PID loop
     #if PID_USE_FLOATING_POINT_MATH
         static constexpr int32_t kFPFactor = 1;
+        static constexpr float kFPAntiWindupFactor = 1.0f;
     #else
         static constexpr int32_t kFPFactor = kMaxError;                                     // factor to reduce error, power of 2 avoids multiplications and divisions
+        static constexpr int32_t kFPAntiWindupFactor = 1024;
     #endif
 
     // convert RPM to counts per PID interval
@@ -83,7 +85,7 @@ struct PidController
     PidController() :
         rpm(0),
         motorDirection(EEPROM::kMotorDirectionForward),
-        antiWindup(kAntiWindup),
+        antiWindup(kAntiWindup * kFPAntiWindupFactor),
         errorCode(ErrorCodeType::NONE),
         running(false),
         releaseBreakCounter(0)
@@ -204,8 +206,13 @@ struct PidController
      */
     inline void setAntiWindup(uint16_t value)
     {
-        antiWindup = std::clamp<float>(value / (UIConstants::kAntiWindupFactor * 100.0f), 0.5f, 1.0f);
-        SWO::data.antiWindup = antiWindup * 100.0f;
+        #if PID_USE_FLOATING_POINT_MATH
+            antiWindup = std::clamp<float>(value / (UIConstants::kAntiWindupFactor * 100.0f), 0.5f, 1.0f);
+            SWO::data.antiWindup = antiWindup * 100.0f;
+        #else
+            antiWindup = std::clamp<PidValueType>(value * kFPAntiWindupFactor / (UIConstants::kAntiWindupFactor * 100), 0.5f * kFPAntiWindupFactor, 1.0f * kFPAntiWindupFactor);
+            SWO::data.antiWindup = antiWindup * (100.0f / kFPAntiWindupFactor);
+        #endif
     }
 
     /**
@@ -427,9 +434,8 @@ struct PidController
      */
     size_t errorPrintf(char *buf, size_t bufSize) const;
 
-    public:
+public:
     // === Fault states data structure ===
-
     struct FaultStates
     {
         uint32_t isenseMax;             // maximum current as ADC value
@@ -456,7 +462,6 @@ struct PidController
     };
 
     // === Statistics data structure ===
-
     struct StatsType
     {
         Helpers::LowPass<32> rpm;           // filtered RPM for displaying
@@ -476,7 +481,6 @@ struct PidController
     };
 
     // === PID tuning data structure ===
-
     struct PidLoopType
     {
         uint32_t sequence;
@@ -501,7 +505,6 @@ struct PidController
     static constexpr size_t kPidLoopTypeSize = sizeof(PidLoopType);
 
     // === OCP state machine and constants ===
-
     static constexpr uint32_t kOcpTickInterval = 5;                                     // 5us tick interval
     static constexpr uint32_t kOcpISenseThreshold = 90;                                 // lower threshold in percent before the OCP condition is cleared
     static constexpr uint32_t kOcpRecoveryInterval = 20 / kOcpTickInterval;             // 20us interval
@@ -550,7 +553,7 @@ public:
     float Kd;
     uint32_t rpm;                                   // target RPM
     uint32_t motorDirection;                        // motor direction
-    float antiWindup;                               // anti-windup factor
+    PidValueType antiWindup;                        // anti-windup factor
 
     uint32_t lastEncoderCounter;                    // last encoder counter value
     PidValueType integral;                          // PID variables
@@ -562,8 +565,8 @@ public:
     PidValueType KdPreCalc;
     int32_t countsPerInterval;                      // counts per interval (RPM)
 
-    uint32_t lastRpmCounter;
-    uint32_t lastRpmCounterUpdated;
+    uint32_t lastRpmCounter;                        // counts rotations to detect a motor stall
+    uint32_t lastRpmCounterUpdated;                 // last time the RPM counter was updated
 
     StatsType stats;                                // statistics
     FaultStates faults;                             // DRV8701 and ocp faults
@@ -575,13 +578,5 @@ public:
     volatile bool running;                          // true if the PID controller is running
     uint32_t releaseBreakCounter;                   // counter for releasing the brake after motor off
 };
-
-#ifdef PID_CYCLE_MEASUREMENT
-extern volatile uint32_t pidIsrCycles;
-extern volatile uint32_t pidIsrCyclesAccumulated;
-extern volatile uint32_t pidIsrCycleCount;
-extern volatile uint32_t pidIsrCyclesPerSecond;
-extern volatile uint32_t pidIsrCyclesMax;
-#endif
 
 extern PidController pid;

@@ -159,7 +159,7 @@ void PidController::reset()
         FloatToString::convertTrimmed(pBuf, sizeof(pBuf), Kp, 6);
         FloatToString::convertTrimmed(iBuf, sizeof(iBuf), Ki, 6);
         FloatToString::convertTrimmed(dBuf, sizeof(dBuf), Kd, 6);
-        FloatToString::convertTrimmed(aBuf, sizeof(aBuf), antiWindup, 6);
+        FloatToString::convertTrimmed(aBuf, sizeof(aBuf), antiWindup / (float)PidController::kFPAntiWindupFactor, 6);
         __enable_irq();
         DEBUG_PRINT(DebugType::PID, "Kp=%s Ki=%s Kd=%s RPM=%u windup=%s OCP=%u/%u OVP=%u", pBuf, iBuf, dBuf, rpm, aBuf, eeprom.getInputCurrentLimit(), eeprom.getMotorCurrentLimit(), eeprom.getOvpProtection());
     #endif
@@ -261,11 +261,19 @@ void PidController::isr()
 
     if (eeprom.isPIDMode()) {
         if (ocp.state != OcpStateType::NONE) {
-            setIntegral(getIntegral() * kOcpAntiWindUp);
+            #if PID_USE_FLOATING_POINT_MATH
+                setIntegral(getIntegral() * kOcpAntiWindUp);
+            #else
+                setIntegral((getIntegral() * kFPAntiWindupFactor) / static_cast<PidValueType>(kOcpAntiWindUp * kFPAntiWindupFactor));
+            #endif
         }
         else if (antiWindup) {
             if (pwmLevel < (int32_t)(kMaxPWMLevel * -1.1f) || pwmLevel > (int32_t)(kMaxPWMLevel * 1.1f)) {
-                setIntegral(getIntegral() * antiWindup);
+                #if PID_USE_FLOATING_POINT_MATH
+                    setIntegral(getIntegral() * antiWindup);
+                #else
+                    setIntegral((getIntegral() * kFPAntiWindupFactor) / antiWindup);
+                #endif
             }
         }
     }

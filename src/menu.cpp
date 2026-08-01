@@ -84,6 +84,10 @@ static const char *current_slider_format_callback(uint32_t value, char *buf, siz
 // custom format for current and conversion from uint16_t to float
 static const char *anti_windup_format_callback(uint32_t value, char *buf, size_t bufSize)
 {
+    if (value == 0) {
+        snprintf(buf, bufSize, "Disabled");
+        return buf;
+    }
     const uint32_t antiWindup = value * (1000 / UIConstants::kAntiWindupFactor); // value = percentage * 100, so multiply by 10 to get percentage * 1000
     snprintf(buf, bufSize, SPRINTF_FP2_FMT " %%", CONVERT_TO_FP2(antiWindup));
     return buf;
@@ -342,7 +346,9 @@ void Menu::handleButtonPress()
                         "LED Brightness",
                         UIConstants::kMinLEDBrightness,
                         UIConstants::kMaxLEDBrightness,
-                        "%"
+                        "%",
+                        nullptr,
+                        "OFF"
                     ));
                     setValue(eeprom.getLEDBrightness());
                     break;
@@ -370,7 +376,9 @@ void Menu::handleButtonPress()
                         "Motor Brake",
                         0,
                         100,
-                        "%"
+                        "%",
+                        nullptr,
+                        "OFF"
                     ));
                     setValue(eeprom.getMotorBrake());
                     break;
@@ -761,10 +769,8 @@ int32_t Menu::updateRotaryValue(int32_t value)
                     setValue(clampedValue);
                     break;
                 case DashboardScreen::SelectedValueType::ANTI_WINDUP:
-                    clampedValue = std::clamp<int32_t>(getValue(), UIConstants::kMinAntiWindup, UIConstants::kMaxAntiWindup);
-                    eeprom.setAntiWindup(clampedValue);
+                    eeprom.setAntiWindup(clampAntiWindupValue());
                     pid.applyPIDParams();
-                    setValue(clampedValue);
                     break;
                 case DashboardScreen::SelectedValueType::MAX:
                     break;
@@ -832,7 +838,7 @@ int32_t Menu::updateRotaryValue(int32_t value)
             pid.applyPIDParams();
             break;
         case Screen::Type::PID_ANTI_WINDUP:
-            eeprom.setAntiWindup(getValue());
+            eeprom.setAntiWindup(clampAntiWindupValue());
             pid.applyPIDParams();
             break;
         case Screen::Type::OVP_PROTECTION:
@@ -875,4 +881,18 @@ void Menu::updateSpeedValue()
     }
     // set clamped value
     setValue(clampedValue);
+}
+
+int32_t Menu::clampAntiWindupValue()
+{
+    int32_t clampedValue = std::clamp<int32_t>(getValue(), UIConstants::kMinAntiWindup, UIConstants::kMaxAntiWindup);
+    if (clampedValue < (int32_t)(UIConstants::kMaxAntiWindup / 2)) {
+        if (eeprom.getAntiWindup() == 0 && clampedValue > 0) {
+            clampedValue = UIConstants::kMaxAntiWindup / 2; // restore 50% of the value is 0
+        } else {
+            clampedValue = 0; // set to 0 if value is less than 50%
+        }
+    }
+    setValue(clampedValue);
+    return clampedValue;
 }

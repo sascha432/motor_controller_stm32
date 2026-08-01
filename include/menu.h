@@ -39,6 +39,7 @@ struct Menu
     void applyEEPROMSettings();
 
     void updateSpeedValue();
+    int32_t clampAntiWindupValue();
 };
 
 extern Menu menu;
