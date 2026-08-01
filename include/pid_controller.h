@@ -476,8 +476,8 @@ struct PidController
     static constexpr uint32_t kOcpISenseThreshold = 90;                                 // lower threshold in percent before the OCP condition is cleared
     static constexpr uint32_t kOcpRecoveryInterval = 20 / kOcpTickInterval;             // 20us interval
     static constexpr uint32_t kOcpRetriggerTimeout = 10 / kOcpTickInterval;             // 10us timeout
-    static constexpr uint32_t kOcpCurrentRampUp = 32;                                   // increase current by 1/32 every tick
-    static constexpr uint32_t kOcpCurrentRampDown = 32;                                 // reduce current by 1/32 every tick
+    static constexpr uint32_t kOcpCurrentRampUp = 16;                                   // increase current by 1/16 every tick
+    static constexpr uint32_t kOcpCurrentRampDown = 16;                                 // reduce current by 1/16 every tick
     static constexpr uint32_t kOcpInputToMotorCurrentRatio = 8;                         // if the motor current limit is higher than x the input current limit, it will be reduced to x the input current limit, before ramping it down further
     static constexpr float kOcpAntiWindUp = 0.8f;                                       // strong anti windup during OCP condition
 

@@ -396,7 +396,7 @@ void PidController::ocp_isr()
 void PidController::trigger_ocp()
 {
     if (ocp.state == OcpStateType::NONE || ocp.state == OcpStateType::RECOVERY) {
-        if (adc.getISenseOcpFilteredValue() > faults.isenseMax) {
+        if (adc.getISenseValue() > faults.isenseMax) {
             ocp.state = OcpStateType::TRIGGERED;
             ocp.counter = 0;
             ocp.lastCounter = 0;

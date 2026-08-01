@@ -5,6 +5,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <type_traits>
 #include <stm32f1xx.h>
 
 /**
@@ -490,4 +491,33 @@ inline void WatchDog::tickHandler()
 inline void WatchDog::feed()
 {
     ticks = 0;
+}
+
+/**
+ * @brief Return ((filteredValue * (FILTER - 1)) + value) / FILTER
+ *
+ * Note: This function uses 32bit operations if necessary to avoid overflow for 16bit values. It won't use 64bit operations for 32bit types of T
+ *
+ * @tparam T The type of the filtered value
+ * @tparam FILTER The filter coefficient
+ * @param filteredValue The current filtered value
+ * @param value The new value to be filtered
+ * @return T The updated filtered value
+ */
+template<typename T, T FILTER, typename FILTER_TYPE = std::conditional_t<std::is_signed_v<T>, int32_t, uint32_t>>
+inline T filterValue(T filteredValue, T value)
+{
+    if constexpr (FILTER == 1) {
+        return value;
+    }
+    else if constexpr (FILTER == 2) {
+        return (static_cast<FILTER_TYPE>(filteredValue) + value) / 2;
+    }
+    else if constexpr ((FILTER & (FILTER - 1)) == 0) {
+        // FILTER is a power of 2, use bitwise operations for efficiency
+        return (filteredValue * static_cast<FILTER_TYPE>(FILTER) - filteredValue + value) / FILTER;
+    }
+    else {
+        return (filteredValue * static_cast<FILTER_TYPE>(FILTER - 1) + value) / FILTER;
+    }
 }

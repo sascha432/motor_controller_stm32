@@ -9,6 +9,7 @@
 #include "pins.h"
 
 extern "C" void DMA1_Channel1_IRQHandler();
+struct PidController;
 
 static constexpr float kADCClockMHz = 12.0f;    // ADC clock in MHz
 
@@ -31,8 +32,9 @@ static constexpr float kAdcSampleTimeUs(uint32_t sampleBits)
  * @brief ADC class to read multiple channels using DMA
  *
  */
-struct ADC {
-
+struct ADC
+{
+    // ADC sample times in ADC_CCR register
     static constexpr uint32_t kADC_SampleTime_1_5Cycles   = 0;
     static constexpr uint32_t kADC_SampleTime_7_5Cycles   = 1;
     static constexpr uint32_t kADC_SampleTime_13_5Cycles  = 2;
@@ -43,6 +45,7 @@ struct ADC {
     static constexpr uint32_t kADC_SampleTime_239_5Cycles = 7;
 
     static constexpr uint32_t kNumConversions = 4;                                  // number of channels
+    // WARNING/TODO: for same reason only 239.5 cycles work @12MHz, lower or mixed sample times cause invalid readings from all channels
     static constexpr uint32_t kSampleTimeCH2 = kADC_SampleTime_239_5Cycles;         // isense
     static constexpr uint32_t kSampleTimeCH3 = kADC_SampleTime_239_5Cycles;         // vsense
     static constexpr uint32_t kSampleTimeCH14 = kADC_SampleTime_239_5Cycles;        // motor ntc
@@ -51,19 +54,9 @@ struct ADC {
     static constexpr float kTotalSampleTime = kAdcSampleTimeUs(kSampleTimeCH2) + kAdcSampleTimeUs(kSampleTimeCH3) + kAdcSampleTimeUs(kSampleTimeCH14) + kAdcSampleTimeUs(kSampleTimeCH15); // sum of sample time per channel
     static constexpr float kTotalSamplesPerSecond = 1000000.0f / kTotalSampleTime;  // samples per second for all channels
 
-    static constexpr uint16_t kISenseCountMax = (uint32_t)(((kTotalSamplesPerSecond * 1.0f * 1.065f) / kNumConversions) / 16) * 16; // rolling average over ~1.0 second (+-3.25%), round down to multiple of 16
-
-    /**
-     * @brief struct to access the ADC buffer values
-     *
-     */
-    struct BufferType
-    {
-        uint16_t isense;            // CH2
-        uint16_t vsense;            // CH3
-        uint16_t motor_ntc;         // CH14
-        uint16_t driver_ntc;        // CH15
-    };
+    static constexpr uint32_t kISenseCountDivider = 16;                             // reduce by 6.5% to avoid overflow in rolling average
+    static constexpr float kISenseRollingAverageTime = 1.0f;                        // rolling average over 1.0 second
+    static constexpr uint16_t kISenseCountMax = (kTotalSamplesPerSecond * kISenseRollingAverageTime * (1.0f + (0.5f / kISenseCountDivider))) / kNumConversions; // calculate number of samples
 
     /**
      * @brief Construct a new ADC object
@@ -108,16 +101,6 @@ struct ADC {
     inline void setInputCurrentLimit(uint16_t value)
     {
         DAC_SET_INPUT_CURRENT(ADCConverter::Current::reverse(value));
-    }
-
-    /**
-     * @brief Copy ADC buffer into struct
-     *
-     * @return BufferType
-     */
-    inline BufferType readAll() const
-    {
-        return *(BufferType *)adc_buffer;
     }
 
     /**
@@ -172,6 +155,7 @@ struct ADC {
 
 protected:
     friend void DMA1_Channel1_IRQHandler();
+    friend PidController;
 
     /**
      * @brief Get the Input Current value

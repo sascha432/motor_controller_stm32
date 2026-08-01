@@ -98,15 +98,15 @@ extern "C" void DMA1_Channel1_IRQHandler()
         adc.isenseSum += value;
         if (++adc.isenseCount >= ADC::kISenseCountMax) {
             // reduce by 6.5% to avoid overflow in rolling average
-            adc.isenseSum -= adc.isenseSum / 16;
-            adc.isenseCount -= adc.isenseCount / 16;
+            adc.isenseSum -= adc.isenseSum / ADC::kISenseCountDivider;
+            adc.isenseCount -= adc.isenseCount / ADC::kISenseCountDivider;
         }
         // store filtered value for fast OCP detection
-        adc.isenseOcpFiltered = (adc.isenseOcpFiltered + value) / 2;
+        adc.isenseOcpFiltered = filterValue<uint32_t, 2>(adc.isenseOcpFiltered, value);
 
         // update filtered temperature values
-        adc.motorTemperatureFiltered = (adc.motorTemperatureFiltered * 16 - adc.motorTemperatureFiltered + adc.getMotorNTCValue()) / 16;
-        adc.mosfetTemperatureFiltered = (adc.mosfetTemperatureFiltered * 16 - adc.mosfetTemperatureFiltered + adc.getMosfetNTCValue()) / 16;
+        adc.motorTemperatureFiltered = filterValue<uint16_t, 16>(adc.motorTemperatureFiltered, adc.getMotorNTCValue());
+        adc.mosfetTemperatureFiltered = filterValue<uint16_t, 16>(adc.mosfetTemperatureFiltered, adc.getMosfetNTCValue());
     }
 }
 #if defined(__GNUC__) && !defined(__clang__)
