@@ -75,11 +75,12 @@ extern "C" void EXTI15_10_IRQHandler(void)
     }
 }
 
-// DMA1_Channel1_IRQHandler is the interrupt handler for the DMA1 Channel 1. It is called when a DMA transfer is complete
 #if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC push_options
 #pragma GCC optimize("O3")
 #endif
+
+// DMA1_Channel1_IRQHandler is the interrupt handler for the DMA1 Channel 1. It is called when a DMA transfer is complete
 extern "C" void DMA1_Channel1_IRQHandler()
 {
     if (DMA1->ISR & DMA_ISR_TCIF1) {
@@ -109,6 +110,7 @@ extern "C" void DMA1_Channel1_IRQHandler()
         adc.mosfetTemperatureFiltered = filterValue<uint16_t, 16>(adc.mosfetTemperatureFiltered, adc.getMosfetNTCValue());
     }
 }
+
 #if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC pop_options
 #endif

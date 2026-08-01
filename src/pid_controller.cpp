@@ -210,6 +210,11 @@ bool PidController::motorToggle()
     return false;
 }
 
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC push_options
+#pragma GCC optimize("O3")
+#endif
+
 void PidController::isr()
 {
     // most timers are 16bit counters only
@@ -229,8 +234,12 @@ void PidController::isr()
 
     if (eeprom.isPIDMode()) {
         // calculate error and derivative
-        float error = (getCountsPerInterval() - delta) / kMaxError;
-        float derivative = (error - getLastError());
+        #if PID_USE_FLOATING_POINT_MATH
+            PidValueType error = (getCountsPerInterval() - delta) / kMaxError;
+        #else
+            PidValueType error = getCountsPerInterval() - delta;
+        #endif
+        PidValueType derivative = (error - getLastError());
         setLastError(error);
 
         // apply filter
@@ -324,9 +333,16 @@ void PidController::isr()
         item.mosfetTemperature = adc.getMosfetTemperatureFiltered();
         item.dacMotorCurrent = DAC_GET_MOTOR_CURRENT();
         item.dacInputCurrent =  DAC_GET_INPUT_CURRENT();
-        item.error = getLastError();
-        item.integral = getIntegral();
-        item.derivative = getLastDerivative();
+        if constexpr (PidController::kFPFactor == 1) {
+            item.error = getLastError();
+            item.integral = getIntegral();
+            item.derivative = getLastDerivative();
+        } else {
+            constexpr auto tmp = 1 / static_cast<float>(PidController::kFPFactor);
+            item.error = getLastError() * tmp;
+            item.integral = getIntegral() * tmp;
+            item.derivative = getLastDerivative() * tmp;
+        }
         item.running = running ? 1U : 0U;
         item.drv8701Fault = faults.drv8701Fault ? 1U : 0U;
         item.ocpFault = (ocp.state != OcpStateType::NONE) ? 1U : 0U;
@@ -361,11 +377,6 @@ void PidController::isr()
     }
 }
 
-#if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC push_options
-#pragma GCC optimize("O3")
-#endif
-
 void PidController::ocp_isr()
 {
     ocp.counter++;
@@ -396,7 +407,7 @@ void PidController::ocp_isr()
 void PidController::trigger_ocp()
 {
     if (ocp.state == OcpStateType::NONE || ocp.state == OcpStateType::RECOVERY) {
-        if (adc.getISenseValue() > faults.isenseMax) {
+        if (adc.getISenseOcpFilteredValue() > faults.isenseMax) {
             ocp.state = OcpStateType::TRIGGERED;
             ocp.counter = 0;
             ocp.lastCounter = 0;

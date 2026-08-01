@@ -10,8 +10,18 @@
 #include "stats.h"
 #include "leds.h"
 
+// use floating point math for PID calculations, otherwise fixed point math is used
+#define PID_USE_FLOATING_POINT_MATH     0
+
 struct PidController
 {
+    #if PID_USE_FLOATING_POINT_MATH
+    using PidValueType = float;
+    #else
+    using PidValueType = int32_t;
+    #endif
+
+    static constexpr uint32_t kReleaseBreakTime = 5000;                                 // time in ms to release the break after motor is turned off
     static constexpr uint16_t kMaxPWMLevel = kPWMFrequencyToARR<20000>();               // Motor PWM 20Khz
     static constexpr uint16_t kPPR = 1024;                                              // MT6701 PPR
     static constexpr uint16_t kCPR = kPPR * 4;                                          // 4x Mode PPR to CPR
@@ -21,7 +31,11 @@ struct PidController
     static constexpr bool kProgramPPR = false;                                          // set to true to program the MT6701 encoder during boot over i2c
     static constexpr uint32_t kMaxRPM = 55000;                                          // max. supported RPM by the encoder
     static constexpr float kMaxError = kCPR / (60000 / kPIDIntervalFloat) * kMaxRPM;    // factor to reduce error to a value between -1.0 and 1.0 for the PID loop
-    static constexpr uint32_t kReleaseBreakTime = 5000;                                 // time in ms to release the break after motor is turned off
+    #if PID_USE_FLOATING_POINT_MATH
+        static constexpr int32_t kFPFactor = 1;
+    #else
+        static constexpr int32_t kFPFactor = kMaxError;                                     // factor to reduce error, power of 2 avoids multiplications and divisions
+    #endif
 
     // convert RPM to counts per PID interval
     static constexpr uint32_t kRPMToIntCounts(uint32_t value)
@@ -53,6 +67,11 @@ struct PidController
         SNSOUT,
         OVP
     };
+
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC push_options
+#pragma GCC optimize("O3")
+#endif
 
     /**
      * @brief Construct a new Pid Controller object
@@ -129,9 +148,13 @@ struct PidController
      * @param derivative The derivative of the error
      * @return int32_t The calculated PWM level
      */
-    inline int32_t calcPWMLevel(float error, float integral, float derivative) const
+    inline int32_t calcPWMLevel(PidValueType error, PidValueType integral, PidValueType derivative) const
     {
-        return (error * KpPreCalc + integral * KiPreCalc + derivative * KdPreCalc);
+        #if PID_USE_FLOATING_POINT_MATH
+            return (error * KpPreCalc + integral * KiPreCalc + derivative * KdPreCalc);
+        #else
+            return (error * (int64_t)KpPreCalc + integral * (int64_t)KiPreCalc + derivative * (int64_t)KdPreCalc) / kFPFactor; // use int64_t to avoid overflow
+        #endif
     }
 
     /**
@@ -234,37 +257,37 @@ struct PidController
         return delta;
     }
 
-    inline void setIntegral(float value)
+    inline void setIntegral(PidValueType value)
     {
-        integral = std::clamp<float>(value, -1.0f, 1.0f);
+        integral = std::clamp<PidValueType>(value, -kFPFactor, kFPFactor);
     }
 
-    inline float getIntegral() const
+    inline PidValueType getIntegral() const
     {
         return integral;
     }
 
-    inline void updateIntegral(float error)
+    inline void updateIntegral(PidValueType error)
     {
         setIntegral(integral + error);
     }
 
-    inline void setLastError(float value)
+    inline void setLastError(PidValueType value)
     {
         lastError = value;
     }
 
-    inline float getLastError() const
+    inline PidValueType getLastError() const
     {
         return lastError;
     }
 
-    inline void setLastDerivative(float value)
+    inline void setLastDerivative(PidValueType value)
     {
         lastDerivative = value;
     }
 
-    inline int32_t getLastDerivative() const
+    inline PidValueType getLastDerivative() const
     {
         return lastDerivative;
     }
@@ -334,6 +357,10 @@ struct PidController
     {
         return errorCode != ErrorCodeType::NONE;
     }
+
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC pop_options
+#endif
 
     /**
      * @brief initialize PID controller
@@ -523,13 +550,13 @@ public:
     float antiWindup;                               // anti-windup factor
 
     uint32_t lastEncoderCounter;                    // last encoder counter value
-    float integral;                                 // PID variables
-    float lastError;
-    float lastDerivative;
+    PidValueType integral;                          // PID variables
+    PidValueType lastError;
+    PidValueType lastDerivative;
 
-    float KpPreCalc;                                // pre-calculated K-values for PID loop
-    float KiPreCalc;
-    float KdPreCalc;
+    PidValueType KpPreCalc;                         // pre-calculated K-values for PID loop
+    PidValueType KiPreCalc;
+    PidValueType KdPreCalc;
     int32_t countsPerInterval;                      // counts per interval (RPM)
 
     uint32_t lastRpmCounter;
