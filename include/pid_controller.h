@@ -207,10 +207,10 @@ struct PidController
     inline void setAntiWindup(uint16_t value)
     {
         #if PID_USE_FLOATING_POINT_MATH
-            antiWindup = std::clamp<float>(value / (UIConstants::kAntiWindupFactor * 100.0f), 0.5f, 1.0f);
+            antiWindup = value ? std::clamp<float>(value / (UIConstants::kAntiWindupFactor * 100.0f), 0.5f, 1.0f) : 0;
             SWO::data.antiWindup = antiWindup * 100.0f;
         #else
-            antiWindup = std::clamp<PidValueType>(value * kFPAntiWindupFactor / (UIConstants::kAntiWindupFactor * 100), 0.5f * kFPAntiWindupFactor, 1.0f * kFPAntiWindupFactor);
+            antiWindup = value ? std::clamp<PidValueType>(value * kFPAntiWindupFactor / (UIConstants::kAntiWindupFactor * 100), 0.5f * kFPAntiWindupFactor, 1.0f * kFPAntiWindupFactor) : 0;
             SWO::data.antiWindup = antiWindup * (100.0f / kFPAntiWindupFactor);
         #endif
     }
