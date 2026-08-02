@@ -19,16 +19,16 @@ struct LEDs_T {
 
     static void init()
     {
+        // PWM timer setup handled in tft_driver_gpio_tim_init()
+        static_assert(GPIO_ILLUMINATION_LED_PIN == PB10, "Illumination LED pin must be PB10");
+        static_assert(GPIO_LEDS_PIN == PB11, "LEDs pin must be PB11");
+
         // Enable GPIO port clock
         __HAL_RCC_GPIOx_CLK_ENABLE<GPIO_LEDS_PIN>();
         __HAL_RCC_GPIOx_CLK_ENABLE<GPIO_ILLUMINATION_LED_PIN>();
 
         // LED 1 & 2
         off();
-
-        // Illumination LED
-        // tft_driver_gpio_init() is handling the PWM configuration
-        static_assert(GPIO_ILLUMINATION_LED_PIN == PB10, "Illumination LED pin must be PB10");
     }
 
     static void off()
@@ -70,7 +70,7 @@ struct LEDs_T {
             UI_ILLUMINATION_LED_SET_PWM(0);
             return;
         }
-        // get more linear brightness by using a gamma curve and offset to avoid flickering at low brightness
+        // get more linear brightness by using a gamma curve and zero offset
         constexpr uint32_t kOffset = 15;
         const uint32_t clampedBrightness = std::clamp<uint32_t>(value + (kOffset * kIlluminationResolution), (kOffset * kIlluminationResolution), ((100 + kOffset) * kIlluminationResolution));
         const float brightness = clampedBrightness * (1.0f / ((kOffset + 100.0f) * kIlluminationResolution));
