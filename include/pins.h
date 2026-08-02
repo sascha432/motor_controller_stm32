@@ -79,12 +79,12 @@ Timer configurations:
 #if TFT_PIN_RS != PC7 || TFT_PIN_RST != PC6 || TFT_PIN_CS != PD15
 #error PINS are hardcoded
 #else
-#define TFT_PIN_RS_HIGH()           GPIOC->BSRR = (1 << 7)
-#define TFT_PIN_RS_LOW()            GPIOC->BSRR = (1 << (7 + 16))
-#define TFT_PIN_CS_HIGH()           GPIOD->BSRR = (1 << 15)
-#define TFT_PIN_CS_LOW()            GPIOD->BSRR = (1 << (15 + 16))
-#define TFT_PIN_RST_HIGH()          GPIOC->BSRR = (1 << 6)
-#define TFT_PIN_RST_LOW()           GPIOC->BSRR = (1 << (6 +  16))
+#define TFT_PIN_RS_HIGH()           digitalWriteHigh<TFT_PIN_RS>()
+#define TFT_PIN_RS_LOW()            digitalWriteLow<TFT_PIN_RS>()
+#define TFT_PIN_CS_HIGH()           digitalWriteHigh<TFT_PIN_CS>()
+#define TFT_PIN_CS_LOW()            digitalWriteLow<TFT_PIN_CS>()
+#define TFT_PIN_RST_HIGH()          digitalWriteHigh<TFT_PIN_RST>()
+#define TFT_PIN_RST_LOW()           digitalWriteLow<TFT_PIN_RST>()
 #endif
 
 // motor driver pins are connected to channels 1 and 2 of TIM1 (PA8 and PA9)
@@ -101,8 +101,8 @@ Timer configurations:
 // DAC macros for DRV8701 and INA381 overcurrent protection
 #define DAC_SET_MOTOR_CURRENT(value)                (DAC->DHR12R1 = (value) & 0xfff)
 #define DAC_SET_INPUT_CURRENT(value)                (DAC->DHR12R2 = (value) & 0xfff)
-#define DAC_GET_MOTOR_CURRENT()                     ((uint16_t)DAC->DHR12R1)
-#define DAC_GET_INPUT_CURRENT()                     ((uint16_t)DAC->DHR12R2)
+#define DAC_GET_MOTOR_CURRENT()                     ((uint16_t)DAC->DHR12R1) // DRVOCP_VREF_DAC_PIN/PA4
+#define DAC_GET_INPUT_CURRENT()                     ((uint16_t)DAC->DHR12R2) // OCP_VREF_DAC_PIN/PA5
 
 // macros to read encoder pulse counter and rpm counter
 #define PID_READ_ENCODER_COUNTER()                  ((uint16_t)TIM4->CNT) // QDEC on MT6701_I2C_SCL_PIN/MT6701_I2C_SDA_PIN

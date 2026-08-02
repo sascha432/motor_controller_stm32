@@ -79,7 +79,7 @@ static void setup()
     pid.init();
 
     // Initialize display gpio and SPI
-    tft_driver_gpio_init();
+    tft_driver_gpio_tim_init();
     tft_driver_spi_init();
 }
 
@@ -312,6 +312,23 @@ extern "C" void OTG_FS_IRQHandler(void)
 
 #endif
 
+#if HAVE_HAL_CRC
+
+CRC_HandleTypeDef hcrc;
+
+void MX_CRC_Init(void)
+{
+    __HAL_RCC_CRC_CLK_ENABLE();
+
+    hcrc.Instance = CRC;
+
+    if (HAL_CRC_Init(&hcrc) != HAL_OK) {
+        Error_Handler();
+    }
+}
+
+#endif
+
 // === core clock configuration ===
 
 /**
@@ -363,22 +380,6 @@ extern "C" void SystemClock_Config(void)
     __HAL_RCC_PLLI2S_ENABLE();
 }
 
-#if 0
-CRC_HandleTypeDef hcrc;
-
-void MX_CRC_Init(void)
-{
-    __HAL_RCC_CRC_CLK_ENABLE();
-
-    hcrc.Instance = CRC;
-
-    if (HAL_CRC_Init(&hcrc) != HAL_OK)
-    {
-        Error_Handler();
-    }
-}
-#endif
-
 // === main ===
 
 int main(void)
@@ -386,7 +387,9 @@ int main(void)
     // system init
     HAL_Init();
     SystemClock_Config();
-    // MX_CRC_Init();
+    #if HAVE_HAL_CRC
+        MX_CRC_Init();
+    #endif
     TIM7_TIM6_Init();
     #if HAVE_USB_DEVICE
         /*
@@ -413,7 +416,6 @@ int main(void)
             WatchDog::delay(500);
         }
     #endif
-
     setup();
     EXTI_Init();
     // user init

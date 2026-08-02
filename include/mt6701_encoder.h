@@ -123,10 +123,8 @@ private:
  * @tparam ACTIVE_LOW_I2C true if I2C enable is active low, false if active high
  */
 template<uint8_t GPIO_PIN, bool ACTIVE_LOW_I2C>
-struct MT6701Encoder {
-
-    inline GPIO_TypeDef *getGPIOPort() const { return digitalPinToGPIO<GPIO_PIN>(); }
-
+struct MT6701Encoder
+{
     /**
      * @brief select encoder mode
      *
@@ -134,10 +132,7 @@ struct MT6701Encoder {
      */
     void setI2CEnablePin(bool state)
     {
-        (ACTIVE_LOW_I2C ? !state : state) ?
-            (getGPIOPort()->BSRR = (1 << digitalPinToBit<GPIO_PIN>())) :
-            (getGPIOPort()->BRR  = (1 << digitalPinToBit<GPIO_PIN>()))
-        ;
+        (ACTIVE_LOW_I2C ? !state : state) ? digitalWriteHigh<GPIO_PIN>() : digitalWriteLow<GPIO_PIN>();
         // wait for the encoder to change state
         HAL_Delay(1);
     }

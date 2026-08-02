@@ -48,7 +48,7 @@ struct LEDs_T {
 
     static void onLEDError()
     {
-        digitalPinToGPIO<GPIO_LEDS_PIN>()->BSRR = (1U << digitalPinToBit<GPIO_LEDS_PIN>()); // set pin high to turn on LED1
+        digitalWriteHigh<GPIO_LEDS_PIN>(); // set pin high to turn on LED1
         // MODE=10 (2MHz), CNF=00 (push-pull)
         GPIO_CRx_REG<GPIO_LEDS_PIN>() &= ~(0xF << digitalPinShift<GPIO_LEDS_PIN>());
         GPIO_CRx_REG<GPIO_LEDS_PIN>() |= (0x2 << digitalPinShift<GPIO_LEDS_PIN>());
@@ -56,7 +56,7 @@ struct LEDs_T {
 
     static void onLEDWarning()
     {
-        digitalPinToGPIO<GPIO_LEDS_PIN>()->BSRR = (1U << (digitalPinToBit<GPIO_LEDS_PIN>() + 16)); // set pin low to turn on LED2
+        digitalWriteLow<GPIO_LEDS_PIN>(); // set pin low to turn on LED2
         // MODE=10 (2MHz), CNF=00 (push-pull)
         GPIO_CRx_REG<GPIO_LEDS_PIN>() &= ~(0xF << digitalPinShift<GPIO_LEDS_PIN>());
         GPIO_CRx_REG<GPIO_LEDS_PIN>() |= (0x2 << digitalPinShift<GPIO_LEDS_PIN>());

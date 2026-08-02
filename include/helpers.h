@@ -296,6 +296,28 @@ inline volatile uint32_t &GPIO_CRx_REG()
 }
 
 /**
+ * @brief Set the specified digital pin HIGH
+ *
+ * @tparam PIN Arduino digital pin number
+ */
+template <uint32_t PIN>
+inline void digitalWriteHigh()
+{
+    digitalPinToGPIO<PIN>()->BSRR = (1 << digitalPinToBit<PIN>());
+}
+
+/**
+ * @brief Set the specified digital pin LOW
+ *
+ * @tparam PIN Arduino digital pin number
+ */
+template <uint32_t PIN>
+inline void digitalWriteLow()
+{
+    digitalPinToGPIO<PIN>()->BSRR = (1 << (digitalPinToBit<PIN>() + 16));
+}
+
+/**
  * @brief Calculate the auto-reload register value for a given PWM frequency with no prescaler (PSC=0)
  *
  * @tparam FREQUENCY PWM frequency in Hz
@@ -367,8 +389,7 @@ inline void FloatToString::convertTrimmed(char *buffer, size_t size, float value
     float_to_string_convert(buffer, size, value, precision, true);
 }
 
-// use static buffer to return pointer to string
-// use only for debugging
+// uses static buffer to return pointer(s) to string(s) for debugging
 const char *debugFloatToString(float value, uint8_t precision = 6, bool trimTrailingZeros = false);
 
 /**
@@ -464,13 +485,38 @@ inline void call_default_error_handler(InterruptErrorType type)
  */
 struct WatchDog
 {
-    static void init();
-    static void stop();
-    static void feed();
-    static void delay(uint32_t ms);
-    static void tickHandler();
+    static constexpr uint32_t kTimeoutMs = 1000;    // timeout in milliseconds before watchdog triggers error handler
 
-    static constexpr uint32_t kTimeoutMs = 1000;
+    /**
+     * @brief Initialize the watchdog
+     *
+     */
+    static void init();
+
+    /**
+     * @brief Disable the watchdog
+     *
+     */
+    static void deinit();
+
+    /**
+     * @brief Reset the watchdog timeout counter
+     *
+     */
+    static void feed();
+
+    /**
+     * @brief HAL_Delay() with feeding the watchdog
+     *
+     * @param ms milliseconds
+     */
+    static void delay(uint32_t ms);
+
+    /**
+     * @brief Watchdog tick handler, call this from SysTick_Handler()
+     *
+     */
+    static void tickHandler();
 
     static volatile uint32_t ticks;
     static WWDG_HandleTypeDef watchdog;

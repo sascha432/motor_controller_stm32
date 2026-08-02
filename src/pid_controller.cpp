@@ -81,15 +81,15 @@ void PidController::init()
     HAL_TIM_Encoder_Start(&tim4, TIM_CHANNEL_ALL);
 
     // TIM5 setup for RPM counter
-    __HAL_RCC_GPIOA_CLK_ENABLE();
+    __HAL_RCC_GPIOx_CLK_ENABLE<ENC1_ANALOG_PIN>();
     __HAL_RCC_TIM5_CLK_ENABLE();
 
     // PA1 (TIM5_CH2) input floating
     GPIO_InitStruct = {};
-    GPIO_InitStruct.Pin = GPIO_PIN_1;
+    GPIO_InitStruct.Pin = digitalPinToHAL<ENC1_ANALOG_PIN>();
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
-    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+    HAL_GPIO_Init(digitalPinToGPIO<ENC1_ANALOG_PIN>(), &GPIO_InitStruct);
 
     // Reset TIM5
     TIM5->CR1 = 0;
@@ -187,7 +187,7 @@ void PidController::motorOff()
     PID_WRITE_MOTOR_PWM_OFF();
     if (running) {
         running = false;
-        uint32_t level = clampPWMLevel(eeprom.getMotorBrake() * kMaxPWMLevel / 100);
+        const uint32_t level = clampPWMLevel(eeprom.getMotorBrake() * kMaxPWMLevel / 100);
         PID_WRITE_MOTOR_PWM_BREAK(level);
         releaseBreakCounter = (kReleaseBreakTimeMillis / kPIDIntervalFloat) + 1;
         __enable_irq();
@@ -267,7 +267,7 @@ void PidController::isr()
         else if (antiWindup) {
             if ((pwmLevel < kWindupPwmLower) || (pwmLevel > kWindupPwmUpper)) {
                 #if PID_USE_FLOATING_POINT_MATH
-                    setIntegral(getIntegral() * antiWindup / (UIConstants::kAntiWindupFactor * 100.0f));
+                    setIntegral(getIntegral() * antiWindup * (0.01f / UIConstants::kAntiWindupFactor));
                 #else
                     setIntegral((getIntegral() * antiWindup) / (UIConstants::kAntiWindupFactor * 100));
                 #endif
@@ -297,7 +297,7 @@ void PidController::isr()
     stats.pwm.update(clampedPwmLevel);
 
     // update rpm stats
-    int32_t deltaRPM = kIntCountsToRPM(delta);
+    const int32_t deltaRPM = kIntCountsToRPM(delta);
     stats.rpm.update(deltaRPM);
 
     if (running) {
@@ -315,8 +315,8 @@ void PidController::isr()
         }
 
         // check for motor stall
-        uint32_t now = HAL_GetTick();
-        uint32_t newRpmCounter = PID_READ_RPM_COUNTER();
+        const uint32_t now = HAL_GetTick();
+        const uint32_t newRpmCounter = PID_READ_RPM_COUNTER();
         if (newRpmCounter >= lastRpmCounter + 2) { // require more than one rotation before updating the value
             lastRpmCounter = newRpmCounter;
             lastRpmCounterUpdated = now;

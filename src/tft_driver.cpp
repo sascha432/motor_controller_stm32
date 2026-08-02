@@ -12,12 +12,10 @@ lv_color_t s_lvgl_buf_1[TFT_BUFFER_SIZE];
 lv_disp_drv_t s_lvgl_disp_drv;
 
 /**
- * @brief init GPIO pins for the SPI TFT display and backlight PWM
- *
- * This code does not use the PIN macros and needs to modified manually if the pinout is changed
+ * @brief init GPIO pins and timers for the SPI display and backlight PWM
  *
  */
-void tft_driver_gpio_init(void)
+void tft_driver_gpio_tim_init(void)
 {
     // Enable GPIOC and GPIOD clocks
     __HAL_RCC_GPIOC_CLK_ENABLE();
@@ -44,7 +42,7 @@ void tft_driver_gpio_init(void)
 
     // backlight PWM on TFT_PIN_LED/PB11
     __HAL_RCC_AFIO_CLK_ENABLE();
-    __HAL_RCC_GPIOB_CLK_ENABLE();
+    // __HAL_RCC_GPIOB_CLK_ENABLE();
     __HAL_RCC_TIM2_CLK_ENABLE();
 
     __HAL_AFIO_REMAP_TIM2_PARTIAL_2();

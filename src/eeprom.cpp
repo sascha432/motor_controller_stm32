@@ -26,8 +26,8 @@ EEPROM eeprom;
 
 bool eepromWriteByte(uint8_t memAddress, uint8_t data);
 int16_t eepromReadByte(uint8_t memAddress);
-bool eepromWriteBytes(uint16_t memAddress, const uint8_t *data, uint16_t length);
-bool eepromReadBytes(uint16_t memAddress, uint8_t *data, uint16_t length);
+bool eepromWriteBytes(uint8_t memAddress, const uint8_t *data, uint16_t length);
+bool eepromReadBytes(uint8_t memAddress, uint8_t *data, uint16_t length);
 bool eepromWaitReady(void);
 
 // === EEPROM implementation ===
@@ -147,7 +147,7 @@ int16_t eepromReadByte(uint8_t memAddress)
 //------------------------------------------------------------------
 // Multi byte write, split into AT24C02 page-aligned chunks (8 bytes/page)
 //------------------------------------------------------------------
-bool eepromWriteBytes(uint16_t memAddress, const uint8_t *data, uint16_t length)
+bool eepromWriteBytes(uint8_t memAddress, const uint8_t *data, uint16_t length)
 {
     if (memAddress + length > EEPROM_SIZE) {
         return false; // out of range
@@ -159,7 +159,7 @@ bool eepromWriteBytes(uint16_t memAddress, const uint8_t *data, uint16_t length)
         uint8_t chunk       = (length < spaceInPage) ? (uint8_t)length : spaceInPage;
 
         uint8_t buf[1 + EEPROM_PAGE_SIZE];
-        buf[0] = (uint8_t)memAddress;
+        buf[0] = memAddress;
         memcpy(&buf[1], data, chunk);
 
         if (!i2c.sendBytes(EEPROM_ADDRESS, buf, (uint16_t)(chunk + 1), true)) {
@@ -179,14 +179,13 @@ bool eepromWriteBytes(uint16_t memAddress, const uint8_t *data, uint16_t length)
 //------------------------------------------------------------------
 // Multi byte sequential read: word addr write, repeated start, burst read
 //------------------------------------------------------------------
-bool eepromReadBytes(uint16_t memAddress, uint8_t *data, uint16_t length)
+bool eepromReadBytes(uint8_t memAddress, uint8_t *data, uint16_t length)
 {
     if (memAddress + length > EEPROM_SIZE) {
         return false; // out of range
     }
 
-    uint8_t addr = (uint8_t)memAddress;
-    if (!i2c.sendBytes(EEPROM_ADDRESS, &addr, 1, false)) {
+    if (!i2c.sendBytes(EEPROM_ADDRESS, &memAddress, 1, false)) {
         return false;
     }
 

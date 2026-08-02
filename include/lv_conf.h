@@ -91,7 +91,6 @@
 #define LV_FONT_MONTSERRAT_24 1
 #define LV_FONT_UNSCII_8 0
 
-//#define LV_FONT_DEFAULT &lv_font_unscii_8
 #define LV_FONT_DEFAULT &lv_font_montserrat_12
 
 #endif

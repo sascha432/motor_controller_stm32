@@ -111,14 +111,6 @@ extern "C" void DMA1_Channel1_IRQHandler()
     }
 }
 
-extern "C" void HAL_WWDG_MspInit(WWDG_HandleTypeDef *hwwdg)
-{
-    (void)hwwdg;
-    __HAL_RCC_WWDG_CLK_ENABLE();
-    HAL_NVIC_SetPriority(WWDG_IRQn, 0, 0);
-    HAL_NVIC_EnableIRQ(WWDG_IRQn);
-}
-
 // === interrupt handlers ===
 
 /**
@@ -238,7 +230,7 @@ extern "C" void Error_Handler(void)
     }
     #endif
     // disable watchdog
-    WatchDog::stop();
+    WatchDog::deinit();
     // disable interrupts
     __disable_irq();
     // infinite loop to signal error via LED flashes
