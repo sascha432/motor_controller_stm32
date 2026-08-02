@@ -21,7 +21,7 @@ struct LEDs_T {
     {
         // PWM timer setup handled in tft_driver_gpio_tim_init()
         static_assert(GPIO_ILLUMINATION_LED_PIN == PB10, "Illumination LED pin must be PB10");
-        static_assert(GPIO_LEDS_PIN == PB11, "LEDs pin must be PB11");
+        static_assert(GPIO_LEDS_PIN == PD12, "LEDs pin must be PD12");
 
         // Enable GPIO port clock
         __HAL_RCC_GPIOx_CLK_ENABLE<GPIO_LEDS_PIN>();
