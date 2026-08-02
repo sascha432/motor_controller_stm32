@@ -144,7 +144,7 @@ static const char *anti_windup_format_callback(uint32_t value, char *buf, size_t
         snprintf(buf, bufSize, "Disabled");
         return buf;
     }
-    const uint32_t antiWindup = value * (1000 / UIConstants::kAntiWindupFactor); // value = percentage * 100, so multiply by 10 to get percentage * 1000
+    const uint32_t antiWindup = value * 1000 / UIConstants::kAntiWindupFactor; // multiply by 1000 for convert_to_fp2
     snprintf(buf, bufSize, SPRINTF_FP2_FMT " %%", CONVERT_TO_FP2(antiWindup));
     return buf;
 }
@@ -652,6 +652,7 @@ void Menu::handleButtonPress()
                         "%",
                         anti_windup_format_callback
                     ));
+                    screenFlow->setSteps(UIConstants::kAntiWindupFactor / 100);
                     setValue(eeprom.getAntiWindup());
                     break;
                 case PIDParametersItemType::BACK:
@@ -701,7 +702,7 @@ void Menu::handleButtonPress()
                         setValue(EEPROM::kPIDParamToUint32(eeprom.getKd()));
                         break;
                     case DashboardScreen::SelectedValueType::ANTI_WINDUP:
-                        dashboard.setMaxAcceleration(sqrt(UIConstants::kMaxAntiWindup - UIConstants::kMinAntiWindup));
+                        dashboard.setMaxAcceleration(std::sqrt(UIConstants::kMaxAntiWindup - UIConstants::kMinAntiWindup));
                         setValue(eeprom.getAntiWindup());
                         break;
                     case DashboardScreen::SelectedValueType::MAX:
@@ -732,8 +733,10 @@ void Menu::handleButtonPress()
         case Screen::Type::OVP_PROTECTION:
             restorePreviousMenu();
             break;
-        default:
-            DEBUG_PRINT(DebugType::ERROR, "MainMenu: unhandled id: %d", static_cast<int>(screenFlow->getId()));
+        case Screen::Type::WELCOME:
+        case Screen::Type::EEPROM_SAVED:
+        case Screen::Type::EEPROM_RESTORED:
+            // no button action
             break;
     }
     DEBUG_PRINT(DebugType::UI, "leave screen=%p id=%d value=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), getValue());
@@ -762,6 +765,7 @@ void Menu::handleBackButtonPress()
             loadStartScreen();
             break;
         default:
+            // default is back
             restorePreviousMenu();
             break;
     }
@@ -786,11 +790,11 @@ void Menu::handleStartButtonPress()
             }
             break;
         default:
+            // no default action
             break;
     }
     DEBUG_PRINT(DebugType::UI, "leave screen=%p id=%d value=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), getValue());
 }
-
 
 /**
  * @brief Call to update menu position from rotary encoder
@@ -907,8 +911,6 @@ int32_t Menu::updateRotaryValue(int32_t value)
         case Screen::Type::ADVANCED_MENU:
         case Screen::Type::MOTOR_RPM_SETTINGS:
         case Screen::Type::CURRENT_LIMITS:
-        case Screen::Type::CONTROL_MODE_PWM:
-        case Screen::Type::CONTROL_MODE_PID:
         case Screen::Type::RESTORE_DEFAULTS_CONFIRMATION:
         case Screen::Type::EEPROM_RESTORED:
         case Screen::Type::DIAGNOSTICS:

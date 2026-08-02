@@ -92,15 +92,20 @@ PID_FRAME_MAGIC = b"PID1"
 PID_ITEM_STRUCT = "<I9H2xfffI"
 PID_ITEM_SIZE = struct.calcsize(PID_ITEM_STRUCT)
 PID_PWM_MAX_LEVEL = 3599.0
+ANTI_WINDUP_FACTOR = 512.0
 SWO_DATA_FIXED_RAM_ADDRESS = 0x2000F000
 SWO_ENABLE_DISABLED = 0
 SWO_ENABLE_SWO = 1
 SWO_ENABLE_USB = 2
 SWO_DATA_EEPROM_ADDRESS_OFFSET = 20
 SWO_DATA_EEPROM_COMMIT_OFFSET = 24
-SWO_DATA_STRUCT = "<ffffHB?I?xxx"
+# C++ SWO::DataType layout:
+# float Kp, float Ki, float Kd, uint16_t antiWindup, uint16_t rpm,
+# uint8_t enabled, bool changed, 2 bytes padding,
+# uint32_t EEPROM.address, bool EEPROM.commit, 3 bytes padding.
+SWO_DATA_STRUCT = "<fffHHB?2xI?3x"
 SWO_DATA_SIZE = struct.calcsize(SWO_DATA_STRUCT)
-SWO_DATA_ENABLED_OFFSET = struct.calcsize("<ffffH")
+SWO_DATA_ENABLED_OFFSET = struct.calcsize("<fffHH")
 EEPROM_DATA_STRUCT = "<IIIBBHHHHHBBBBBBBBHxxfffHH"
 EEPROM_DATA_SIZE = struct.calcsize(EEPROM_DATA_STRUCT)
 
@@ -110,7 +115,7 @@ class SWOData:
     kp: float
     ki: float
     kd: float
-    anti_windup: float
+    anti_windup: int
     rpm: int
     changed: bool
     eeprom_address: int
@@ -204,6 +209,14 @@ def decode_fault_word(word: int) -> Tuple[int, int, int, int]:
     ocp_fault = (word >> 2) & 0x1
     snsout_fault = (word >> 3) & 0x1
     return running, drv_fault, ocp_fault, snsout_fault
+
+
+def anti_windup_raw_to_percent(raw_value: int) -> float:
+    return float(raw_value) / ANTI_WINDUP_FACTOR
+
+
+def anti_windup_percent_to_raw(percent_value: float) -> int:
+    return int(round(percent_value * ANTI_WINDUP_FACTOR))
 
 
 def decode_pid_item(payload: bytes) -> Optional[Sample]:
@@ -699,7 +712,7 @@ class PIDTuningApp:
         self.kp_var = tk.StringVar(value="0.0")
         self.ki_var = tk.StringVar(value="0.0")
         self.kd_var = tk.StringVar(value="0.0")
-        self.anti_windup_var = tk.StringVar(value="97.00")
+        self.anti_windup_var = tk.StringVar(value="0.00")
         self.rpm_var = tk.StringVar(value="0")
         self._pid_fields_updating = False
         self._pid_fields_dirty = False
@@ -938,9 +951,9 @@ class PIDTuningApp:
         enabled_state: int = SWO_ENABLE_DISABLED,
         changed: bool = True,
     ) -> bytes:
-        # C++ layout: float Kp, float Ki, float Kd, float antiWindup,
+        # C++ layout: float Kp, float Ki, float Kd, uint16_t antiWindup,
         # uint16_t rpm, enum class EnableState : uint8_t enabled, bool changed,
-        # struct { uint32_t address; bool commit; } EEPROM.
+        # padding, then struct { uint32_t address; bool commit; } EEPROM.
         return struct.pack(
             SWO_DATA_STRUCT,
             data.kp,
@@ -955,7 +968,7 @@ class PIDTuningApp:
         )
 
     def _unpack_swo_data(self, payload: bytes) -> SWOData:
-        kp, ki, kd, anti_windup, rpm, _enabled_state, changed, eeprom_address, eeprom_commit = struct.unpack(
+        kp, ki, kd, anti_windup_raw, rpm, _enabled_state, changed, eeprom_address, eeprom_commit = struct.unpack(
             SWO_DATA_STRUCT,
             payload[:SWO_DATA_SIZE],
         )
@@ -963,7 +976,7 @@ class PIDTuningApp:
             kp=kp,
             ki=ki,
             kd=kd,
-            anti_windup=anti_windup,
+            anti_windup=anti_windup_raw,
             rpm=rpm,
             changed=changed,
             eeprom_address=eeprom_address,
@@ -1010,7 +1023,7 @@ class PIDTuningApp:
             and abs(data.kp - 1.0) < 1e-6
             and abs(data.ki - 1.0) < 1e-6
             and abs(data.kd - 0.0) < 1e-6
-            and abs(data.anti_windup - 0.0) < 1e-6
+            and data.anti_windup == 0
             and data.rpm == 0
         )
 
@@ -1024,21 +1037,16 @@ class PIDTuningApp:
         if enabled_state not in (SWO_ENABLE_DISABLED, SWO_ENABLE_SWO, SWO_ENABLE_USB):
             raise RuntimeError(f"Invalid SWO::data enabled state: {enabled_state}")
 
-        for name, value in (
-            ("Kp", data.kp),
-            ("Ki", data.ki),
-            ("Kd", data.kd),
-            ("AntiWindup", data.anti_windup),
-        ):
+        for name, value in (("Kp", data.kp), ("Ki", data.ki), ("Kd", data.kd)):
             if not math.isfinite(value):
                 raise RuntimeError(f"Invalid SWO::data {name}: not finite")
 
         if not (0 <= data.rpm <= 65535):
             raise RuntimeError(f"Invalid SWO::data RPM: {data.rpm}")
 
-        if not (0.0 <= data.anti_windup <= 100.0):
+        if not (0 <= data.anti_windup <= anti_windup_percent_to_raw(100.0)):
             raise RuntimeError(
-                f"Invalid SWO::data anti-windup: {data.anti_windup}"
+                f"Invalid SWO::data anti-windup raw value: {data.anti_windup}"
             )
 
         if data.eeprom_address == 0:
@@ -1064,7 +1072,7 @@ class PIDTuningApp:
             self.kp_var.set(f"{data.kp:.6f}")
             self.ki_var.set(f"{data.ki:.6f}")
             self.kd_var.set(f"{data.kd:.6f}")
-            self.anti_windup_var.set(f"{data.anti_windup:.2f}")
+            self.anti_windup_var.set(f"{anti_windup_raw_to_percent(data.anti_windup):.2f}")
             self.rpm_var.set(str(data.rpm))
             self._last_loaded_swo_data = data
             self._pid_fields_dirty = False
@@ -1115,7 +1123,7 @@ class PIDTuningApp:
             return f"{float(value):.6f}"
 
         if field_kind == "percent":
-            return f"{float(value) / 100.0:.2f}"
+            return f"{anti_windup_raw_to_percent(int(value)):.2f}"
 
         return str(int(value))
 
@@ -1204,7 +1212,7 @@ class PIDTuningApp:
                     raise ValueError(f"{field_name} below minimum {minimum}")
                 if maximum is not None and parsed_percent > maximum:
                     raise ValueError(f"{field_name} above maximum {maximum}")
-                values[field_name] = int(round(parsed_percent * 100.0))
+                values[field_name] = anti_windup_percent_to_raw(parsed_percent)
                 continue
             else:
                 parsed_value = int(raw_text)
@@ -1457,9 +1465,11 @@ class PIDTuningApp:
             kp=kp,
             ki=ki,
             kd=kd,
-            anti_windup=anti_windup,
+            anti_windup=anti_windup_percent_to_raw(anti_windup),
             rpm=rpm,
             changed=True,
+            eeprom_address=0,
+            eeprom_commit=False,
         )
 
         def worker() -> None:
@@ -1741,7 +1751,7 @@ class PIDTuningApp:
                 self._append_log(
                     f"Loaded SWO::data ({reason}): "
                     f"Kp={data.kp:.6f} Ki={data.ki:.6f} Kd={data.kd:.6f} "
-                    f"AWR={data.anti_windup:.2f}% RPM={data.rpm} changed={int(data.changed)}"
+                    f"AWR={anti_windup_raw_to_percent(data.anti_windup):.2f}% RPM={data.rpm} changed={int(data.changed)}"
                 )
                 self._set_sync_enabled(True)
                 if reason == "startup":
@@ -1795,7 +1805,7 @@ class PIDTuningApp:
                         self.kp_var.set(f"{committed_eeprom_data.kp:.6f}")
                         self.ki_var.set(f"{committed_eeprom_data.ki:.6f}")
                         self.kd_var.set(f"{committed_eeprom_data.kd:.6f}")
-                        self.anti_windup_var.set(f"{(float(committed_eeprom_data.anti_windup) / 100.0):.2f}")
+                        self.anti_windup_var.set(f"{anti_windup_raw_to_percent(committed_eeprom_data.anti_windup):.2f}")
                         self.rpm_var.set(str(committed_eeprom_data.motor_rpm))
                         self._pid_fields_dirty = False
                     finally:
@@ -1806,7 +1816,7 @@ class PIDTuningApp:
                             kp=committed_eeprom_data.kp,
                             ki=committed_eeprom_data.ki,
                             kd=committed_eeprom_data.kd,
-                            anti_windup=float(committed_eeprom_data.anti_windup) / 100.0,
+                            anti_windup=committed_eeprom_data.anti_windup,
                             rpm=committed_eeprom_data.motor_rpm,
                             changed=self._last_loaded_swo_data.changed,
                             eeprom_address=self._last_loaded_swo_data.eeprom_address,
@@ -1817,7 +1827,7 @@ class PIDTuningApp:
                         "Updated input fields after EEPROM commit: "
                         f"Kp={committed_eeprom_data.kp:.6f} Ki={committed_eeprom_data.ki:.6f} "
                         f"Kd={committed_eeprom_data.kd:.6f} "
-                        f"AWR={(float(committed_eeprom_data.anti_windup) / 100.0):.2f}% "
+                        f"AWR={anti_windup_raw_to_percent(committed_eeprom_data.anti_windup):.2f}% "
                         f"RPM={committed_eeprom_data.motor_rpm}"
                     )
                     self._set_sync_enabled(True)

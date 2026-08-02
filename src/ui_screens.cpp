@@ -686,7 +686,7 @@ void DashboardScreen::_refreshVisuals()
             lv_label_set_text_fmt(valueLabel, "Kd %s", buf);
             break;
         case SelectedValueType::ANTI_WINDUP: {
-            const uint32_t antiWindup = eeprom.getAntiWindup() * (1000 / UIConstants::kAntiWindupFactor);
+            const uint32_t antiWindup = (eeprom.getAntiWindup() * 1000) / UIConstants::kAntiWindupFactor;
             lv_label_set_text_fmt(valueLabel, "Anti-windup " SPRINTF_FP2_FMT "%%", CONVERT_TO_FP2(antiWindup));
             break;
         }

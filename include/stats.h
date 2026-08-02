@@ -111,10 +111,10 @@ namespace Helpers {
             reset();
         }
 
-        void reset(int32_t value = 0)
+        void reset()
         {
             lastUpdate = HAL_GetTick();
-            output = value * kFactor;
+            output = 0;
         }
 
         void update(int16_t value)
@@ -146,6 +146,37 @@ namespace Helpers {
 
         uint32_t lastUpdate;
         int32_t output;   // fixed point: real value * kFactor
+    };
+
+    template<uint32_t INTERVAL_MS, uint32_t FILTER_TIME_MS, int32_t FACTOR = 1024>
+    struct FixedLowPass
+    {
+        static_assert(INTERVAL_MS > 0, "INTERVAL_MS must be positive");
+        static_assert(FILTER_TIME_MS >= INTERVAL_MS, "FILTER_TIME_MS must be >= INTERVAL_MS");
+        static constexpr int32_t kAlpha = (INTERVAL_MS * FACTOR) / FILTER_TIME_MS;
+
+        FixedLowPass()
+        {
+            reset();
+        }
+
+        void reset()
+        {
+            output = 0;
+        }
+
+        void update(int16_t value)
+        {
+            int32_t error = static_cast<int32_t>(value) * FACTOR - output;
+            output += (kAlpha * error) / FACTOR;
+        }
+
+        int32_t get() const
+        {
+            return output / FACTOR;
+        }
+
+        int32_t output;
     };
 
     template <uint32_t MAX_COUNT, uint32_t DECAY_DIVIDER>

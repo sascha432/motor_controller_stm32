@@ -12,7 +12,7 @@
 - On-device tuning for speed, brake strength, and stall timeout
 - Configurable protection limits for input current, motor current, MOSFET temperature, and motor temperature
 - Advanced setup for RPM range, motor direction, and sensor direction
-- PID parameter tuning (Kp, Ki, Kd, anti-windup reduction) with live parameter apply
+- PID parameter tuning (Kp, Ki, Kd, anti-windup) with live parameter apply
 - Diagnostics screen with firmware/PCB info and live min/max telemetry (VCC, current, temperatures, RPM/PWM)
 - EEPROM-backed settings with save/restore-defaults from the menu
 - LVGL TFT UI with rotary encoder plus dedicated start/back/knob buttons

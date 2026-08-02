@@ -154,15 +154,16 @@ void PidController::reset()
     resetFaults();
     applyPIDParams();
 
-    #if DEBUG
-        char pBuf[16], iBuf[16], dBuf[16], aBuf[16];
-        FloatToString::convertTrimmed(pBuf, sizeof(pBuf), Kp, 6);
-        FloatToString::convertTrimmed(iBuf, sizeof(iBuf), Ki, 6);
-        FloatToString::convertTrimmed(dBuf, sizeof(dBuf), Kd, 6);
-        FloatToString::convertTrimmed(aBuf, sizeof(aBuf), antiWindup / (float)PidController::kFPAntiWindupFactor, 6);
-        __enable_irq();
-        DEBUG_PRINT(DebugType::PID, "Kp=%s Ki=%s Kd=%s RPM=%u windup=%s OCP=%u/%u OVP=%u", pBuf, iBuf, dBuf, rpm, aBuf, eeprom.getInputCurrentLimit(), eeprom.getMotorCurrentLimit(), eeprom.getOvpProtection());
-    #endif
+    DEBUG_PRINT(DebugType::PID, "Kp=%s Ki=%s Kd=%s RPM=%u windup=%s OCP=%u/%u OVP=%u",
+        debugFloatToString(Kp, 6, true),
+        debugFloatToString(Ki, 6, true),
+        debugFloatToString(Kd, 6, true),
+        rpm,
+        debugFloatToString(antiWindup / static_cast<float>(UIConstants::kAntiWindupFactor), 2, true),
+        eeprom.getInputCurrentLimit(),
+        eeprom.getMotorCurrentLimit(),
+        eeprom.getOvpProtection()
+    );
 }
 
 void PidController::motorOn()
@@ -251,31 +252,33 @@ void PidController::isr()
 
         // get pwm level and set output
         pwmLevel = calcPWMLevel(error, getIntegral(), derivative);
-    }
-    else {
-        pwmLevel = (eeprom.getMotorPWM() * kMaxPWMLevel) / 100;
-    }
+        // clamp pwm level to max. allowed value
+        clampedPwmLevel = clampPWMLevel(pwmLevel);
 
-    // clamp pwm level to max. allowed value
-    clampedPwmLevel = clampPWMLevel(pwmLevel);
-
-    if (eeprom.isPIDMode()) {
+        // apply anti-windup
         if (ocp.state != OcpStateType::NONE) {
             #if PID_USE_FLOATING_POINT_MATH
-                setIntegral(getIntegral() * kOcpAntiWindUp);
+                setIntegral(getIntegral() * kOcpAntiWindUpFloat);
             #else
-                setIntegral((getIntegral() * kFPAntiWindupFactor) / static_cast<PidValueType>(kOcpAntiWindUp * kFPAntiWindupFactor));
+                // use fixed point
+                setIntegral((getIntegral() * static_cast<PidValueType>(kOcpAntiWindUpFloat * 1024)) / 1024);
             #endif
         }
         else if (antiWindup) {
-            if (pwmLevel < (int32_t)(kMaxPWMLevel * -1.1f) || pwmLevel > (int32_t)(kMaxPWMLevel * 1.1f)) {
+            if (pwmLevel < kWindupPwmLower || pwmLevel > kWindupPwmUpper) {
                 #if PID_USE_FLOATING_POINT_MATH
-                    setIntegral(getIntegral() * antiWindup);
+                    setIntegral(getIntegral() * antiWindup / (UIConstants::kAntiWindupFactor * 100.0f));
                 #else
-                    setIntegral((getIntegral() * kFPAntiWindupFactor) / antiWindup);
+                    setIntegral((getIntegral() * antiWindup) / (UIConstants::kAntiWindupFactor * 100));
                 #endif
             }
         }
+    }
+    else {
+        // fixed pwm from settings
+        pwmLevel = (eeprom.getMotorPWM() * kMaxPWMLevel) / 100;
+        // clamp pwm level to max. allowed value
+        clampedPwmLevel = clampPWMLevel(pwmLevel);
     }
 
     // apply new PWM level if motor is running
@@ -286,10 +289,7 @@ void PidController::isr()
         // countdown once set
         if (--releaseBreakCounter == 0) {
             PID_WRITE_MOTOR_PWM_OFF();
-            #if DEBUG
-            __enable_irq();
             DEBUG_PRINT(DebugType::PID, "Brake released");
-            #endif
         }
     }
 
@@ -346,7 +346,7 @@ void PidController::isr()
             item.integral = getIntegral();
             item.derivative = getLastDerivative();
         } else {
-            constexpr auto tmp = 1 / static_cast<float>(PidController::kFPFactor);
+            constexpr float tmp = 1 / static_cast<float>(PidController::kFPFactor);
             item.error = getLastError() * tmp;
             item.integral = getIntegral() * tmp;
             item.derivative = getLastDerivative() * tmp;
@@ -363,7 +363,7 @@ void PidController::isr()
             eeprom.setKp(SWO::data.Kp);
             eeprom.setKi(SWO::data.Ki);
             eeprom.setMotorRPM(SWO::data.rpm);
-            eeprom.setAntiWindup(SWO::data.antiWindup * UIConstants::kAntiWindupFactor);
+            eeprom.setAntiWindup(SWO::data.antiWindup);
             SWO::data.changed = false;
 
             // apply to PID controller
@@ -373,14 +373,13 @@ void PidController::isr()
             pid.setRPM(eeprom.getMotorRPM());
             pid.setAntiWindup(eeprom.getAntiWindup());
 
-            #if DEBUG
-                char bufKp[16], bufKi[16], bufKd[16];
-                FloatToString::convertTrimmed(bufKp, sizeof(bufKp), SWO::data.Kp, 6);
-                FloatToString::convertTrimmed(bufKi, sizeof(bufKi), SWO::data.Ki, 6);
-                FloatToString::convertTrimmed(bufKd, sizeof(bufKd), SWO::data.Kd, 6);
-                __enable_irq();
-                DEBUG_PRINT(DebugType::PID, "PID tuning via SWO: Kp=%s Ki=%s Kd=%s RPM=%u", bufKp, bufKi, bufKd, SWO::data.rpm);
-            #endif
+            DEBUG_PRINT(DebugType::PID, "PID tuning via SWO: Kp=%s Ki=%s Kd=%s RPM=%u windup=%s",
+                debugFloatToString(SWO::data.Kp, 6, true),
+                debugFloatToString(SWO::data.Ki, 6, true),
+                debugFloatToString(SWO::data.Kd, 6, true),
+                SWO::data.rpm,
+                debugFloatToString(SWO::data.antiWindup / static_cast<float>(UIConstants::kAntiWindupFactor), 2, true)
+            );
         }
     }
 }

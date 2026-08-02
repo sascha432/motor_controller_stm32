@@ -12,6 +12,7 @@
 
 // 32bit floating point ~1800 clock cycles
 // int64_t fixed point ~580 clock cycles
+// the code has changed since i measured this, but the difference is still significant
 #ifndef PID_USE_FLOATING_POINT_MATH
 #define PID_USE_FLOATING_POINT_MATH 0
 #endif
@@ -26,20 +27,20 @@ struct PidController
 
     static constexpr uint32_t kReleaseBreakTime = 5000;                                 // time in ms to release the break after motor is turned off
     static constexpr uint16_t kMaxPWMLevel = kPWMFrequencyToARR<20000>();               // Motor PWM 20Khz
+    static constexpr int32_t kWindupPwmLower = kMaxPWMLevel * -1.1f;                    // PWM level below which the integral is reduced
+    static constexpr int32_t kWindupPwmUpper = kMaxPWMLevel * 1.1f;                     // PWM level above which the integral is reduced
     static constexpr uint16_t kPPR = 1024;                                              // MT6701 PPR
     static constexpr uint16_t kCPR = kPPR * 4;                                          // 4x Mode PPR to CPR
     static constexpr float kPIDIntervalFloat = 5.12f;                                   // PID update rate in millis used for precise RPM calculation
     static constexpr uint32_t kPIDInterval = 5;                                         // PID update rate in millis
-    static constexpr float kAntiWindup = 0.97f;                                         // reduce integral if error is out of range (97%)
+    static constexpr uint16_t kAntiWindup = 97 * UIConstants::kAntiWindupFactor;        // reduce integral if error is out of range (97%)
     static constexpr bool kProgramPPR = false;                                          // set to true to program the MT6701 encoder during boot over i2c
     static constexpr uint32_t kMaxRPM = 55000;                                          // max. supported RPM by the encoder
     static constexpr float kMaxError = kCPR / (60000 / kPIDIntervalFloat) * kMaxRPM;    // factor to reduce error to a value between -1.0 and 1.0 for the PID loop
     #if PID_USE_FLOATING_POINT_MATH
         static constexpr int32_t kFPFactor = 1;
-        static constexpr float kFPAntiWindupFactor = 1.0f;
     #else
-        static constexpr int32_t kFPFactor = kMaxError;                                     // factor to reduce error, power of 2 avoids multiplications and divisions
-        static constexpr int32_t kFPAntiWindupFactor = 1024;
+        static constexpr int32_t kFPFactor = kMaxError;                                 // factor to reduce error, power of 2 avoids multiplications and divisions
     #endif
 
     // convert RPM to counts per PID interval
@@ -85,7 +86,7 @@ struct PidController
     PidController() :
         rpm(0),
         motorDirection(EEPROM::kMotorDirectionForward),
-        antiWindup(kAntiWindup * kFPAntiWindupFactor),
+        antiWindup(kAntiWindup),
         errorCode(ErrorCodeType::NONE),
         running(false),
         releaseBreakCounter(0)
@@ -206,13 +207,8 @@ struct PidController
      */
     inline void setAntiWindup(uint16_t value)
     {
-        #if PID_USE_FLOATING_POINT_MATH
-            antiWindup = value ? std::clamp<float>(value / (UIConstants::kAntiWindupFactor * 100.0f), 0.5f, 1.0f) : 0;
-            SWO::data.antiWindup = antiWindup * 100.0f;
-        #else
-            antiWindup = value ? std::clamp<PidValueType>(value * kFPAntiWindupFactor / (UIConstants::kAntiWindupFactor * 100), 0.5f * kFPAntiWindupFactor, 1.0f * kFPAntiWindupFactor) : 0;
-            SWO::data.antiWindup = antiWindup * (100.0f / kFPAntiWindupFactor);
-        #endif
+        antiWindup = value ? std::clamp<PidValueType>(value, UIConstants::kLowestAntiWindup, UIConstants::kMaxAntiWindup) : 0;
+        SWO::data.antiWindup = value;
     }
 
     /**
@@ -464,8 +460,10 @@ public:
     // === Statistics data structure ===
     struct StatsType
     {
-        Helpers::LowPass<32> rpm;           // filtered RPM for displaying
-        Helpers::LowPass<8> pwm;            // filtered PWM for displaying
+        // Helpers::LowPass<32> rpm;           // filtered RPM for displaying
+        // Helpers::LowPass<8> pwm;            // filtered PWM for displaying
+        Helpers::FixedLowPass<kPIDInterval, 32> rpm;    // filtered RPM for displaying
+        Helpers::FixedLowPass<kPIDInterval, 8> pwm;     // filtered PWM for displaying
         struct {
             uint32_t loop;                  // number of times the PID loop has been called
             int32_t pulse;                  // number of pulses received from the A/B motor encoder
@@ -512,7 +510,7 @@ public:
     static constexpr uint32_t kOcpCurrentRampUp = 16;                                   // increase current by 1/16 every tick
     static constexpr uint32_t kOcpCurrentRampDown = 16;                                 // reduce current by 1/16 every tick
     static constexpr uint32_t kOcpInputToMotorCurrentRatio = 8;                         // if the motor current limit is higher than x the input current limit, it will be reduced to x the input current limit, before ramping it down further
-    static constexpr float kOcpAntiWindUp = 0.8f;                                       // strong anti windup during OCP condition
+    static constexpr float kOcpAntiWindUpFloat = 0.8f;                                  // strong anti windup during OCP condition
 
     enum class OcpStateType : uint32_t {
         NONE = 0,           // no OCP condition

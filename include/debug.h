@@ -44,7 +44,7 @@ struct SWO
         volatile float Kp;
         volatile float Ki;
         volatile float Kd;
-        volatile float antiWindup;
+        volatile uint16_t antiWindup;
         volatile uint16_t rpm;
         volatile EnableState enabled;
         volatile bool changed;

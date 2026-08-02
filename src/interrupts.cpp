@@ -211,8 +211,7 @@ extern "C" void Error_Handler(void)
 {
     // turn motor off
     PID_WRITE_MOTOR_PWM_OFF();
-    #if DEBUG
-    #if DEBUG_OUTPUT == DEBUG_OUTPUT_SWD
+    #if DEBUG && (DEBUG_OUTPUT == DEBUG_OUTPUT_SWD)
     // report error type via SWO
     switch(interruptErrorType) {
         case InterruptErrorType::ERROR_HANDLER:
@@ -237,7 +236,6 @@ extern "C" void Error_Handler(void)
             SWO::write(0, "WD\n", sizeof("WD\n") - 1);
             break;
     }
-    #endif
     #endif
     // disable watchdog
     WatchDog::stop();
