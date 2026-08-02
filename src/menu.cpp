@@ -196,10 +196,12 @@ void Menu::showWelcomeScreen()
 
     if (UIConstants::kEnableIlluminationLEDFading) {
         // gradually increase LED brightness to target value
-        uint32_t start = HAL_GetTick();
-        uint8_t targetBrightness = eeprom.getLEDBrightness();
-        float currentBrightness = 0;
-        float step = targetBrightness / (UIConstants::kWelcomeScreenTimeout / 8.0f);
+        constexpr uint32_t kMultiplier = (1 << 23);
+        constexpr uint32_t kLoopDelay = 10;
+        const uint32_t start = HAL_GetTick();
+        uint32_t targetBrightness = eeprom.getLEDBrightness() * kMultiplier;
+        uint32_t currentBrightness = 0;
+        uint32_t step = targetBrightness / (UIConstants::kWelcomeScreenTimeout / kLoopDelay);
         targetBrightness -= step;
         for(;;) {
             uint32_t elapsed = HAL_GetTick() - start;
@@ -209,10 +211,10 @@ void Menu::showWelcomeScreen()
             if (currentBrightness < targetBrightness) {
                 currentBrightness += step;
             }
-            LEDs::illuminationLedSetPWM(currentBrightness);
+            LEDs::illuminationLedSetPWM(currentBrightness / (kMultiplier / LEDs::kIlluminationResolution));
             // blink motor LEDs
             ((elapsed / 500) & 0x01) ? LEDs::onLEDError() : LEDs::onLEDWarning();
-            WatchDog::delay(8);
+            WatchDog::delay(kLoopDelay);
         }
         LEDs::off();
     }
@@ -342,7 +344,7 @@ void Menu::saveEEPROMChanges()
 void Menu::applyEEPROMSettings()
 {
     tft_backlight_pwm_set(eeprom.getTFTBrightness());
-    LEDs::illuminationLedSetPWM(eeprom.getLEDBrightness());
+    LEDs::illuminationLedSetPWM(eeprom.getLEDBrightness() * LEDs::kIlluminationResolution);
     adc.setInputCurrentLimit(eeprom.getInputCurrentLimit());
     adc.setMotorCurrentLimit(eeprom.getMotorCurrentLimit());
     pid.applyPIDParams();
@@ -846,7 +848,7 @@ int32_t Menu::updateRotaryValue(int32_t value)
             break;
         case Screen::Type::LED_BRIGHTNESS:
             eeprom.setLEDBrightness(getValue());
-            LEDs::illuminationLedSetPWM(eeprom.getLEDBrightness());
+            LEDs::illuminationLedSetPWM(eeprom.getLEDBrightness() * LEDs::kIlluminationResolution);
             break;
         case Screen::Type::INPUT_CURRENT_LIMIT:
             eeprom.setInputCurrentLimit(getValue());

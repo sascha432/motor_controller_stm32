@@ -15,6 +15,8 @@
 template <uint32_t GPIO_LEDS_PIN, uint32_t GPIO_ILLUMINATION_LED_PIN>
 struct LEDs_T {
 
+    static constexpr uint32_t kIlluminationResolution = 1024;
+
     static void init()
     {
         // Enable GPIO port clock
@@ -62,19 +64,17 @@ struct LEDs_T {
         GPIO_CRx_REG<GPIO_LEDS_PIN>() |= (0x2 << digitalPinShift<GPIO_LEDS_PIN>());
     }
 
-    static void illuminationLedSetPWM(float value)
+    static void illuminationLedSetPWM(uint32_t value)
     {
         if (value == 0) {
             UI_ILLUMINATION_LED_SET_PWM(0);
             return;
         }
         // get more linear brightness by using a gamma curve and offset to avoid flickering at low brightness
-        float brightness = std::clamp<float>(value + 15, 15, 115) / 115.0f;
-
-        // old int version, not enough steps for fading brightness in and out
-        // float brightness = std::clamp<int32_t>(value + 15, 15, 115) / 115.0f;
-        brightness = powf(brightness, 2.2f);
-        UI_ILLUMINATION_LED_SET_PWM(brightness * 1000);
+        constexpr uint32_t kOffset = 15;
+        const uint32_t clampedBrightness = std::clamp<uint32_t>(value + (kOffset * kIlluminationResolution), (kOffset * kIlluminationResolution), ((100 + kOffset) * kIlluminationResolution));
+        const float brightness = clampedBrightness * (1.0f / ((kOffset + 100.0f) * kIlluminationResolution));
+        UI_ILLUMINATION_LED_SET_PWM(powf(brightness, 2.2f) * 1000.0f);
     }
 };
 
