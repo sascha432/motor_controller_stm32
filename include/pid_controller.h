@@ -25,7 +25,9 @@ struct PidController
     using PidValueType = int32_t;
     #endif
 
-    static constexpr uint32_t kReleaseBreakTime = 5000;                                 // time in ms to release the break after motor is turned off
+    static constexpr uint32_t kReleaseBreakTimeMillis = 5000;                           // time to release the brake after motor is turned off
+    static constexpr uint32_t kInitialSensorCheckTimeMillis = 750;                      // time to initially check for motor stall and sensor errors
+
     static constexpr uint16_t kMaxPWMLevel = kPWMFrequencyToARR<20000>();               // Motor PWM 20Khz
     static constexpr int32_t kWindupPwmLower = kMaxPWMLevel * -1.1f;                    // PWM level below which the integral is reduced
     static constexpr int32_t kWindupPwmUpper = kMaxPWMLevel * 1.1f;                     // PWM level above which the integral is reduced

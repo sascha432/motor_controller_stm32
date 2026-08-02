@@ -581,7 +581,7 @@ void DiagnosticsScreen::_refreshVisuals()
     );
     lv_label_set_text(rpmPwmLabel, buf);
 
-    pid.errorPrintf(buf, sizeof(buf));
+    pid.errorPrintf(buf, sizeof(buf) - 1);
     lv_label_set_text_fmt(lastErrorLabel, "Last Error %s", buf);
 }
 

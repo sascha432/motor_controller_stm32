@@ -704,7 +704,7 @@ class PIDTuningApp:
 
         self.root = tk.Tk()
         self.root.title("PID Tuning SWO Monitor")
-        self.root.geometry("1920x880")
+        self.root.geometry("1920x1200")
         self.root.minsize(1000, 640)
 
         self.window_seconds_var = tk.StringVar(value="10")

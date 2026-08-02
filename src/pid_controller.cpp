@@ -189,7 +189,7 @@ void PidController::motorOff()
         running = false;
         uint32_t level = clampPWMLevel(eeprom.getMotorBrake() * kMaxPWMLevel / 100);
         PID_WRITE_MOTOR_PWM_BREAK(level);
-        releaseBreakCounter = (kReleaseBreakTime / kPIDIntervalFloat) + 1;
+        releaseBreakCounter = (kReleaseBreakTimeMillis / kPIDIntervalFloat) + 1;
         __enable_irq();
     }
     else {
@@ -265,7 +265,7 @@ void PidController::isr()
             #endif
         }
         else if (antiWindup) {
-            if (pwmLevel < kWindupPwmLower || pwmLevel > kWindupPwmUpper) {
+            if ((pwmLevel < kWindupPwmLower) || (pwmLevel > kWindupPwmUpper)) {
                 #if PID_USE_FLOATING_POINT_MATH
                     setIntegral(getIntegral() * antiWindup / (UIConstants::kAntiWindupFactor * 100.0f));
                 #else
@@ -301,15 +301,15 @@ void PidController::isr()
     stats.rpm.update(deltaRPM);
 
     if (running) {
-        // initial stall and sensor check after 500ms
-        if (stats.counter.loop == (500 / kPIDInterval)) {
+        // initial stall and sensor check
+        if (stats.counter.loop == static_cast<uint32_t>(kInitialSensorCheckTimeMillis / kPIDIntervalFloat)) {
             if (stats.counter.pulse < -10) { // sensor counts backwards, wrong direction set
                 setErrorCode(ErrorCodeType::SENSOR_REVERSE);
             }
             else if (PID_READ_RPM_COUNTER() >= 1 && stats.counter.pulse < 10) { // we have 1 rotation but less than 10 pulses, something is wrong with the sensor
                 setErrorCode(ErrorCodeType::SENSOR);
             }
-            else if (stats.counter.pulse < (kCPR / 4)) { // quarter of a rotation or less, motor has stalled
+            else if (stats.counter.pulse < (kCPR / 8)) { // 1/8th of a rotation or less, motor has stalled
                 setErrorCode(ErrorCodeType::STALL);
             }
         }
@@ -321,7 +321,7 @@ void PidController::isr()
             lastRpmCounter = newRpmCounter;
             lastRpmCounterUpdated = now;
         }
-        if (now - lastRpmCounterUpdated > eeprom.getMotorStallTimeout()) {
+        else if (now - lastRpmCounterUpdated > eeprom.getMotorStallTimeout()) {
             setErrorCode(ErrorCodeType::STALL);
         }
     }
@@ -346,7 +346,7 @@ void PidController::isr()
             item.integral = getIntegral();
             item.derivative = getLastDerivative();
         #else
-            constexpr float tmp = 1 / static_cast<float>(PidController::kFPFactor);
+            constexpr float tmp = 1.0f / PidController::kFPFactor;
             item.error = getLastError() * tmp;
             item.integral = getIntegral() * tmp;
             item.derivative = getLastDerivative() * tmp;
@@ -373,7 +373,7 @@ void PidController::isr()
             pid.setRPM(eeprom.getMotorRPM());
             pid.setAntiWindup(eeprom.getAntiWindup());
 
-            DEBUG_PRINT(DebugType::PID, "PID tuning via SWO: Kp=%s Ki=%s Kd=%s RPM=%u windup=%s",
+            DEBUG_PRINT(DebugType::PID, "SWO PID tuning: Kp=%s Ki=%s Kd=%s RPM=%u windup=%s",
                 debugFloatToString(SWO::data.Kp, 6, true),
                 debugFloatToString(SWO::data.Ki, 6, true),
                 debugFloatToString(SWO::data.Kd, 6, true),
@@ -389,7 +389,7 @@ void PidController::ocp_isr()
     ocp.counter++;
     if (ocp.state == OcpStateType::TRIGGERED) {
         if (adc.getISenseOcpFilteredValue() < ((faults.isenseMax * (kOcpISenseThreshold * 1024 / 100)) / 1024)) {
-            // start recovery after the current dropped to 90% of the limit
+            // start recovery after the current dropped to kOcpISenseThreshold % of the limit
             ocp.state = OcpStateType::RECOVERY;
             ocp.counter = 0;
         }
