@@ -9,11 +9,8 @@
 namespace Helpers {
 
     template<uint32_t UPDATE_RATE_TIME = 10000>
-    struct MinMax {
-        uint32_t lastUpdate;
-        int16_t min;
-        int16_t max;
-
+    struct MinMax
+    {
         MinMax()
         {
             reset();
@@ -27,16 +24,17 @@ namespace Helpers {
 
         void update(int16_t value)
         {
-            if ((HAL_GetTick() - lastUpdate) > UPDATE_RATE_TIME) {
+            const uint32_t now = HAL_GetTick();
+            if ((now - lastUpdate) > UPDATE_RATE_TIME) {
                 reset();
             }
             if (value < min) {
                 min = value;
-                lastUpdate = HAL_GetTick();
+                lastUpdate = now;
             }
-            if (value > max) {
+            else if (value > max) {
                 max = value;
-                lastUpdate = HAL_GetTick();
+                lastUpdate = now;
             }
         }
 
@@ -49,11 +47,17 @@ namespace Helpers {
         {
             return max;
         }
+
+    private:
+        uint32_t lastUpdate;
+        int16_t min;
+        int16_t max;
     };
 
     // DECAY_TIME should be a power of 2 so the compiler can optimize multiply/divide operations into bit shifts
     template<uint32_t DECAY_TIME = 1024>
-    struct Integral {
+    struct Integral
+    {
         static_assert(DECAY_TIME < 60000, "DECAY_TIME must be less than 60000ms");
 
         static constexpr uint32_t kFactor = 1024;
@@ -71,21 +75,19 @@ namespace Helpers {
 
         void update(int16_t value)
         {
-            uint32_t dt = HAL_GetTick() - lastUpdate;
-            if (dt == 0)
+            const uint32_t now = HAL_GetTick();
+            uint32_t dt = now - lastUpdate;
+            if (dt == 0) {
                 return;
-
-            lastUpdate = HAL_GetTick();
-
-            if (dt > DECAY_TIME)
+            }
+            lastUpdate = now;
+            if (dt > DECAY_TIME) {
                 dt = DECAY_TIME;
-
+            }
             // decay = 1 - dt / DECAY_TIME
             uint32_t decay = kFactor - (dt * kFactor) / DECAY_TIME;
-
             // apply decay
             integral = (integral * decay) / kFactor;
-
             // add integration term: value * dt / 1000
             integral += ((int32_t)value * dt * kFactor) / 1000;
         }
@@ -95,6 +97,7 @@ namespace Helpers {
             return integral / kFactor;
         }
 
+    private:
         uint32_t lastUpdate;
         int32_t integral;   // signed because value can be negative
     };
@@ -119,24 +122,20 @@ namespace Helpers {
 
         void update(int16_t value)
         {
-            uint32_t now = HAL_GetTick();
+            const uint32_t now = HAL_GetTick();
             uint32_t dt = now - lastUpdate;
-
-            if (dt == 0)
+            if (dt == 0) {
                 return;
-
+            }
             lastUpdate = now;
-
-            if (dt > FILTER_TIME)
+            if (dt > FILTER_TIME) {
                 dt = FILTER_TIME;
-
+            }
             // alpha = dt / FILTER_TIME
-            int32_t alpha = ((int64_t)dt * kFactor) / FILTER_TIME;
-
+            const int64_t alpha = (static_cast<int64_t>(dt) * kFactor) / FILTER_TIME;
             // output += alpha * (input - output)
-            int32_t error = ((int32_t)value * kFactor) - output;
-
-            output += ((int64_t)alpha * error) / kFactor;
+            const int32_t error = (static_cast<int32_t>(value) * kFactor) - output;
+            output += (alpha * error) / kFactor;
         }
 
         int32_t get() const
@@ -144,16 +143,18 @@ namespace Helpers {
             return output / kFactor;
         }
 
+    private:
         uint32_t lastUpdate;
-        int32_t output;   // fixed point: real value * kFactor
+        int32_t output;
     };
 
-    template<uint32_t INTERVAL_MS, uint32_t FILTER_TIME_MS, int32_t FACTOR = 1024>
+    template<uint32_t INTERVAL_MS, uint32_t FILTER_TIME_MS>
     struct FixedLowPass
     {
+        static constexpr int32_t kFactor = 1024;
         static_assert(INTERVAL_MS > 0, "INTERVAL_MS must be positive");
         static_assert(FILTER_TIME_MS >= INTERVAL_MS, "FILTER_TIME_MS must be >= INTERVAL_MS");
-        static constexpr int32_t kAlpha = (INTERVAL_MS * FACTOR) / FILTER_TIME_MS;
+        static constexpr int32_t kAlpha = (INTERVAL_MS * kFactor) / FILTER_TIME_MS;
 
         FixedLowPass()
         {
@@ -167,15 +168,16 @@ namespace Helpers {
 
         void update(int16_t value)
         {
-            int32_t error = static_cast<int32_t>(value) * FACTOR - output;
-            output += (kAlpha * error) / FACTOR;
+            const int32_t error = static_cast<int32_t>(value) * kFactor - output;
+            output += (kAlpha * error) / kFactor;
         }
 
         int32_t get() const
         {
-            return output / FACTOR;
+            return output / kFactor;
         }
 
+    private:
         int32_t output;
     };
 
@@ -183,11 +185,13 @@ namespace Helpers {
     struct Average {
         Average() : sum(0), count(0) {}
 
-        void reset() {
+        void reset()
+        {
             *this = Average();
         }
 
-        void update(int32_t value) {
+        void update(int32_t value)
+        {
             sum += value;
             if (++count > MAX_COUNT) {
                 sum -= sum / DECAY_DIVIDER;
@@ -195,16 +199,18 @@ namespace Helpers {
             }
         }
 
-        int32_t get() const {
+        int32_t get() const
+        {
             return count ? sum / count : 0;
         }
 
+    private:
         int32_t sum;
         uint32_t count;
     };
 
-    struct Raw {
-
+    struct Raw
+    {
         Raw() : value(0)
         {}
 
@@ -218,6 +224,7 @@ namespace Helpers {
             return value;
         }
 
+    private:
         int32_t value;
     };
 

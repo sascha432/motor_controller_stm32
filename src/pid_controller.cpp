@@ -341,16 +341,16 @@ void PidController::isr()
         item.mosfetTemperature = adc.getMosfetTemperatureFiltered();
         item.dacMotorCurrent = DAC_GET_MOTOR_CURRENT();
         item.dacInputCurrent =  DAC_GET_INPUT_CURRENT();
-        if constexpr (PidController::kFPFactor == 1) {
+        #if PID_USE_FLOATING_POINT_MATH
             item.error = getLastError();
             item.integral = getIntegral();
             item.derivative = getLastDerivative();
-        } else {
+        #else
             constexpr float tmp = 1 / static_cast<float>(PidController::kFPFactor);
             item.error = getLastError() * tmp;
             item.integral = getIntegral() * tmp;
             item.derivative = getLastDerivative() * tmp;
-        }
+        #endif
         item.running = running ? 1U : 0U;
         item.drv8701Fault = faults.drv8701Fault ? 1U : 0U;
         item.ocpFault = (ocp.state != OcpStateType::NONE) ? 1U : 0U;

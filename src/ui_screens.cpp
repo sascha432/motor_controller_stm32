@@ -468,7 +468,12 @@ void DiagnosticsScreen::load()
 
     // Firmware label
     firmwareLabel = diagnostic_screen_create_label(content, textWidth, 0);
-    lv_label_set_text_fmt(firmwareLabel, "Firmware %u.%u.%u\nPCB Rev %u.%u\nBuild " __DATE__ " " __TIME__  "\nEEPROM cycle #%u",  VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, PCB_REV_MAJOR, PCB_REV_MINOR, (unsigned)eeprom.getData().sequence);
+    lv_label_set_text_fmt(firmwareLabel,
+        "Firmware " STR(VERSION_MAJOR) "." STR(VERSION_MINOR) "." STR(VERSION_PATCH) "\n"
+        "PCB Rev " STR(PCB_REV_MAJOR) "." STR(PCB_REV_MINOR) "\n"
+        "Build " __DATE__ " " __TIME__ "\n"
+        "EEPROM cycle #%u", (unsigned)eeprom.getData().sequence
+    );
 
     // VCC label
     vccLabel = diagnostic_screen_create_label(content, textWidth, 1);
@@ -758,12 +763,11 @@ void StartScreen::load()
 
 void StartScreen::_refreshVisuals()
 {
-    char buf[32];
-
     start_screen_update_top_status_labels(voltageLabel, currentLabel, motorTempLabel, mosfetTempLabel);
 
     lv_label_set_text_static(directionLabel, pid.isForwardMotorDirection() ? "START FORWARD" : "START REVERSE");
 
+    char buf[32];
     if (eeprom.isPIDMode()) {
         snprintf(buf, sizeof(buf) - 1, "%u RPM", (unsigned)eeprom.getSpeed());
     } else {

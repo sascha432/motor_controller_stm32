@@ -888,7 +888,7 @@ int32_t Menu::updateRotaryValue(int32_t value)
             break;
         case Screen::Type::PID_KP:
             eeprom.setKp(EEPROM::kUint32ToPIDParam(value));
-            pid.applyPIDParams(); // apply or live tuning otherwise only a reset will apply the new values
+            pid.applyPIDParams();
             break;
         case Screen::Type::PID_KI:
             eeprom.setKi(EEPROM::kUint32ToPIDParam(getValue()));
