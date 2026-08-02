@@ -20,6 +20,24 @@ void delay_us(uint32_t us)
 
 // === float to string conversion ===
 
+#if DEBUG
+
+static char floatBuffer[128] = { 0 };
+size_t floatBufferPos = 0;
+
+const char *debugFloatToString(float value, uint8_t precision, bool trimTrailingZeros)
+{
+    if (floatBufferPos > sizeof(floatBuffer) - 24) {
+        floatBufferPos = 0;
+    }
+    float_to_string_convert(floatBuffer + floatBufferPos, sizeof(floatBuffer) - floatBufferPos, value, precision, trimTrailingZeros);
+    size_t oldPos = floatBufferPos;
+    floatBufferPos += strlen(floatBuffer + floatBufferPos) + 1;
+    return floatBuffer + oldPos;
+}
+
+#endif
+
 void float_to_string_convert(char *buffer, size_t size, float value, uint8_t precision, bool trimTrailingZeros)
 {
     if (!buffer || size == 0) {
