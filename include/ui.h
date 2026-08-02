@@ -90,8 +90,6 @@ struct Screen
         MOTOR_CURRENT_LIMIT,
         MIN_RPM,
         MAX_RPM,
-        CONTROL_MODE_PWM,
-        CONTROL_MODE_PID,
         MOTOR_STALL_TIMEOUT,
         MOTOR_BRAKE,
         MOSFET_TEMPERATURE_LIMIT,
@@ -268,7 +266,7 @@ struct SliderScreen : public Screen
         valueLabel(nullptr),
         formatCallback(callback)
     {
-        maxAcceleration = sqrt(maxValue - minValue);
+        maxAcceleration = std::sqrt(maxValue - minValue);
     }
 
     virtual void load() override;
