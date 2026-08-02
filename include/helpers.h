@@ -367,6 +367,10 @@ inline void FloatToString::convertTrimmed(char *buffer, size_t size, float value
     float_to_string_convert(buffer, size, value, precision, true);
 }
 
+// use static buffer to return pointer to string
+// use only for debugging
+const char *debugFloatToString(float value, uint8_t precision = 6, bool trimTrailingZeros = false);
+
 /**
  * @brief Simple non-blocking Ring buffer implementation
  *
