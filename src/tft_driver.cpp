@@ -10,6 +10,7 @@
 lv_disp_draw_buf_t s_lvgl_draw_buf;
 lv_color_t s_lvgl_buf_1[TFT_BUFFER_SIZE];
 lv_disp_drv_t s_lvgl_disp_drv;
+TIM_HandleTypeDef tim2;
 
 /**
  * @brief init GPIO pins and timers for the SPI display and backlight PWM
@@ -55,7 +56,6 @@ void tft_driver_gpio_tim_init(void)
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
     // TIM2 setup
-    TIM_HandleTypeDef tim2 = {};
     tim2.Instance = TIM2;
     tim2.Init.Prescaler = 71;          // 72MHz / (71+1) = 1MHz timer clock
     tim2.Init.CounterMode = TIM_COUNTERMODE_UP;
@@ -83,8 +83,8 @@ void tft_driver_gpio_tim_init(void)
 void tft_driver_spi_init(void)
 {
     /* Enable clocks */
-    RCC->APB1ENR |= RCC_APB1ENR_SPI2EN;
-    RCC->APB2ENR |= RCC_APB2ENR_IOPBEN | RCC_APB2ENR_IOPAEN;
+    __HAL_RCC_SPI2_CLK_ENABLE();
+    __HAL_RCC_GPIOB_CLK_ENABLE();
 
     /* Configure PB13 (CLK) and PB15 (MOSI) as alternate function push-pull */
     GPIOB->CRH &= ~(GPIO_CRH_MODE13 | GPIO_CRH_CNF13 | GPIO_CRH_MODE15 | GPIO_CRH_CNF15);

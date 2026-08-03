@@ -8,6 +8,8 @@
 
 PidController pid;
 MotorEncoder motorEncoder;
+TIM_HandleTypeDef tim4;
+TIM_HandleTypeDef tim1;
 
 void PidController::init()
 {
@@ -26,7 +28,6 @@ void PidController::init()
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
     // TIM1 PWM setup
-    TIM_HandleTypeDef tim1 = {};
     tim1.Instance = TIM1;
     tim1.Init.Prescaler = 0;
     tim1.Init.CounterMode = TIM_COUNTERMODE_UP;
@@ -55,7 +56,6 @@ void PidController::init()
     __HAL_RCC_AFIO_CLK_ENABLE();
     __HAL_RCC_TIM4_CLK_ENABLE();
 
-    TIM_HandleTypeDef tim4 = {};
     tim4.Instance = TIM4;
     tim4.Init.Prescaler = 0;
     tim4.Init.CounterMode = TIM_COUNTERMODE_UP;
