@@ -106,3 +106,28 @@ void ADC::initDAC()
     // Enable DAC channel 1 and channel 2
     DAC->CR |= DAC_CR_EN1 | DAC_CR_EN2;
 }
+
+void ADC::isr()
+{
+    // hard fault if the have a OVP condition, mostly likely due to reverse currents while braking
+    if (getVSenseValue() > pid.faults.vsenseMax) {
+        if (pid.errorCode != PidController::ErrorCodeType::OVP) {
+            pid.setErrorCode(PidController::ErrorCodeType::OVP);
+        }
+    }
+
+    uint16_t value = getISenseValue();
+    // store average for display
+    isenseSum += value;
+    if (++isenseCount >= kISenseCountMax) {
+        // reduce by 1/16th to avoid overflow in rolling average
+        isenseSum -= isenseSum / kISenseCountDivider;
+        isenseCount -= isenseCount / kISenseCountDivider;
+    }
+    // update filtered value for fast OCP detection
+    isenseOcpFiltered = filterValue<uint32_t, 2>(isenseOcpFiltered, value);
+
+    // update filtered temperature values
+    motorTemperatureFiltered = filterValue<uint16_t, 16>(motorTemperatureFiltered, getMotorNTCValue());
+    mosfetTemperatureFiltered = filterValue<uint16_t, 16>(mosfetTemperatureFiltered, getMosfetNTCValue());
+}

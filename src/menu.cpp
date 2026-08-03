@@ -14,6 +14,8 @@
 ScreenFlow screenFlow;
 Menu menu;
 
+// === menu enums and items ===
+
 enum class MainMenuItemType {
     SPEED = 0,
     CONTROL_MODE,
@@ -130,14 +132,29 @@ static const char *kRestoreDefaultsMenuItems[] = {
     "Cancel"                    // 1
 };
 
-// custom format for current and conversion from uint16_t to float
-static const char *current_slider_format_callback(uint32_t value, char *buf, size_t bufSize)
+/**
+ * @brief custom format for current (mA) conversion from uint32_t to "n.n A"
+ */
+static const char *current_format_callback(uint32_t value, char *buf, size_t bufSize)
 {
     snprintf(buf, bufSize, SPRINTF_FP1_FMT " A", CONVERT_TO_FP1(value));
     return buf;
 }
 
-// custom format for current and conversion from uint16_t to float
+/**
+ * @brief custom format for voltage (mV) conversion from uint32_t to "n.n V"
+ *
+ */
+static const char *voltage_format_callback(uint32_t value, char *buf, size_t bufSize)
+{
+    snprintf(buf, bufSize, SPRINTF_FP1_FMT " V", CONVERT_TO_FP1(value));
+    return buf;
+}
+
+/**
+ * @brief custom format for anti windup conversion from uint32_t to "n.nn%"
+ *
+ */
 static const char *anti_windup_format_callback(uint32_t value, char *buf, size_t bufSize)
 {
     if (value == 0) {
@@ -149,26 +166,14 @@ static const char *anti_windup_format_callback(uint32_t value, char *buf, size_t
     return buf;
 }
 
-// custom format for PID parameters and conversion from uint32_t to float
+/**
+ * @brief custom format for PID parameters and conversion from uint32_t to "n.nnnnnn" with trimmed trailing zeros
+ *
+ */
 static const char *pid_parameter_format_callback(uint32_t value, char *buf, size_t bufSize)
 {
     FloatToString::convertTrimmed(buf, bufSize, value / UIConstants::kPIDParamFactor, 6);
     return buf;
-}
-
-// custom format for OVP protection and conversion from uint32_t to float
-static const char *format_ovp_protection_callback(uint32_t value, char *buf, size_t bufSize)
-{
-    snprintf(buf, bufSize, SPRINTF_FP1_FMT " V", CONVERT_TO_FP1(value));
-    return buf;
-}
-
-/**
- * @brief Menu constructor
- *
- */
-Menu::Menu()
-{
 }
 
 /**
@@ -302,7 +307,7 @@ void Menu::abortableDelay(uint32_t ms)
     while (HAL_GetTick() - start < ms) {
         WatchDog::feed();
         if (isAnyButtonDown()) {
-            while(isAnyButtonDown()) {
+            while (isAnyButtonDown()) {
                 WatchDog::feed();
             }
             clearUserInput();
@@ -311,11 +316,21 @@ void Menu::abortableDelay(uint32_t ms)
     }
 }
 
+/**
+ * @brief Return if any button is currently pressed
+ *
+ * @return true
+ * @return false
+ */
 bool Menu::isAnyButtonDown()
 {
     return knobButton.isDown() || backButton.isDown() || startButton.isDown();
 }
 
+/**
+ * @brief Clear button states and rotary encoder position
+ *
+ */
 void Menu::clearUserInput()
 {
     // clear states
@@ -337,6 +352,7 @@ void Menu::saveEEPROMChanges()
         abortableDelay(UIConstants::kInfoScreenTimeout);
     }
 }
+
 /**
  * @brief Apply settings from EEPROM to the system after initialization or after restoring defaults
  *
@@ -369,7 +385,7 @@ void Menu::handleButtonPress()
             switch(static_cast<MainMenuItemType>(getValue())) {
                 case MainMenuItemType::SPEED:
                     switch(eeprom.getControlMode()) {
-                        case EEPROM::kControlModePID:
+                        case EEPROM::ControlMode::PID:
                             screenFlow.next(new SliderScreen(
                                 Screen::Type::MOTOR_SPEED,
                                 "Motor Speed",
@@ -378,7 +394,7 @@ void Menu::handleButtonPress()
                                 "RPM"
                             ));
                             break;
-                        case EEPROM::kControlModePWM:
+                        case EEPROM::ControlMode::PWM:
                             screenFlow.next(new SliderScreen(
                                 Screen::Type::MOTOR_SPEED,
                                 "Motor Speed",
@@ -396,7 +412,7 @@ void Menu::handleButtonPress()
                         kControlModeItems,
                         sizeof_array(kControlModeItems)
                     ));
-                    setValue(eeprom.getControlMode());
+                    setValue(static_cast<uint8_t>(eeprom.getControlMode()));
                     break;
                 case MainMenuItemType::LED_BRIGHTNESS:
                     screenFlow.next(new SliderScreen(
@@ -472,7 +488,7 @@ void Menu::handleButtonPress()
                         UIConstants::kMinInputCurrent,
                         UIConstants::kMaxInputCurrent,
                         "A",
-                        current_slider_format_callback
+                        current_format_callback
                     );
                     screen->setSteps(UIConstants::kStepInputCurrent);
                     screenFlow.next(screen);
@@ -485,7 +501,7 @@ void Menu::handleButtonPress()
                         UIConstants::kMinMotorCurrent,
                         UIConstants::kMaxMotorCurrent,
                         "A",
-                        current_slider_format_callback
+                        current_format_callback
                     );
                     screen->setSteps(UIConstants::kStepMotorCurrent);
                     screenFlow.next(screen);
@@ -543,7 +559,7 @@ void Menu::handleButtonPress()
                         kDirectionItems,
                         sizeof_array(kDirectionItems)
                     ));
-                    setValue(eeprom.getMotorDirection());
+                    setValue(static_cast<uint8_t>(eeprom.getMotorDirection()));
                     break;
                 case AdvancedMenuItemType::SENSOR_DIRECTION:
                     screenFlow.next(new MenuScreen(
@@ -551,7 +567,7 @@ void Menu::handleButtonPress()
                         kDirectionItems,
                         sizeof_array(kDirectionItems)
                     ));
-                    setValue(eeprom.getSensorDirection());
+                    setValue(static_cast<uint8_t>(eeprom.getSensorDirection()));
                     break;
                 case AdvancedMenuItemType::PID_PARAMETERS:
                     screenFlow.next(new MenuScreen(
@@ -568,7 +584,7 @@ void Menu::handleButtonPress()
                         UIConstants::kMinOvpProtection,
                         UIConstants::kMaxOvpProtection,
                         "V",
-                        format_ovp_protection_callback
+                        voltage_format_callback
                     ));
                     setValue(eeprom.getOvpProtection());
                     break;
@@ -859,16 +875,16 @@ int32_t Menu::updateRotaryValue(int32_t value)
             adc.setMotorCurrentLimit(eeprom.getMotorCurrentLimit());
             break;
         case Screen::Type::MOTOR_DIRECTION:
-            eeprom.setMotorDirection(getValue());
+            eeprom.setMotorDirection(static_cast<EEPROM::MotorDirection>(getValue()));
             break;
         case Screen::Type::SENSOR_DIRECTION:
-            eeprom.setSensorDirection(getValue());
+            eeprom.setSensorDirection(static_cast<EEPROM::SensorDirection>(getValue()));
             break;
         case Screen::Type::MOTOR_BRAKE:
             eeprom.setMotorBrake(getValue());
             break;
         case Screen::Type::CONTROL_MODE:
-            eeprom.setControlMode(getValue());
+            eeprom.setControlMode(static_cast<EEPROM::ControlMode>(getValue()));
             break;
         case Screen::Type::MIN_RPM:
             eeprom.setMinRPM(getValue());
@@ -917,10 +933,8 @@ int32_t Menu::updateRotaryValue(int32_t value)
         case Screen::Type::EEPROM_RESTORED:
         case Screen::Type::DIAGNOSTICS:
         case Screen::Type::PID_PARAMETERS:
-        default:
             break;
     }
-
     return getValue();
 }
 

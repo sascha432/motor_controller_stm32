@@ -49,7 +49,7 @@ static void debug_usb_otg_state(const char *tag)
 
 static void setup()
 {
-    // Initialize debug output
+    // Initialize debugging
     SWO::init();
     debug_init();
 
@@ -78,7 +78,7 @@ static void setup()
     // PID controller
     pid.init();
 
-    // Initialize display gpio and SPI
+    // Initialize display gpio, timer and SPI
     tft_driver_gpio_tim_init();
     tft_driver_spi_init();
 }
@@ -164,10 +164,9 @@ static void loop()
     static uint32_t lastLvHandler = 0;
     if (HAL_GetTick() - lastLvHandler >= 5) {
         // handle rotary encoder
-        int32_t newPosition;
-        int32_t delta = knob.getDeltaPosition();
+        int32_t delta = knob.getPositionDelta();
         if (delta) {
-            newPosition = menu.updateRotaryValue(delta);
+            int32_t newPosition = menu.updateRotaryValue(delta);
             (void)newPosition;
             DEBUG_PRINT(DebugType::UI, "menu=%d delta=%d", newPosition, delta);
         }

@@ -18,6 +18,10 @@
 template<uint8_t GPIO_PIN, bool ACTIVE_STATE, uint32_t kDebounceTimeMs = 50>
 struct Button
 {
+    /**
+     * @brief Initialize GPIO and states for the button
+     *
+     */
     void init();
 
     /**
@@ -66,18 +70,35 @@ struct Button
         return (state == ACTIVE_STATE);
     }
 
-    inline bool readState()
-    {
-        return digitalRead<GPIO_PIN>();
-    }
-
+    /**
+     * @brief Interrupt service routine to be called when the button PIN state changes
+     *
+     * @param idr The GPIO IDR register value of the related PIN
+     */
     void isr(uint32_t idr);
 
+    /**
+     * @brief Call ISR with the PINs value register
+     *
+     */
     inline void isr()
     {
         isr(digitalPinToGPIO<GPIO_PIN>()->IDR);
     }
 
+protected:
+    /**
+     * @brief Read the current state of the button PIN
+     *
+     * @return true
+     * @return false
+     */
+    inline bool readState()
+    {
+        return digitalRead<GPIO_PIN>();
+    }
+
+protected:
     uint32_t lastDebounceTime;
     volatile bool state;
     volatile bool pressed;
@@ -92,31 +113,34 @@ struct Button
  * @tparam GPIO_PORT_ADDR address of the GPIO port, pin A and pin B must be on the same port
  */
 template<uint8_t GPIO_PIN_A, uint8_t GPIO_PIN_B>
-struct RotaryEncoder {
-
+struct RotaryEncoder
+{
+    /**
+     * @brief Ctor
+     *
+     */
     RotaryEncoder() :
         maxAcceleration(1),
         position(0)
     {}
 
+    /**
+     * @brief Initialize GPIO and TIM3 for rotary encoder
+     *
+     */
     void init();
-    void reset();
-
-    void isr();
 
     /**
-     * @brief Get the Delta Position object and clean up the position counter
+     * @brief Reset rotary encoder value
      *
-     * @return int32_t
      */
-    inline int32_t getDeltaPosition()
-    {
-        __disable_irq();
-        int32_t tmpDelta = (position / 2); // full rotations only
-        position -= tmpDelta * 2;
-        __enable_irq();
-        return tmpDelta;
-    }
+    void reset();
+
+    /**
+     * @brief Interrupt handler to be called every 20-30ms
+     *
+     */
+    void isr();
 
     /**
      * @brief Set the acceleration factor
@@ -128,6 +152,21 @@ struct RotaryEncoder {
         maxAcceleration = acceleration + 1;
     }
 
+    /**
+     * @brief Get the position changes since last call
+     *
+     * @return int32_t Number of full rotations since last call
+     */
+    inline int32_t getPositionDelta()
+    {
+        __disable_irq();
+        int32_t tmpDelta = (position / 2); // full rotations only
+        position -= tmpDelta * 2;
+        __enable_irq();
+        return tmpDelta;
+    }
+
+protected:
     uint32_t maxAcceleration;
     volatile int32_t position;
     int32_t acceleration;

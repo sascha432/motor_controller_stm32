@@ -80,34 +80,16 @@ extern "C" void EXTI15_10_IRQHandler(void)
     }
 }
 
-// DMA1_Channel1_IRQHandler is the interrupt handler for the DMA1 Channel 1. It is called when a DMA transfer is complete
+/**
+ * @brief DMA1_Channel1_IRQHandler is the interrupt handler for the DMA1 Channel 1. It is called when a DMA transfer is complete
+ *
+ */
 extern "C" void DMA1_Channel1_IRQHandler()
 {
     if (DMA1->ISR & DMA_ISR_TCIF1) {
         // clear transfer complete
         DMA1->IFCR = DMA_IFCR_CTCIF1;
-
-        // hard fault if the have a OVP condition, mostly likely due to reverse currents while braking
-        if (adc.getVSenseValue() > pid.faults.vsenseMax) {
-            if (pid.errorCode != PidController::ErrorCodeType::OVP) {
-                pid.setErrorCode(PidController::ErrorCodeType::OVP);
-            }
-        }
-
-        uint16_t value = adc.getISenseValue();
-        // store average for display
-        adc.isenseSum += value;
-        if (++adc.isenseCount >= ADC::kISenseCountMax) {
-            // reduce by 6.5% to avoid overflow in rolling average
-            adc.isenseSum -= adc.isenseSum / ADC::kISenseCountDivider;
-            adc.isenseCount -= adc.isenseCount / ADC::kISenseCountDivider;
-        }
-        // store filtered value for fast OCP detection
-        adc.isenseOcpFiltered = filterValue<uint32_t, 2>(adc.isenseOcpFiltered, value);
-
-        // update filtered temperature values
-        adc.motorTemperatureFiltered = filterValue<uint16_t, 16>(adc.motorTemperatureFiltered, adc.getMotorNTCValue());
-        adc.mosfetTemperatureFiltered = filterValue<uint16_t, 16>(adc.mosfetTemperatureFiltered, adc.getMosfetNTCValue());
+        adc.isr();
     }
 }
 

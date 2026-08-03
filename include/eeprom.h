@@ -23,16 +23,30 @@ struct EEPROM
         return value / UIConstants::kPIDParamFactor;
     }
 
-    static constexpr uint8_t kControlModePWM = 0;
-    static constexpr uint8_t kControlModePID = 1;
+    enum class ControlMode : uint8_t {
+        PWM = 0,
+        PID = 1
+    };
 
-    static constexpr uint8_t kMotorDirectionForward = 0;
-    static constexpr uint8_t kMotorDirectionReverse = 1;
+    enum class MotorDirection : uint8_t {
+        Forward = 0,
+        Reverse = 1
+    };
 
-    static constexpr uint8_t kSensorDirectionForward = kMotorDirectionForward;
-    static constexpr uint8_t kSensorDirectionReverse = kMotorDirectionReverse;
+    enum class SensorDirection : uint8_t {
+        Forward = 0,
+        Reverse = 1
+    };
 
-    struct Data {
+    static_assert(static_cast<uint8_t>(MotorDirection::Forward) == static_cast<uint8_t>(SensorDirection::Forward), "Motor and Sensor direction enum values must match");
+    static_assert(static_cast<uint8_t>(MotorDirection::Reverse) == static_cast<uint8_t>(SensorDirection::Reverse), "Motor and Sensor direction enum values must match");
+
+    /**
+     * @brief EEPROM data structure
+     *
+     */
+    struct Data
+    {
         uint32_t magic;
         uint32_t version;
         uint32_t sequence;
@@ -43,10 +57,10 @@ struct EEPROM
         uint16_t min_rpm;
         uint16_t max_rpm;
         uint16_t motor_stall_timeout;
-        uint8_t motor_direction;
-        uint8_t sensor_direction;
+        MotorDirection motor_direction;
+        SensorDirection sensor_direction;
         uint8_t motor_brake;
-        uint8_t control_mode;
+        ControlMode control_mode;
         uint8_t mosfet_temperature_limit;
         uint8_t motor_temperature_limit;
         uint8_t max_pwm;
@@ -58,6 +72,10 @@ struct EEPROM
         uint16_t anti_windup;
         uint16_t ovp_protection;
 
+        /**
+         * @brief Construct a new Data object with default settings
+         *
+         */
         Data() :
             magic(kMagic),
             version(kVersion),
@@ -69,10 +87,10 @@ struct EEPROM
             min_rpm(UIConstants::kDefaultMinRPM),
             max_rpm(UIConstants::kDefaultMaxRPM),
             motor_stall_timeout(UIConstants::kDefaultMotorStallTimeout),
-            motor_direction(kMotorDirectionForward),
-            sensor_direction(kSensorDirectionForward),
+            motor_direction(MotorDirection::Forward),
+            sensor_direction(SensorDirection::Forward),
             motor_brake(UIConstants::kDefaultMotorBrake),
-            control_mode(kControlModePID),
+            control_mode(ControlMode::PID),
             mosfet_temperature_limit(UIConstants::kDefaultMosfetTemperatureLimit),
             motor_temperature_limit(UIConstants::kDefaultMotorTemperatureLimit),
             max_pwm(UIConstants::kDefaultMaxPWM),
@@ -85,6 +103,13 @@ struct EEPROM
             ovp_protection(UIConstants::kDefaultOvpProtection)
         {}
 
+        /**
+         * @brief Compare if EEPROM data is equal without comparing the magic, version and sequence number
+         *
+         * @param other EEPROM data to compare with
+         * @return true
+         * @return false
+         */
         bool operator==(const Data &other) const
         {
             return memcmp(
@@ -94,6 +119,10 @@ struct EEPROM
             ) == 0;
         }
 
+        /**
+         * @brief Invalidate data
+         *
+         */
         void invalidate()
         {
             magic = 0xcccccccc;
@@ -102,19 +131,40 @@ struct EEPROM
         }
     };
 
+    /**
+     * @brief Initialize GPIO and I2C for EEPROM access
+     *
+     */
     void init();
+
+    /**
+     * @brief Read EEPROM configuration or restore defaults settings on failure
+     *
+     */
     void read();
+
+    /**
+     * @brief Write configuration data to EEPROM, only if it has changed since the last read/write operation.
+     *
+     * @return true data written
+     * @return false data the same or failure
+     */
     bool write();
 
+    /**
+     * @brief Restore default settings
+     *
+     */
+    void resetDefaults();
+
+    /**
+     * @brief Get the EEPROM data object
+     *
+     * @return Data&
+     */
     Data &getData()
     {
         return data;
-    }
-
-    void resetDefaults()
-    {
-        data = Data();
-        updateTemperatureLimits();
     }
 
     uint8_t getTFTBrightness() const
@@ -187,44 +237,44 @@ struct EEPROM
         data.motor_stall_timeout = value;
     }
 
-    uint8_t getMotorDirection() const
+    MotorDirection getMotorDirection() const
     {
         return data.motor_direction;
     }
 
-    void setSensorDirection(uint8_t value)
+    void setSensorDirection(SensorDirection value)
     {
         data.sensor_direction = value;
     }
 
-    uint8_t getSensorDirection() const
+    SensorDirection getSensorDirection() const
     {
         return data.sensor_direction;
     }
 
-    void setMotorDirection(uint8_t value)
+    void setMotorDirection(MotorDirection value)
     {
         data.motor_direction = value;
     }
 
     bool isForwardMotorDirection() const
     {
-        return data.motor_direction == kMotorDirectionForward;
+        return data.motor_direction == MotorDirection::Forward;
     }
 
     bool isReverseMotorDirection() const
     {
-        return data.motor_direction == kMotorDirectionReverse;
+        return data.motor_direction == MotorDirection::Reverse;
     }
 
     bool isReverseSensorDirection() const
     {
-        return data.sensor_direction == kSensorDirectionReverse;
+        return data.sensor_direction == SensorDirection::Reverse;
     }
 
-    bool isMotorAndSensorDirectionDifferent() const
+    bool compareWithSensorDirection(MotorDirection direction) const
     {
-        return data.motor_direction != data.sensor_direction;
+        return static_cast<uint8_t>(data.sensor_direction) == static_cast<uint8_t>(direction);
     }
 
     uint8_t getMotorBrake() const
@@ -237,22 +287,22 @@ struct EEPROM
         data.motor_brake = value;
     }
 
-    uint8_t getControlMode() const
+    ControlMode getControlMode() const
     {
         return data.control_mode;
     }
 
     bool isPIDMode() const
     {
-        return data.control_mode == kControlModePID;
+        return data.control_mode == ControlMode::PID;
     }
 
     bool isPWMMode() const
     {
-        return data.control_mode == kControlModePWM;
+        return data.control_mode == ControlMode::PWM;
     }
 
-    void setControlMode(uint8_t value)
+    void setControlMode(ControlMode value)
     {
         data.control_mode = value;
     }
@@ -262,11 +312,7 @@ struct EEPROM
         return data.mosfet_temperature_limit;
     }
 
-    void setMosfetTemperatureLimit(uint8_t value)
-    {
-        data.mosfet_temperature_limit = value;
-        mosfet_temperature_limit_adc = ADCConverter::NTC::reverse(value);
-    }
+    void setMosfetTemperatureLimit(uint8_t value);
 
     uint16_t getMosfetTemperatureLimitADC() const
     {
@@ -278,11 +324,7 @@ struct EEPROM
         return data.motor_temperature_limit;
     }
 
-    void setMotorTemperatureLimit(uint8_t value)
-    {
-        data.motor_temperature_limit = value;
-        motor_temperature_limit_adc = ADCConverter::NTC::reverse(value);
-    }
+    void setMotorTemperatureLimit(uint8_t value);
 
     uint16_t getMotorTemperatureLimitADC() const
     {
@@ -322,10 +364,10 @@ struct EEPROM
     void setSpeed(uint32_t value)
     {
         switch(data.control_mode) {
-            case kControlModePWM:
+            case ControlMode::PWM:
                 setMotorPWM(static_cast<uint8_t>(value));
                 break;
-            case kControlModePID:
+            case ControlMode::PID:
                 setMotorRPM(static_cast<uint16_t>(value));
                 break;
         }
@@ -333,7 +375,7 @@ struct EEPROM
 
     uint32_t getSpeed() const
     {
-        return data.control_mode == kControlModePID ? getMotorRPM() : getMotorPWM();
+        return data.control_mode == ControlMode::PID ? getMotorRPM() : getMotorPWM();
     }
 
     void setKp(float value)

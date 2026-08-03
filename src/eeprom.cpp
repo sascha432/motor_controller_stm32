@@ -40,10 +40,6 @@ void EEPROM::init()
     DEBUG_PRINT(DebugType::INFO, "EEPROM detected=%u", (int)res);
 }
 
-/**
- * @brief Read EEPROM configuration or restore defaults settings on failure
- *
- */
 void EEPROM::read()
 {
     Data tmp;
@@ -59,12 +55,6 @@ void EEPROM::read()
     updateTemperatureLimits();
 }
 
-/**
- * @brief Write configuration data to EEPROM, only if it has changed since the last read/write operation.
- *
- * @return true data written
- * @return false data the same or failure
- */
 bool EEPROM::write()
 {
     // read EEPROM and compare with current data to avoid unnecessary writes
@@ -95,6 +85,24 @@ bool EEPROM::write()
         DEBUG_PRINT(DebugType::NOTICE, "verify=%u magic=%08x version=%d sequence=%d", result, tmp.magic, tmp.version, tmp.sequence);
     #endif
     return result;
+}
+
+void EEPROM::resetDefaults()
+{
+    data = Data();
+    updateTemperatureLimits();
+}
+
+void EEPROM::setMosfetTemperatureLimit(uint8_t value)
+{
+    data.mosfet_temperature_limit = value;
+    mosfet_temperature_limit_adc = ADCConverter::NTC::reverse(value);
+}
+
+void EEPROM::setMotorTemperatureLimit(uint8_t value)
+{
+    data.motor_temperature_limit = value;
+    motor_temperature_limit_adc = ADCConverter::NTC::reverse(value);
 }
 
 void EEPROM::updateTemperatureLimits()

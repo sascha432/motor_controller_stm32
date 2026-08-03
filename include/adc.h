@@ -72,13 +72,13 @@ struct ADC
     }
 
     /**
-     * @brief Initialize the ADC and DMA for reading multiple channels
+     * @brief Initialize the ADC, GPIO pins and DMA for reading multiple channels
      *
      */
     void init();
 
     /**
-     * @brief Initialize the DAC for reference voltages
+     * @brief Initialize the DAC and GPIO pins for reference voltages
      *
      */
     void initDAC();
@@ -152,6 +152,12 @@ struct ADC
     {
         return mosfetTemperatureFiltered;
     }
+
+    /**
+     * @brief Interrupt Service Routine for the ADC. This function is called when a DMA transfer is complete
+     *
+     */
+    void isr();
 
 protected:
     friend void DMA1_Channel1_IRQHandler();

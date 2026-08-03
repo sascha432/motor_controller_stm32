@@ -220,12 +220,8 @@ void PidController::isr()
 {
     // most timers are 16bit counters only
     int32_t delta = getCountsDelta(PID_READ_ENCODER_COUNTER());
-    // apply fixed sensor, motor and selected motor direction to delta
-    if (
-        eeprom.isForwardMotorDirection() ?
-            (eeprom.getSensorDirection() != motorDirection) :
-            (eeprom.getSensorDirection() == motorDirection)
-    ) {
+    // determine direction from fixed sensor, motor and pid motor direction
+    if (eeprom.compareWithSensorDirection(motorDirection) == eeprom.isReverseMotorDirection()) {
         delta = -delta;
     }
     stats.counter.pulse += delta;

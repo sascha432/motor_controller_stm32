@@ -94,7 +94,7 @@ Timer configurations:
 #define PID_READ_MOTOR_PWM_DRV_IN2()                ((uint16_t)TIM1->CCR2)
 #define PID_WRITE_MOTOR_PWM_FORWARD(level)          (TIM1->CCR1 = (level), TIM1->CCR2 = 0)
 #define PID_WRITE_MOTOR_PWM_REVERSE(level)          (TIM1->CCR1 = 0, TIM1->CCR2 = (level))
-#define PID_WRITE_MOTOR_PWM_ON(level, reverse)      (reverse) ? PID_WRITE_MOTOR_PWM_REVERSE(level) : PID_WRITE_MOTOR_PWM_FORWARD(level)
+#define PID_WRITE_MOTOR_PWM_ON(level, dir)          (dir == EEPROM::MotorDirection::Reverse) ? PID_WRITE_MOTOR_PWM_REVERSE(level) : PID_WRITE_MOTOR_PWM_FORWARD(level)
 #define PID_WRITE_MOTOR_PWM_OFF()                   (TIM1->CCR1 = 0, TIM1->CCR2 = 0)
 #define PID_WRITE_MOTOR_PWM_BREAK(level)            (TIM1->CCR1 = (level), TIM1->CCR2 = (level))
 

@@ -87,7 +87,7 @@ struct PidController
      */
     PidController() :
         rpm(0),
-        motorDirection(EEPROM::kMotorDirectionForward),
+        motorDirection(EEPROM::MotorDirection::Forward),
         antiWindup(kAntiWindup),
         errorCode(ErrorCodeType::NONE),
         running(false),
@@ -230,7 +230,7 @@ struct PidController
      */
     void setMotorDirection(bool forward)
     {
-        motorDirection = forward ? EEPROM::kMotorDirectionForward : EEPROM::kMotorDirectionReverse;
+        motorDirection = forward ? EEPROM::MotorDirection::Forward : EEPROM::MotorDirection::Reverse;
     }
 
     /**
@@ -241,7 +241,7 @@ struct PidController
      */
     bool isForwardMotorDirection() const
     {
-        return motorDirection == EEPROM::kMotorDirectionForward;
+        return motorDirection == EEPROM::MotorDirection::Forward;
     }
 
     /**
@@ -249,7 +249,7 @@ struct PidController
      */
     void toggleMotorDirection()
     {
-        motorDirection = (motorDirection == EEPROM::kMotorDirectionForward) ? EEPROM::kMotorDirectionReverse : EEPROM::kMotorDirectionForward;
+        motorDirection = (motorDirection == EEPROM::MotorDirection::Forward) ? EEPROM::MotorDirection::Reverse : EEPROM::MotorDirection::Forward;
     }
 
     /**
@@ -552,7 +552,7 @@ public:
     float Ki;
     float Kd;
     uint32_t rpm;                                   // target RPM
-    uint32_t motorDirection;                        // motor direction
+    EEPROM::MotorDirection motorDirection;          // motor direction
     PidValueType antiWindup;                        // anti-windup factor
 
     uint32_t lastEncoderCounter;                    // last encoder counter value

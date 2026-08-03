@@ -12,8 +12,6 @@ struct ScreenFlow;
 // === Menu class ===
 struct Menu
 {
-    Menu();
-
     void handleButtonPress();
     void handleBackButtonPress();
     void handleStartButtonPress();
