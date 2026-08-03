@@ -10,10 +10,6 @@
 
 // === Screen Flow Manager ===
 
-ScreenFlow::ScreenFlow() : screen(nullptr)
-{
-}
-
 void ScreenFlow::init()
 {
     Screen::emptyScreen = lv_obj_create(nullptr);
@@ -65,14 +61,4 @@ void ScreenFlow::next(Screen *nextScreen)
     }
     screen = nextScreen;
     screen->load();
-}
-
-Screen *ScreenFlow::operator->() const
-{
-    return screen;
-}
-
-Screen *ScreenFlow::getScreen() const
-{
-    return screen;
 }

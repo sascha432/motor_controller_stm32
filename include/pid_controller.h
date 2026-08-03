@@ -451,7 +451,7 @@ public:
         {
         }
 
-        void reset()
+        inline void reset()
         {
             drv8701Fault = false;
             ocpFault = false;
@@ -462,8 +462,6 @@ public:
     // === Statistics data structure ===
     struct StatsType
     {
-        // Helpers::LowPass<32> rpm;           // filtered RPM for displaying
-        // Helpers::LowPass<8> pwm;            // filtered PWM for displaying
         Helpers::FixedLowPass<kPIDInterval, 32> rpm;    // filtered RPM for displaying
         Helpers::FixedLowPass<kPIDInterval, 8> pwm;     // filtered PWM for displaying
         struct {
@@ -471,7 +469,7 @@ public:
             int32_t pulse;                  // number of pulses received from the A/B motor encoder
         } counter;
 
-        void reset(uint32_t rpmCounter)
+        inline void reset(uint32_t rpmCounter)
         {
             rpm.reset();
             pwm.reset();
@@ -537,7 +535,7 @@ public:
         {
         }
 
-        void reset()
+        inline void reset()
         {
             state = OcpStateType::NONE;
             counter = 0;

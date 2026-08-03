@@ -149,7 +149,11 @@ struct Screen
     static constexpr lv_coord_t kDiagnosticScreenScrollbarWidth = 4;
     static constexpr lv_coord_t kDiagnosticScreenRowHeight = 16;
     static constexpr int32_t kDiagnosticScreenRowCount = 7;
+    static constexpr lv_coord_t kDiagnosticViewportWidth = TFT_DIM_WIDTH - kDiagnosticScreenMargin;
+    static constexpr lv_coord_t kDiagnosticViewportHeight = TFT_DIM_HEIGHT - kDiagnosticScreenMargin;
+    static constexpr lv_coord_t kDiagnosticTextWidth = kDiagnosticViewportWidth - kDiagnosticScreenScrollbarWidth - 4;
 
+    // dashboard screen style constants
     static constexpr lv_coord_t kDashboardScreenContainerWidth = TFT_DIM_WIDTH - 16;
     static constexpr lv_coord_t kDashboardScreenContainerHeight = TFT_DIM_HEIGHT - 12;
     static constexpr lv_coord_t kDashboardScreenColumnWidth = (kDashboardScreenContainerWidth / 2) - 4;
@@ -159,26 +163,67 @@ struct Screen
     Screen(Type id);
     virtual ~Screen();
 
+    /**
+     * @brief Get the Id object
+     *
+     * @return Type
+     */
     Type getId() const;
+
+    /**
+     * @brief Set the value and normalize, update any visual elements on the screen to reflect the new value
+     *
+     * @param value
+     */
     virtual void setValue(uint32_t value);
+
+    /**
+     * @brief Get the stored and normalized value
+     *
+     * @return uint32_t
+     */
     virtual uint32_t getValue() const;
 
+    /**
+     * @brief Set the max acceleration
+     *
+     * @param value 1 is minimum (menus, etc...), 100000 is a high acceleration. sqrt(range) gives a good acceleration for most cases
+     */
     inline void setMaxAcceleration(uint32_t value)
     {
         maxAcceleration = value;
     }
 
+    /**
+     * @brief Set the steps per change, useful to increase the steps or change direction of a rotary encoder to match the precision displayed while maintaining an internal value
+     *
+     * @param value negative will reverse direction
+     */
     inline void setSteps(int32_t value)
     {
         steps = value;
     }
 
+    /**
+     * @brief Get steps
+     *
+     * @return int32_t
+     */
     inline int32_t getSteps() const
     {
         return steps;
     }
 
+    /**
+     * @brief Create screen and load into LVGL
+     *
+     */
     virtual void load();
+
+    /**
+     * @brief Update screen contents
+     *
+     */
     virtual void update();
 
 protected:
@@ -232,7 +277,7 @@ struct MenuScreen : public Screen
     virtual uint32_t getValue() const override;
 
 private:
-    uint8_t _first_visible_start_index(uint8_t selected_index);
+    inline uint32_t _first_visible_start_index(uint32_t selected_index);
 
 protected:
     void _refreshMenuScreen();
@@ -241,8 +286,8 @@ protected:
     lv_obj_t *rows[kMenuScreenVisibleItems];
     lv_obj_t *labels[kMenuScreenVisibleItems];
     const char **itemLabels;
-    uint8_t count;
-    uint8_t selected;
+    uint32_t count;
+    uint32_t selected;
 };
 
 // === Slider Screen ===
@@ -375,27 +420,40 @@ struct DashboardScreen : public Screen
         maxAcceleration = eeprom.isPIDMode() ? UIConstants::kStepsRPM : UIConstants::kStepsPWM;
     }
 
-    void update() {
-        _refreshVisuals();
-    }
-
     virtual void load() override;
 
+    /**
+     * @brief Get the value that is selected for adjustment (speed, PID parameters, etc...)
+     *
+     * @return SelectedValueType
+     */
     SelectedValueType getSelectedValue() const
     {
         return selectedValue;
     }
 
+    /**
+     * @brief Set the value that is selected for adjustment (speed, PID parameters, etc...)
+     *
+     * @param value
+     */
     void setSelectedValue(SelectedValueType value)
     {
         selectedValue = value;
     }
 
+    /**
+     * @brief Increment the value that is selected for adjustment (speed, PID parameters, etc...) and wrap around to the first value if the last value is reached
+     *
+     * @return SelectedValueType New selected value
+     */
     SelectedValueType incrSelectedValue()
     {
         selectedValue = static_cast<SelectedValueType>((static_cast<uint32_t>(selectedValue) + 1) % static_cast<uint32_t>(SelectedValueType::MAX));
         return selectedValue;
     }
+
+    virtual void update() override;
 
 protected:
     void _refreshVisuals();
@@ -441,21 +499,4 @@ private:
     lv_obj_t *speedLabel;
 };
 
-// === Screen Flow Manager ===
-
-struct ScreenFlow {
-
-    ScreenFlow();
-
-    void init();
-    void destroy();
-    void setScreen(Screen *newScreen);
-    void back();
-    void next(Screen *nextScreen);
-
-    Screen *operator->() const;
-    Screen *getScreen() const;
-
-protected:
-    Screen *screen;
-};
+#include "ui_screen_flow.h"

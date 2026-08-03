@@ -175,7 +175,7 @@ WelcomeScreen::WelcomeScreen() : InfoScreen(Type::WELCOME, nullptr, kWelcomeScre
 void WelcomeScreen::load()
 {
     InfoScreen::load();
-    lv_label_set_text_fmt(label, "Version %u.%u.%u", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
+    lv_label_set_text_static(label, "Version " STR(VERSION_MAJOR) "." STR(VERSION_MINOR) "." STR(VERSION_PATCH));
 }
 
 // === Info Screen ===
@@ -185,9 +185,7 @@ void InfoScreen::load()
     DEBUG_PRINT(DebugType::UI, "message=%s", message ? message : "<NULL>");
     Screen::load();
     label = lv_label_create(screen);
-    if (message) {
-        lv_label_set_text_static(label, message);
-    }
+    lv_label_set_text_static(label, message);
     lv_obj_set_style_text_color(label, INFOSCREEN_COLOR_TEXT, LV_PART_MAIN);
     lv_obj_set_style_text_font(label, font, LV_PART_MAIN);
     lv_obj_center(label);
@@ -201,7 +199,7 @@ MenuScreen::MenuScreen(Type id, const char **itemLabels, size_t itemCount) :
     rows{},
     labels{},
     itemLabels(itemLabels),
-    count(static_cast<uint8_t>(itemCount)),
+    count(itemCount),
     selected(0)
 {
     steps = -1; // invert for menus
@@ -221,33 +219,34 @@ void MenuScreen::load()
     lv_obj_set_style_pad_all(menu, 0, LV_PART_MAIN);
     lv_obj_set_style_clip_corner(menu, true, LV_PART_MAIN);
 
-    for (lv_coord_t i = 0; i < kMenuScreenVisibleItems && i < count; ++i) {
-        const bool isSelected = (i == 0);
+    for (uint32_t i = 0; i < kMenuScreenVisibleItems && i < count; ++i) {
         rows[i] = lv_obj_create(menu);
         lv_obj_remove_style_all(rows[i]);
-        menuscreen_style_menu_row(rows[i], isSelected);
+        menuscreen_style_menu_row(rows[i], false);
         lv_obj_set_pos(rows[i], 0, i * Screen::kMenuScreenItemHeight);
-        labels[i] = menuscreen_create_menu_label(rows[i], itemLabels[i], isSelected);
+        labels[i] = menuscreen_create_menu_label(rows[i], itemLabels[i], false);
     }
 
     _refreshMenuScreen();
-
     lv_scr_load(screen);
 }
 
-uint8_t MenuScreen::_first_visible_start_index(uint8_t selected_index)
+inline uint32_t MenuScreen::_first_visible_start_index(uint32_t selected_index)
 {
-    int16_t first = static_cast<int16_t>(selected_index) - 2;
-    const int16_t last_first = (count > MenuScreen::kMenuScreenVisibleItems) ?
-        (static_cast<int16_t>(count) - static_cast<int16_t>(MenuScreen::kMenuScreenVisibleItems)) : 0;
-    return static_cast<uint8_t>(std::clamp<int16_t>(first, 0, last_first));
+    return static_cast<uint32_t>(
+        std::clamp<int32_t>(
+            selected_index - 2,
+            0,
+            (count > MenuScreen::kMenuScreenVisibleItems) ? (count - MenuScreen::kMenuScreenVisibleItems) : 0
+        )
+    );
 }
 
 void MenuScreen::_refreshMenuScreen()
 {
-    const uint8_t first_index = _first_visible_start_index(selected);
-    for (uint8_t i = 0; i < kMenuScreenVisibleItems && i < count; ++i) {
-        const uint8_t item_index = first_index + i;
+    const uint32_t first_index = _first_visible_start_index(selected);
+    for (uint32_t i = 0; i < kMenuScreenVisibleItems && i < count; ++i) {
+        const uint32_t item_index = first_index + i;
         const bool selected = (item_index == this->selected);
         menuscreen_style_menu_row(rows[i], selected);
         lv_label_set_text_static(labels[i], itemLabels[item_index]);
@@ -262,7 +261,7 @@ void MenuScreen::setValue(uint32_t index)
         selected = (((int32_t)index % count) + count) % count;
     #else
         // no wrapping
-        selected = std::clamp<int16_t>(index, 0, count - 1);
+        selected = std::clamp<int32_t>(index, 0, count - 1);
     #endif
     _refreshMenuScreen();
 }
@@ -370,13 +369,12 @@ void SliderScreen::load()
     lv_obj_align_to(valueLabel, slider, LV_ALIGN_OUT_BOTTOM_MID, 0, 8);
 
     _refreshVisuals();
-
     lv_scr_load(screen);
 }
 
 void SliderScreen::_refreshVisuals()
 {
-    const uint32_t range = (maxValue > minValue) ? (maxValue - minValue) : 1;
+    const uint32_t range = std::max<int32_t>(maxValue - minValue, 1);
     const uint32_t percent = ((value - minValue) * 100U) / range;
     const lv_coord_t sliderVisualHeight = std::max<lv_coord_t>(kSliderScreenSliderHeight, kSliderScreenKnobSize + 4);
     const lv_coord_t sliderFillHeight = std::max<lv_coord_t>(6, kSliderScreenSliderHeight - 8);
@@ -435,15 +433,10 @@ void DiagnosticsScreen::load()
 {
     Screen::load();
 
-    // Diagnostics container with manual scrolling and a visual scrollbar.
-    const lv_coord_t viewportWidth = TFT_DIM_WIDTH - kDiagnosticScreenMargin;
-    const lv_coord_t viewportHeight = TFT_DIM_HEIGHT - kDiagnosticScreenMargin;
-    const lv_coord_t textWidth = viewportWidth - kDiagnosticScreenScrollbarWidth - 4;
-
     viewport = lv_obj_create(screen);
     lv_obj_remove_style_all(viewport);
     lv_obj_set_pos(viewport, kDiagnosticScreenViewportX, kDiagnosticScreenViewportY);
-    lv_obj_set_size(viewport, viewportWidth, viewportHeight);
+    lv_obj_set_size(viewport, kDiagnosticViewportWidth, kDiagnosticViewportHeight);
     lv_obj_set_style_bg_opa(viewport, LV_OPA_TRANSP, LV_PART_MAIN);
     lv_obj_set_style_border_width(viewport, 0, LV_PART_MAIN);
     lv_obj_set_style_pad_all(viewport, 0, LV_PART_MAIN);
@@ -452,8 +445,8 @@ void DiagnosticsScreen::load()
 
     scrollbarTrack = lv_obj_create(viewport);
     lv_obj_remove_style_all(scrollbarTrack);
-    lv_obj_set_size(scrollbarTrack, kDiagnosticScreenScrollbarWidth, viewportHeight);
-    lv_obj_set_pos(scrollbarTrack, viewportWidth - kDiagnosticScreenScrollbarWidth, 0);
+    lv_obj_set_size(scrollbarTrack, kDiagnosticScreenScrollbarWidth, kDiagnosticViewportHeight);
+    lv_obj_set_pos(scrollbarTrack, kDiagnosticViewportWidth - kDiagnosticScreenScrollbarWidth, 0);
     lv_obj_set_style_bg_color(scrollbarTrack, DIAGNOSTICSCREEN_COLOR_SCROLLBAR_BG, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(scrollbarTrack, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_radius(scrollbarTrack, 2, LV_PART_MAIN);
@@ -466,8 +459,7 @@ void DiagnosticsScreen::load()
     lv_obj_set_style_bg_opa(scrollbarThumb, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_radius(scrollbarThumb, 2, LV_PART_MAIN);
 
-    // Firmware label
-    firmwareLabel = diagnostic_screen_create_label(content, textWidth, 0);
+    firmwareLabel = diagnostic_screen_create_label(content, kDiagnosticTextWidth, 0);
     lv_label_set_text_fmt(firmwareLabel,
         "Firmware " STR(VERSION_MAJOR) "." STR(VERSION_MINOR) "." STR(VERSION_PATCH) "\n"
         "PCB Rev " STR(PCB_REV_MAJOR) "." STR(PCB_REV_MINOR) "\n"
@@ -475,25 +467,14 @@ void DiagnosticsScreen::load()
         "EEPROM cycle #%u", (unsigned)eeprom.getData().sequence
     );
 
-    // VCC label
-    vccLabel = diagnostic_screen_create_label(content, textWidth, 1);
+    vccLabel = diagnostic_screen_create_label(content, kDiagnosticTextWidth, 1);
+    currentLabel = diagnostic_screen_create_label(content, kDiagnosticTextWidth, 2);
+    motorTempLabel = diagnostic_screen_create_label(content, kDiagnosticTextWidth, 3);
+    mosfetTempLabel = diagnostic_screen_create_label(content, kDiagnosticTextWidth, 4);
+    rpmPwmLabel = diagnostic_screen_create_label(content, kDiagnosticTextWidth, 5);
+    lastErrorLabel = diagnostic_screen_create_label(content, kDiagnosticTextWidth, 6);
 
-    // Current label
-    currentLabel = diagnostic_screen_create_label(content, textWidth, 2);
-
-    // Motor temperature label
-    motorTempLabel = diagnostic_screen_create_label(content, textWidth, 3);
-
-    // MOSFET temperature label
-    mosfetTempLabel = diagnostic_screen_create_label(content, textWidth, 4);
-
-    // RPM/PWM label
-    rpmPwmLabel = diagnostic_screen_create_label(content, textWidth, 5);
-
-    // Last error label
-    lastErrorLabel = diagnostic_screen_create_label(content, textWidth, 6);
-
-    scrollMax = diagnostic_screen_scroll_max_lines(viewportHeight);
+    scrollMax = diagnostic_screen_scroll_max_lines(kDiagnosticViewportHeight);
     scrollOffset = 0;
 
     lv_scr_load(screen); // update is using lv_obj_get_height() etc, load screen first
@@ -502,20 +483,16 @@ void DiagnosticsScreen::load()
 
 void DiagnosticsScreen::setValue(uint32_t value)
 {
-    const int32_t viewportHeight = lv_obj_get_height(viewport);
-    scrollMax = diagnostic_screen_scroll_max_lines(viewportHeight);
-    this->value = std::clamp<int32_t>(static_cast<int32_t>(value), 0, scrollMax);
+    scrollMax = diagnostic_screen_scroll_max_lines(lv_obj_get_height(viewport));
+    this->value = std::clamp<int32_t>(value, 0, scrollMax);
 }
 
 void DiagnosticsScreen::update()
 {
     _refreshVisuals();
 
-    const int32_t viewportHeight = lv_obj_get_height(viewport);
-    scrollMax = diagnostic_screen_scroll_max_lines(viewportHeight);
-
-    const int32_t signedValue = static_cast<int32_t>(value);
-    const int32_t scrollLine = std::clamp<int32_t>(signedValue, 0, scrollMax);
+    scrollMax = diagnostic_screen_scroll_max_lines(lv_obj_get_height(viewport));
+    const int32_t scrollLine = std::clamp<int32_t>(value, 0, scrollMax);
     scrollOffset = scrollLine * Screen::kDiagnosticScreenRowHeight;
 
     // Keep labels in one container and scroll in full line-height steps.
@@ -676,7 +653,7 @@ void DashboardScreen::_refreshVisuals()
 
     switch(getSelectedValue()) {
         case SelectedValueType::SPEED:
-            lv_label_set_text_fmt(valueLabel, "PWM %u%%", (unsigned)((pid.stats.pwm.get() * 100 / pid.kMaxPWMLevel) + 1));
+            lv_label_set_text_fmt(valueLabel, "PWM %u%%", (unsigned)(((pid.stats.pwm.get() * 100) + (pid.kMaxPWMLevel / 2)) / pid.kMaxPWMLevel));
             break;
         case SelectedValueType::KP:
             FloatToString::convertTrimmed(buf, sizeof(buf) - 1, eeprom.getKp(), 6);
@@ -698,6 +675,11 @@ void DashboardScreen::_refreshVisuals()
         case SelectedValueType::MAX:
             break;
     }
+}
+
+void DashboardScreen::update()
+{
+    _refreshVisuals();
 }
 
 // === Start Screen ===
@@ -768,11 +750,7 @@ void StartScreen::_refreshVisuals()
     lv_label_set_text_static(directionLabel, pid.isForwardMotorDirection() ? "START FORWARD" : "START REVERSE");
 
     char buf[32];
-    if (eeprom.isPIDMode()) {
-        snprintf(buf, sizeof(buf) - 1, "%u RPM", (unsigned)eeprom.getSpeed());
-    } else {
-        snprintf(buf, sizeof(buf) - 1, "%u%% PWM", (unsigned)eeprom.getSpeed());
-    }
+    snprintf(buf, sizeof(buf) - 1, eeprom.isPIDMode() ? "%u RPM" : "%u%% PWM", (unsigned)eeprom.getSpeed());
     lv_label_set_text(speedLabel, buf);
 }
 
