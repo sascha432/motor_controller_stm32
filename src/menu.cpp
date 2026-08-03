@@ -176,22 +176,9 @@ static const char *pid_parameter_format_callback(uint32_t value, char *buf, size
     return buf;
 }
 
-/**
- * @brief Restore previous menu screen and selected item
- *
- */
-void Menu::restorePreviousMenu()
-{
-    DEBUG_PRINT(DebugType::UI, "value=%d", getValue());
-    screenFlow.back(); // restore previous screen
-    clearUserInput();
-}
+// === menu implementation ===
 
-/**
- * @brief Show welcome screen for a few seconds
- *
- */
-void Menu::showWelcomeScreen()
+void Menu::loadWelcomeScreen()
 {
     // Show welcome screen for a few seconds
     screenFlow.init();
@@ -226,14 +213,9 @@ void Menu::showWelcomeScreen()
     else {
         WatchDog::delay(UIConstants::kWelcomeScreenTimeout);
     }
-
     clearUserInput();
 }
 
-/**
- * @brief Load main menu screen
- *
- */
 void Menu::loadMainMenu()
 {
     screenFlow.setScreen(new MenuScreen(
@@ -245,10 +227,6 @@ void Menu::loadMainMenu()
     clearUserInput();
 }
 
-/**
- * @brief Start motor screen with some info
- *
- */
 void Menu::loadStartScreen()
 {
     screenFlow.setScreen(new StartScreen());
@@ -260,10 +238,6 @@ void Menu::loadStartScreen()
     clearUserInput();
 }
 
-/**
- * @brief Show motor dashboard screen with speed and other info while running
- *
- */
 void Menu::loadDashboardScreen()
 {
     screenFlow.setScreen(new DashboardScreen());
@@ -271,31 +245,23 @@ void Menu::loadDashboardScreen()
     clearUserInput();
 }
 
-/**
- * @brief Update rotary encoder value and set screen value
- *
- * @param value
- */
+void Menu::restorePreviousMenu()
+{
+    DEBUG_PRINT(DebugType::UI, "value=%d", getValue());
+    screenFlow.back(); // restore previous screen
+    clearUserInput();
+}
+
 void Menu::setValue(int32_t value)
 {
     screenFlow->setValue(value);
 }
 
-/**
- * @brief Get screen value
- *
- * @return int32_t
- */
 int32_t Menu::getValue() const
 {
     return screenFlow->getValue();
 }
 
-/**
- * @brief Return reference to the ScreenFlow object
- *
- * @return ScreenFlow&
- */
 ScreenFlow &Menu::getScreenFlow()
 {
     return screenFlow;
@@ -316,21 +282,11 @@ void Menu::abortableDelay(uint32_t ms)
     }
 }
 
-/**
- * @brief Return if any button is currently pressed
- *
- * @return true
- * @return false
- */
 bool Menu::isAnyButtonDown()
 {
     return knobButton.isDown() || backButton.isDown() || startButton.isDown();
 }
 
-/**
- * @brief Clear button states and rotary encoder position
- *
- */
 void Menu::clearUserInput()
 {
     // clear states
@@ -340,10 +296,6 @@ void Menu::clearUserInput()
     knob.reset();
 }
 
-/**
- * @brief Save changes to EEPROM and display info screen in case of changes written
- *
- */
 void Menu::saveEEPROMChanges()
 {
     if (eeprom.write()) {
@@ -353,10 +305,6 @@ void Menu::saveEEPROMChanges()
     }
 }
 
-/**
- * @brief Apply settings from EEPROM to the system after initialization or after restoring defaults
- *
- */
 void Menu::applyEEPROMSettings()
 {
     tft_backlight_pwm_set(eeprom.getTFTBrightness());
@@ -366,10 +314,6 @@ void Menu::applyEEPROMSettings()
     pid.applyPIDParams();
 }
 
-/**
- * @brief Handle main button press based on the current screen and selected item
- *
- */
 void Menu::handleButtonPress()
 {
     DEBUG_PRINT(DebugType::UI, "enter screen=%p id=%d value=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), getValue());
@@ -760,10 +704,6 @@ void Menu::handleButtonPress()
     DEBUG_PRINT(DebugType::UI, "leave screen=%p id=%d value=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), getValue());
 }
 
-/**
- * @brief Handle back button press
- *
- */
 void Menu::handleBackButtonPress()
 {
     DEBUG_PRINT(DebugType::UI, "enter screen=%p id=%d value=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), getValue());
@@ -790,9 +730,6 @@ void Menu::handleBackButtonPress()
     DEBUG_PRINT(DebugType::UI, "leave screen=%p id=%d value=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), getValue());
 }
 
-/**
- * @brief Handle start button press
- */
 void Menu::handleStartButtonPress()
 {
     DEBUG_PRINT(DebugType::UI, "enter screen=%p id=%d value=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), getValue());
@@ -814,11 +751,6 @@ void Menu::handleStartButtonPress()
     DEBUG_PRINT(DebugType::UI, "leave screen=%p id=%d value=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), getValue());
 }
 
-/**
- * @brief Call to update menu position from rotary encoder
- *
- * @param value The new rotary encoder value
- */
 int32_t Menu::updateRotaryValue(int32_t value)
 {
     int32_t clampedValue;
@@ -938,10 +870,6 @@ int32_t Menu::updateRotaryValue(int32_t value)
     return getValue();
 }
 
-/**
- * @brief Update RPM or PWM value
- *
- */
 void Menu::updateSpeedValue()
 {
     int32_t clampedValue;
@@ -958,11 +886,6 @@ void Menu::updateSpeedValue()
     setValue(clampedValue);
 }
 
-/**
- * @brief Clamp anti-windup value to the allowed range and handle special case for "Disabled" below 50%
- *
- * @return int32_t Clamped anti-windup value
- */
 int32_t Menu::clampAntiWindupValue()
 {
     int32_t clampedValue = std::clamp<int32_t>(getValue(), UIConstants::kMinAntiWindup, UIConstants::kMaxAntiWindup);

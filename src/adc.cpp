@@ -94,16 +94,13 @@ void ADC::initDAC()
 {
     __HAL_RCC_DAC_CLK_ENABLE();
     __HAL_RCC_GPIOA_CLK_ENABLE();
-    /** DAC GPIO Configuration
-    PA4     ------> DAC_OUT1
-    PA5     ------> DAC_OUT2
-    */
+
    GPIO_InitTypeDef GPIO_InitStruct = {};
    GPIO_InitStruct.Pin = digitalPinToHAL<DRVOCP_VREF_DAC_PIN>()|digitalPinToHAL<OCP_VREF_DAC_PIN>();
    GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-    // Enable DAC channel 1 and channel 2
+    // Enable DAC channel #1/PA4/DRVOCP_VREF_DAC_PIN and channel #2/PA5/OCP_VREF_DAC_PIN
     DAC->CR |= DAC_CR_EN1 | DAC_CR_EN2;
 }
 

@@ -99,7 +99,7 @@ static void user_setup()
     WatchDog::init();
 
     // Show welcome screen and load main menu
-    menu.showWelcomeScreen();
+    menu.loadWelcomeScreen();
     // Apply settings after welcome screen since it turns the backlight on
     menu.applyEEPROMSettings();
 

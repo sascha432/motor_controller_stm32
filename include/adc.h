@@ -59,7 +59,7 @@ struct ADC
     static constexpr uint16_t kISenseCountMax = (kTotalSamplesPerSecond * kISenseRollingAverageTime * (1.0f + (0.5f / kISenseCountDivider))) / kNumConversions; // calculate number of samples
 
     /**
-     * @brief Construct a new ADC object
+     * @brief Construct ADC object
      *
      */
     ADC() :
