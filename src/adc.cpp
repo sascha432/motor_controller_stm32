@@ -8,11 +8,14 @@
 #include "leds.h"
 
 ADC adc;
+ADC_HandleTypeDef hadc1;
+DMA_HandleTypeDef hdma_adc1;
 
 void ADC::init()
 {
-    // Enable GPIOA/GPIOC and ADC1 clocks
-    RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_IOPCEN | RCC_APB2ENR_ADC1EN;
+    // Enable GPIOA/GPIOC
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+    __HAL_RCC_GPIOC_CLK_ENABLE();
 
     GPIO_InitTypeDef GPIO_InitStruct = {};
     GPIO_InitStruct.Pin = digitalPinToHAL<PA2>()|digitalPinToHAL<PA3>();
@@ -21,78 +24,76 @@ void ADC::init()
     GPIO_InitStruct.Pin = digitalPinToHAL<PC4>()|digitalPinToHAL<PC5>();
     HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-    // ADC scan mode (multiple channels)
-    ADC1->CR1 |= ADC_CR1_SCAN;
+    // Enable ADC1 clock
+    __HAL_RCC_ADC1_CLK_ENABLE();
 
-    // set the number of conversions in the regular ADC sequence.
-    ADC1->SQR1 = ((kNumConversions - 1) << 20);
-    ADC1->SQR3 =
-        (2  << 0)  |        // rank 1: PA2
-        (3  << 5)  |        // rank 2: PA3
-        (14 << 10) |        // rank 3: PC4
-        (15 << 15);         // rank 4: PC5
+    // Configure ADC
+    RCC_PeriphCLKInitTypeDef PeriphClkInit = {};
+    PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_ADC;
+    PeriphClkInit.AdcClockSelection = RCC_ADCPCLK2_DIV6;
+    HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit);
 
-    // Clear and set ADC clock divider
-    RCC->CFGR &= ~RCC_CFGR_ADCPRE;
-    RCC->CFGR |= RCC_CFGR_ADCPRE_DIV6;   // 72MHz / 6 = 12MHz ADC clock (kADCClockMHz)
+    hadc1.Instance = ADC1;
+    hadc1.Init.ScanConvMode = ADC_SCAN_ENABLE;
+    hadc1.Init.ContinuousConvMode = DISABLE;
+    hadc1.Init.DiscontinuousConvMode = DISABLE;
+    hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+    hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+    hadc1.Init.NbrOfConversion = kNumConversions;
+    HAL_ADC_Init(&hadc1);
 
-    // PA2, PA3 in SMPR2
-    ADC1->SMPR2 &= ~((0x07 << (2 * 3)) | (0x07 << (3 * 3))); // clear
-    ADC1->SMPR2 |= (kSampleTimeCH2 << (2 * 3));   // CH2
-    ADC1->SMPR2 |= (kSampleTimeCH3 << (3 * 3));   // CH3
+    ADC_ChannelConfTypeDef sConfig = {};
+    sConfig.Channel = ADC_CHANNEL_2;
+    sConfig.Rank = ADC_REGULAR_RANK_1;
+    sConfig.SamplingTime = kSampleTimeCH2;
+    HAL_ADC_ConfigChannel(&hadc1, &sConfig);
 
-    // PC4, PC5 in SMPR1
-    ADC1->SMPR1 &= ~((0x07 << ((14 - 10) * 3)) | (0x07 << ((15 - 10) * 3))); // clear
-    ADC1->SMPR1 |= (kSampleTimeCH14 << ((14 - 10) * 3)); // CH14
-    ADC1->SMPR1 |= (kSampleTimeCH15 << ((15 - 10) * 3)); // CH15
+    sConfig.Channel = ADC_CHANNEL_3;
+    sConfig.Rank = ADC_REGULAR_RANK_2;
+    sConfig.SamplingTime = kSampleTimeCH3;
+    HAL_ADC_ConfigChannel(&hadc1, &sConfig);
 
-    // enable DMA
-    RCC->AHBENR |= RCC_AHBENR_DMA1EN;
+    sConfig.Channel = ADC_CHANNEL_14;
+    sConfig.Rank = ADC_REGULAR_RANK_3;
+    sConfig.SamplingTime = kSampleTimeCH14;
+    HAL_ADC_ConfigChannel(&hadc1, &sConfig);
 
-    // configure DMA
-    DMA1_Channel1->CCR &= ~DMA_CCR_EN;
+    sConfig.Channel = ADC_CHANNEL_15;
+    sConfig.Rank = ADC_REGULAR_RANK_4;
+    sConfig.SamplingTime = kSampleTimeCH15;
+    HAL_ADC_ConfigChannel(&hadc1, &sConfig);
 
-    DMA1_Channel1->CPAR  = (uint32_t)&ADC1->DR;
-    DMA1_Channel1->CMAR  = (uint32_t)adc_buffer;
-    DMA1_Channel1->CNDTR = kNumConversions;
+    // calibrate ADC
+    HAL_ADCEx_Calibration_Start(&hadc1);
 
-    DMA1_Channel1->CCR =
-        DMA_CCR_MINC |       // increment memory
-        DMA_CCR_PSIZE_0 |    // 16-bit peripheral
-        DMA_CCR_MSIZE_0 |    // 16-bit memory
-        DMA_CCR_CIRC |       // repeat forever
-        DMA_CCR_TCIE;        // enable transfer complete interrupt
+    // Enable DMA
+    __HAL_RCC_DMA1_CLK_ENABLE();
 
-    NVIC_EnableIRQ(DMA1_Channel1_IRQn); // enable DMA1 channel 1 interrupt
-
-    DMA1_Channel1->CCR |= DMA_CCR_EN;
-
-    // Enable ADC for calibration
-    ADC1->CR2 |= ADC_CR2_ADON;
-    delay_us<10>();
-
-    // Reset calibration
-    ADC1->CR2 |= ADC_CR2_RSTCAL;
-    while (ADC1->CR2 & ADC_CR2_RSTCAL) {
+    // Configure DMA for ADC1
+    hdma_adc1.Instance = DMA1_Channel1;
+    hdma_adc1.Init.Direction = DMA_PERIPH_TO_MEMORY;
+    hdma_adc1.Init.PeriphInc = DMA_PINC_DISABLE;
+    hdma_adc1.Init.MemInc = DMA_MINC_ENABLE;
+    hdma_adc1.Init.PeriphDataAlignment = DMA_PDATAALIGN_HALFWORD;
+    hdma_adc1.Init.MemDataAlignment = DMA_MDATAALIGN_HALFWORD;
+    hdma_adc1.Init.Mode = DMA_NORMAL;
+    hdma_adc1.Init.Priority = DMA_PRIORITY_HIGH;
+    if (HAL_DMA_Init(&hdma_adc1) != HAL_OK) {
+        Error_Handler();
     }
 
-    // Calibrate
-    ADC1->CR2 |= ADC_CR2_CAL;
-    while (ADC1->CR2 & ADC_CR2_CAL) {
+    __HAL_LINKDMA(&hadc1, DMA_Handle, hdma_adc1);
+    HAL_NVIC_SetPriority(DMA1_Channel1_IRQn, 0, 0);
+    HAL_NVIC_EnableIRQ(DMA1_Channel1_IRQn); // enable DMA1 channel 1 interrupt
+
+    if (HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc_buffer, kNumConversions) != HAL_OK) {
+        Error_Handler();
     }
-
-    // Enable ADC again after calibration
-    ADC1->CR2 |= ADC_CR2_ADON;
-    delay_us<10>();
-
-    ADC1->CR2 |= ADC_CR2_DMA;           // Enable DMA
-    ADC1->CR2 |= ADC_CR2_CONT;          // Continuous conversion
-    ADC1->CR2 |= ADC_CR2_SWSTART;       // Start
 }
 
 void ADC::initDAC()
 {
-    __HAL_RCC_DAC_CLK_ENABLE();
+    // Initialize GPIOA for DAC output pins
     __HAL_RCC_GPIOA_CLK_ENABLE();
 
    GPIO_InitTypeDef GPIO_InitStruct = {};
@@ -100,7 +101,8 @@ void ADC::initDAC()
    GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-    // Enable DAC channel #1/PA4/DRVOCP_VREF_DAC_PIN and channel #2/PA5/OCP_VREF_DAC_PIN
+    // Enable DAC channel #1 (PA4/DRVOCP_VREF_DAC_PIN) and channel #2 (PA5/OCP_VREF_DAC_PIN)
+    __HAL_RCC_DAC_CLK_ENABLE();
     DAC->CR |= DAC_CR_EN1 | DAC_CR_EN2;
 }
 
@@ -127,4 +129,6 @@ void ADC::isr()
     // update filtered temperature values
     motorTemperatureFiltered = filterValue<uint16_t, 16>(motorTemperatureFiltered, getMotorNTCValue());
     mosfetTemperatureFiltered = filterValue<uint16_t, 16>(mosfetTemperatureFiltered, getMosfetNTCValue());
+
+    HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc_buffer, kNumConversions);
 }

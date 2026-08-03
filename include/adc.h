@@ -8,7 +8,6 @@
 #include "adc_converters.h"
 #include "pins.h"
 
-extern "C" void DMA1_Channel1_IRQHandler();
 struct PidController;
 
 static constexpr float kADCClockMHz = 12.0f;    // ADC clock in MHz
@@ -16,14 +15,14 @@ static constexpr float kADCClockMHz = 12.0f;    // ADC clock in MHz
 static constexpr float kAdcSampleTimeUs(uint32_t sampleBits)
 {
     switch (sampleBits & 0x07) {
-        case 0: return (1.5f   + 12.5f) / kADCClockMHz;
-        case 1: return (7.5f   + 12.5f) / kADCClockMHz;
-        case 2: return (13.5f  + 12.5f) / kADCClockMHz;
-        case 3: return (28.5f  + 12.5f) / kADCClockMHz;
-        case 4: return (41.5f  + 12.5f) / kADCClockMHz;
-        case 5: return (55.5f  + 12.5f) / kADCClockMHz;
-        case 6: return (71.5f  + 12.5f) / kADCClockMHz;
-        case 7: return (239.5f + 12.5f) / kADCClockMHz;
+        case ADC_SAMPLETIME_1CYCLE_5: return (1.5f   + 12.5f) / kADCClockMHz;
+        case ADC_SAMPLETIME_7CYCLES_5: return (7.5f   + 12.5f) / kADCClockMHz;
+        case ADC_SAMPLETIME_13CYCLES_5: return (13.5f  + 12.5f) / kADCClockMHz;
+        case ADC_SAMPLETIME_28CYCLES_5: return (28.5f  + 12.5f) / kADCClockMHz;
+        case ADC_SAMPLETIME_41CYCLES_5: return (41.5f  + 12.5f) / kADCClockMHz;
+        case ADC_SAMPLETIME_55CYCLES_5: return (55.5f  + 12.5f) / kADCClockMHz;
+        case ADC_SAMPLETIME_71CYCLES_5: return (71.5f  + 12.5f) / kADCClockMHz;
+        case ADC_SAMPLETIME_239CYCLES_5: return (239.5f + 12.5f) / kADCClockMHz;
     }
     return 0.0f;
 }
@@ -34,22 +33,11 @@ static constexpr float kAdcSampleTimeUs(uint32_t sampleBits)
  */
 struct ADC
 {
-    // ADC sample times in ADC_CCR register
-    static constexpr uint32_t kADC_SampleTime_1_5Cycles   = 0;
-    static constexpr uint32_t kADC_SampleTime_7_5Cycles   = 1;
-    static constexpr uint32_t kADC_SampleTime_13_5Cycles  = 2;
-    static constexpr uint32_t kADC_SampleTime_28_5Cycles  = 3;
-    static constexpr uint32_t kADC_SampleTime_41_5Cycles  = 4;
-    static constexpr uint32_t kADC_SampleTime_55_5Cycles  = 5;
-    static constexpr uint32_t kADC_SampleTime_71_5Cycles  = 6;
-    static constexpr uint32_t kADC_SampleTime_239_5Cycles = 7;
-
     static constexpr uint32_t kNumConversions = 4;                                  // number of channels
-    // WARNING/TODO: for same reason only 239.5 cycles work @12MHz, lower or mixed sample times cause invalid readings from all channels
-    static constexpr uint32_t kSampleTimeCH2 = kADC_SampleTime_239_5Cycles;         // isense
-    static constexpr uint32_t kSampleTimeCH3 = kADC_SampleTime_239_5Cycles;         // vsense
-    static constexpr uint32_t kSampleTimeCH14 = kADC_SampleTime_239_5Cycles;        // motor ntc
-    static constexpr uint32_t kSampleTimeCH15 = kADC_SampleTime_239_5Cycles;        // mosfet ntc
+    static constexpr uint32_t kSampleTimeCH2 = ADC_SAMPLETIME_55CYCLES_5;           // isense
+    static constexpr uint32_t kSampleTimeCH3 = ADC_SAMPLETIME_239CYCLES_5;          // vsense
+    static constexpr uint32_t kSampleTimeCH14 = ADC_SAMPLETIME_239CYCLES_5;         // motor ntc
+    static constexpr uint32_t kSampleTimeCH15 = ADC_SAMPLETIME_239CYCLES_5;         // mosfet ntc
 
     static constexpr float kTotalSampleTime = kAdcSampleTimeUs(kSampleTimeCH2) + kAdcSampleTimeUs(kSampleTimeCH3) + kAdcSampleTimeUs(kSampleTimeCH14) + kAdcSampleTimeUs(kSampleTimeCH15); // sum of sample time per channel
     static constexpr float kTotalSamplesPerSecond = 1000000.0f / kTotalSampleTime;  // samples per second for all channels
@@ -160,7 +148,6 @@ struct ADC
     void isr();
 
 protected:
-    friend void DMA1_Channel1_IRQHandler();
     friend PidController;
 
     /**
@@ -203,3 +190,4 @@ protected:
 };
 
 extern ADC adc;
+extern DMA_HandleTypeDef hdma_adc1;

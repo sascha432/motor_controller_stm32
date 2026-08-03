@@ -10,6 +10,8 @@ KnobButton knobButton;
 StartButton startButton;
 BackButton backButton;
 
+TIM_HandleTypeDef tim3;
+
 template <uint8_t GPIO_PIN, bool ACTIVE_STATE, uint32_t kDebounceTimeMs>
 void Button<GPIO_PIN, ACTIVE_STATE, kDebounceTimeMs>::init()
 {
@@ -68,7 +70,6 @@ void RotaryEncoder<GPIO_PIN_A, GPIO_PIN_B>::init()
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
     // TIM3 encoder init
-    TIM_HandleTypeDef tim3 = {};
     tim3.Instance = TIM3;
     tim3.Init.Prescaler = 0;
     tim3.Init.CounterMode = TIM_COUNTERMODE_UP;

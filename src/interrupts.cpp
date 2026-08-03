@@ -13,7 +13,7 @@
 
 // === global variables ===
 
-TIM_HandleTypeDef tim6;
+extern TIM_HandleTypeDef tim6;
 uint32_t timer6Counter = 0;
 WWDG_HandleTypeDef WatchDog::watchdog;
 InterruptErrorType interruptErrorType;
@@ -86,11 +86,16 @@ extern "C" void EXTI15_10_IRQHandler(void)
  */
 extern "C" void DMA1_Channel1_IRQHandler()
 {
-    if (DMA1->ISR & DMA_ISR_TCIF1) {
-        // clear transfer complete
-        DMA1->IFCR = DMA_IFCR_CTCIF1;
-        adc.isr();
-    }
+    HAL_DMA_IRQHandler(&hdma_adc1);
+}
+
+/**
+ * @brief Called from DMA1_Channel1_IRQHandler
+ *
+ */
+extern "C" void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
+{
+    adc.isr();
 }
 
 // === interrupt handlers ===

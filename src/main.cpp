@@ -268,12 +268,12 @@ static void EXTI_Init()
     NVIC_EnableIRQ(EXTI15_10_IRQn);
 }
 
-extern TIM_HandleTypeDef tim6;
+TIM_HandleTypeDef tim6;
+TIM_HandleTypeDef tim7;
 
 static void TIM7_TIM6_Init()
 {
     // TIM7 for microsecond delay
-    TIM_HandleTypeDef tim7;
     tim7.Instance = TIM7;
     tim7.Init.Prescaler = 71; // 72 MHz / 72 = 1 MHz (1 us tick)
     tim7.Init.CounterMode = TIM_COUNTERMODE_UP;
