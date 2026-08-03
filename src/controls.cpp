@@ -9,7 +9,6 @@ RotaryEncoderKnob knob;
 KnobButton knobButton;
 StartButton startButton;
 BackButton backButton;
-
 TIM_HandleTypeDef tim3;
 
 template <uint8_t GPIO_PIN, bool ACTIVE_STATE, uint32_t kDebounceTimeMs>

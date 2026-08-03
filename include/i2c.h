@@ -25,7 +25,6 @@ struct I2CHelper {
         RCC->APB1ENR |= RCC_APB1ENR_I2C1EN;
 
         // Remap I2C1 to PB8/PB9
-        // AFIO->MAPR &= ~AFIO_MAPR_I2C1_REMAP;
         AFIO->MAPR |= AFIO_MAPR_I2C1_REMAP;
 
         // PB8, PB9 = Alternate Function Open Drain, 50MHz

@@ -13,32 +13,56 @@
 
 // === global variables ===
 
-extern TIM_HandleTypeDef tim6;
-uint32_t timer6Counter = 0;
 WWDG_HandleTypeDef WatchDog::watchdog;
 InterruptErrorType interruptErrorType;
 
 // === interrupt handlers ===
 
-extern "C" void TIM6_IRQHandler(void)
+// avoid overhead for fast timer interrupts and call timer6 handler directly
+// other events might interfere with code that is not handled by HAL, but TIM6 is dedicated for the PID controller timing
+#define CALL_TIM6_HANDLER_DIRECTLY 1
+
+static uint32_t timer6Counter = 0;
+
+static inline void TIM6_Handler(void)
 {
-    HAL_TIM_IRQHandler(&tim6);
+    pid.ocp_isr();
+    if ((timer6Counter & 0x3ff) == 0) { // every 5.12ms
+        pid.isr();
+        if (timer6Counter % 5120 == 0) { // every 25.6ms
+            knob.isr();
+        }
+    }
+    timer6Counter++;
 }
 
+extern "C" void TIM6_IRQHandler(void)
+{
+    #if CALL_TIM6_HANDLER_DIRECTLY
+        TIM6->SR &= ~TIM_SR_UIF;
+        TIM6_Handler();
+    #else
+        extern TIM_HandleTypeDef tim6;
+        HAL_TIM_IRQHandler(&tim6);
+    #endif
+}
+
+#if !CALL_TIM6_HANDLER_DIRECTLY
+/**
+ * @brief Periodically call PID controller methods
+ */
 extern "C" void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
     if (htim->Instance == TIM6) { // every 5us
-        pid.ocp_isr();
-        if ((timer6Counter & 0x3ff) == 0) { // every 5.12ms
-            pid.isr();
-            if (timer6Counter % 5120 == 0) { // every 25.6ms
-                knob.isr();
-            }
-        }
-        timer6Counter++;
+        TIM6_Handler();
     }
 }
+#endif
 
+/**
+ * @brief Handle external interrupts for buttons
+ *
+ */
 extern "C" void EXTI9_5_IRQHandler(void)
 {
     uint32_t pending = EXTI->PR & ((1 << 8) | (1 << 9));
@@ -53,6 +77,10 @@ extern "C" void EXTI9_5_IRQHandler(void)
     }
 }
 
+/**
+ * @brief Handle external interrupts for buttons and faults
+ *
+ */
 extern "C" void EXTI15_10_IRQHandler(void)
 {
     uint32_t pending = EXTI->PR & ((1 << 10) | (1 << 11) | (1 << 12) | (1 << 14));
@@ -90,7 +118,7 @@ extern "C" void DMA1_Channel1_IRQHandler()
 }
 
 /**
- * @brief Called from DMA1_Channel1_IRQHandler
+ * @brief Called from HAL_DMA_IRQHandler/DMA1_Channel1_IRQHandler
  *
  */
 extern "C" void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)

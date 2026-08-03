@@ -178,6 +178,7 @@
 			"LV_USE_QRCODE",
 			"LV_USE_SJPG",
 			"lvgl",
+			"MAPR",
 			"milliamps",
 			"MILLIOHM",
 			"MOHM",
