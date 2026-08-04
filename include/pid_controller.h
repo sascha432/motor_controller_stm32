@@ -528,7 +528,7 @@ public:
     static constexpr float kMinADCTimeMicros = 1000000 / ADC::kTotalSamplesPerSecond;   // sample time for current measurement in microseconds, limits retrigger timeout and recovery interval
 
     static constexpr uint32_t kOcpTickInterval = 5;                                     // 5us tick interval
-    static constexpr uint32_t kOcpISenseThreshold = 90;                                 // lower threshold in percent before the OCP condition is cleared
+    static constexpr uint32_t kOcpISenseThreshold = 80;                                 // lower threshold in percent before the OCP condition is cleared
     static constexpr uint32_t kOcpRecoveryInterval = 20 / kOcpTickInterval;             // 20us interval
     static constexpr uint32_t kOcpRetriggerTimeout = 10 / kOcpTickInterval;             // 10us timeout
     static constexpr uint32_t kOcpCurrentRampUp = 16;                                   // increase current by 1/16 every tick

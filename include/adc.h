@@ -43,8 +43,8 @@ struct ADC
     static constexpr float kTotalSampleTime = kAdcSampleTimeUs(kSampleTimeCH2) + kAdcSampleTimeUs(kSampleTimeCH3) + kAdcSampleTimeUs(kSampleTimeCH14) + kAdcSampleTimeUs(kSampleTimeCH15); // sum of sample time per channel
     static constexpr float kTotalSamplesPerSecond = 1000000.0f / kTotalSampleTime;  // samples per second for all channels
 
-    static constexpr uint32_t kISenseCountDecayDivider = 16;                        // reduce by 6.5% to avoid overflow in rolling average
-    static constexpr float kISenseRollingAverageTime = 1.0f;                        // rolling average over 1.0 second
+    static constexpr uint32_t kISenseCountDecayDivider = 16;                        // reduce by 1/16 to avoid overflow in rolling average
+    static constexpr float kISenseRollingAverageTime = 0.25f;                       // rolling average over 250ms
     static constexpr uint16_t kISenseCountMax = (kTotalSamplesPerSecond * kISenseRollingAverageTime * (1.0f + (0.5f / kISenseCountDecayDivider))) / kNumConversions; // calculate number of samples
 
     /**

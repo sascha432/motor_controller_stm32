@@ -1542,8 +1542,20 @@ class PIDTuningApp:
         (self.line_pwm_avg,) = ax1.plot(self.x_values, self.pwm_avg, label="Avg PWM %", color="#9A031E", linestyle="--")
         ax1.legend(loc="upper left")
 
-        (self.line_i_avg,) = ax2.plot(self.x_values, self.current_avg_ma, label="Current Avg", color="#4361EE")
-        (self.line_i_ocp,) = ax2.plot(self.x_values, self.current_ocp_ma, label="Current OCP", color="#F72585")
+        (self.line_i_ocp,) = ax2.plot(
+            self.x_values,
+            self.current_ocp_ma,
+            label="Current OCP",
+            color="#F72585",
+            zorder=2,
+        )
+        (self.line_i_avg,) = ax2.plot(
+            self.x_values,
+            self.current_avg_ma,
+            label="Current Avg",
+            color="#4361EE",
+            zorder=3,
+        )
         (self.line_i_motor_limit,) = ax2.plot(
             self.x_values,
             self.dac_motor_current_ma,
