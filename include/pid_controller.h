@@ -337,8 +337,10 @@ struct PidController
      */
     void setErrorCode(ErrorCodeType code)
     {
-        PID_WRITE_MOTOR_PWM_OFF();
+        // stop updating the motor pwm in the PID loop
         running = false;
+        // turn motor off
+        PID_WRITE_MOTOR_PWM_OFF();
         errorCode = code;
         if (code != ErrorCodeType::NONE) {
             LEDs::onLEDError();
