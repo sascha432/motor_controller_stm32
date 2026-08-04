@@ -26,7 +26,7 @@ static void debug_swd_init()
     // Enable ITM and set the trace bus ID
     ITM->TCR = ITM_TCR_ITMENA_Msk | ITM_TCR_SYNCENA_Msk | ITM_TCR_TSENA_Msk | (1U << 16);
 
-    #if DEBUG_OUTPUT == DEBUG_OUTPUT_SWD
+    #if DEBUG_OUTPUT == DEBUG_OUTPUT_SWO
         // Enable stimulus ports 0 (text logs) and 1 (binary sample stream).
         ITM->TER |= (1UL << 0) | (1UL << 1);
     #else
@@ -51,7 +51,7 @@ void SWO::init()
 void SWO::deinit()
 {
     // do not disable if SWD debugging is enabled
-    #if DEBUG_OUTPUT != DEBUG_OUTPUT_SWD
+    #if DEBUG_OUTPUT != DEBUG_OUTPUT_SWO
     // Disable ITM
     ITM->TCR = 0;
 
@@ -152,7 +152,7 @@ const char *debug_function_name(const char *signature, char *out, size_t outSize
     return out;
 }
 
-#if DEBUG_OUTPUT == DEBUG_OUTPUT_SWD
+#if DEBUG_OUTPUT == DEBUG_OUTPUT_SWO
 
 static inline bool debug_swd_write_ITM_SendChar(uint32_t ch)
 {

@@ -62,7 +62,7 @@ struct SWO
 #define DEBUG_OUTPUT_NONE       0
 #define DEBUG_OUTPUT_SERIAL     1
 #define DEBUG_OUTPUT_SERIAL4    2
-#define DEBUG_OUTPUT_SWD        3
+#define DEBUG_OUTPUT_SWO        3
 #define DEBUG_OUTPUT_USB        4
 
 #ifndef DEBUG_OUTPUT
@@ -72,6 +72,20 @@ struct SWO
 #if defined(DEBUG) && !DEBUG
     #undef DEBUG_OUTPUT
     #define DEBUG_OUTPUT        DEBUG_OUTPUT_NONE
+#endif
+
+#if defined(DEBUG) && DEBUG
+    #if DEBUG_OUTPUT == DEBUG_OUTPUT_SWO
+        #define __DEBUG__BUILD__ "DEBUG SWO"
+    #elif DEBUG_OUTPUT == DEBUG_OUTPUT_USB
+        #define __DEBUG__BUILD__ "DEBUG USB"
+    #elif DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL
+        #define __DEBUG__BUILD__ "DEBUG UART"
+    #else
+        #define __DEBUG__BUILD__ "DEBUG"
+    #endif
+#else
+    #define __DEBUG__BUILD__ ""
 #endif
 
 enum class DebugType : uint32_t
@@ -170,7 +184,7 @@ void debug_init(void);
             } \
         } while(0)
 
-#elif DEBUG_OUTPUT == DEBUG_OUTPUT_SWD
+#elif DEBUG_OUTPUT == DEBUG_OUTPUT_SWO
 
     void debug_swd_printf(const char *fmt, ...);
 

@@ -234,7 +234,7 @@ extern "C" void Error_Handler(void)
     // disable watchdog
     WatchDog::deinit();
 
-    #if DEBUG && (DEBUG_OUTPUT == DEBUG_OUTPUT_SWD)
+    #if DEBUG && (DEBUG_OUTPUT == DEBUG_OUTPUT_SWO)
     // report error type via SWO
     switch(interruptErrorType) {
         case InterruptErrorType::ERROR_HANDLER:

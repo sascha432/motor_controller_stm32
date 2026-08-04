@@ -141,7 +141,6 @@ void WatchDog::deinit()
     HAL_NVIC_DisableIRQ(WWDG_IRQn);
 }
 
-
 // === MotorVibes implementation ===
 
 extern TIM_HandleTypeDef tim1;
@@ -192,7 +191,6 @@ void MotorVibes::deinit()
 
 void MotorVibes::playTone(uint32_t frequency)
 {
-    DEBUG_PRINT_MSG(DEBUG_ALL, "t=%u", frequency);
     if (frequency == 0) {
         stopTone();
         return;

@@ -60,14 +60,25 @@ struct Button
     }
 
     /**
-     * @brief get button pressed state
+     * @brief Get button down state
      *
      * @return true if the button is down/pressed
      * @return false otherwise
      */
-    inline bool isDown()
+    inline bool isDown() const
     {
         return (state == ACTIVE_STATE);
+    }
+
+    /**
+     * @brief Get button pressed state
+     *
+     * @return true if the button has been pressed
+     * @return false otherwise
+     */
+    inline bool isPressed() const
+    {
+        return pressed;
     }
 
     /**

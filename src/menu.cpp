@@ -147,7 +147,7 @@ struct Tone {
     uint8_t duration;
 };
 
-constexpr Tone imperial_march[] = {
+const Tone imperial_march[] = {
     {65, 125}, {65, 125}, {65, 125}, {51, 93}, {77, 31}, {65, 125}, {51, 93}, {77, 31}, {65, 250},
     {97, 125}, {97, 125}, {97, 125}, {103, 93}, {77, 31}, {65, 125}, {51, 93}, {77, 31}, {65, 250},
     {130, 125}, {65, 93}, {65, 31}, {130, 125}, {123, 93}, {116, 31}, {110, 31}, {103, 31}, {110, 125},
@@ -158,26 +158,30 @@ constexpr Tone imperial_march[] = {
     {51, 62}, {61, 125}, {51, 93}, {77, 31}, {65, 125}, {51, 93}, {77, 31}, {65, 250},
 };
 
-void playImperialMarch()
+static void playImperialMarch()
 {
+    menu.clearUserInput();
     screenFlow.next(new InfoScreen(Screen::Type::DIAGNOSTICS, "Imperial March", Screen::kInfoScreenLabelFont));
-    lv_timer_handler();
+    screenFlow.refresh();
     MotorVibes vibes;
     vibes.init();
-    for(uint32_t i = 0; i < sizeof(imperial_march) / sizeof(imperial_march[0]); ++i) {
+    for(uint32_t i = 0; i < sizeof_array(imperial_march); ++i) {
         vibes.playTone(imperial_march[i].frequency << 2);
         WatchDog::delay(imperial_march[i].duration << 2);
         vibes.stopTone();
         WatchDog::delay(20);
-        if (menu.isAnyButtonDown()) {
+        if (menu.hasAnyButtonBeenPressed()) {
             break;
         }
     }
     vibes.stopTone();
     vibes.deinit();
+    while (menu.isAnyButtonDown()) {
+        WatchDog::feed();
+    }
     menu.clearUserInput();
     screenFlow.back();
-    lv_timer_handler();
+    screenFlow.refresh();
 }
 
 #endif
@@ -233,7 +237,7 @@ void Menu::loadWelcomeScreen()
     // Show welcome screen for a few seconds
     screenFlow.init();
     screenFlow.setScreen(new WelcomeScreen());
-    lv_timer_handler();
+    screenFlow.refresh();
     tft_backlight_pwm_set(eeprom.getTFTBrightness());
 
     if (UIConstants::kEnableIlluminationLEDFading) {
@@ -343,10 +347,11 @@ ScreenFlow &Menu::getScreenFlow()
 
 void Menu::abortableDelay(uint32_t ms)
 {
+    clearUserInput();
     uint32_t start = HAL_GetTick();
     while (HAL_GetTick() - start < ms) {
         WatchDog::feed();
-        if (isAnyButtonDown()) {
+        if (hasAnyButtonBeenPressed()) {
             while (isAnyButtonDown()) {
                 WatchDog::feed();
             }
@@ -356,9 +361,14 @@ void Menu::abortableDelay(uint32_t ms)
     }
 }
 
-bool Menu::isAnyButtonDown()
+bool Menu::isAnyButtonDown() const
 {
     return knobButton.isDown() || backButton.isDown() || startButton.isDown();
+}
+
+bool Menu::hasAnyButtonBeenPressed() const
+{
+    return knobButton.isPressed() || backButton.isPressed() || startButton.isPressed();
 }
 
 void Menu::clearUserInput()
@@ -374,7 +384,7 @@ void Menu::saveEEPROMChanges()
 {
     if (eeprom.write()) {
         screenFlow.setScreen(new InfoScreen(Screen::Type::EEPROM_SAVED, "Saved"));
-        lv_timer_handler();
+        screenFlow.refresh();
         abortableDelay(UIConstants::kInfoScreenTimeout);
     }
 }
@@ -720,7 +730,7 @@ void Menu::handleButtonPress()
                     eeprom.write();
                     menu.applyEEPROMSettings();
                     screenFlow.next(new InfoScreen(Screen::Type::EEPROM_RESTORED, "Restored"));
-                    lv_timer_handler();
+                    screenFlow.refresh();
                     abortableDelay(UIConstants::kInfoScreenTimeout);
                     loadMainMenu();
                     break;

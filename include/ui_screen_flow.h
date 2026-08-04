@@ -62,6 +62,15 @@ struct ScreenFlow {
      */
     Screen *getScreen() const;
 
+    /**
+     * @brief Refresh current screen
+     *
+     */
+    static inline void refresh()
+    {
+        lv_timer_handler();
+    }
+
 protected:
     Screen *screen;
 };

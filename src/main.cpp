@@ -184,7 +184,7 @@ static void loop()
         }
 
         // update UI, this might take a couple 100ms
-        lv_timer_handler();
+        screenFlow.refresh();
         lastLvHandler = HAL_GetTick();
     }
 

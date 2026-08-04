@@ -76,7 +76,16 @@ struct Menu
      * @return true
      * @return false
      */
-    bool isAnyButtonDown();
+    bool isAnyButtonDown() const;
+
+    /**
+     * @brief Return if any button has been pressed
+     *
+     * @return true if any button has been pressed
+     * @return false otherwise
+     */
+
+    bool hasAnyButtonBeenPressed() const;
 
     /**
      * @brief Clear button states and rotary encoder position

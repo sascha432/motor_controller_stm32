@@ -461,7 +461,7 @@ void DiagnosticsScreen::load()
 
     firmwareLabel = diagnostic_screen_create_label(content, kDiagnosticTextWidth, 0);
     lv_label_set_text_fmt(firmwareLabel,
-        "Firmware " STR(VERSION_MAJOR) "." STR(VERSION_MINOR) "." STR(VERSION_PATCH) "\n"
+        "Firmware " STR(VERSION_MAJOR) "." STR(VERSION_MINOR) "." STR(VERSION_PATCH) " " __DEBUG__BUILD__ "\n"
         "PCB Rev " STR(PCB_REV_MAJOR) "." STR(PCB_REV_MINOR) "\n"
         "Build " __DATE__ " " __TIME__ "\n"
         "EEPROM cycle #%u", (unsigned)eeprom.getData().sequence
