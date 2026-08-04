@@ -603,3 +603,21 @@ inline bool kIsDivisible(uint32_t value)
         return (value % DIVISOR) == 0;
     }
 }
+
+struct MotorVibes
+{
+    static constexpr uint32_t kTonePeriod = 21;  // period optimal for 50-1600Hz tones
+
+    void init();
+    void deinit();
+
+    void playTone(uint32_t frequency);
+    void playNote(uint8_t note);
+    void stopTone();
+
+    uint16_t prescaler;
+    uint16_t period;
+    uint16_t arr;
+    uint16_t motorCurrentLimit;
+    uint16_t inputCurrentLimit;
+};

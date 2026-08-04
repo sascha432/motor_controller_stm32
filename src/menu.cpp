@@ -51,6 +51,9 @@ enum class AdvancedMenuItemType {
     PWM_FREQUENCY,
     OVP_PROTECTION,
     DIAGNOSTICS,
+#if HAVE_IMPERIAL_MARCH
+    PLAY_IMPERIAL_MARCH,
+#endif
     BACK
 };
 
@@ -65,7 +68,10 @@ static const char *kAdvancedMenuItems[] = {
     "PWM Frequency",            // 7
     "OVP Protection",           // 8
     "Diagnostics",              // 9
-    "Back"                      // 10
+#if HAVE_IMPERIAL_MARCH
+    "Play Imperial March",      // 10
+#endif
+    "Back"
 };
 
 enum class PIDParametersItemType {
@@ -134,6 +140,48 @@ static const char *kRestoreDefaultsMenuItems[] = {
     "Cancel"                    // 1
 };
 
+#if HAVE_IMPERIAL_MARCH
+
+struct Tone {
+    uint8_t frequency;
+    uint8_t duration;
+};
+
+constexpr Tone imperial_march[] = {
+    {65, 125}, {65, 125}, {65, 125}, {51, 93}, {77, 31}, {65, 125}, {51, 93}, {77, 31}, {65, 250},
+    {97, 125}, {97, 125}, {97, 125}, {103, 93}, {77, 31}, {65, 125}, {51, 93}, {77, 31}, {65, 250},
+    {130, 125}, {65, 93}, {65, 31}, {130, 125}, {123, 93}, {116, 31}, {110, 31}, {103, 31}, {110, 125},
+    {69, 62}, {92, 125}, {87, 93}, {82, 31}, {77, 31}, {73, 31}, {77, 125},
+    {51, 62}, {61, 125}, {51, 93}, {61, 31}, {77, 125}, {65, 93}, {77, 31}, {97, 250},
+    {130, 125}, {65, 93}, {65, 31}, {130, 125}, {123, 93}, {116, 31}, {110, 31}, {103, 31}, {110, 125},
+    {69, 62}, {92, 125}, {87, 93}, {82, 31}, {77, 31}, {73, 31}, {77, 125},
+    {51, 62}, {61, 125}, {51, 93}, {77, 31}, {65, 125}, {51, 93}, {77, 31}, {65, 250},
+};
+
+void playImperialMarch()
+{
+    screenFlow.next(new InfoScreen(Screen::Type::DIAGNOSTICS, "Imperial March", Screen::kInfoScreenLabelFont));
+    lv_timer_handler();
+    MotorVibes vibes;
+    vibes.init();
+    for(uint32_t i = 0; i < sizeof(imperial_march) / sizeof(imperial_march[0]); ++i) {
+        vibes.playTone(imperial_march[i].frequency << 2);
+        WatchDog::delay(imperial_march[i].duration << 2);
+        vibes.stopTone();
+        WatchDog::delay(20);
+        if (menu.isAnyButtonDown()) {
+            break;
+        }
+    }
+    vibes.stopTone();
+    vibes.deinit();
+    menu.clearUserInput();
+    screenFlow.back();
+    lv_timer_handler();
+}
+
+#endif
+
 /**
  * @brief custom format for current (mA) conversion from uint32_t to "n.n A"
  */
@@ -189,6 +237,25 @@ void Menu::loadWelcomeScreen()
     tft_backlight_pwm_set(eeprom.getTFTBrightness());
 
     if (UIConstants::kEnableIlluminationLEDFading) {
+
+        MotorVibes chime;
+        chime.init();
+
+        const uint8_t chimeFrequency50msInterval[] = {
+            104, 104, 104,  // 520 Hz
+            0,
+            132, 132, 132,  // 660 Hz
+            0,
+            157, 157, 157, 157,  // 785 Hz
+            0,
+            132, 132, 132,  // 660 Hz
+            0,
+            157, 157, 157, 157,  // 785 Hz
+            0,
+            209, 209, 209, 209, 209, // 1045 Hz
+            0
+        };
+
         // gradually increase LED brightness to target value
         constexpr uint32_t kMultiplier = (1 << 23);
         constexpr uint32_t kLoopDelay = 10;
@@ -197,7 +264,7 @@ void Menu::loadWelcomeScreen()
         uint32_t currentBrightness = 0;
         uint32_t step = targetBrightness / (UIConstants::kWelcomeScreenTimeout / kLoopDelay);
         targetBrightness -= step;
-        for(;;) {
+        for(uint32_t i = 0; ; i++) {
             uint32_t elapsed = HAL_GetTick() - start;
             if (elapsed >= UIConstants::kWelcomeScreenTimeout) {
                 break;
@@ -208,9 +275,14 @@ void Menu::loadWelcomeScreen()
             LEDs::illuminationLedSetPWM(currentBrightness / (kMultiplier / LEDs::kIlluminationResolution));
             // blink motor LEDs
             ((elapsed / 500) & 0x01) ? LEDs::onLEDError() : LEDs::onLEDWarning();
+            // play chime tone
+            const uint32_t index = i / 5;
+            chime.playTone((index >= sizeof(chimeFrequency50msInterval)) ? 0 : (chimeFrequency50msInterval[index] * 5));
             WatchDog::delay(kLoopDelay);
         }
         LEDs::off();
+        chime.stopTone();
+        chime.deinit();
     }
     else {
         WatchDog::delay(UIConstants::kWelcomeScreenTimeout);
@@ -549,6 +621,11 @@ void Menu::handleButtonPress()
                     screenFlow.next(new DiagnosticsScreen(Screen::Type::DIAGNOSTICS));
                     setValue(0);
                     break;
+                #if HAVE_IMPERIAL_MARCH
+                case AdvancedMenuItemType::PLAY_IMPERIAL_MARCH:
+                    playImperialMarch();
+                    break;
+                #endif
                 case AdvancedMenuItemType::BACK:
                     restorePreviousMenu();
                     break;
