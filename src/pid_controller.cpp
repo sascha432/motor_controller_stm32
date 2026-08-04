@@ -31,7 +31,7 @@ void PidController::init()
     tim1.Instance = TIM1;
     tim1.Init.Prescaler = 0;
     tim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-    tim1.Init.Period = kPWMFrequencyToARR(UIConstants::kDefaultPWMFrequency) - 1;
+    tim1.Init.Period = pwmLevel.getMax() - 1;
     tim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
     HAL_TIM_PWM_Init(&tim1);
 

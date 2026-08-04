@@ -460,9 +460,9 @@ public:
     {
         uint32_t isenseMax;             // maximum current as ADC value
         uint32_t vsenseMax;             // maximum voltage as ADC value
-        bool drv8701Fault : 1;          // DRV8701 fault pin state
-        bool ocpFault : 1;              // OCP(INA381) fault pin state
-        bool snsoutFault : 1;           // SNSOUT(motor current limit) fault pin state
+        bool drv8701Fault;              // DRV8701 fault pin state
+        bool ocpFault;                  // OCP(INA381) fault pin state
+        bool snsoutFault;               // SNSOUT(motor current limit) fault pin state
 
         FaultStates() :
             isenseMax(INT32_MAX),
@@ -525,6 +525,8 @@ public:
     static constexpr size_t kPidLoopTypeSize = sizeof(PidLoopType);
 
     // === OCP state machine and constants ===
+    static constexpr float kMinADCTimeMicros = 1000000 / ADC::kTotalSamplesPerSecond;   // sample time for current measurement in microseconds, limits retrigger timeout and recovery interval
+
     static constexpr uint32_t kOcpTickInterval = 5;                                     // 5us tick interval
     static constexpr uint32_t kOcpISenseThreshold = 90;                                 // lower threshold in percent before the OCP condition is cleared
     static constexpr uint32_t kOcpRecoveryInterval = 20 / kOcpTickInterval;             // 20us interval
@@ -570,8 +572,7 @@ public:
     // === PWM level data structure ===
     struct PWMLevel
     {
-        PWMLevel() : level(kPWMFrequencyToARR(UIConstants::kDefaultPWMFrequency))
-        {
+        PWMLevel() : level(kPWMFrequencyToARR(UIConstants::kDefaultPWMFrequency)) {
         }
 
         inline uint16_t getMax() const {

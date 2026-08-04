@@ -69,6 +69,11 @@ struct SWO
     #define DEBUG_OUTPUT        DEBUG_OUTPUT_SERIAL
 #endif
 
+#if defined(DEBUG) && !DEBUG
+    #undef DEBUG_OUTPUT
+    #define DEBUG_OUTPUT        DEBUG_OUTPUT_NONE
+#endif
+
 enum class DebugType : uint32_t
 {
     ERROR = 0x01,
