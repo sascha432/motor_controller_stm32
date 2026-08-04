@@ -31,7 +31,7 @@ void PidController::init()
     tim1.Instance = TIM1;
     tim1.Init.Prescaler = 0;
     tim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-    tim1.Init.Period = kPWMFrequencyToARR(20000) - 1;
+    tim1.Init.Period = kPWMFrequencyToARR(UIConstants::kDefaultPWMFrequency) - 1;
     tim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
     HAL_TIM_PWM_Init(&tim1);
 
@@ -215,7 +215,8 @@ bool PidController::motorToggle()
     return false;
 }
 
-#if defined(__GNUC__) && !defined(__clang__)
+
+#if (!defined(DEBUG_DISABLE_O3) || (!DEBUG_DISABLE_O3)) && defined(__GNUC__) && !defined(__clang__)
 #pragma GCC push_options
 #pragma GCC optimize("O3")
 #endif
@@ -450,7 +451,7 @@ void PidController::trigger_ocp()
     }
 }
 
-#if defined(__GNUC__) && !defined(__clang__)
+#if (!defined(DEBUG_DISABLE_O3) || (!DEBUG_DISABLE_O3)) && defined(__GNUC__) && !defined(__clang__)
 #pragma GCC pop_options
 #endif
 
@@ -478,24 +479,36 @@ size_t PidController::errorPrintf(char *buf, size_t bufSize) const
         case ErrorCodeType::NONE:
             return snprintf(buf, bufSize, "NONE");
     }
-    *buf = 0;
-    return 0;
+    #if DEBUG
+        return snprintf(buf, bufSize, "ERROR #%d", static_cast<int>(errorCode));
+    #else
+        *buf = 0;
+        return 0;
+    #endif
 }
 
 void PidController::setPWMFrequency(uint32_t frequency)
 {
+    // clamp frequency to min/max values
+    constexpr uint32_t kMinPWMFrequency = kARRToPWMFrequency(0xffff);       // 16bit timer limit
+    constexpr uint32_t kMaxPWMFrequency = kARRToPWMFrequency(1024);         // at least 10bit pwm resolution
+    frequency = std::clamp<uint32_t>(frequency, kMinPWMFrequency, kMaxPWMFrequency);
+
     // set pwm level
     pwmLevel.setMax(kPWMFrequencyToARR(frequency));
     // get the max. pwm level for the auto-reload register
     const uint32_t arr = pwmLevel.getMax() - 1;
 
-    // update precalc. values for PID loop
-    KpPreCalc = Kp * pwmLevel.getMax();
-    KiPreCalc = Ki * pwmLevel.getMax();
-    KdPreCalc = Kd * pwmLevel.getMax();
-
+    // stop timer and update pwm frequency
     __HAL_TIM_DISABLE(&tim1);
     __HAL_TIM_SET_AUTORELOAD(&tim1, arr);
+
+    // update pre-calculated PID parameters
+    setKp(Kp);
+    setKi(Ki);
+    setKd(Kd);
+
+    // start timer
     __HAL_TIM_SET_COUNTER(&tim1, 0);
     __HAL_TIM_ENABLE(&tim1);
 }

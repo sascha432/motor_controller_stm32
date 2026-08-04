@@ -896,7 +896,7 @@ void Menu::updateSpeedValue()
         pid.setRPM(eeprom.getSpeed());
     }
     else {
-        clampedValue = std::clamp<int32_t>(getValue(), 0, eeprom.getMaxPWM() * pid.getMaxPWMLevel() / 100);
+        clampedValue = std::clamp<int32_t>(getValue(), 0, eeprom.getMaxPWM() * pid.getPWMLevelMax() / 100);
         eeprom.setSpeed(clampedValue);
     }
     // set clamped value

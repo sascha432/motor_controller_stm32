@@ -73,16 +73,10 @@ struct ADC
     void initDAC();
 
     /**
-     * @brief Set the ADC sample time for all channels
+     * @brief Interrupt Service Routine for the ADC. This function is called when a DMA transfer is complete
      *
-     * @param fast If true, use fast preset sample times; otherwise, use slowest sample times possible to reduce MCU load
      */
-    void setADCSampleTime(bool fast);
-
-    /**
-     * @brief Internal method
-     */
-    void _setADCSampleTime(bool fast);
+    void isr();
 
     /**
      * @brief Set DAC voltage for the DRV8701 reference voltage
@@ -154,11 +148,8 @@ struct ADC
         return mosfetTemperatureFiltered;
     }
 
-    /**
-     * @brief Interrupt Service Routine for the ADC. This function is called when a DMA transfer is complete
-     *
-     */
-    void isr();
+protected:
+    friend PidController;
 
     /**
      * @brief Check if the DMA is ready for a new transfer
@@ -180,9 +171,6 @@ struct ADC
     {
         return HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc_buffer, kNumConversions);
     }
-
-protected:
-    friend PidController;
 
     /**
      * @brief Get the Input Current value

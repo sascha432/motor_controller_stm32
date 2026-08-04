@@ -6,9 +6,11 @@
 #include "pid_controller.h"
 #include "controls.h"
 
-#if defined(__GNUC__) && !defined(__clang__)
+#if (!defined(DEBUG_DISABLE_O3) || (!DEBUG_DISABLE_O3)) && defined(__GNUC__) && !defined(__clang__)
 #pragma GCC push_options
 #pragma GCC optimize("O3")
+#else
+#warning DEBUG_DISABLE_O3 set, O3 optimization disabled
 #endif
 
 // === global variables ===
@@ -206,7 +208,7 @@ extern "C" void HAL_WWDG_EarlyWakeupCallback(WWDG_HandleTypeDef *hwwdg)
     call_default_error_handler(InterruptErrorType::WATCHDOG_TIMEOUT);
 }
 
-#if defined(__GNUC__) && !defined(__clang__)
+#if (!defined(DEBUG_DISABLE_O3) || (!DEBUG_DISABLE_O3)) && defined(__GNUC__) && !defined(__clang__)
 #pragma GCC pop_options
 #endif
 

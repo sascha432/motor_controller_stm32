@@ -53,7 +53,7 @@ static void setup()
     SWO::init();
     debug_init();
 
-    // Initialize and read EEPROM on I2C1 on PB8/9
+    // Initialize and read EEPROM on I2C1 on PB8/PB9
     eeprom.init();
     eeprom.read();
 
@@ -78,7 +78,7 @@ static void setup()
     // PID controller
     pid.init();
 
-    // Initialize display gpio, timer and SPI
+    // Initialize display GPIO, PWM timer and SPI
     tft_driver_gpio_tim_init();
     tft_driver_spi_init();
 }

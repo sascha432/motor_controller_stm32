@@ -435,7 +435,7 @@ struct EEPROM
 
     uint16_t getPWMFrequency() const
     {
-        return std::clamp<uint16_t>(data.pwm_frequency, UIConstants::kMinPWMFrequency, UIConstants::kMaxPWMFrequency);
+        return data.pwm_frequency;
     }
 
 protected:

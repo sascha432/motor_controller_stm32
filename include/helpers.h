@@ -333,6 +333,17 @@ static constexpr uint16_t kPWMFrequencyToARR(uint32_t frequency)
 }
 
 /**
+ * @brief Calculate the PWM frequency for a given auto-reload register value (ARR)
+ *
+ * @param arr
+ * @return constexpr uint32_t
+ */
+static constexpr uint32_t kARRToPWMFrequency(uint16_t arr)
+{
+    return 72000000 / (arr + 1);
+}
+
+/**
  * @brief Delay function for up to 65535 microseconds
  *
  * @tparam microseconds delay

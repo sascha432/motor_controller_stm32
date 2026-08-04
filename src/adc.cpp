@@ -106,6 +106,11 @@ void ADC::initDAC()
     DAC->CR |= DAC_CR_EN1 | DAC_CR_EN2;
 }
 
+#if (!defined(DEBUG_DISABLE_O3) || (!DEBUG_DISABLE_O3)) && defined(__GNUC__) && !defined(__clang__)
+#pragma GCC push_options
+#pragma GCC optimize("O3")
+#endif
+
 void ADC::isr()
 {
     // hard fault if we have an OVP condition, mostly likely due to reverse currents while braking
@@ -134,3 +139,7 @@ void ADC::isr()
         startDMA();
     }
 }
+
+#if (!defined(DEBUG_DISABLE_O3) || (!DEBUG_DISABLE_O3)) && defined(__GNUC__) && !defined(__clang__)
+#pragma GCC pop_options
+#endif

@@ -39,7 +39,7 @@ struct PidController
     #if PID_USE_FLOATING_POINT_MATH
         static constexpr int32_t kFPFactor = 1;
     #else
-        static constexpr int32_t kFPFactor = kMaxError;                                 // factor to reduce error, power of 2 avoids multiplications and divisions
+        static constexpr int32_t kFPFactor = kMaxError;
     #endif
 
     // convert RPM to counts per PID interval
@@ -73,7 +73,7 @@ struct PidController
         OVP
     };
 
-#if defined(__GNUC__) && !defined(__clang__)
+#if (!defined(DEBUG_DISABLE_O3) || (!DEBUG_DISABLE_O3)) && defined(__GNUC__) && !defined(__clang__)
 #pragma GCC push_options
 #pragma GCC optimize("O3")
 #endif
@@ -90,9 +90,9 @@ struct PidController
         running(false),
         releaseBreakCounter(0)
     {
-        setKp(1.0f);
-        setKi(1.0f);
-        setKd(0.0f);
+        setKp(UIConstants::kDefaultKp);
+        setKi(UIConstants::kDefaultKi);
+        setKd(UIConstants::kDefaultKd);
     }
 
     /**
@@ -117,7 +117,7 @@ struct PidController
     inline void setKp(float value)
     {
         Kp = value;
-        KpPreCalc = value * pwmLevel.getMax();;
+        KpPreCalc = value * pwmLevel.getMax();
         SWO::data.Kp = value;
     }
 
@@ -311,7 +311,6 @@ struct PidController
         faults.drv8701Fault = !digitalRead<DRV8701_FAULT_PIN>();
         faults.ocpFault = !digitalRead<OCP_INT_PIN>();
         faults.snsoutFault = !digitalRead<DRV_SNSOUT_PIN>();
-        DEBUG_PRINT(DebugType::PID, "drv8701=%d ocp=%d snsout=%d", faults.drv8701Fault, faults.ocpFault, faults.snsoutFault);
     }
 
     /**
@@ -365,7 +364,27 @@ struct PidController
         return errorCode != ErrorCodeType::NONE;
     }
 
-#if defined(__GNUC__) && !defined(__clang__)
+    /**
+     * @brief Get the Max PWM Level
+     *
+     * @return uint16_t
+     */
+    inline uint16_t getPWMLevelMax() const
+    {
+        return pwmLevel.getMax();
+    }
+
+    /**
+     * @brief Get the ARR (Auto-Reload Register) value for the PWM level
+     *
+     * @return uint16_t
+     */
+    inline uint16_t getPWMLevelARR() const
+    {
+        return pwmLevel.getARR();
+    }
+
+#if (!defined(DEBUG_DISABLE_O3) || (!DEBUG_DISABLE_O3)) && defined(__GNUC__) && !defined(__clang__)
 #pragma GCC pop_options
 #endif
 
@@ -383,9 +402,6 @@ struct PidController
     /**
      * @brief Interrupt service routine for the PID controller.
      *
-     * This function should be called at a fixed interval defined by kPIDInterval.
-     * It reads the encoder counter, calculates the error, derivative, and integral,
-     * updates the PWM output, and handles anti-windup.
      */
     void isr();
 
@@ -431,6 +447,13 @@ struct PidController
      */
     size_t errorPrintf(char *buf, size_t bufSize) const;
 
+    /**
+     * @brief Set PWM frequency
+     *
+     * @param value PWM frequency in Hz
+     */
+    void setPWMFrequency(uint32_t value);
+
 public:
     // === Fault states data structure ===
     struct FaultStates
@@ -461,8 +484,8 @@ public:
     // === Statistics data structure ===
     struct StatsType
     {
-        Helpers::FixedLowPass<kPIDInterval, 32> rpm;    // filtered RPM for displaying
-        Helpers::FixedLowPass<kPIDInterval, 8> pwm;     // filtered PWM for displaying
+        Helpers::FixedLowPass<kPIDInterval, kPIDInterval * 8, 512> rpm;     // filtered RPM for displaying
+        Helpers::FixedLowPass<kPIDInterval, kPIDInterval * 2, 256> pwm;     // filtered PWM for displaying
         struct {
             uint32_t loop;                  // number of times the PID loop has been called
             int32_t pulse;                  // number of pulses received from the A/B motor encoder
@@ -545,10 +568,9 @@ public:
     };
 
     // === PWM level data structure ===
-
     struct PWMLevel
     {
-        PWMLevel() : level(kPWMFrequencyToARR(20000))
+        PWMLevel() : level(kPWMFrequencyToARR(UIConstants::kDefaultPWMFrequency))
         {
         }
 
@@ -557,13 +579,13 @@ public:
         }
 
         inline uint16_t getARR() const {
-            return TIM1->ARR; // this is (level - 1)
+            return PID_MOTOR_PWM_TIMER->ARR; // this is (level - 1)
         }
 
         inline void setMax(uint16_t value)
         {
             level = value;
-            upper = (value * 140) / 128;
+            upper = (value * 140U) / 128U;
             lower = -upper;
         }
 
@@ -580,33 +602,6 @@ public:
         int32_t upper;
         uint16_t level;
     };
-
-    /**
-     * @brief Update PWM frequency. The motor must not run
-     *
-     * @param value PWM frequency in Hz
-     */
-    void setPWMFrequency(uint32_t value);
-
-    /**
-     * @brief Get the Max PWM Level
-     *
-     * @return uint16_t
-     */
-    inline uint16_t getMaxPWMLevel() const
-    {
-        return pwmLevel.getMax();
-    }
-
-    /**
-     * @brief Get the ARR (Auto-Reload Register) value for the PWM level
-     *
-     * @return uint16_t
-     */
-    inline uint16_t getPWMLevelARR() const
-    {
-        return pwmLevel.getARR();
-    }
 
 public:
     float Kp;                                       // PID K-values
