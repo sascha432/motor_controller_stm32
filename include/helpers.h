@@ -584,3 +584,22 @@ inline T filterValue(T filteredValue, T value)
         return (filteredValue * static_cast<FILTER_TYPE>(FILTER - 1) + value) / FILTER;
     }
 }
+
+/**
+ * @brief Check if a value is divisible by a divisor
+ *
+ * @param value The value to check
+ * @param divisor The divisor to check against
+ * @return true if value is divisible by divisor
+ * @return false otherwise
+ */
+template<uint32_t DIVISOR>
+inline bool kIsDivisible(uint32_t value)
+{
+    if constexpr ((DIVISOR & (DIVISOR - 1)) == 0) {
+        return (value & (DIVISOR - 1)) == 0;
+    }
+    else {
+        return (value % DIVISOR) == 0;
+    }
+}

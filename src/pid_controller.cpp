@@ -403,7 +403,7 @@ void PidController::ocp_isr()
         }
     }
     if (ocp.state == OcpStateType::RECOVERY) {
-        if ((ocp.counter % kOcpRecoveryInterval) == 0) {
+        if (kIsDivisible<kOcpRecoveryInterval>(ocp.counter)) {
             uint32_t value = DAC_GET_MOTOR_CURRENT();
             value = value + (value / kOcpCurrentRampUp);
             if (value > ocp.dacMotorCurrent) {

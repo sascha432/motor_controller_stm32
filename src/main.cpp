@@ -287,7 +287,7 @@ static void TIM7_TIM6_Init()
     tim6.Instance = TIM6;
     tim6.Init.Prescaler = 71; // 72 MHz / 72 = 1 MHz (1 us tick)
     tim6.Init.CounterMode = TIM_COUNTERMODE_UP;
-    tim6.Init.Period = 5 - 1; // 5 counts = 5us
+    tim6.Init.Period = PidController::kOcpTickInterval - 1; // 20 counts = 20us
     tim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
     __HAL_RCC_TIM6_CLK_ENABLE();
     HAL_TIM_Base_Init(&tim6);

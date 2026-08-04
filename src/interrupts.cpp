@@ -26,16 +26,16 @@ InterruptErrorType interruptErrorType;
 
 /**
  * @brief Periodically call PID controller methods
- *
- * Handler is executed every 5us
  */
 static inline void TIM6_Handler(void)
 {
+    constexpr uint32_t kTicksPerPidIsr = (PidController::kPIDIntervalFloat * 1000.0f) / PidController::kOcpTickInterval; // every 5.12ms
+    constexpr uint32_t kTicksPerKnobIsr = kTicksPerPidIsr * 5; // every 25.6ms
     static uint32_t timer6Counter = 0;
     pid.ocp_isr();
-    if ((timer6Counter & 0x3ff) == 0) { // every 5.12ms (1024x5us)
+    if (kIsDivisible<kTicksPerPidIsr>(timer6Counter)) {
         pid.isr();
-        if (timer6Counter % 5120 == 0) { // every 25.6ms
+        if (kIsDivisible<kTicksPerKnobIsr>(timer6Counter)) {
             knob.isr();
         }
     }

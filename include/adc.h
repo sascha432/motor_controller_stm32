@@ -36,7 +36,7 @@ struct ADC
 {
     static constexpr uint32_t kNumConversions = 4;                                  // number of channels
     static constexpr uint32_t kSampleTimeCH2 = ADC_SAMPLETIME_13CYCLES_5;           // isense
-    static constexpr uint32_t kSampleTimeCH3 = ADC_SAMPLETIME_13CYCLES_5;           // vsense
+    static constexpr uint32_t kSampleTimeCH3 = ADC_SAMPLETIME_28CYCLES_5;           // vsense
     static constexpr uint32_t kSampleTimeCH14 = ADC_SAMPLETIME_71CYCLES_5;          // motor ntc
     static constexpr uint32_t kSampleTimeCH15 = ADC_SAMPLETIME_71CYCLES_5;          // mosfet ntc
 

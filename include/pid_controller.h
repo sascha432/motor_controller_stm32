@@ -170,7 +170,7 @@ struct PidController
      */
     inline int32_t clampPWMLevel(int32_t value) const
     {
-        return std::clamp<int32_t>(value, 0, pwmLevel.getARR());
+        return pwmLevel.clamp(value);
     }
 
     /**
@@ -527,10 +527,10 @@ public:
     // === OCP state machine and constants ===
     static constexpr float kMinADCTimeMicros = 1000000 / ADC::kTotalSamplesPerSecond;   // sample time for current measurement in microseconds, limits retrigger timeout and recovery interval
 
-    static constexpr uint32_t kOcpTickInterval = 5;                                     // 5us tick interval
+    static constexpr uint32_t kOcpTickInterval = 20;                                     // 5us tick interval
     static constexpr uint32_t kOcpISenseThreshold = 80;                                 // lower threshold in percent before the OCP condition is cleared
     static constexpr uint32_t kOcpRecoveryInterval = 20 / kOcpTickInterval;             // 20us interval
-    static constexpr uint32_t kOcpRetriggerTimeout = 10 / kOcpTickInterval;             // 10us timeout
+    static constexpr uint32_t kOcpRetriggerTimeout = 20 / kOcpTickInterval;             // 20us timeout
     static constexpr uint32_t kOcpCurrentRampUp = 16;                                   // increase current by 1/16 every tick
     static constexpr uint32_t kOcpCurrentRampDown = 16;                                 // reduce current by 1/16 every tick
     static constexpr uint32_t kOcpInputToMotorCurrentRatio = 8;                         // if the motor current limit is higher than x the input current limit, it will be reduced to x the input current limit, before ramping it down further
@@ -573,6 +573,11 @@ public:
     struct PWMLevel
     {
         PWMLevel() : level(kPWMFrequencyToARR(UIConstants::kDefaultPWMFrequency)) {
+        }
+
+        inline int32_t clamp(int32_t value) const
+        {
+            return std::clamp<int32_t>(value, 0, getARR());
         }
 
         inline uint16_t getMax() const {
