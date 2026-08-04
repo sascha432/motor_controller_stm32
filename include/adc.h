@@ -8,6 +8,7 @@
 #include "adc_converters.h"
 #include "pins.h"
 
+extern ADC_HandleTypeDef hadc1;
 struct PidController;
 
 static constexpr float kADCClockMHz = 12.0f;    // ADC clock in MHz
@@ -34,17 +35,17 @@ static constexpr float kAdcSampleTimeUs(uint32_t sampleBits)
 struct ADC
 {
     static constexpr uint32_t kNumConversions = 4;                                  // number of channels
-    static constexpr uint32_t kSampleTimeCH2 = ADC_SAMPLETIME_55CYCLES_5;           // isense
-    static constexpr uint32_t kSampleTimeCH3 = ADC_SAMPLETIME_239CYCLES_5;          // vsense
-    static constexpr uint32_t kSampleTimeCH14 = ADC_SAMPLETIME_239CYCLES_5;         // motor ntc
-    static constexpr uint32_t kSampleTimeCH15 = ADC_SAMPLETIME_239CYCLES_5;         // mosfet ntc
+    static constexpr uint32_t kSampleTimeCH2 = ADC_SAMPLETIME_13CYCLES_5;           // isense
+    static constexpr uint32_t kSampleTimeCH3 = ADC_SAMPLETIME_13CYCLES_5;           // vsense
+    static constexpr uint32_t kSampleTimeCH14 = ADC_SAMPLETIME_71CYCLES_5;          // motor ntc
+    static constexpr uint32_t kSampleTimeCH15 = ADC_SAMPLETIME_71CYCLES_5;          // mosfet ntc
 
     static constexpr float kTotalSampleTime = kAdcSampleTimeUs(kSampleTimeCH2) + kAdcSampleTimeUs(kSampleTimeCH3) + kAdcSampleTimeUs(kSampleTimeCH14) + kAdcSampleTimeUs(kSampleTimeCH15); // sum of sample time per channel
     static constexpr float kTotalSamplesPerSecond = 1000000.0f / kTotalSampleTime;  // samples per second for all channels
 
-    static constexpr uint32_t kISenseCountDivider = 16;                             // reduce by 6.5% to avoid overflow in rolling average
+    static constexpr uint32_t kISenseCountDecayDivider = 16;                        // reduce by 6.5% to avoid overflow in rolling average
     static constexpr float kISenseRollingAverageTime = 1.0f;                        // rolling average over 1.0 second
-    static constexpr uint16_t kISenseCountMax = (kTotalSamplesPerSecond * kISenseRollingAverageTime * (1.0f + (0.5f / kISenseCountDivider))) / kNumConversions; // calculate number of samples
+    static constexpr uint16_t kISenseCountMax = (kTotalSamplesPerSecond * kISenseRollingAverageTime * (1.0f + (0.5f / kISenseCountDecayDivider))) / kNumConversions; // calculate number of samples
 
     /**
      * @brief Construct ADC object
@@ -70,6 +71,18 @@ struct ADC
      *
      */
     void initDAC();
+
+    /**
+     * @brief Set the ADC sample time for all channels
+     *
+     * @param fast If true, use fast preset sample times; otherwise, use slowest sample times possible to reduce MCU load
+     */
+    void setADCSampleTime(bool fast);
+
+    /**
+     * @brief Internal method
+     */
+    void _setADCSampleTime(bool fast);
 
     /**
      * @brief Set DAC voltage for the DRV8701 reference voltage
@@ -146,6 +159,27 @@ struct ADC
      *
      */
     void isr();
+
+    /**
+     * @brief Check if the DMA is ready for a new transfer
+     *
+     * @return true
+     * @return false
+     */
+    inline bool isDMAReady() const
+    {
+        return HAL_DMA_GetState(hadc1.DMA_Handle) == HAL_DMA_STATE_READY;
+    }
+
+    /**
+     * @brief Start ADC DMA transfer
+     *
+     * @return HAL_StatusTypeDef
+     */
+    inline HAL_StatusTypeDef startDMA()
+    {
+        return HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc_buffer, kNumConversions);
+    }
 
 protected:
     friend PidController;

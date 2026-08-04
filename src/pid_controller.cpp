@@ -173,6 +173,8 @@ void PidController::motorOn()
         PID_WRITE_MOTOR_PWM_OFF();
         reset();
         running = true;
+        // start DMA transfer after setting running to true, the ADC will self restart while running
+        adc.startDMA();
         __enable_irq();
     }
     else {
@@ -319,6 +321,13 @@ void PidController::isr()
         }
         else if (now - lastRpmCounterUpdated > eeprom.getMotorStallTimeout()) {
             setErrorCode(ErrorCodeType::STALL);
+        }
+
+    }
+    else {
+        // start new ADC DMA transfer manually while not running, helps to reduce MCU load
+        if (adc.isDMAReady()) {
+            adc.startDMA();
         }
     }
 

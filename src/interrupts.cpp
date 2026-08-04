@@ -18,16 +18,20 @@ InterruptErrorType interruptErrorType;
 
 // === interrupt handlers ===
 
-// avoid overhead for fast timer interrupts and call timer6 handler directly
+// avoid overhead for fast timer interrupt and call timer6 handler directly
 // other events might interfere with code that is not handled by HAL, but TIM6 is dedicated for the PID controller timing
 #define CALL_TIM6_HANDLER_DIRECTLY 1
 
-static uint32_t timer6Counter = 0;
-
+/**
+ * @brief Periodically call PID controller methods
+ *
+ * Handler is executed every 5us
+ */
 static inline void TIM6_Handler(void)
 {
+    static uint32_t timer6Counter = 0;
     pid.ocp_isr();
-    if ((timer6Counter & 0x3ff) == 0) { // every 5.12ms
+    if ((timer6Counter & 0x3ff) == 0) { // every 5.12ms (1024x5us)
         pid.isr();
         if (timer6Counter % 5120 == 0) { // every 25.6ms
             knob.isr();
@@ -36,6 +40,10 @@ static inline void TIM6_Handler(void)
     timer6Counter++;
 }
 
+/**
+ * @brief TIM6 IRQ Handler
+ *
+ */
 extern "C" void TIM6_IRQHandler(void)
 {
     #if CALL_TIM6_HANDLER_DIRECTLY
@@ -49,7 +57,8 @@ extern "C" void TIM6_IRQHandler(void)
 
 #if !CALL_TIM6_HANDLER_DIRECTLY
 /**
- * @brief Periodically call PID controller methods
+ * @brief Callback for TIM period elapsed
+ *
  */
 extern "C" void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
@@ -118,7 +127,7 @@ extern "C" void DMA1_Channel1_IRQHandler()
 }
 
 /**
- * @brief Called from HAL_DMA_IRQHandler/DMA1_Channel1_IRQHandler
+ * @brief Called from HAL_DMA_IRQHandler
  *
  */
 extern "C" void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
@@ -216,8 +225,13 @@ static void delay_ms(uint32_t ms)
   */
 extern "C" void Error_Handler(void)
 {
+    // disable interrupts
+    __disable_irq();
     // turn motor off
     PID_WRITE_MOTOR_PWM_OFF();
+    // disable watchdog
+    WatchDog::deinit();
+
     #if DEBUG && (DEBUG_OUTPUT == DEBUG_OUTPUT_SWD)
     // report error type via SWO
     switch(interruptErrorType) {
@@ -244,10 +258,7 @@ extern "C" void Error_Handler(void)
             break;
     }
     #endif
-    // disable watchdog
-    WatchDog::deinit();
-    // disable interrupts
-    __disable_irq();
+
     // infinite loop to signal error via LED flashes
     while (1) {
         LEDs::onLEDError();

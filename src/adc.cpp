@@ -86,7 +86,7 @@ void ADC::init()
     HAL_NVIC_SetPriority(DMA1_Channel1_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(DMA1_Channel1_IRQn); // enable DMA1 channel 1 interrupt
 
-    if (HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc_buffer, kNumConversions) != HAL_OK) {
+    if (startDMA() != HAL_OK) {
         Error_Handler();
     }
 }
@@ -108,20 +108,20 @@ void ADC::initDAC()
 
 void ADC::isr()
 {
-    // hard fault if the have a OVP condition, mostly likely due to reverse currents while braking
+    // hard fault if we have an OVP condition, mostly likely due to reverse currents while braking
     if (getVSenseValue() > pid.faults.vsenseMax) {
         if (pid.errorCode != PidController::ErrorCodeType::OVP) {
             pid.setErrorCode(PidController::ErrorCodeType::OVP);
         }
     }
 
-    uint16_t value = getISenseValue();
+    const uint16_t value = getISenseValue();
     // store average for display
     isenseSum += value;
     if (++isenseCount >= kISenseCountMax) {
         // reduce by 1/16th to avoid overflow in rolling average
-        isenseSum -= isenseSum / kISenseCountDivider;
-        isenseCount -= isenseCount / kISenseCountDivider;
+        isenseSum -= isenseSum / kISenseCountDecayDivider;
+        isenseCount -= isenseCount / kISenseCountDecayDivider;
     }
     // update filtered value for fast OCP detection
     isenseOcpFiltered = filterValue<uint32_t, 2>(isenseOcpFiltered, value);
@@ -130,5 +130,7 @@ void ADC::isr()
     motorTemperatureFiltered = filterValue<uint16_t, 16>(motorTemperatureFiltered, getMotorNTCValue());
     mosfetTemperatureFiltered = filterValue<uint16_t, 16>(mosfetTemperatureFiltered, getMosfetNTCValue());
 
-    HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc_buffer, kNumConversions);
+    if (pid.running) { // update as fast as possible while running
+        startDMA();
+    }
 }
