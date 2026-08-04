@@ -404,6 +404,7 @@ void PidController::ocp_isr()
     }
     if (ocp.state == OcpStateType::RECOVERY) {
         if (kIsDivisible<kOcpRecoveryInterval>(ocp.counter)) {
+            // use 32bit to avoid overflow
             uint32_t value = DAC_GET_MOTOR_CURRENT();
             value = value + (value / kOcpCurrentRampUp);
             if (value > ocp.dacMotorCurrent) {
@@ -421,7 +422,20 @@ void PidController::ocp_isr()
 
 void PidController::trigger_ocp()
 {
-    if (ocp.state == OcpStateType::NONE || ocp.state == OcpStateType::RECOVERY) {
+    if (ocp.state == OcpStateType::TRIGGERED) {
+        if (ocp.counter >= ocp.lastCounter + kOcpRetriggerTimeout) {
+            ocp.lastCounter = ocp.counter;
+            // reduce motor current every time we trigger input OCP
+            uint16_t value = DAC_GET_MOTOR_CURRENT();
+            value = value - (value / kOcpCurrentRampDown);
+            if (value < ocp.dacInputCurrent) {
+                value = ocp.dacInputCurrent;
+            }
+            DAC_SET_MOTOR_CURRENT(value);
+        }
+    }
+    else { // ocp.state != OcpStateType::TRIGGERED, we can use else here
+    // else if (ocp.state == OcpStateType::NONE || ocp.state == OcpStateType::RECOVERY) {
         if (adc.getISenseOcpFilteredValue() > faults.isenseMax) {
             ocp.state = OcpStateType::TRIGGERED;
             ocp.counter = 0;
@@ -435,18 +449,6 @@ void PidController::trigger_ocp()
             }
             DAC_SET_MOTOR_CURRENT(value);
             LEDs::onLEDWarning();
-        }
-    }
-    else if (ocp.state == OcpStateType::TRIGGERED) {
-        if (ocp.counter >= ocp.lastCounter + kOcpRetriggerTimeout) {
-            ocp.lastCounter = ocp.counter;
-            // reduce motor current every time we trigger input OCP
-            uint16_t value = DAC_GET_MOTOR_CURRENT();
-            value = value - (value / kOcpCurrentRampDown);
-            if (value < ocp.dacInputCurrent) {
-                value = ocp.dacInputCurrent;
-            }
-            DAC_SET_MOTOR_CURRENT(value);
         }
     }
 }
