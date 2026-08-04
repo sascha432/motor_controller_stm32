@@ -570,6 +570,7 @@ template<typename T, T FILTER, typename FILTER_TYPE = std::conditional_t<std::is
 inline T filterValue(T filteredValue, T value)
 {
     if constexpr (FILTER == 1) {
+        (void)filteredValue;
         return value;
     }
     else if constexpr (FILTER == 2) {
