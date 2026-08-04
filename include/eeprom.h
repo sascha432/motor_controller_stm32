@@ -71,6 +71,7 @@ struct EEPROM
         float Kd;
         uint16_t anti_windup;
         uint16_t ovp_protection;
+        uint16_t pwm_frequency;
 
         /**
          * @brief Construct a new Data object with default settings
@@ -100,7 +101,8 @@ struct EEPROM
             Ki(UIConstants::kDefaultKi),
             Kd(UIConstants::kDefaultKd),
             anti_windup(UIConstants::kDefaultAntiWindup),
-            ovp_protection(UIConstants::kDefaultOvpProtection)
+            ovp_protection(UIConstants::kDefaultOvpProtection),
+            pwm_frequency(UIConstants::kDefaultPWMFrequency)
         {}
 
         /**
@@ -424,6 +426,16 @@ struct EEPROM
     uint16_t getOvpProtection() const
     {
         return data.ovp_protection;
+    }
+
+    void setPWMFrequency(uint16_t value)
+    {
+        data.pwm_frequency = value;
+    }
+
+    uint16_t getPWMFrequency() const
+    {
+        return std::clamp<uint16_t>(data.pwm_frequency, UIConstants::kMinPWMFrequency, UIConstants::kMaxPWMFrequency);
     }
 
 protected:

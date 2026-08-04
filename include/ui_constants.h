@@ -58,6 +58,9 @@ struct UIConstants
     static constexpr uint32_t kMaxOvpProtection = 40000;                    // Max. OVP protection in millivolts
     static constexpr uint32_t kStepsRPM = 50;                               // RPM steps
     static constexpr uint32_t kStepsPWM = 1;                                // PWM steps
+    static constexpr uint32_t kMinPWMFrequency = 5000;                      // Min. PWM frequency in Hz
+    static constexpr uint32_t kMaxPWMFrequency = 40000;                     // Max. PWM frequency in Hz
+    static constexpr uint32_t kStepPWMFrequency = 500;                      // PWM frequency step in Hz
 
     // eeprom default values
     static constexpr uint8_t kDefaultTFTBrightness = 90;                    // Default TFT Brightness
@@ -78,6 +81,7 @@ struct UIConstants
     static constexpr float kDefaultKd = 0.0f;                               // Default PID Kd value
     static constexpr uint16_t kDefaultAntiWindup = 97 * kAntiWindupFactor;  // Default PID anti-windup in percentage (0-100) * kAntiWindupFactor
     static constexpr uint16_t kDefaultOvpProtection = 38500;                // Default OVP protection in millivolts
+    static constexpr uint8_t kDefaultPWMFrequency = 20;                     // Default PWM frequency in kHz
 
     // ui menu timeouts
     static constexpr uint32_t kWelcomeScreenTimeout = 2000;                 // WelcomeScreen timeout in milliseconds

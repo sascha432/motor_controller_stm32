@@ -31,7 +31,7 @@ void PidController::init()
     tim1.Instance = TIM1;
     tim1.Init.Prescaler = 0;
     tim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-    tim1.Init.Period = kMaxPWMLevel - 1;
+    tim1.Init.Period = kPWMFrequencyToARR(20000) - 1;
     tim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
     HAL_TIM_PWM_Init(&tim1);
 
@@ -134,8 +134,11 @@ void PidController::init()
 
 void PidController::reset()
 {
+    __disable_irq();
+    PID_WRITE_MOTOR_PWM_OFF();
     LEDs::off();
     running = false;
+    setPWMFrequency(eeprom.getPWMFrequency());
     lastEncoderCounter = PID_READ_ENCODER_COUNTER();
     lastError = 0;
     lastDerivative = 0;
@@ -170,7 +173,6 @@ void PidController::motorOn()
 {
     __disable_irq();
     if (!running) {
-        PID_WRITE_MOTOR_PWM_OFF();
         reset();
         running = true;
         // start DMA transfer after setting running to true, the ADC will self restart while running
@@ -189,7 +191,7 @@ void PidController::motorOff()
     PID_WRITE_MOTOR_PWM_OFF();
     if (running) {
         running = false;
-        const uint32_t level = clampPWMLevel(eeprom.getMotorBrake() * kMaxPWMLevel / 100);
+        const uint32_t level = clampPWMLevel(eeprom.getMotorBrake() * pwmLevel.getMax() / 100);
         PID_WRITE_MOTOR_PWM_BREAK(level);
         releaseBreakCounter = (kReleaseBreakTimeMillis / kPIDIntervalFloat) + 1;
         __enable_irq();
@@ -229,7 +231,7 @@ void PidController::isr()
     stats.counter.pulse += delta;
 
     // calculate PWM level based on PID or fixed PWM value
-    int32_t pwmLevel, clampedPwmLevel;
+    int32_t newPwmLevel, clampedPwmLevel;
 
     if (eeprom.isPIDMode()) {
         // calculate error and derivative
@@ -249,9 +251,9 @@ void PidController::isr()
         updateIntegral(error);
 
         // get pwm level and set output
-        pwmLevel = calcPWMLevel(error, getIntegral(), derivative);
+        newPwmLevel = calcPWMLevel(error, getIntegral(), derivative);
         // clamp pwm level to max. allowed value
-        clampedPwmLevel = clampPWMLevel(pwmLevel);
+        clampedPwmLevel = clampPWMLevel(newPwmLevel);
 
         // apply anti-windup
         if (ocp.state != OcpStateType::NONE) {
@@ -263,7 +265,7 @@ void PidController::isr()
             #endif
         }
         else if (antiWindup) {
-            if ((pwmLevel < kWindupPwmLower) || (pwmLevel > kWindupPwmUpper)) {
+            if ((newPwmLevel < pwmLevel.getLower()) || (newPwmLevel > pwmLevel.getUpper())) {
                 #if PID_USE_FLOATING_POINT_MATH
                     setIntegral(getIntegral() * antiWindup * (0.01f / UIConstants::kAntiWindupFactor));
                 #else
@@ -274,9 +276,9 @@ void PidController::isr()
     }
     else {
         // fixed pwm from settings
-        pwmLevel = (eeprom.getMotorPWM() * kMaxPWMLevel) / 100;
+        newPwmLevel = (eeprom.getMotorPWM() * pwmLevel.getARR()) / 100;
         // clamp pwm level to max. allowed value
-        clampedPwmLevel = clampPWMLevel(pwmLevel);
+        clampedPwmLevel = clampPWMLevel(newPwmLevel);
     }
 
     // apply new PWM level if motor is running
@@ -338,7 +340,7 @@ void PidController::isr()
         PidLoopType item;
         item.sequence = stats.counter.loop;
         item.rpm = static_cast<uint16_t>(deltaRPM);
-        item.pwmLevel = static_cast<uint16_t>(clampedPwmLevel);
+        item.pwmLevel = static_cast<uint16_t>((clampedPwmLevel * 100) / pwmLevel.getARR());
         item.voltage = adc.getVSenseValue();
         item.currentOcp = adc.getISenseOcpFilteredValue();
         item.currentAverage = adc.getISenseAverageValue();
@@ -474,8 +476,26 @@ size_t PidController::errorPrintf(char *buf, size_t bufSize) const
         case ErrorCodeType::SNSOUT:
             return snprintf(buf, bufSize, "DRV8701 SNSOUT");
         case ErrorCodeType::NONE:
-        default:
-            break;
+            return snprintf(buf, bufSize, "NONE");
     }
-    return snprintf(buf, bufSize, "ERROR #%d", static_cast<int>(errorCode));
+    *buf = 0;
+    return 0;
+}
+
+void PidController::setPWMFrequency(uint32_t frequency)
+{
+    // set pwm level
+    pwmLevel.setMax(kPWMFrequencyToARR(frequency));
+    // get the max. pwm level for the auto-reload register
+    const uint32_t arr = pwmLevel.getMax() - 1;
+
+    // update precalc. values for PID loop
+    KpPreCalc = Kp * pwmLevel.getMax();
+    KiPreCalc = Ki * pwmLevel.getMax();
+    KdPreCalc = Kd * pwmLevel.getMax();
+
+    __HAL_TIM_DISABLE(&tim1);
+    __HAL_TIM_SET_AUTORELOAD(&tim1, arr);
+    __HAL_TIM_SET_COUNTER(&tim1, 0);
+    __HAL_TIM_ENABLE(&tim1);
 }

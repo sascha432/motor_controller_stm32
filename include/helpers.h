@@ -320,15 +320,16 @@ inline void digitalWriteLow()
 /**
  * @brief Calculate the auto-reload register value for a given PWM frequency with no prescaler (PSC=0)
  *
- * @tparam FREQUENCY PWM frequency in Hz
- * @return constexpr uint16_t
+ * @param frequency PWM frequency in Hz
+ * @return uint16_t max PWM level
  */
-template<uint32_t FREQUENCY>
-static constexpr uint16_t kPWMFrequencyToARR()
+static constexpr uint16_t kPWMFrequencyToARR(uint32_t frequency)
 {
-    constexpr uint32_t tmp = 72000000 / FREQUENCY;
-    static_assert(tmp <= 0xFFFF, "PWM frequency too low for 16bit timer");
-    return tmp;
+    uint32_t tmp = 72000000 / frequency;
+    if (tmp > 0xFFFF) {
+        tmp = 0xFFFF;
+    }
+    return static_cast<uint16_t>(tmp);
 }
 
 /**

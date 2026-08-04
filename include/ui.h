@@ -100,6 +100,7 @@ struct Screen
         DIAGNOSTICS,
         DASHBOARD,
         PID_PARAMETERS,
+        PWM_FREQUENCY,
         PID_KP,
         PID_KI,
         PID_KD,

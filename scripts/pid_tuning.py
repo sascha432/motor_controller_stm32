@@ -91,7 +91,8 @@ PID_FRAME_MAGIC = b"PID1"
 # C++ PidLoopType has 2 bytes padding before float members for 4-byte alignment.
 PID_ITEM_STRUCT = "<I9H2xfffI"
 PID_ITEM_SIZE = struct.calcsize(PID_ITEM_STRUCT)
-PID_PWM_MAX_LEVEL = 3599.0
+# PID_PWM_MAX_LEVEL = 3599.0
+PID_PWM_MAX_LEVEL = 100.0
 ANTI_WINDUP_FACTOR = 512.0
 SWO_DATA_FIXED_RAM_ADDRESS = 0x2000F000
 SWO_ENABLE_DISABLED = 0
@@ -106,7 +107,7 @@ SWO_DATA_EEPROM_COMMIT_OFFSET = 24
 SWO_DATA_STRUCT = "<fffHHB?2xI?3x"
 SWO_DATA_SIZE = struct.calcsize(SWO_DATA_STRUCT)
 SWO_DATA_ENABLED_OFFSET = struct.calcsize("<fffHH")
-EEPROM_DATA_STRUCT = "<IIIBBHHHHHBBBBBBBBHxxfffHH"
+EEPROM_DATA_STRUCT = "<IIIBBHHHHHBBBBBBBBHxxfffHHH"
 EEPROM_DATA_SIZE = struct.calcsize(EEPROM_DATA_STRUCT)
 
 
@@ -148,6 +149,7 @@ class EEPROMData:
     kd: float
     anti_windup: int
     ovp_protection: int
+    pwm_frequency: int
 
 
 EEPROM_FIELD_SPECS = (
@@ -172,6 +174,7 @@ EEPROM_FIELD_SPECS = (
     ("Kd", "kd", "float", 0.0, 1000.0, None),
     ("Anti-Windup (%)", "anti_windup", "percent", 0.0, 100.0, None),
     ("OVP Protection (mV)", "ovp_protection", "int", 8000, 40000, None),
+    ("PWM Frequency (Hz)", "pwm_frequency", "int", 5000, 40000, None),
 )
 
 
@@ -1010,6 +1013,7 @@ class PIDTuningApp:
             data.kd,
             data.anti_windup,
             data.ovp_protection,
+            data.pwm_frequency,
         )
 
     def _unpack_eeprom_data(self, payload: bytes) -> EEPROMData:

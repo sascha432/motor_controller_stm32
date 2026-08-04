@@ -48,6 +48,7 @@ enum class AdvancedMenuItemType {
     MOTOR_DIRECTION,
     SENSOR_DIRECTION,
     PID_PARAMETERS,
+    PWM_FREQUENCY,
     OVP_PROTECTION,
     DIAGNOSTICS,
     BACK
@@ -61,9 +62,10 @@ static const char *kAdvancedMenuItems[] = {
     "Motor Direction",          // 4
     "Sensor Direction",         // 5
     "PID Parameters",           // 6
-    "OVP Protection",           // 7
-    "Diagnostics",              // 8
-    "Back"                      // 9
+    "PWM Frequency",            // 7
+    "OVP Protection",           // 8
+    "Diagnostics",              // 9
+    "Back"                      // 10
 };
 
 enum class PIDParametersItemType {
@@ -521,6 +523,17 @@ void Menu::handleButtonPress()
                     ));
                     setValue(0);
                     break;
+                case AdvancedMenuItemType::PWM_FREQUENCY:
+                    screenFlow.next(new SliderScreen(
+                        Screen::Type::PWM_FREQUENCY,
+                        "PWM Frequency",
+                        UIConstants::kMinPWMFrequency,
+                        UIConstants::kMaxPWMFrequency,
+                        "Hz"
+                    ));
+                    screenFlow->setSteps(UIConstants::kStepPWMFrequency);
+                    setValue(eeprom.getPWMFrequency());
+                    break;
                 case AdvancedMenuItemType::OVP_PROTECTION:
                     screenFlow.next(new SliderScreen(
                         Screen::Type::OVP_PROTECTION,
@@ -693,6 +706,7 @@ void Menu::handleButtonPress()
         case Screen::Type::PID_KD:
         case Screen::Type::PID_ANTI_WINDUP:
         case Screen::Type::OVP_PROTECTION:
+        case Screen::Type::PWM_FREQUENCY:
             restorePreviousMenu();
             break;
         case Screen::Type::WELCOME:
@@ -855,6 +869,9 @@ int32_t Menu::updateRotaryValue(int32_t value)
         case Screen::Type::OVP_PROTECTION:
             eeprom.setOvpProtection(getValue());
             break;
+        case Screen::Type::PWM_FREQUENCY:
+            eeprom.setPWMFrequency(getValue());
+            break;
         case Screen::Type::WELCOME:
         case Screen::Type::EEPROM_SAVED:
         case Screen::Type::MAIN_MENU:
@@ -879,7 +896,7 @@ void Menu::updateSpeedValue()
         pid.setRPM(eeprom.getSpeed());
     }
     else {
-        clampedValue = std::clamp<int32_t>(getValue(), 0, eeprom.getMaxPWM() * pid.kMaxPWMLevel / 100);
+        clampedValue = std::clamp<int32_t>(getValue(), 0, eeprom.getMaxPWM() * pid.getMaxPWMLevel() / 100);
         eeprom.setSpeed(clampedValue);
     }
     // set clamped value

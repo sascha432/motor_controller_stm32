@@ -28,9 +28,6 @@ struct PidController
     static constexpr uint32_t kReleaseBreakTimeMillis = 5000;                           // time to release the brake after motor is turned off
     static constexpr uint32_t kInitialSensorCheckTimeMillis = 750;                      // time to initially check for motor stall and sensor errors
 
-    static constexpr uint16_t kMaxPWMLevel = kPWMFrequencyToARR<20000>();               // Motor PWM 20Khz
-    static constexpr int32_t kWindupPwmLower = kMaxPWMLevel * -1.1f;                    // PWM level below which the integral is reduced
-    static constexpr int32_t kWindupPwmUpper = kMaxPWMLevel * 1.1f;                     // PWM level above which the integral is reduced
     static constexpr uint16_t kPPR = 1024;                                              // MT6701 PPR
     static constexpr uint16_t kCPR = kPPR * 4;                                          // 4x Mode PPR to CPR
     static constexpr float kPIDIntervalFloat = 5.12f;                                   // PID update rate in millis used for precise RPM calculation
@@ -120,7 +117,7 @@ struct PidController
     inline void setKp(float value)
     {
         Kp = value;
-        KpPreCalc = value * kMaxPWMLevel;
+        KpPreCalc = value * pwmLevel.getMax();;
         SWO::data.Kp = value;
     }
 
@@ -132,7 +129,7 @@ struct PidController
     inline void setKi(float value)
     {
         Ki = value;
-        KiPreCalc = value * kMaxPWMLevel;
+        KiPreCalc = value * pwmLevel.getMax();
         SWO::data.Ki = value;
     }
 
@@ -144,7 +141,7 @@ struct PidController
     inline void setKd(float value)
     {
         Kd = value;
-        KdPreCalc = value * kMaxPWMLevel;
+        KdPreCalc = value * pwmLevel.getMax();
         SWO::data.Kd = value;
     }
 
@@ -173,7 +170,7 @@ struct PidController
      */
     inline int32_t clampPWMLevel(int32_t value) const
     {
-        return std::clamp<int32_t>(value, 0, kMaxPWMLevel - 1);
+        return std::clamp<int32_t>(value, 0, pwmLevel.getARR());
     }
 
     /**
@@ -547,10 +544,75 @@ public:
         }
     };
 
+    // === PWM level data structure ===
+
+    struct PWMLevel
+    {
+        PWMLevel() : level(kPWMFrequencyToARR(20000))
+        {
+        }
+
+        inline uint16_t getMax() const {
+            return level;
+        }
+
+        inline uint16_t getARR() const {
+            return TIM1->ARR; // this is (level - 1)
+        }
+
+        inline void setMax(uint16_t value)
+        {
+            level = value;
+            upper = (value * 140) / 128;
+            lower = -upper;
+        }
+
+        inline int32_t getLower() const {
+            return lower;
+        }
+
+        inline int32_t getUpper() const {
+            return upper;
+        }
+
+    protected:
+        int32_t lower;
+        int32_t upper;
+        uint16_t level;
+    };
+
+    /**
+     * @brief Update PWM frequency. The motor must not run
+     *
+     * @param value PWM frequency in Hz
+     */
+    void setPWMFrequency(uint32_t value);
+
+    /**
+     * @brief Get the Max PWM Level
+     *
+     * @return uint16_t
+     */
+    inline uint16_t getMaxPWMLevel() const
+    {
+        return pwmLevel.getMax();
+    }
+
+    /**
+     * @brief Get the ARR (Auto-Reload Register) value for the PWM level
+     *
+     * @return uint16_t
+     */
+    inline uint16_t getPWMLevelARR() const
+    {
+        return pwmLevel.getARR();
+    }
+
 public:
     float Kp;                                       // PID K-values
     float Ki;
     float Kd;
+    PWMLevel pwmLevel;                              // stores max. pwm level and upper/lower bounds
     uint32_t rpm;                                   // target RPM
     EEPROM::MotorDirection motorDirection;          // motor direction
     PidValueType antiWindup;                        // anti-windup factor
