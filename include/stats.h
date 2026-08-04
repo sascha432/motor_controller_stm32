@@ -148,13 +148,14 @@ namespace Helpers {
         int32_t output;
     };
 
-    template<uint32_t INTERVAL_MS, uint32_t FILTER_TIME_MS>
+    template<uint32_t INTERVAL_MS, uint32_t FILTER_TIME_MS, uint32_t FACTOR = 1024>
     struct FixedLowPass
     {
-        static constexpr int32_t kFactor = 1024;
+        static constexpr int32_t kFactor = FACTOR;
         static_assert(INTERVAL_MS > 0, "INTERVAL_MS must be positive");
         static_assert(FILTER_TIME_MS >= INTERVAL_MS, "FILTER_TIME_MS must be >= INTERVAL_MS");
         static constexpr int32_t kAlpha = (INTERVAL_MS * kFactor) / FILTER_TIME_MS;
+        static_assert(INT16_MAX * kFactor * kAlpha < INT32_MAX, "kAlpha is too large, may cause overflow.. reduce FACTOR or increase FILTER_TIME_MS");
 
         FixedLowPass()
         {
@@ -177,7 +178,7 @@ namespace Helpers {
             return output / kFactor;
         }
 
-    private:
+    // private:
         int32_t output;
     };
 
