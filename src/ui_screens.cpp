@@ -730,6 +730,12 @@ void StartScreen::load()
     lv_obj_set_width(directionLabel, kStartScreenContainerWidth);
     lv_obj_set_style_text_align(directionLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     lv_obj_set_pos(directionLabel, 0, kStartScreenDirectionOffsetY);
+    lv_obj_set_style_radius(directionLabel, kStartScreenDirectionCornerRadius, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(directionLabel, kStartScreenDirectionPadding, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(directionLabel, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(directionLabel, STARTSCREEN_COLOR_START_BG, LV_PART_MAIN);
+    lv_obj_set_style_border_width(directionLabel, kStartScreenDirectionBorderWidth, LV_PART_MAIN);
+    lv_obj_set_style_border_color(directionLabel, STARTSCREEN_COLOR_START_LABEL, LV_PART_MAIN);
 
     speedLabel = lv_label_create(container);
     lv_obj_set_style_text_color(speedLabel, STARTSCREEN_COLOR_SPEED, LV_PART_MAIN);

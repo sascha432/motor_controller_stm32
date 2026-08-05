@@ -42,7 +42,8 @@ static constexpr bool kUIKeepScreenObjectsInMemory = false;
 #define DIAGNOSTICSCREEN_COLOR_SCROLLBAR_BG     COLOR_PALETTE_DARK_GRAY
 #define DIAGNOSTICSCREEN_COLOR_SCROLLBAR_THUMB  COLOR_PALETTE_LIGHT_GRAY
 
-#define STARTSCREEN_COLOR_START_LABEL           SCREEN_COLOR_TEXT
+#define STARTSCREEN_COLOR_START_LABEL           COLOR_PALETTE_LIGHT_GRAY
+#define STARTSCREEN_COLOR_START_BG              COLOR_PALETTE_BLUE
 #define STARTSCREEN_COLOR_SPEED                 COLOR_PALETTE_PURPLE
 #define STARTSCREEN_COLOR_VOLTAGE               SCREEN_COLOR_VOLTAGE
 #define STARTSCREEN_COLOR_CURRENT               SCREEN_COLOR_CURRENT
@@ -128,7 +129,7 @@ struct Screen
     static constexpr lv_coord_t kMenuScreenItemStartY = 2;
     static constexpr lv_coord_t kMenuScreenItemWidth = kScreenWidth - (2 * kMenuScreenStartX);
     static constexpr uint32_t kMenuScreenItemScrollSpeed = 10;
-    static constexpr uint8_t kMenuScreenCornerRadius = 4;
+    static constexpr lv_coord_t kMenuScreenCornerRadius = 4;
 
     // slider screen style constants
     static constexpr const lv_font_t *kSliderScreenLabelFont = &lv_font_montserrat_14;
@@ -180,8 +181,11 @@ struct Screen
     static constexpr lv_coord_t kStartScreenColumnWidth = (kStartScreenContainerWidth / 2) - 4;
     static constexpr lv_coord_t kStartScreenMotorTempOffsetY = kDashboardScreenMotorTempOffsetY;
     static constexpr lv_coord_t kStartScreenMosfetTempOffsetY = kDashboardScreenMosfetTempOffsetY;
-    static constexpr lv_coord_t kStartScreenDirectionOffsetY = (kScreenHeight / 2) - 24;
-    static constexpr lv_coord_t kStartScreenSpeedOffsetY = (kScreenHeight / 2) + 10;
+    static constexpr lv_coord_t kStartScreenDirectionOffsetY = (kScreenHeight / 2) - 16;
+    static constexpr lv_coord_t kStartScreenSpeedOffsetY = (kScreenHeight / 2) + 28;
+    static constexpr lv_coord_t kStartScreenDirectionCornerRadius = 12;
+    static constexpr lv_coord_t kStartScreenDirectionBorderWidth = 2;
+    static constexpr lv_coord_t kStartScreenDirectionPadding = 2;
 
     Screen(Type id);
     virtual ~Screen();
