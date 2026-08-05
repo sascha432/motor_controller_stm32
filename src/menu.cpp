@@ -242,23 +242,25 @@ void Menu::loadWelcomeScreen()
 
     if (UIConstants::kEnableIlluminationLEDFading) {
 
-        MotorVibes chime;
-        chime.init();
+        #if HAVE_MOTOR_VIBES
+            MotorVibes chime;
+            chime.init();
 
-        const uint8_t chimeFrequency50msInterval[] = {
-            104, 104, 104,  // 520 Hz
-            0,
-            132, 132, 132,  // 660 Hz
-            0,
-            157, 157, 157, 157,  // 785 Hz
-            0,
-            132, 132, 132,  // 660 Hz
-            0,
-            157, 157, 157, 157,  // 785 Hz
-            0,
-            209, 209, 209, 209, 209, // 1045 Hz
-            0
-        };
+            const uint8_t chimeFrequency50msInterval[] = {
+                104, 104, 104,  // 520 Hz
+                0,
+                132, 132, 132,  // 660 Hz
+                0,
+                157, 157, 157, 157,  // 785 Hz
+                0,
+                132, 132, 132,  // 660 Hz
+                0,
+                157, 157, 157, 157,  // 785 Hz
+                0,
+                209, 209, 209, 209, 209, // 1045 Hz
+                0
+            };
+        #endif
 
         // gradually increase LED brightness to target value
         constexpr uint32_t kMultiplier = (1 << 23);
@@ -279,14 +281,18 @@ void Menu::loadWelcomeScreen()
             LEDs::illuminationLedSetPWM(currentBrightness / (kMultiplier / LEDs::kIlluminationResolution));
             // blink motor LEDs
             ((elapsed / 500) & 0x01) ? LEDs::onLEDError() : LEDs::onLEDWarning();
-            // play chime tone
-            const uint32_t index = i / 5;
-            chime.playTone((index >= sizeof(chimeFrequency50msInterval)) ? 0 : (chimeFrequency50msInterval[index] * 5));
+            #if HAVE_MOTOR_VIBES
+                // play chime tone
+                const uint32_t index = i / 5;
+                chime.playTone((index >= sizeof(chimeFrequency50msInterval)) ? 0 : (chimeFrequency50msInterval[index] * 5));
+            #endif
             WatchDog::delay(kLoopDelay);
         }
         LEDs::off();
-        chime.stopTone();
-        chime.deinit();
+        #if HAVE_MOTOR_VIBES
+            chime.stopTone();
+            chime.deinit();
+        #endif
     }
     else {
         WatchDog::delay(UIConstants::kWelcomeScreenTimeout);

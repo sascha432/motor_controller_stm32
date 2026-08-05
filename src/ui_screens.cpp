@@ -570,7 +570,7 @@ void DashboardScreen::load()
 
     lv_obj_t *container = lv_obj_create(screen);
     lv_obj_remove_style_all(container);
-    lv_obj_set_pos(container, 8, 6);
+    lv_obj_set_pos(container, kDashboardScreenContainerX, kDashboardScreenContainerY);
     lv_obj_set_size(container, kDashboardScreenContainerWidth, kDashboardScreenContainerHeight);
     lv_obj_set_style_bg_opa(container, LV_OPA_TRANSP, LV_PART_MAIN);
     lv_obj_set_style_border_width(container, 0, LV_PART_MAIN);
@@ -595,28 +595,28 @@ void DashboardScreen::load()
     lv_obj_set_style_text_font(motorTempLabel, kDashboardScreenFont, LV_PART_MAIN);
     lv_obj_set_width(motorTempLabel, kDashboardScreenColumnWidth);
     lv_obj_set_style_text_align(motorTempLabel, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
-    lv_obj_set_pos(motorTempLabel, kDashboardScreenContainerWidth - kDashboardScreenColumnWidth, 0);
+    lv_obj_set_pos(motorTempLabel, kDashboardScreenContainerWidth - kDashboardScreenColumnWidth, kDashboardScreenMotorTempOffsetY);
 
     mosfetTempLabel = lv_label_create(container);
     lv_obj_set_style_text_color(mosfetTempLabel, DASHBOARDSCREEN_COLOR_TEMPERATURE, LV_PART_MAIN);
     lv_obj_set_style_text_font(mosfetTempLabel, kDashboardScreenFont, LV_PART_MAIN);
     lv_obj_set_width(mosfetTempLabel, kDashboardScreenColumnWidth);
     lv_obj_set_style_text_align(mosfetTempLabel, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
-    lv_obj_set_pos(mosfetTempLabel, kDashboardScreenContainerWidth - kDashboardScreenColumnWidth, 18);
+    lv_obj_set_pos(mosfetTempLabel, kDashboardScreenContainerWidth - kDashboardScreenColumnWidth, kDashboardScreenMosfetTempOffsetY);
 
     rpmLabel = lv_label_create(container);
     lv_obj_set_style_text_color(rpmLabel, DASHBOARDSCREEN_COLOR_SPEED, LV_PART_MAIN);
     lv_obj_set_style_text_font(rpmLabel, kDashboardScreenBigFont, LV_PART_MAIN);
     lv_obj_set_width(rpmLabel, kDashboardScreenContainerWidth);
     lv_obj_set_style_text_align(rpmLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    lv_obj_set_pos(rpmLabel, 0, (TFT_DIM_HEIGHT / 2) - 12);
+    lv_obj_set_pos(rpmLabel, 0, kDashboardScreenRpmOffsetY);
 
     valueLabel = lv_label_create(container);
     lv_obj_set_style_text_color(valueLabel, DASHBOARDSCREEN_COLOR_PWM_LABEL, LV_PART_MAIN);
     lv_obj_set_style_text_font(valueLabel, kDashboardScreenFont, LV_PART_MAIN);
     lv_obj_set_width(valueLabel, kDashboardScreenContainerWidth);
     lv_obj_set_style_text_align(valueLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    lv_obj_set_pos(valueLabel, 0, kDashboardScreenContainerHeight - 24);
+    lv_obj_set_pos(valueLabel, 0, kDashboardScreenValueBottomOffsetY);
 
     _refreshVisuals();
 
@@ -690,53 +690,53 @@ void StartScreen::load()
 
     lv_obj_t *container = lv_obj_create(screen);
     lv_obj_remove_style_all(container);
-    lv_obj_set_pos(container, 8, 6);
-    lv_obj_set_size(container, kDashboardScreenContainerWidth, kDashboardScreenContainerHeight);
+    lv_obj_set_pos(container, kStartScreenContainerX, kStartScreenContainerY);
+    lv_obj_set_size(container, kStartScreenContainerWidth, kStartScreenContainerHeight);
     lv_obj_set_style_bg_opa(container, LV_OPA_TRANSP, LV_PART_MAIN);
     lv_obj_set_style_border_width(container, 0, LV_PART_MAIN);
     lv_obj_set_style_pad_all(container, 0, LV_PART_MAIN);
 
     voltageLabel = lv_label_create(container);
     lv_obj_set_style_text_color(voltageLabel, STARTSCREEN_COLOR_VOLTAGE, LV_PART_MAIN);
-    lv_obj_set_style_text_font(voltageLabel, kDashboardScreenFont, LV_PART_MAIN);
-    lv_obj_set_width(voltageLabel, kDashboardScreenColumnWidth);
+    lv_obj_set_style_text_font(voltageLabel, kStartScreenFont, LV_PART_MAIN);
+    lv_obj_set_width(voltageLabel, kStartScreenContainerWidth);
     lv_obj_set_style_text_align(voltageLabel, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
     lv_obj_set_pos(voltageLabel, 0, 0);
 
     currentLabel = lv_label_create(container);
     lv_obj_set_style_text_color(currentLabel, STARTSCREEN_COLOR_CURRENT, LV_PART_MAIN);
-    lv_obj_set_style_text_font(currentLabel, kDashboardScreenFont, LV_PART_MAIN);
-    lv_obj_set_width(currentLabel, kDashboardScreenColumnWidth);
+    lv_obj_set_style_text_font(currentLabel, kStartScreenFont, LV_PART_MAIN);
+    lv_obj_set_width(currentLabel, kStartScreenContainerWidth);
     lv_obj_set_style_text_align(currentLabel, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
     lv_obj_set_pos(currentLabel, 0, 18);
 
     motorTempLabel = lv_label_create(container);
     lv_obj_set_style_text_color(motorTempLabel, STARTSCREEN_COLOR_TEMPERATURE, LV_PART_MAIN);
-    lv_obj_set_style_text_font(motorTempLabel, kDashboardScreenFont, LV_PART_MAIN);
-    lv_obj_set_width(motorTempLabel, kDashboardScreenColumnWidth);
+    lv_obj_set_style_text_font(motorTempLabel, kStartScreenFont, LV_PART_MAIN);
+    lv_obj_set_width(motorTempLabel, kStartScreenColumnWidth);
     lv_obj_set_style_text_align(motorTempLabel, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
-    lv_obj_set_pos(motorTempLabel, kDashboardScreenContainerWidth - kDashboardScreenColumnWidth, 0);
+    lv_obj_set_pos(motorTempLabel, kStartScreenContainerWidth - kStartScreenColumnWidth, kStartScreenMotorTempOffsetY);
 
     mosfetTempLabel = lv_label_create(container);
     lv_obj_set_style_text_color(mosfetTempLabel, STARTSCREEN_COLOR_TEMPERATURE, LV_PART_MAIN);
-    lv_obj_set_style_text_font(mosfetTempLabel, kDashboardScreenFont, LV_PART_MAIN);
-    lv_obj_set_width(mosfetTempLabel, kDashboardScreenColumnWidth);
+    lv_obj_set_style_text_font(mosfetTempLabel, kStartScreenFont, LV_PART_MAIN);
+    lv_obj_set_width(mosfetTempLabel, kStartScreenColumnWidth);
     lv_obj_set_style_text_align(mosfetTempLabel, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
-    lv_obj_set_pos(mosfetTempLabel, kDashboardScreenContainerWidth - kDashboardScreenColumnWidth, 18);
+    lv_obj_set_pos(mosfetTempLabel, kStartScreenContainerWidth - kStartScreenColumnWidth, kStartScreenMosfetTempOffsetY);
 
     directionLabel = lv_label_create(container);
     lv_obj_set_style_text_color(directionLabel, STARTSCREEN_COLOR_START_LABEL, LV_PART_MAIN);
-    lv_obj_set_style_text_font(directionLabel, kDashboardScreenBigFont, LV_PART_MAIN);
-    lv_obj_set_width(directionLabel, kDashboardScreenContainerWidth);
+    lv_obj_set_style_text_font(directionLabel, kStartScreenBigFont, LV_PART_MAIN);
+    lv_obj_set_width(directionLabel, kStartScreenContainerWidth);
     lv_obj_set_style_text_align(directionLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    lv_obj_set_pos(directionLabel, 0, (TFT_DIM_HEIGHT / 2) - 24);
+    lv_obj_set_pos(directionLabel, 0, kStartScreenDirectionOffsetY);
 
     speedLabel = lv_label_create(container);
     lv_obj_set_style_text_color(speedLabel, STARTSCREEN_COLOR_SPEED, LV_PART_MAIN);
-    lv_obj_set_style_text_font(speedLabel, kDashboardScreenBigFont, LV_PART_MAIN);
-    lv_obj_set_width(speedLabel, kDashboardScreenContainerWidth);
+    lv_obj_set_style_text_font(speedLabel, kStartScreenBigFont, LV_PART_MAIN);
+    lv_obj_set_width(speedLabel, kStartScreenContainerWidth);
     lv_obj_set_style_text_align(speedLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    lv_obj_set_pos(speedLabel, 0, (TFT_DIM_HEIGHT / 2) + 10);
+    lv_obj_set_pos(speedLabel, 0, kStartScreenSpeedOffsetY);
 
     _refreshVisuals();
 

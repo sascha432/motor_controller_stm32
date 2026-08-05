@@ -27,6 +27,10 @@
 
 #define sizeof_array(arr)                   (sizeof(arr) / sizeof(arr[0]))
 
+#ifndef F_CPU
+#define F_CPU                               72000000UL
+#endif
+
 // === define arduino pin macros if not defined ===
 #ifndef PA0
 #if defined(STM32F107xC)
@@ -325,7 +329,7 @@ inline void digitalWriteLow()
  */
 static constexpr uint16_t kPWMFrequencyToARR(uint32_t frequency)
 {
-    uint32_t tmp = 72000000 / frequency;
+    uint32_t tmp = F_CPU / frequency;
     if (tmp > 0xFFFF) {
         tmp = 0xFFFF;
     }
@@ -340,7 +344,7 @@ static constexpr uint16_t kPWMFrequencyToARR(uint32_t frequency)
  */
 static constexpr uint32_t kARRToPWMFrequency(uint16_t arr)
 {
-    return 72000000 / (arr + 1);
+    return F_CPU / (arr + 1);
 }
 
 /**
@@ -604,20 +608,55 @@ inline bool kIsDivisible(uint32_t value)
     }
 }
 
+#if !HAVE_MOTOR_VIBES
+    #undef HAVE_MOTOR_VIBES
+    #undef HAVE_IMPERIAL_MARCH
+    #define HAVE_MOTOR_VIBES 0
+    #define HAVE_IMPERIAL_MARCH 0
+#endif
+
+#if HAVE_MOTOR_VIBES
+
+/**
+ * @brief Play tones using the motor driver
+ *
+ */
 struct MotorVibes
 {
-    static constexpr uint32_t kTonePeriod = 21;  // period optimal for 50-1600Hz tones
+    static constexpr uint32_t kTonePeriod = 21;     // period optimal for 50-1600Hz tones
+    static constexpr uint32_t kPWMDivider = 24;     // 4.2% duty cycle should prevent the motor from spinning
 
+    /**
+     * @brief Initialize TIM1 to play tones
+     *
+     */
     void init();
+
+    /**
+     * @brief Deinitialize player and restore previous settings
+     *
+     */
     void deinit();
 
+    /**
+     * @brief Play tone with specified frequency
+     *
+     * @param frequency
+     */
     void playTone(uint32_t frequency);
-    void playNote(uint8_t note);
+
+    /**
+     * @brief Stop playing tone
+     *
+     */
     void stopTone();
 
+private:
     uint16_t prescaler;
     uint16_t period;
     uint16_t arr;
     uint16_t motorCurrentLimit;
     uint16_t inputCurrentLimit;
 };
+
+#endif

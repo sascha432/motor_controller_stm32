@@ -143,6 +143,8 @@ void WatchDog::deinit()
 
 // === MotorVibes implementation ===
 
+#if HAVE_MOTOR_VIBES
+
 extern TIM_HandleTypeDef tim1;
 
 void MotorVibes::init()
@@ -195,12 +197,11 @@ void MotorVibes::playTone(uint32_t frequency)
         stopTone();
         return;
     }
-    const uint32_t arr = 72000000 / ((kTonePeriod + 1) * frequency) - 1;
-    if (arr != PID_MOTOR_PWM_TIMER->ARR) {
-        __HAL_TIM_SET_AUTORELOAD(&tim1, arr);
-    }
-    // play tone
-    PID_MOTOR_PWM_TIMER->CCR1 = PID_MOTOR_PWM_TIMER->ARR / 24; // 4.2% duty cycle should prevent the motor from spinning
+    // change pwm frequency
+    const uint32_t arr = F_CPU / ((kTonePeriod + 1) * frequency) - 1;
+    PID_MOTOR_PWM_TIMER->ARR = arr;
+    // play tone with reduced duty cycle to prevent the motor from spinning
+    PID_MOTOR_PWM_TIMER->CCR1 = arr / kPWMDivider;
     PID_MOTOR_PWM_TIMER->CCR2 = 0;
 }
 
@@ -210,3 +211,5 @@ void MotorVibes::stopTone()
     PID_MOTOR_PWM_TIMER->CCR1 = PID_MOTOR_PWM_TIMER->ARR;
     PID_MOTOR_PWM_TIMER->CCR2 = PID_MOTOR_PWM_TIMER->ARR;
 }
+
+#endif

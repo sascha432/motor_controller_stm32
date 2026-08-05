@@ -19,16 +19,15 @@
 #endif
 
 // get dimensions from lvgl conf
-#define TFT_DIM_WIDTH               LV_HOR_RES_MAX
-#define TFT_DIM_HEIGHT              LV_VER_RES_MAX
-#define TFT_BUFFER_SIZE             (TFT_DIM_WIDTH * 64) // at least 10, increase if RAM is available
+#define LV_BUFFER_LINES             (LV_VER_RES_MAX / 2)                // at least 10 horizontal lines, increase if RAM is available
+#define LV_BUFFER_SIZE              (LV_HOR_RES_MAX * LV_BUFFER_LINES)
 
 #define TFT_DMA_CH                  DMA1_Channel5
 #define TFT_DMA_TX_CHUNK_PIXELS     64
 
 // Function prototypes
 extern lv_disp_draw_buf_t s_lvgl_draw_buf;
-extern lv_color_t s_lvgl_buf_1[TFT_BUFFER_SIZE];
+extern lv_color_t s_lvgl_buf_1[LV_BUFFER_SIZE];
 extern lv_disp_drv_t s_lvgl_disp_drv;
 
 inline void tft_driver_delay()

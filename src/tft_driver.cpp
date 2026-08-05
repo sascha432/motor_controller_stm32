@@ -8,7 +8,7 @@
 #include "tft_driver.h"
 
 lv_disp_draw_buf_t s_lvgl_draw_buf;
-lv_color_t s_lvgl_buf_1[TFT_BUFFER_SIZE];
+lv_color_t s_lvgl_buf_1[LV_BUFFER_SIZE];
 lv_disp_drv_t s_lvgl_disp_drv;
 TIM_HandleTypeDef tim2;
 
@@ -251,10 +251,10 @@ void tft_driver_lvgl_flush_cb(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv
  */
 void tft_driver_lvgl_init(void)
 {
-    lv_disp_draw_buf_init(&s_lvgl_draw_buf, s_lvgl_buf_1, nullptr, TFT_BUFFER_SIZE);
+    lv_disp_draw_buf_init(&s_lvgl_draw_buf, s_lvgl_buf_1, nullptr, LV_BUFFER_SIZE);
     lv_disp_drv_init(&s_lvgl_disp_drv);
-    s_lvgl_disp_drv.hor_res = TFT_DIM_WIDTH;
-    s_lvgl_disp_drv.ver_res = TFT_DIM_HEIGHT;
+    s_lvgl_disp_drv.hor_res = LV_HOR_RES_MAX;
+    s_lvgl_disp_drv.ver_res = LV_VER_RES_MAX;
     s_lvgl_disp_drv.flush_cb = tft_driver_lvgl_flush_cb;
     s_lvgl_disp_drv.draw_buf = &s_lvgl_draw_buf;
     lv_disp_drv_register(&s_lvgl_disp_drv);

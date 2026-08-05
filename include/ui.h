@@ -108,6 +108,10 @@ struct Screen
         OVP_PROTECTION,
     };
 
+    // screen dimensions
+    static constexpr const lv_coord_t kScreenWidth = LV_HOR_RES_MAX;
+    static constexpr const lv_coord_t kScreenHeight = LV_VER_RES_MAX;
+
     // welcome screen style constants
     static constexpr const lv_font_t *kWelcomeScreenLabelFont = &lv_font_montserrat_24;
 
@@ -115,14 +119,14 @@ struct Screen
     static constexpr const lv_font_t *kInfoScreenLabelFont = &lv_font_montserrat_24;
 
     // menu screen style constants
-    static constexpr lv_coord_t kMenuScreenVisibleItems = 5;
     static constexpr const lv_font_t *kMenuScreenLabelFont = &lv_font_montserrat_18;
+    static constexpr lv_coord_t kMenuScreenVisibleItems = 5;
     static constexpr lv_coord_t kMenuScreenItemHeight = 26;
     static constexpr lv_coord_t kMenuScreenStartX = 10;
-    static constexpr lv_coord_t kMenuScreenStartY = TFT_DIM_HEIGHT - (kMenuScreenVisibleItems * kMenuScreenItemHeight) - 1;
+    static constexpr lv_coord_t kMenuScreenStartY = kScreenHeight - (kMenuScreenVisibleItems * kMenuScreenItemHeight) - 1;
     static constexpr lv_coord_t kMenuScreenItemStartX = 8;
     static constexpr lv_coord_t kMenuScreenItemStartY = 2;
-    static constexpr lv_coord_t kMenuScreenItemWidth = TFT_DIM_WIDTH - (2 * kMenuScreenStartX);
+    static constexpr lv_coord_t kMenuScreenItemWidth = kScreenWidth - (2 * kMenuScreenStartX);
     static constexpr uint32_t kMenuScreenItemScrollSpeed = 10;
     static constexpr uint8_t kMenuScreenCornerRadius = 4;
 
@@ -132,8 +136,8 @@ struct Screen
     static constexpr const lv_font_t *kSliderScreenValueFont = &lv_font_montserrat_18;
     static constexpr lv_coord_t kSliderScreenContainerX = 16;
     static constexpr lv_coord_t kSliderScreenContainerY = 20;
-    static constexpr lv_coord_t kSliderScreenContainerWidth = TFT_DIM_WIDTH - 24;
-    static constexpr lv_coord_t kSliderScreenContainerHeight = TFT_DIM_HEIGHT - kSliderScreenContainerY;
+    static constexpr lv_coord_t kSliderScreenContainerWidth = kScreenWidth - 24;
+    static constexpr lv_coord_t kSliderScreenContainerHeight = kScreenHeight - kSliderScreenContainerY;
     static constexpr lv_coord_t kSliderScreenTitleBottomGap = 35;
     static constexpr lv_coord_t kSliderScreenTitleAnimSpeed = 10;
     static constexpr lv_coord_t kSliderScreenSliderHeight = 24;
@@ -150,16 +154,35 @@ struct Screen
     static constexpr lv_coord_t kDiagnosticScreenScrollbarWidth = 4;
     static constexpr lv_coord_t kDiagnosticScreenRowHeight = 16;
     static constexpr int32_t kDiagnosticScreenRowCount = 7;
-    static constexpr lv_coord_t kDiagnosticViewportWidth = TFT_DIM_WIDTH - kDiagnosticScreenMargin;
-    static constexpr lv_coord_t kDiagnosticViewportHeight = TFT_DIM_HEIGHT - kDiagnosticScreenMargin;
+    static constexpr lv_coord_t kDiagnosticViewportWidth = kScreenWidth - kDiagnosticScreenMargin;
+    static constexpr lv_coord_t kDiagnosticViewportHeight = kScreenHeight - kDiagnosticScreenMargin;
     static constexpr lv_coord_t kDiagnosticTextWidth = kDiagnosticViewportWidth - kDiagnosticScreenScrollbarWidth - 4;
 
     // dashboard screen style constants
-    static constexpr lv_coord_t kDashboardScreenContainerWidth = TFT_DIM_WIDTH - 16;
-    static constexpr lv_coord_t kDashboardScreenContainerHeight = TFT_DIM_HEIGHT - 12;
-    static constexpr lv_coord_t kDashboardScreenColumnWidth = (kDashboardScreenContainerWidth / 2) - 4;
     static constexpr const lv_font_t *kDashboardScreenFont = &lv_font_montserrat_14;
     static constexpr const lv_font_t *kDashboardScreenBigFont = &lv_font_montserrat_24;
+    static constexpr lv_coord_t kDashboardScreenContainerX = 8;
+    static constexpr lv_coord_t kDashboardScreenContainerY = 6;
+    static constexpr lv_coord_t kDashboardScreenContainerWidth = kScreenWidth - (kDashboardScreenContainerX * 2);
+    static constexpr lv_coord_t kDashboardScreenContainerHeight = kScreenHeight - (kDashboardScreenContainerY * 2);
+    static constexpr lv_coord_t kDashboardScreenColumnWidth = (kDashboardScreenContainerWidth / 2) - 4;
+    static constexpr lv_coord_t kDashboardScreenMotorTempOffsetY = 0;
+    static constexpr lv_coord_t kDashboardScreenMosfetTempOffsetY = 18;
+    static constexpr lv_coord_t kDashboardScreenRpmOffsetY = (kScreenHeight / 2) - 12;
+    static constexpr lv_coord_t kDashboardScreenValueBottomOffsetY = kDashboardScreenContainerHeight - 24;
+
+    // start screen style constants
+    static constexpr const lv_font_t *kStartScreenFont = kDashboardScreenFont;
+    static constexpr const lv_font_t *kStartScreenBigFont = kDashboardScreenBigFont;
+    static constexpr lv_coord_t kStartScreenContainerX = 8;
+    static constexpr lv_coord_t kStartScreenContainerY = 6;
+    static constexpr lv_coord_t kStartScreenContainerWidth = kScreenWidth - (kStartScreenContainerX * 2);
+    static constexpr lv_coord_t kStartScreenContainerHeight = kScreenHeight - (kStartScreenContainerY * 2);
+    static constexpr lv_coord_t kStartScreenColumnWidth = (kStartScreenContainerWidth / 2) - 4;
+    static constexpr lv_coord_t kStartScreenMotorTempOffsetY = kDashboardScreenMotorTempOffsetY;
+    static constexpr lv_coord_t kStartScreenMosfetTempOffsetY = kDashboardScreenMosfetTempOffsetY;
+    static constexpr lv_coord_t kStartScreenDirectionOffsetY = (kScreenHeight / 2) - 24;
+    static constexpr lv_coord_t kStartScreenSpeedOffsetY = (kScreenHeight / 2) + 10;
 
     Screen(Type id);
     virtual ~Screen();

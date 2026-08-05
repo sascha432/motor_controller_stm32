@@ -223,11 +223,11 @@ void tft_driver_init(void)
  */
 void tft_clear_display(uint16_t color)
 {
-    set_column(0, TFT_DIM_WIDTH - 1);
-    set_row(0, TFT_DIM_HEIGHT - 1);
+    set_column(0, LV_HOR_RES_MAX - 1);
+    set_row(0, LV_VER_RES_MAX - 1);
     tft_driver_send_command(ST7789_RAMWR);
 
-    write_color_pixels(color, (uint32_t)TFT_DIM_WIDTH * TFT_DIM_HEIGHT);
+    write_color_pixels(color, (uint32_t)LV_HOR_RES_MAX * LV_VER_RES_MAX);
 }
 
 #endif // TFT_DRIVER == TFT_DRIVER_ST7735
