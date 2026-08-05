@@ -144,7 +144,6 @@ struct Screen
     static constexpr lv_coord_t kSliderScreenSliderBorder = 2;
     static constexpr lv_coord_t kSliderScreenSliderRadius = 6;
     static constexpr lv_coord_t kSliderScreenKnobSize = 30;
-    static constexpr lv_coord_t kSliderScreenValueTopGap = 40;
 
     // diagnostics screen style constants
     static constexpr const lv_font_t *kDiagnosticsScreenLabelFont = &lv_font_montserrat_14;
