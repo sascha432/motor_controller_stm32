@@ -486,17 +486,17 @@ public:
     {
         Helpers::FixedLowPass<kPIDInterval, kPIDInterval * 8, 512> rpm;     // filtered RPM for displaying
         Helpers::FixedLowPass<kPIDInterval, kPIDInterval * 2, 256> pwm;     // filtered PWM for displaying
+
         struct {
             uint32_t loop;                  // number of times the PID loop has been called
             int32_t pulse;                  // number of pulses received from the A/B motor encoder
         } counter;
 
-        inline void reset(uint32_t rpmCounter)
+        inline void reset()
         {
             rpm.reset();
             pwm.reset();
-            counter.loop = 0;
-            counter.pulse = 0;
+            counter = {};
         }
     };
 
@@ -527,7 +527,7 @@ public:
     // === OCP state machine and constants ===
     static constexpr float kMinADCTimeMicros = 1000000 / ADC::kTotalSamplesPerSecond;   // sample time for current measurement in microseconds, limits retrigger timeout and recovery interval
 
-    static constexpr uint32_t kOcpTickInterval = 20;                                     // 5us tick interval
+    static constexpr uint32_t kOcpTickInterval = 20;                                    // 20us tick interval
     static constexpr uint32_t kOcpISenseThreshold = 80;                                 // lower threshold in percent before the OCP condition is cleared
     static constexpr uint32_t kOcpRecoveryInterval = 20 / kOcpTickInterval;             // 20us interval
     static constexpr uint32_t kOcpRetriggerTimeout = 20 / kOcpTickInterval;             // 20us timeout

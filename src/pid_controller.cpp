@@ -143,7 +143,7 @@ void PidController::reset()
     lastError = 0;
     lastDerivative = 0;
     integral = 0;
-    stats.reset(PID_READ_RPM_COUNTER());
+    stats.reset();
     errorCode = ErrorCodeType::NONE;
     releaseBreakCounter = 0;
     faults.reset();
@@ -493,7 +493,7 @@ void PidController::setPWMFrequency(uint32_t frequency)
 {
     // clamp frequency to min/max values
     constexpr uint32_t kMinPWMFrequency = kARRToPWMFrequency(0xffff);       // 16bit timer limit
-    constexpr uint32_t kMaxPWMFrequency = kARRToPWMFrequency(1024);         // at least 10bit pwm resolution
+    constexpr uint32_t kMaxPWMFrequency = kARRToPWMFrequency(1 << 10);      // at least 10bit pwm resolution
     frequency = std::clamp<uint32_t>(frequency, kMinPWMFrequency, kMaxPWMFrequency);
 
     // set pwm level
