@@ -631,6 +631,7 @@ void Menu::handleButtonPress()
                         "V",
                         voltage_format_callback
                     ));
+                    screenFlow->setSteps(UIConstants::kStepOvpProtection);
                     setValue(eeprom.getOvpProtection());
                     break;
                 case AdvancedMenuItemType::DIAGNOSTICS:

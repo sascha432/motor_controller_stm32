@@ -56,6 +56,7 @@ struct UIConstants
     static constexpr int32_t kLowestAntiWindup = 50 * kAntiWindupFactor;    // Below 50% disable anti-windup
     static constexpr uint32_t kMinOvpProtection = 8000;                     // Min. OVP protection in millivolts
     static constexpr uint32_t kMaxOvpProtection = 40000;                    // Max. OVP protection in millivolts
+    static constexpr uint32_t kStepOvpProtection = 100;                     // OVP protection step in millivolts
     static constexpr uint32_t kStepsRPM = 50;                               // RPM steps
     static constexpr uint32_t kStepsPWM = 1;                                // PWM steps
     static constexpr uint16_t kMinPWMFrequency = 5000;                      // Min. PWM frequency in Hz
