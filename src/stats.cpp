@@ -38,10 +38,19 @@ void Stats::update()
     mosfetTemp = ADCConverter::NTC::convert(mosfetTempFiltered);
     min.vcc = ADCConverter::Voltage::convert(minMax.vcc.getMin());
     min.current = ADCConverter::Current::convert(minMax.current.getMin());
-    min.motorTemp = ADCConverter::NTC::convert(minMax.motorTemp.getMin());
-    min.mosfetTemp = ADCConverter::NTC::convert(minMax.mosfetTemp.getMin());
     max.vcc = ADCConverter::Voltage::convert(minMax.vcc.getMax());
     max.current = ADCConverter::Current::convert(minMax.current.getMax());
-    max.motorTemp = ADCConverter::NTC::convert(minMax.motorTemp.getMax());
-    max.mosfetTemp = ADCConverter::NTC::convert(minMax.mosfetTemp.getMax());
+    if constexpr (ADCConverter::NTC::kHighSideNTC) {
+        // min/max swapped for NTC because the ADC value is inverted, lower ADC value = higher temperature
+        min.motorTemp = ADCConverter::NTC::convert(minMax.motorTemp.getMax());
+        min.mosfetTemp = ADCConverter::NTC::convert(minMax.mosfetTemp.getMax());
+        max.motorTemp = ADCConverter::NTC::convert(minMax.motorTemp.getMin());
+        max.mosfetTemp = ADCConverter::NTC::convert(minMax.mosfetTemp.getMin());
+    }
+    else {
+        min.motorTemp = ADCConverter::NTC::convert(minMax.motorTemp.getMin());
+        min.mosfetTemp = ADCConverter::NTC::convert(minMax.mosfetTemp.getMin());
+        max.motorTemp = ADCConverter::NTC::convert(minMax.motorTemp.getMax());
+        max.mosfetTemp = ADCConverter::NTC::convert(minMax.mosfetTemp.getMax());
+    }
 }

@@ -97,6 +97,7 @@ struct ADCConverter {
         static constexpr uint32_t kBetaCoefficient = NTC_BETA_COEFF;
         static constexpr uint32_t kNominalTemperature = NTC_NOMINAL_TEMP;
         static constexpr uint32_t kADCMax = ADC_MAX;
+        static constexpr bool kHighSideNTC = HIGH_SIDE_NTC;
 
         /**
          * @brief Convert ADC value to temperature
@@ -110,7 +111,7 @@ struct ADCConverter {
                 return 0.0f;
             }
             float resistance;
-            if constexpr (HIGH_SIDE_NTC) {
+            if constexpr (kHighSideNTC) {
                 // VCC - NTC - ADC - Rseries - GND
                 resistance = (static_cast<float>(kADCMax) / static_cast<float>(adcValue) - 1.0f) * static_cast<float>(kSeriesResistance);
             }
@@ -137,7 +138,7 @@ struct ADCConverter {
             float temperatureK = temperature + 273.15f;
             // Calculate NTC resistance
             const float resistance = kNominalResistance * std::exp(kBetaCoefficient * 1.0f / temperatureK - 1.0f / (kNominalTemperature + 273.15f));
-            if constexpr (HIGH_SIDE_NTC) {
+            if constexpr (kHighSideNTC) {
                 // VCC - NTC - ADC - Rseries - GND
                 return static_cast<uint16_t>(static_cast<float>(kADCMax) * kSeriesResistance / (resistance + kSeriesResistance));
             }
@@ -152,9 +153,9 @@ struct ADCConverter {
          *
          * @return int8_t If temperature of adc1 is higher than adc2, return 1, if lower return -1, if equal return 0
          */
-        static int8_t compare(uint16_t adc1, uint16_t adc2)
+        static constexpr int8_t compare(uint16_t adc1, uint16_t adc2)
         {
-            if constexpr (HIGH_SIDE_NTC) {
+            if constexpr (kHighSideNTC) {
                 if (adc1 < adc2) {
                     return 1;
                 }

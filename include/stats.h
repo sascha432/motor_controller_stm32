@@ -32,7 +32,7 @@ namespace Helpers {
                 min = value;
                 lastUpdate = now;
             }
-            else if (value > max) {
+            if (value > max) {
                 max = value;
                 lastUpdate = now;
             }
@@ -85,7 +85,7 @@ namespace Helpers {
                 dt = DECAY_TIME;
             }
             // decay = 1 - dt / DECAY_TIME
-            uint32_t decay = kFactor - (dt * kFactor) / DECAY_TIME;
+            const uint32_t decay = kFactor - (dt * kFactor) / DECAY_TIME;
             // apply decay
             integral = (integral * decay) / kFactor;
             // add integration term: value * dt / 1000
@@ -231,17 +231,9 @@ namespace Helpers {
 
 };
 
-struct Stats {
-
+struct Stats
+{
     void update();
-
-    // stats
-    struct {
-        Helpers::MinMax<30000> vcc;
-        Helpers::MinMax<30000> current;
-        Helpers::MinMax<120000> motorTemp;
-        Helpers::MinMax<120000> mosfetTemp;
-    } minMax;
 
     // helper variables to store the converted values for display purposes
     // units are millivolts, milliamps, degrees Celsius
@@ -261,6 +253,15 @@ struct Stats {
         int16_t motorTemp;
         int16_t mosfetTemp;
     } max;
+
+protected:
+    // stats
+    struct {
+        Helpers::MinMax<30000> vcc;
+        Helpers::MinMax<30000> current;
+        Helpers::MinMax<120000> motorTemp;
+        Helpers::MinMax<120000> mosfetTemp;
+    } minMax;
 };
 
 extern Stats stats;
