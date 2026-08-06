@@ -653,7 +653,7 @@ void DashboardScreen::_refreshVisuals()
 
     switch(getSelectedValue()) {
         case SelectedValueType::SPEED:
-            lv_label_set_text_fmt(valueLabel, "PWM %d%%", (int)((pid.stats.pwm.get() * 100) / pid.getPWMLevelARR()));
+            lv_label_set_text_fmt(valueLabel, "PWM %d%% %u.%uW", (int)((pid.stats.pwm.get() * 100) / pid.getPWMLevelARR()), CONVERT_TO_FP1(stats.vcc * stats.current / 1000U));
             break;
         case SelectedValueType::KP:
             FloatToString::convertTrimmed(buf, sizeof(buf) - 1, eeprom.getKp(), 6);
