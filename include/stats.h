@@ -259,8 +259,8 @@ protected:
     struct {
         Helpers::MinMax<30000> vcc;
         Helpers::MinMax<30000> current;
-        Helpers::MinMax<120000> motorTemp;
-        Helpers::MinMax<120000> mosfetTemp;
+        Helpers::MinMax<60000> motorTemp;
+        Helpers::MinMax<60000> mosfetTemp;
     } minMax;
 };
 
