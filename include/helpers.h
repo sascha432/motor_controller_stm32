@@ -608,13 +608,6 @@ inline bool kIsDivisible(uint32_t value)
     }
 }
 
-#if !HAVE_MOTOR_VIBES
-    #undef HAVE_MOTOR_VIBES
-    #undef HAVE_IMPERIAL_MARCH
-    #define HAVE_MOTOR_VIBES 0
-    #define HAVE_IMPERIAL_MARCH 0
-#endif
-
 #if HAVE_MOTOR_VIBES
 
 /**
@@ -624,7 +617,7 @@ inline bool kIsDivisible(uint32_t value)
 struct MotorVibes
 {
     static constexpr uint32_t kTonePeriod = 21;     // period optimal for 50-1600Hz tones
-    static constexpr uint32_t kPWMDivider = 24;     // 4.2% duty cycle should prevent the motor from spinning
+    static constexpr uint32_t kPWMDivider = 24;     // 4.2% duty cycle should prevent the motor from spinning even at low PWM frequencies, reduce if the motor has less friction
 
     /**
      * @brief Initialize TIM1 to play tones
@@ -659,4 +652,10 @@ private:
     uint16_t inputCurrentLimit;
 };
 
+#else
+    // set both macros to 0 if not enabled
+    #undef HAVE_MOTOR_VIBES
+    #undef HAVE_IMPERIAL_MARCH
+    #define HAVE_MOTOR_VIBES 0
+    #define HAVE_IMPERIAL_MARCH 0
 #endif

@@ -234,6 +234,13 @@ namespace Helpers {
 struct Stats
 {
     void update();
+    void reset()
+    {
+        minMax.vcc.reset();
+        minMax.current.reset();
+        minMax.motorTemp.reset();
+        minMax.mosfetTemp.reset();
+    }
 
     // helper variables to store the converted values for display purposes
     // units are millivolts, milliamps, degrees Celsius

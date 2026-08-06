@@ -144,6 +144,7 @@ void PidController::reset()
     lastDerivative = 0;
     integral = 0;
     stats.reset();
+    ::stats.reset();
     errorCode = ErrorCodeType::NONE;
     releaseBreakCounter = 0;
     faults.reset();

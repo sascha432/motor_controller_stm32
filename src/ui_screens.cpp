@@ -758,11 +758,25 @@ void StartScreen::load()
 
 void StartScreen::_refreshVisuals()
 {
+    char buf[32];
+
     start_screen_update_top_status_labels(voltageLabel, currentLabel, motorTempLabel, mosfetTempLabel);
 
-    lv_label_set_text_static(directionLabel, pid.isForwardMotorDirection() ? "START FORWARD" : "START REVERSE");
+    // blink any errors
+    if (((HAL_GetTick() / 1024) & 0x01) == 0 && pid.hasErrorCode()) {
+        pid.errorPrintf(buf, sizeof(buf) - 1);
+        lv_label_set_text(directionLabel, buf);
+        lv_obj_set_style_text_color(directionLabel, STARTSCREEN_COLOR_ERROR, LV_PART_MAIN);
+        lv_obj_set_style_border_color(directionLabel, STARTSCREEN_COLOR_ERROR_LABEL, LV_PART_MAIN);
+        lv_obj_set_style_bg_color(directionLabel, STARTSCREEN_COLOR_ERROR_BG, LV_PART_MAIN);
+    }
+    else {
+        lv_label_set_text_static(directionLabel, pid.isForwardMotorDirection() ? "START FORWARD" : "START REVERSE");
+        lv_obj_set_style_text_color(directionLabel, STARTSCREEN_COLOR_START_LABEL, LV_PART_MAIN);
+        lv_obj_set_style_border_color(directionLabel, STARTSCREEN_COLOR_START_LABEL, LV_PART_MAIN);
+        lv_obj_set_style_bg_color(directionLabel, STARTSCREEN_COLOR_START_BG, LV_PART_MAIN);
+    }
 
-    char buf[32];
     snprintf(buf, sizeof(buf) - 1, eeprom.isPIDMode() ? "%u RPM" : "%u%% PWM", (unsigned)eeprom.getSpeed());
     lv_label_set_text(speedLabel, buf);
 }
