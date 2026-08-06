@@ -460,9 +460,9 @@ public:
     {
         uint32_t isenseMax;             // maximum current as ADC value
         uint32_t vsenseMax;             // maximum voltage as ADC value
-        bool drv8701Fault;              // DRV8701 fault pin state
-        bool ocpFault;                  // OCP(INA381) fault pin state
-        bool snsoutFault;               // SNSOUT(motor current limit) fault pin state
+        volatile bool drv8701Fault;     // DRV8701 fault pin state
+        volatile bool ocpFault;         // OCP(INA381) fault pin state
+        volatile bool snsoutFault;      // SNSOUT(motor current limit) fault pin state
 
         FaultStates() :
             isenseMax(INT32_MAX),
@@ -484,12 +484,12 @@ public:
     // === Statistics data structure ===
     struct StatsType
     {
-        Helpers::FixedLowPass<kPIDInterval, kPIDInterval * 8, 512> rpm;     // filtered RPM for displaying
-        Helpers::FixedLowPass<kPIDInterval, kPIDInterval * 2, 256> pwm;     // filtered PWM for displaying
+        Helpers::FixedLowPass<kPIDInterval, kPIDInterval * 8, 512, volatile int32_t> rpm;     // filtered RPM for displaying
+        Helpers::FixedLowPass<kPIDInterval, kPIDInterval * 2, 256, volatile int32_t> pwm;     // filtered PWM for displaying
 
         struct {
-            uint32_t loop;                  // number of times the PID loop has been called
-            int32_t pulse;                  // number of pulses received from the A/B motor encoder
+            volatile uint32_t loop;                  // number of times the PID loop has been called
+            volatile int32_t pulse;                  // number of pulses received from the A/B motor encoder
         } counter;
 
         inline void reset()
@@ -614,11 +614,11 @@ public:
     float Ki;
     float Kd;
     PWMLevel pwmLevel;                              // stores max. pwm level and upper/lower bounds
-    uint32_t rpm;                                   // target RPM
+    volatile uint32_t rpm;                          // target RPM
     EEPROM::MotorDirection motorDirection;          // motor direction
     PidValueType antiWindup;                        // anti-windup factor
 
-    uint32_t lastEncoderCounter;                    // last encoder counter value
+    volatile uint32_t lastEncoderCounter;           // last encoder counter value
     PidValueType integral;                          // PID variables
     PidValueType lastError;
     PidValueType lastDerivative;
@@ -635,7 +635,7 @@ public:
     FaultStates faults;                             // DRV8701 and ocp faults
     OcpState ocp;                                   // OCP state machine
 
-    ErrorCodeType errorCode;                        // last error
+    volatile ErrorCodeType errorCode;               // last error
     RingBuffer<PidLoopType, 8> pidLoopBuffer;       // buffer for PID loop data for PID tuning
 
     volatile bool running;                          // true if the PID controller is running

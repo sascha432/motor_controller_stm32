@@ -148,7 +148,7 @@ namespace Helpers {
         int32_t output;
     };
 
-    template<uint32_t INTERVAL_MS, uint32_t FILTER_TIME_MS, uint32_t FACTOR = 1024>
+    template<uint32_t INTERVAL_MS, uint32_t FILTER_TIME_MS, uint32_t FACTOR = 1024, typename OUTPUT_TYPE = int32_t>
     struct FixedLowPass
     {
         static constexpr int32_t kFactor = FACTOR;
@@ -169,17 +169,17 @@ namespace Helpers {
 
         void update(int16_t value)
         {
-            const int32_t error = static_cast<int32_t>(value) * kFactor - output;
+            const OUTPUT_TYPE error = static_cast<OUTPUT_TYPE>(value) * kFactor - output;
             output += (kAlpha * error) / kFactor;
         }
 
-        int32_t get() const
+        OUTPUT_TYPE get() const
         {
             return output / kFactor;
         }
 
     // private:
-        int32_t output;
+        OUTPUT_TYPE output;
     };
 
     template <uint32_t MAX_COUNT, uint32_t DECAY_DIVIDER>

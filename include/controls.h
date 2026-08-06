@@ -178,7 +178,7 @@ struct RotaryEncoder
     }
 
 protected:
-    uint32_t maxAcceleration;
+    volatile uint32_t maxAcceleration;
     volatile int32_t position;
     int32_t acceleration;
 };

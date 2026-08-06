@@ -213,11 +213,11 @@ protected:
 
 protected:
     volatile uint16_t adc_buffer[kNumConversions];
-    uint32_t isenseSum;
-    uint16_t isenseCount;
-    uint32_t isenseOcpFiltered;
-    uint16_t motorTemperatureFiltered;
-    uint16_t mosfetTemperatureFiltered;
+    volatile uint32_t isenseSum;
+    volatile uint16_t isenseCount;
+    volatile uint32_t isenseOcpFiltered;
+    volatile uint16_t motorTemperatureFiltered;
+    volatile uint16_t mosfetTemperatureFiltered;
 };
 
 extern ADC adc;
