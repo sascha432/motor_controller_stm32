@@ -3,15 +3,15 @@ table {
 	width: 100%;
 	table-layout: fixed;
 }
-th:nth-child(1), td:nth-child(1) { width: 26%; }
-th:nth-child(2), td:nth-child(2) { width: 14%; }
-th:nth-child(3), td:nth-child(3) { width: 14%; }
-th:nth-child(4), td:nth-child(4) { width: 46%; }
+th:nth-child(1), td:nth-child(1) { width: 22%; }
+th:nth-child(2), td:nth-child(2) { width: 12%; }
+th:nth-child(3), td:nth-child(3) { width: 12%; }
+th:nth-child(4), td:nth-child(4) { width: 56%; }
 </style>
 
 # STM32F107VCT6 - pin assignments
 
-# Revision: PCB Rev1.0 and Rev1.1
+## Revision: PCB Rev1.0
 
 ### DAC output
 
@@ -105,7 +105,7 @@ th:nth-child(4), td:nth-child(4) { width: 46%; }
 | DRV_FAULT# | PB14 | DIN IRQ | Active-low - DRV8701 fault, falling |
 | OCP_INT# | PB12 | DIN IRQ | Active-low - INA381 ALERT#, falling |
 
-## Digital input - interrupt
+### Digital input - interrupt
 
 | Signal | STM32 pin | Type | Notes |
 |---|---|---|---|
@@ -113,7 +113,7 @@ th:nth-child(4), td:nth-child(4) { width: 46%; }
 | BTN_2 | PD9 | DIN IRQ | Back Button, 100 nF debounce cap, rising/falling |
 | BTN_1 | PD8 | DIN IRQ | Rotary Knob, 100 nF debounce cap, rising/falling |
 
-## Revision: PCB Rev1.1 only
+## Revision: PCB Rev1.1
 
 ### UART
 

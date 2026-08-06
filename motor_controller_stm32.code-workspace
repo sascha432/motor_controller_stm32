@@ -187,6 +187,7 @@
 			"NVIC",
 			"OCFAST",
 			"OCPOLARITY",
+			"pcgcctl",
 			"Periph",
 			"PLLMUL",
 			"QDEC",

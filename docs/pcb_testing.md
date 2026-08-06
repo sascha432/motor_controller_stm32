@@ -26,6 +26,7 @@
 - DRV8701 current limit and INA OCP working
 - USB not detecting any device - CC1/CC2 resistors working, D+/- connected to MCU DP DN, tvs diode right direction
 - MT6701 analog sensor working as counter to check if the motor turns
+- SMCJ33A clamping to 38.7V when braking from high RPM
 
 ### Rev 1.1
 
