@@ -472,7 +472,7 @@ size_t PidController::errorPrintf(char *buf, size_t bufSize) const
         case ErrorCodeType::MOSFET_OVER_TEMPERATURE:
             return snprintf(buf, bufSize, "MOSFET %d" DEGREE_UTF8 "C", ::stats.mosfetTemp);
         case ErrorCodeType::OVP:
-            return snprintf(buf, bufSize, "OVP");
+            return snprintf(buf, bufSize, "OVP %u.%uV", CONVERT_TO_FP1(eeprom.getOvpProtection()));
         case ErrorCodeType::OCP:
             return snprintf(buf, bufSize, "OCP");
         case ErrorCodeType::FAULT:
