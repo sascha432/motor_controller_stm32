@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include "ui_constants.h"
 #include "lvgl.h"
+#include "lv_custom_fonts.h"
 #include "tft_driver.h"
 #include "controls.h"
 #include "eeprom.h"
@@ -159,8 +160,10 @@ struct Screen
     static constexpr lv_coord_t kDiagnosticTextWidth = kDiagnosticViewportWidth - kDiagnosticScreenScrollbarWidth - 4;
 
     // dashboard screen style constants
-    static constexpr const lv_font_t *kDashboardScreenFont = &lv_font_montserrat_14;
-    static constexpr const lv_font_t *kDashboardScreenBigFont = &lv_font_montserrat_24;
+    static constexpr const lv_font_t *kDashboardScreenMetricsFont = &lv_font_dejavu_sans_mono_14;
+    static constexpr const lv_font_t *kDashboardScreenSpeedFont = &lv_font_dejavu_sans_mono_24;
+    static constexpr const lv_font_t *kDashboardScreenValueFixedFont = &lv_font_dejavu_sans_mono_14;
+    static constexpr const lv_font_t *kDashboardScreenValueFont = &lv_font_montserrat_14;
     static constexpr lv_coord_t kDashboardScreenContainerX = 8;
     static constexpr lv_coord_t kDashboardScreenContainerY = 6;
     static constexpr lv_coord_t kDashboardScreenContainerWidth = kScreenWidth - (kDashboardScreenContainerX * 2);
@@ -172,8 +175,9 @@ struct Screen
     static constexpr lv_coord_t kDashboardScreenValueBottomOffsetY = kDashboardScreenContainerHeight - 24;
 
     // start screen style constants
-    static constexpr const lv_font_t *kStartScreenFont = kDashboardScreenFont;
-    static constexpr const lv_font_t *kStartScreenBigFont = kDashboardScreenBigFont;
+    static constexpr const lv_font_t *kStartScreenDirectionFont = &lv_font_montserrat_24;
+    static constexpr const lv_font_t *kStartScreenMetricsFont = &lv_font_dejavu_sans_mono_14;
+    static constexpr const lv_font_t *kStartScreenSpeedFont = &lv_font_dejavu_sans_mono_24;
     static constexpr lv_coord_t kStartScreenContainerX = 8;
     static constexpr lv_coord_t kStartScreenContainerY = 6;
     static constexpr lv_coord_t kStartScreenContainerWidth = kScreenWidth - (kStartScreenContainerX * 2);
@@ -182,7 +186,7 @@ struct Screen
     static constexpr lv_coord_t kStartScreenMotorTempOffsetY = kDashboardScreenMotorTempOffsetY;
     static constexpr lv_coord_t kStartScreenMosfetTempOffsetY = kDashboardScreenMosfetTempOffsetY;
     static constexpr lv_coord_t kStartScreenDirectionOffsetY = (kScreenHeight / 2) - 16;
-    static constexpr lv_coord_t kStartScreenSpeedOffsetY = (kScreenHeight / 2) + 28;
+    static constexpr lv_coord_t kStartScreenSpeedOffsetY = (kScreenHeight / 2) + 32;
     static constexpr lv_coord_t kStartScreenDirectionCornerRadius = 12;
     static constexpr lv_coord_t kStartScreenDirectionBorderWidth = 2;
     static constexpr lv_coord_t kStartScreenDirectionPadding = 2;
@@ -448,6 +452,8 @@ struct DashboardScreen : public Screen
     }
 
     virtual void load() override;
+    virtual void setValue(uint32_t value) override;
+    virtual void update() override;
 
     /**
      * @brief Get the value that is selected for adjustment (speed, PID parameters, etc...)
@@ -479,8 +485,6 @@ struct DashboardScreen : public Screen
         selectedValue = static_cast<SelectedValueType>((static_cast<uint32_t>(selectedValue) + 1) % static_cast<uint32_t>(SelectedValueType::MAX));
         return selectedValue;
     }
-
-    virtual void update() override;
 
 protected:
     void _refreshVisuals();

@@ -76,6 +76,7 @@
 /* Others */
 #define LV_USE_ANIMATION 0
 #define LV_USE_SHADOW 0
+#define LV_USE_FONT_COMPRESSED 1
 
 /* Image/decoder libs */
 #define LV_USE_BMP 0
