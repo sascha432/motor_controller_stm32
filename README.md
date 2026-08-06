@@ -2,8 +2,8 @@
 
 ## TODOs
 
+ - PID tuning over USB and/or UART for PCB Rev1.1
  - Implement USB CDC device
- - PID tuning over USB and/or UART
 
 ## Software Features
 
