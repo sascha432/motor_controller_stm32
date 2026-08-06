@@ -639,7 +639,7 @@ public:
     RingBuffer<PidLoopType, 8> pidLoopBuffer;       // buffer for PID loop data for PID tuning
 
     volatile bool running;                          // true if the PID controller is running
-    uint32_t releaseBreakCounter;                   // counter for releasing the brake after motor off
+    volatile uint32_t releaseBreakCounter;          // counter for releasing the brake after motor off
 };
 
 extern PidController pid;

@@ -176,7 +176,7 @@ void PidController::motorOn()
         reset();
         running = true;
         // start DMA transfer after setting running to true, the ADC will self restart while running
-        adc.startDMA();
+        adc.startDMAIfReady();
         __enable_irq();
     }
     else {
@@ -290,8 +290,14 @@ void PidController::isr()
         // countdown once set
         if (--releaseBreakCounter == 0) {
             PID_WRITE_MOTOR_PWM_OFF();
+            // make sure the ADC is running after releasing the brake
+            adc.startDMAIfReady();
             DEBUG_PRINT(DebugType::PID, "Brake released");
         }
+    }
+    else {
+        // start new ADC DMA transfer manually while not running or braking, helps to reduce MCU load
+        adc.startDMAIfReady();
     }
 
     // update pwm stats
@@ -326,12 +332,6 @@ void PidController::isr()
             setErrorCode(ErrorCodeType::STALL);
         }
 
-    }
-    else {
-        // start new ADC DMA transfer manually while not running, helps to reduce MCU load
-        if (adc.isDMAReady()) {
-            adc.startDMA();
-        }
     }
 
     stats.counter.loop++;

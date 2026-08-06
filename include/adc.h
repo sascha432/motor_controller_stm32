@@ -148,9 +148,18 @@ struct ADC
         return mosfetTemperatureFiltered;
     }
 
-protected:
-    friend PidController;
+    /**
+     * @brief Start ADC DMA transfer if the DMA is ready
+     *
+     */
+    inline void startDMAIfReady()
+    {
+        if (isDMAReady()) {
+            startDMA();
+        }
+    }
 
+protected:
     /**
      * @brief Check if the DMA is ready for a new transfer
      *

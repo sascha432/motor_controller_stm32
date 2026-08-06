@@ -135,7 +135,7 @@ void ADC::isr()
     motorTemperatureFiltered = filterValue<uint16_t, 16>(motorTemperatureFiltered, getMotorNTCValue());
     mosfetTemperatureFiltered = filterValue<uint16_t, 16>(mosfetTemperatureFiltered, getMosfetNTCValue());
 
-    if (pid.running) { // update as fast as possible while running
+    if (pid.running || pid.releaseBreakCounter) { // update as fast as possible while running or braking
         startDMA();
     }
 }
