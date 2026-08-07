@@ -691,6 +691,7 @@ class GDBMemoryClient:
 class PIDTuningApp:
     PRESETS = (5, 10, 20, 30)
     STARTUP_SYNC_DELAY_MS = 200
+    STARTUP_PACKET_TIMEOUT_SECONDS = 5.0
 
     @staticmethod
     def _make_series(length: int) -> deque[float]:
@@ -736,7 +737,10 @@ class PIDTuningApp:
         self.sync_in_progress = False
         self.start_reset_retried = False
         self.reset_in_progress = False
+        self._auto_restart_after_reset = False
         self._startup_sync_job: Optional[str] = None
+        self._waiting_for_first_sample = False
+        self._first_sample_deadline = 0.0
         self.gdb_mem = GDBMemoryClient(config)
 
         self._initial_sash_done = False
@@ -940,6 +944,14 @@ class PIDTuningApp:
         self.eeprom_button = ttk.Button(pid_group, text="EEPROM...", command=self._open_eeprom_dialog, state=tk.DISABLED)
         self.eeprom_button.grid(row=6, column=0, columnspan=2, padx=6, pady=(0, 6), sticky="ew")
 
+        self.reset_firmware_button = ttk.Button(
+            pid_group,
+            text="Reset Firmware",
+            command=self._reset_firmware_manual,
+            state=tk.DISABLED,
+        )
+        self.reset_firmware_button.grid(row=7, column=0, columnspan=2, padx=6, pady=(0, 6), sticky="ew")
+
         ttk.Label(
             outer,
             text="Panels are resizable; drag separators to adjust Graph / Logs / Faults / Controls.",
@@ -1089,10 +1101,16 @@ class PIDTuningApp:
     def _set_eeprom_button_enabled(self, enabled: bool) -> None:
         self.eeprom_button.configure(state=(tk.NORMAL if enabled else tk.DISABLED))
 
-    def _update_control_button_states(self) -> None:
-        self._set_eeprom_button_enabled(self.backend.running and self._eeprom_dialog is None)
+    def _set_reset_firmware_button_enabled(self, enabled: bool) -> None:
+        self.reset_firmware_button.configure(state=(tk.NORMAL if enabled else tk.DISABLED))
 
-    def _set_target_enabled(self, enabled: bool) -> None:
+    def _update_control_button_states(self) -> None:
+        eeprom_enabled = self.backend.running and not self.reset_in_progress and self._eeprom_dialog is None
+        reset_enabled = not self.reset_in_progress and self._eeprom_dialog is None
+        self._set_eeprom_button_enabled(eeprom_enabled)
+        self._set_reset_firmware_button_enabled(reset_enabled)
+
+    def _set_target_enabled(self, enabled: bool, quiet: bool = False) -> None:
         if self.data_address is None:
             return
 
@@ -1109,7 +1127,8 @@ class PIDTuningApp:
                 data[SWO_DATA_EEPROM_COMMIT_OFFSET] = 1 if current_data.eeprom_commit else 0
                 self.gdb_mem.write_memory(self.data_address, bytes(data))
             except Exception as exc:
-                self.event_queue.put(("log", f"Set SWO::data.enabled failed: {exc}"))
+                if not quiet:
+                    self.event_queue.put(("log", f"Set SWO::data.enabled failed: {exc}"))
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -1590,6 +1609,8 @@ class PIDTuningApp:
         series.append(value)
 
     def _handle_sample(self, sample: Sample) -> None:
+        self._waiting_for_first_sample = False
+        self._first_sample_deadline = 0.0
         self._target_running = bool(sample.running)
         self.filled = min(self.filled + 1, self.samples_per_window)
 
@@ -1674,17 +1695,21 @@ class PIDTuningApp:
         self.log_text.see(tk.END)
         self.log_text.configure(state=tk.DISABLED)
 
-    def _reset_backend_after_invalid_swo_data(self, context: str) -> None:
+    def _request_firmware_reset(self, reason: str, auto_restart: bool = False) -> None:
         if self.reset_in_progress:
             self._append_log("Firmware reset already in progress")
             return
 
         self.reset_in_progress = True
-        self._append_log(f"Invalid SWO::data detected ({context}); resetting firmware once")
+        self._auto_restart_after_reset = auto_restart
+        self._append_log(reason)
         self.status_var.set("Resetting")
         self.backend.stop()
         self._cancel_startup_sync_job()
+        self._waiting_for_first_sample = False
+        self._first_sample_deadline = 0.0
         self._set_sync_enabled(False)
+        self._update_control_button_states()
 
         def worker() -> None:
             success = self.backend.reset_target()
@@ -1692,24 +1717,34 @@ class PIDTuningApp:
 
         threading.Thread(target=worker, daemon=True).start()
 
-    def _toggle_start_stop(self) -> None:
-        if self.backend.running:
-            self._cancel_startup_sync_job()
-            self._set_target_enabled(False)
-            self.start_stop_button.configure(text="Start")
-            self.status_var.set("Stopped")
-            self._append_log("Stopped")
-            self.pending_initial_sync = False
-            self.sync_in_progress = False
-            self._set_sync_enabled(False)
-            self.start_reset_retried = False
-            self._set_fault_indicator(self.ocp_indicator, False)
-            self._set_fault_indicator(self.driver_fault_indicator, False)
-            self._set_fault_indicator(self.driver_ocp_indicator, False)
-            self._target_running = False
-            self._update_control_button_states()
-            return
+    def _stop_monitoring(self, log_message: Optional[str] = "Stopped") -> None:
+        self._cancel_startup_sync_job()
+        # Backend shutdown races with this asynchronous memory write; keep stop quiet.
+        self._set_target_enabled(False, quiet=True)
+        self.backend.stop()
+        self.start_stop_button.configure(text="Start")
+        self.status_var.set("Stopped")
+        if log_message:
+            self._append_log(log_message)
+        self.pending_initial_sync = False
+        self.sync_in_progress = False
+        self._set_sync_enabled(False)
+        self.start_reset_retried = False
+        self._set_fault_indicator(self.ocp_indicator, False)
+        self._set_fault_indicator(self.driver_fault_indicator, False)
+        self._set_fault_indicator(self.driver_ocp_indicator, False)
+        self._target_running = False
+        self._waiting_for_first_sample = False
+        self._first_sample_deadline = 0.0
+        self._update_control_button_states()
 
+    def _reset_backend_after_invalid_swo_data(self, context: str) -> None:
+        self._request_firmware_reset(f"Invalid SWO::data detected ({context}); resetting firmware once")
+
+    def _reset_firmware_manual(self) -> None:
+        self._request_firmware_reset("Manual firmware reset requested")
+
+    def _start_monitoring(self) -> None:
         self._cancel_startup_sync_job()
         self._set_sync_enabled(False)
         self.start_reset_retried = False
@@ -1721,6 +1756,8 @@ class PIDTuningApp:
             self.pending_initial_sync = True
             self.sync_in_progress = False
             self.start_reset_retried = False
+            self._waiting_for_first_sample = True
+            self._first_sample_deadline = time.monotonic() + self.STARTUP_PACKET_TIMEOUT_SECONDS
             self._update_control_button_states()
             self._append_log("Waiting for SWO::data read...")
             self._append_log("Started")
@@ -1728,6 +1765,13 @@ class PIDTuningApp:
         else:
             self.status_var.set("Error")
             self._update_control_button_states()
+
+    def _toggle_start_stop(self) -> None:
+        if self.backend.running:
+            self._stop_monitoring("Stopped")
+            return
+
+        self._start_monitoring()
 
     def _set_window_preset(self, value: int) -> None:
         self.window_seconds_var.set(str(value))
@@ -1780,6 +1824,8 @@ class PIDTuningApp:
             elif kind == "firmware-reset-complete":
                 self.reset_in_progress = False
                 reset_ok = bool(payload)
+                auto_restart = self._auto_restart_after_reset
+                self._auto_restart_after_reset = False
                 if reset_ok:
                     self.start_stop_button.configure(text="Start")
                     self.status_var.set("Stopped")
@@ -1791,8 +1837,13 @@ class PIDTuningApp:
                     self._set_fault_indicator(self.driver_ocp_indicator, False)
                     self._target_running = False
                     self._update_control_button_states()
-                    self._append_log('Firmware ready. Press "Start" to connect and run.')
+                    if auto_restart:
+                        self._append_log("Firmware reset complete; restarting monitor")
+                        self._start_monitoring()
+                    else:
+                        self._append_log('Firmware ready. Press "Start" to connect and run.')
                 else:
+                    self._auto_restart_after_reset = False
                     self.status_var.set("Error")
                     self._append_log("Firmware reset failed; check pyOCD/probe connection")
             elif kind == "sync-done":
@@ -1860,10 +1911,18 @@ class PIDTuningApp:
             self._refresh_plot()
             self._last_plot_refresh = now
 
+        if self._waiting_for_first_sample and self.backend.running and now >= self._first_sample_deadline:
+            self._request_firmware_reset(
+                "No PID packets received within 1s after Start. Resetting firmware and retrying automatically.",
+                auto_restart=True,
+            )
+
         if not self.backend.running and self.start_stop_button.cget("text") == "Stop":
             self.start_stop_button.configure(text="Start")
             self.status_var.set("Stopped")
             self._target_running = False
+            self._waiting_for_first_sample = False
+            self._first_sample_deadline = 0.0
             self._update_control_button_states()
 
         self.root.after(40, self._process_events)
