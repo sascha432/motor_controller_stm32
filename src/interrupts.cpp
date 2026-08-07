@@ -123,9 +123,14 @@ extern "C" void EXTI15_10_IRQHandler(void)
  * @brief DMA1_Channel1_IRQHandler is the interrupt handler for the DMA1 Channel 1. It is called when a DMA transfer is complete
  *
  */
+
 extern "C" void DMA1_Channel1_IRQHandler()
 {
+    TickProfiler::start();
     HAL_DMA_IRQHandler(&hdma_adc1);
+    // 290 stopped
+    // 470 running
+    TickProfiler::stop();
 }
 
 /**

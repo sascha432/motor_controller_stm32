@@ -227,3 +227,11 @@ void debug_init(void)
         Serial.begin(115200);
     #endif
 }
+
+// === profiler ===
+
+#if HAVE_DWT_TICK_PROFILER
+
+TickProfiler::AverageSumType TickProfiler::slots[16];
+
+#endif

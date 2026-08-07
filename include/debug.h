@@ -221,3 +221,47 @@ void debug_init(void);
 #else
     #error invalid DEBUG_OUTPUT value
 #endif
+
+
+// === profiler ===
+
+#define HAVE_DWT_TICK_PROFILER 1
+
+#if HAVE_DWT_TICK_PROFILER
+
+struct TickProfiler {
+
+    struct AverageSumType
+    {
+        volatile uint32_t sum;
+        volatile uint32_t count;
+        volatile uint32_t started;
+        AverageSumType() : sum(0), count(0), started(0) {}
+    };
+
+    static inline void start(uint32_t slot = 0)
+    {
+        slots[slot].started = DWT->CYCCNT;
+    }
+
+    static inline void stop(uint32_t slot = 0)
+    {
+        volatile const uint32_t now = DWT->CYCCNT;
+        slots[slot].sum += (now - slots[slot].started);
+
+        if (++slots[slot].count > 128) {
+            slots[slot].sum -= slots[slot].sum / 16;
+            slots[slot].count -= slots[slot].count / 16;
+        }
+    }
+
+    static void snprintf(char *buf, size_t size, uint32_t slot = 0)
+    {
+        const auto &ticks = slots[slot];
+        ::snprintf(buf, size, "%u\n", (unsigned)(ticks.count ? (ticks.sum / ticks.count) : 0));
+    }
+
+    static AverageSumType slots[16];
+};
+
+#endif

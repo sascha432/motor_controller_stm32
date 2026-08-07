@@ -649,6 +649,7 @@ void DashboardScreen::_refreshVisuals()
             snprintf(buf, sizeof(buf) - 1, "%u RPM", (unsigned)pid.clampRPM(pid.stats.rpm.get()));
         }
     }
+TickProfiler::snprintf(buf, sizeof(buf) - 1);//TODO remove
     lv_label_set_text(rpmLabel, buf);
 
     switch(getSelectedValue()) {
@@ -778,6 +779,8 @@ void StartScreen::_refreshVisuals()
     }
 
     snprintf(buf, sizeof(buf) - 1, eeprom.isPIDMode() ? "%u RPM" : "%u%% PWM", (unsigned)eeprom.getSpeed());
+
+TickProfiler::snprintf(buf, sizeof(buf) - 1);//TODO remove
     lv_label_set_text(speedLabel, buf);
 }
 

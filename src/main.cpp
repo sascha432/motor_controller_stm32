@@ -289,6 +289,18 @@ void MX_CRC_Init(void)
 
 #endif
 
+// === DWT cycle counter ===
+
+static void DWT_Init(void)
+{
+    // Enable trace
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+    // Reset cycle counter
+    DWT->CYCCNT = 0;
+    // Enable cycle counter
+    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+}
+
 // === core clock configuration ===
 
 /**
@@ -350,6 +362,7 @@ int main(void)
     #if HAVE_HAL_CRC
         MX_CRC_Init();
     #endif
+    DWT_Init();
     TIM7_TIM6_Init();
     #if HAVE_USB_DEVICE
         MX_USB_DEVICE_Init();
