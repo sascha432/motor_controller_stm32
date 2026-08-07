@@ -629,25 +629,14 @@ void DashboardScreen::_refreshVisuals()
 
     start_screen_update_top_status_labels(voltageLabel, currentLabel, motorTempLabel, mosfetTempLabel);
 
-    // blink any errors
-    bool showError;
-    if (((HAL_GetTick() / 1024) & 0x01) == 0 && pid.hasErrorCode()) {
-        showError = true;
-        pid.errorPrintf(buf, sizeof(buf) - 1);
-        lv_obj_set_style_text_color(rpmLabel, DASHBOARDSCREEN_COLOR_ERROR, LV_PART_MAIN);
+    lv_obj_set_style_text_color(rpmLabel, DASHBOARDSCREEN_COLOR_SPEED, LV_PART_MAIN);
+    lv_obj_set_style_text_font(rpmLabel, kDashboardScreenSpeedFont, LV_PART_MAIN);
+
+    if (eeprom.isPIDMode()) {
+        snprintf(buf, sizeof(buf) - 1, "%u RPM (%u)", (unsigned)pid.clampRPM(pid.stats.rpm.get()), (unsigned)pid.getRPM());
     }
     else {
-        showError = false;
-        lv_obj_set_style_text_color(rpmLabel, DASHBOARDSCREEN_COLOR_SPEED, LV_PART_MAIN);
-    }
-
-    if (!showError) {
-        if (eeprom.isPIDMode()) {
-            snprintf(buf, sizeof(buf) - 1, "%u RPM (%u)", (unsigned)pid.clampRPM(pid.stats.rpm.get()), (unsigned)pid.getRPM());
-        }
-        else {
-            snprintf(buf, sizeof(buf) - 1, "%u RPM", (unsigned)pid.clampRPM(pid.stats.rpm.get()));
-        }
+        snprintf(buf, sizeof(buf) - 1, "%u RPM", (unsigned)pid.clampRPM(pid.stats.rpm.get()));
     }
     lv_label_set_text(rpmLabel, buf);
 

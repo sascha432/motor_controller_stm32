@@ -81,7 +81,7 @@ struct UIConstants
     static constexpr float kDefaultKi = 1.0f;                               // Default PID Ki value
     static constexpr float kDefaultKd = 0.0f;                               // Default PID Kd value
     static constexpr uint16_t kDefaultAntiWindup = 97 * kAntiWindupFactor;  // Default PID anti-windup in percentage (0-100) * kAntiWindupFactor
-    static constexpr uint16_t kDefaultOvpProtection = 38500;                // Default OVP protection in millivolts
+    static constexpr uint16_t kDefaultOvpProtection = 36500;                // Default OVP protection in millivolts
     static constexpr uint16_t kDefaultPWMFrequency = 16500;                 // Default PWM frequency in Hz
 
     // ui menu timeouts

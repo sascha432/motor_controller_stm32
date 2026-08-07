@@ -144,8 +144,14 @@ static void loop()
         // handle LVGL updates
         ScreenFlow &screenFlow = menu.getScreenFlow();
         switch(screenFlow->getId()) {
-            case Screen::Type::START:
             case Screen::Type::DASHBOARD:
+                if (pid.hasErrorCode()) {
+                    // return to start screen
+                    menu.loadStartScreen();
+                    break;
+                }
+                // fallthrough
+            case Screen::Type::START:
             case Screen::Type::DIAGNOSTICS:
                 stats.update();
                 screenFlow->update();
@@ -291,7 +297,9 @@ void MX_CRC_Init(void)
 
 // === DWT cycle counter ===
 
-static void DWT_Init(void)
+#if HAVE_DWT_TICK_PROFILER
+
+static inline void DWT_Init(void)
 {
     // Enable trace
     CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
@@ -300,6 +308,8 @@ static void DWT_Init(void)
     // Enable cycle counter
     DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
 }
+
+#endif
 
 // === core clock configuration ===
 

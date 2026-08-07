@@ -62,7 +62,6 @@ static constexpr bool kUIKeepScreenObjectsInMemory = false;
 #define DASHBOARDSCREEN_COLOR_CURRENT           SCREEN_COLOR_CURRENT
 #define DASHBOARDSCREEN_COLOR_TEMPERATURE       SCREEN_COLOR_TEMPERATURE
 #define DASHBOARDSCREEN_COLOR_SPEED             COLOR_PALETTE_PURPLE
-#define DASHBOARDSCREEN_COLOR_ERROR             COLOR_PALETTE_RED
 #define DASHBOARDSCREEN_COLOR_PWM_LABEL         COLOR_PALETTE_CYAN
 
 #define SLIDERSCREEN_COLOR_LABEL                SCREEN_COLOR_TEXT
@@ -165,6 +164,7 @@ struct Screen
     // dashboard screen style constants
     static constexpr const lv_font_t *kDashboardScreenMetricsFont = &lv_font_dejavu_sans_mono_14;
     static constexpr const lv_font_t *kDashboardScreenSpeedFont = &lv_font_dejavu_sans_mono_24;
+    // static constexpr const lv_font_t *kDashboardScreenErrorFont = &lv_font_montserrat_24;
     static constexpr const lv_font_t *kDashboardScreenValueFixedFont = &lv_font_dejavu_sans_mono_14;
     static constexpr const lv_font_t *kDashboardScreenValueFont = &lv_font_montserrat_14;
     static constexpr lv_coord_t kDashboardScreenContainerX = 8;
