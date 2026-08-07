@@ -127,20 +127,26 @@ extern "C" void EXTI15_10_IRQHandler(void)
 extern "C" void DMA1_Channel1_IRQHandler()
 {
     TickProfiler::start();
-    HAL_DMA_IRQHandler(&hdma_adc1);
-    // 290 stopped
-    // 470 running
+    if (DMA1->ISR & DMA_ISR_TCIF1) {
+        DMA1->IFCR = DMA_IFCR_CGIF1;   // Clear all channel 1 DMA flags
+        adc.isr();
+        // 220 stopped
+        // 285 running
+    }
+    // HAL_DMA_IRQHandler(&hdma_adc1);
+    // // 290 stopped
+    // // 470 running
     TickProfiler::stop();
 }
 
-/**
- * @brief Called from HAL_DMA_IRQHandler
- *
- */
-extern "C" void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
-{
-    adc.isr();
-}
+// /**
+//  * @brief Called from HAL_DMA_IRQHandler
+//  *
+//  */
+// extern "C" void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
+// {
+//     adc.isr();
+// }
 
 // === interrupt handlers ===
 

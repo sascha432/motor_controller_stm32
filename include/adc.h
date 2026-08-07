@@ -56,7 +56,8 @@ struct ADC
         isenseCount(0),
         isenseOcpFiltered(0),
         motorTemperatureFiltered(0),
-        mosfetTemperatureFiltered(0)
+        mosfetTemperatureFiltered(0),
+        dmaTransferComplete(false)
     {
     }
 
@@ -168,7 +169,7 @@ protected:
      */
     inline bool isDMAReady() const
     {
-        return HAL_DMA_GetState(hadc1.DMA_Handle) == HAL_DMA_STATE_READY;
+        return (dmaTransferComplete == true);
     }
 
     /**
@@ -176,9 +177,15 @@ protected:
      *
      * @return HAL_StatusTypeDef
      */
-    inline HAL_StatusTypeDef startDMA()
+    inline void startDMA()
     {
-        return HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc_buffer, kNumConversions);
+        DMA1_Channel1->CCR &= ~DMA_CCR_EN;          // disable DMA
+        dmaTransferComplete = false;                // mark DMA as busy
+        DMA1_Channel1->CNDTR = kNumConversions;     // reload transfer count
+        DMA1->IFCR = DMA_IFCR_CGIF1;                // clear DMA flags
+        DMA1_Channel1->CCR |= DMA_CCR_EN;           // enable DMA
+        ADC1->CR2 |= ADC_CR2_ADON;                  // Ensure ADC stays enabled
+        ADC1->CR2 |= ADC_CR2_SWSTART;               // Trigger regular conversion group
     }
 
     /**
@@ -218,6 +225,7 @@ protected:
     volatile uint32_t isenseOcpFiltered;
     volatile uint16_t motorTemperatureFiltered;
     volatile uint16_t mosfetTemperatureFiltered;
+    volatile bool dmaTransferComplete;
 };
 
 extern ADC adc;
