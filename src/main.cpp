@@ -15,12 +15,6 @@
 #include "stats.h"
 #include "helpers.h"
 #include "debug.h"
-#if HAVE_USB_DEVICE
-#include <usb_device.h>
-#include <usbd_cdc_if.h>
-extern PCD_HandleTypeDef hpcd_USB_OTG_FS;
-extern USBD_HandleTypeDef hUsbDeviceFS;
-#endif
 
 // === core setup ===
 

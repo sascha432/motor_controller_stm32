@@ -197,9 +197,32 @@ void debug_swd_printf(const char *fmt, ...)
 
 #endif
 
+#if DEBUG_OUTPUT == DEBUG_OUTPUT_USB
+
+void debug_usb_printf(const char *fmt, ...)
+{
+    // Avoid calling CDC_Transmit_FS before the USB stack is fully configured.
+    if (hUsbDeviceFS.pClassData == nullptr || hUsbDeviceFS.dev_state != USBD_STATE_CONFIGURED) {
+        return;
+    }
+
+    char buf[192];
+    va_list args;
+
+    va_start(args, fmt);
+    int len = vsnprintf(buf, sizeof(buf) - 1, fmt, args);
+    va_end(args);
+    if (len > 0) {
+        // transmit and ignore any errors
+        CDC_Transmit_FS(reinterpret_cast<uint8_t *>(buf), strlen(buf));
+    }
+}
+
+#endif
+
 void debug_init(void)
 {
-    #if DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL || DEBUG_OUTPUT == DEBUG_OUTPUT_USB
+    #if DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL
         Serial.begin(115200);
     #elif DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL4
         Serial4.begin(115200);
