@@ -10,6 +10,10 @@
 ADC adc;
 ADC_HandleTypeDef hadc1;
 
+#ifndef ADC_CALIBRATION_TIMEOUT
+#define ADC_CALIBRATION_TIMEOUT 10
+#endif
+
 void ADC::init()
 {
     // Enable GPIOA/GPIOC
@@ -69,11 +73,9 @@ void ADC::init()
 
     NVIC_EnableIRQ(DMA1_Channel1_IRQn); // enable DMA1 channel 1 interrupt
 
-    // DMA1_Channel1->CCR |= DMA_CCR_EN;
-
     // Enable ADC for calibration
     ADC1->CR2 |= ADC_CR2_ADON;
-    delay_us(10);
+    delay_us(ADC_CALIBRATION_TIMEOUT);
 
     // Reset calibration
     ADC1->CR2 |= ADC_CR2_RSTCAL;
@@ -87,12 +89,14 @@ void ADC::init()
 
     // Enable ADC again after calibration
     ADC1->CR2 |= ADC_CR2_ADON;
-    delay_us(10);
+    delay_us(ADC_CALIBRATION_TIMEOUT);
 
     ADC1->CR2 &= ~(ADC_CR2_CONT|ADC_CR2_EXTSEL);        // disable continuous conversion and external trigger
     ADC1->CR2 |= ADC_CR2_EXTSEL | ADC_CR2_EXTTRIG;      // enable external trigger (software start)
     ADC1->CR2 |= ADC_CR2_DMA;                           // Enable DMA
 
+    // bare metal is 25-40% faster then HAL
+    // 220/285 (motor stopped/running) clock cycles vs 290/472
     dmaTransferComplete = false;
     startDMA();
 }

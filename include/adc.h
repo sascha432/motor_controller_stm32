@@ -175,7 +175,6 @@ protected:
     /**
      * @brief Start ADC DMA transfer
      *
-     * @return HAL_StatusTypeDef
      */
     inline void startDMA()
     {
@@ -229,4 +228,3 @@ protected:
 };
 
 extern ADC adc;
-extern DMA_HandleTypeDef hdma_adc1;
