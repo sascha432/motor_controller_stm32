@@ -11,7 +11,7 @@ ADC adc;
 ADC_HandleTypeDef hadc1;
 
 #ifndef ADC_CALIBRATION_TIMEOUT
-#define ADC_CALIBRATION_TIMEOUT 10
+    #define ADC_CALIBRATION_TIMEOUT 10
 #endif
 
 void ADC::init()
@@ -91,10 +91,9 @@ void ADC::init()
     ADC1->CR2 &= ~(ADC_CR2_CONT|ADC_CR2_EXTSEL);        // disable continuous conversion and external trigger
     ADC1->CR2 |= ADC_CR2_EXTSEL | ADC_CR2_EXTTRIG;      // enable external trigger (software start)
     ADC1->CR2 |= ADC_CR2_DMA;                           // Enable DMA
-    ADC1->CR2 |= ADC_CR2_ADON;                          // Enable ADC
 
     // bare metal is 26-63% faster then HAL
-    // 146/184 (motor stopped/running) clock cycles vs 290/472
+    // 146/182 (motor stopped/running) clock cycles vs 290/472
     dmaTransferComplete = false;
     startDMA();
 }
@@ -104,10 +103,10 @@ void ADC::initDAC()
     // Initialize GPIOA for DAC output pins
     __HAL_RCC_GPIOA_CLK_ENABLE();
 
-   GPIO_InitTypeDef GPIO_InitStruct = {};
-   GPIO_InitStruct.Pin = digitalPinToHAL<DRVOCP_VREF_DAC_PIN>()|digitalPinToHAL<OCP_VREF_DAC_PIN>();
-   GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
-   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+    GPIO_InitTypeDef GPIO_InitStruct = {};
+    GPIO_InitStruct.Pin = digitalPinToHAL<DRVOCP_VREF_DAC_PIN>()|digitalPinToHAL<OCP_VREF_DAC_PIN>();
+    GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
     // Enable DAC channel #1 (PA4/DRVOCP_VREF_DAC_PIN) and channel #2 (PA5/OCP_VREF_DAC_PIN)
     __HAL_RCC_DAC_CLK_ENABLE();
@@ -143,4 +142,3 @@ void ADC::isr()
         startDMA();
     }
 }
-

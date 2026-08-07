@@ -118,12 +118,10 @@ extern "C" void EXTI15_10_IRQHandler(void)
  */
 extern "C" void DMA1_Channel1_IRQHandler()
 {
-    TickProfiler::start();
     if (DMA1->ISR & DMA_ISR_TCIF1) {
         DMA1->IFCR = DMA_IFCR_CGIF1;
         adc.isr();
     }
-    TickProfiler::stop();
 }
 
 // === interrupt handlers ===
