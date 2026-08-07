@@ -26,11 +26,6 @@ void Button<GPIO_PIN, ACTIVE_STATE, kDebounceTimeMs>::init()
     reset();
 }
 
-#if (!defined(DEBUG_DISABLE_O3) || (!DEBUG_DISABLE_O3)) && defined(__GNUC__) && !defined(__clang__)
-#pragma GCC push_options
-#pragma GCC optimize("O3")
-#endif
-
 template <uint8_t GPIO_PIN, bool ACTIVE_STATE, uint32_t kDebounceTimeMs>
 void Button<GPIO_PIN, ACTIVE_STATE, kDebounceTimeMs>::isr(uint32_t idr)
 {
@@ -54,10 +49,6 @@ void Button<GPIO_PIN, ACTIVE_STATE, kDebounceTimeMs>::isr(uint32_t idr)
         }
     }
 }
-
-#if (!defined(DEBUG_DISABLE_O3) || (!DEBUG_DISABLE_O3)) && defined(__GNUC__) && !defined(__clang__)
-#pragma GCC pop_options
-#endif
 
 template <uint8_t GPIO_PIN_A, uint8_t GPIO_PIN_B>
 void RotaryEncoder<GPIO_PIN_A, GPIO_PIN_B>::init()
@@ -110,11 +101,6 @@ void RotaryEncoder<GPIO_PIN_A, GPIO_PIN_B>::reset()
     __enable_irq();
 }
 
-#if (!defined(DEBUG_DISABLE_O3) || (!DEBUG_DISABLE_O3)) && defined(__GNUC__) && !defined(__clang__)
-#pragma GCC push_options
-#pragma GCC optimize("O3")
-#endif
-
 template <uint8_t GPIO_PIN_A, uint8_t GPIO_PIN_B>
 void RotaryEncoder<GPIO_PIN_A, GPIO_PIN_B>::isr()
 {
@@ -139,10 +125,6 @@ void RotaryEncoder<GPIO_PIN_A, GPIO_PIN_B>::isr()
         position -= value;
     }
 }
-
-#if (!defined(DEBUG_DISABLE_O3) || (!DEBUG_DISABLE_O3)) && defined(__GNUC__) && !defined(__clang__)
-#pragma GCC pop_options
-#endif
 
 template struct RotaryEncoder<ROTARY_ENCODER_PIN_A, ROTARY_ENCODER_PIN_B>;
 template struct Button<KNOB_BUTTON_PIN, false>;

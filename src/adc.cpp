@@ -45,20 +45,17 @@ void ADC::init()
     RCC->CFGR &= ~RCC_CFGR_ADCPRE;
     RCC->CFGR |= RCC_CFGR_ADCPRE_DIV6;   // 72MHz / 6 = 12MHz ADC clock
 
-    // sampling time 239.5 cycles = about 20 microseconds per conversion
+    // Sample times for PA2, PA3 in SMPR2
+    ADC1->SMPR2 |= (kSampleTimeCH2 << (2 * 3));   // CH2
+    ADC1->SMPR2 |= (kSampleTimeCH3 << (3 * 3));   // CH3
+    // Sample times for PC4, PC5 in SMPR1
+    ADC1->SMPR1 |= (kSampleTimeCH14 << ((14 - 10) * 3)); // CH14
+    ADC1->SMPR1 |= (kSampleTimeCH15 << ((15 - 10) * 3)); // CH15
 
-    // PA2, PA3 in SMPR2
-    ADC1->SMPR2 |= (7 << (2 * 3));   // CH2
-    ADC1->SMPR2 |= (7 << (3 * 3));   // CH3
-
-    // PC4, PC5 in SMPR1
-    ADC1->SMPR1 |= (7 << ((14 - 10) * 3)); // CH14
-    ADC1->SMPR1 |= (7 << ((15 - 10) * 3)); // CH15
-
-    // enable DMA
+    // Enable DMA
     RCC->AHBENR |= RCC_AHBENR_DMA1EN;
 
-    // configure DMA
+    // Configure DMA
     DMA1_Channel1->CCR &= ~DMA_CCR_EN;
 
     DMA1_Channel1->CPAR  = (uint32_t)&ADC1->DR;
@@ -94,9 +91,10 @@ void ADC::init()
     ADC1->CR2 &= ~(ADC_CR2_CONT|ADC_CR2_EXTSEL);        // disable continuous conversion and external trigger
     ADC1->CR2 |= ADC_CR2_EXTSEL | ADC_CR2_EXTTRIG;      // enable external trigger (software start)
     ADC1->CR2 |= ADC_CR2_DMA;                           // Enable DMA
+    ADC1->CR2 |= ADC_CR2_ADON;                          // Enable ADC
 
-    // bare metal is 25-40% faster then HAL
-    // 220/285 (motor stopped/running) clock cycles vs 290/472
+    // bare metal is 26-63% faster then HAL
+    // 146/184 (motor stopped/running) clock cycles vs 290/472
     dmaTransferComplete = false;
     startDMA();
 }
@@ -115,11 +113,6 @@ void ADC::initDAC()
     __HAL_RCC_DAC_CLK_ENABLE();
     DAC->CR |= DAC_CR_EN1 | DAC_CR_EN2;
 }
-
-#if (!defined(DEBUG_DISABLE_O3) || (!DEBUG_DISABLE_O3)) && defined(__GNUC__) && !defined(__clang__)
-#pragma GCC push_options
-#pragma GCC optimize("O3")
-#endif
 
 void ADC::isr()
 {
@@ -151,6 +144,3 @@ void ADC::isr()
     }
 }
 
-#if (!defined(DEBUG_DISABLE_O3) || (!DEBUG_DISABLE_O3)) && defined(__GNUC__) && !defined(__clang__)
-#pragma GCC pop_options
-#endif

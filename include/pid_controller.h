@@ -73,11 +73,6 @@ struct PidController
         OVP
     };
 
-#if (!defined(DEBUG_DISABLE_O3) || (!DEBUG_DISABLE_O3)) && defined(__GNUC__) && !defined(__clang__)
-#pragma GCC push_options
-#pragma GCC optimize("O3")
-#endif
-
     /**
      * @brief Construct a new Pid Controller object
      *
@@ -383,10 +378,6 @@ struct PidController
     {
         return pwmLevel.getARR();
     }
-
-#if (!defined(DEBUG_DISABLE_O3) || (!DEBUG_DISABLE_O3)) && defined(__GNUC__) && !defined(__clang__)
-#pragma GCC pop_options
-#endif
 
     /**
      * @brief initialize PID controller

@@ -216,12 +216,6 @@ bool PidController::motorToggle()
     return false;
 }
 
-
-#if (!defined(DEBUG_DISABLE_O3) || (!DEBUG_DISABLE_O3)) && defined(__GNUC__) && !defined(__clang__)
-#pragma GCC push_options
-#pragma GCC optimize("O3")
-#endif
-
 void PidController::isr()
 {
     // most timers are 16bit counters only
@@ -453,10 +447,6 @@ void PidController::trigger_ocp()
         }
     }
 }
-
-#if (!defined(DEBUG_DISABLE_O3) || (!DEBUG_DISABLE_O3)) && defined(__GNUC__) && !defined(__clang__)
-#pragma GCC pop_options
-#endif
 
 size_t PidController::errorPrintf(char *buf, size_t bufSize) const
 {

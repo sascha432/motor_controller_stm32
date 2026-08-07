@@ -6,13 +6,6 @@
 #include "pid_controller.h"
 #include "controls.h"
 
-#if (!defined(DEBUG_DISABLE_O3) || (!DEBUG_DISABLE_O3)) && defined(__GNUC__) && !defined(__clang__)
-#pragma GCC push_options
-#pragma GCC optimize("O3")
-#else
-#warning DEBUG_DISABLE_O3 set, O3 optimization disabled
-#endif
-
 // === global variables ===
 
 WWDG_HandleTypeDef WatchDog::watchdog;
@@ -127,7 +120,7 @@ extern "C" void DMA1_Channel1_IRQHandler()
 {
     TickProfiler::start();
     if (DMA1->ISR & DMA_ISR_TCIF1) {
-        DMA1->IFCR = DMA_IFCR_CGIF1;   // Clear all channel 1 DMA flags
+        DMA1->IFCR = DMA_IFCR_CGIF1;
         adc.isr();
     }
     TickProfiler::stop();
@@ -216,10 +209,6 @@ extern "C" void OTG_FS_IRQHandler(void)
     HAL_PCD_IRQHandler(&hpcd_USB_OTG_FS);
 }
 
-#endif
-
-#if (!defined(DEBUG_DISABLE_O3) || (!DEBUG_DISABLE_O3)) && defined(__GNUC__) && !defined(__clang__)
-#pragma GCC pop_options
 #endif
 
 // for disabled interrupts, not precise
