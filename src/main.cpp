@@ -17,32 +17,9 @@
 #include "debug.h"
 #if HAVE_USB_DEVICE
 #include <usb_device.h>
-
-static uint32_t irqCount = 0;
-
-static void debug_usb_otg_state(const char *tag)
-{
-    auto *usb = USB_OTG_FS;
-    auto *dev = reinterpret_cast<USB_OTG_DeviceTypeDef *>(reinterpret_cast<uint32_t>(usb) + USB_OTG_DEVICE_BASE);
-    uint32_t pcgcctl = *reinterpret_cast<volatile uint32_t *>(reinterpret_cast<uint32_t>(usb) + USB_OTG_PCGCCTL_BASE);
-
-    DEBUG_PRINT_MSG(
-        DEBUG_DEBUG,
-        "USB[%s] irc#=%u GOTGCTL=%08lx GCCFG=%08lx GAHBCFG=%08lx GUSBCFG=%08lx GINTSTS=%08lx GINTMSK=%08lx GRSTCTL=%08lx DSTS=%08lx DCTL=%08lx PCGCCTL=%08lx",
-        tag,
-        irqCount,
-        static_cast<unsigned long>(usb->GOTGCTL),
-        static_cast<unsigned long>(usb->GCCFG),
-        static_cast<unsigned long>(usb->GAHBCFG),
-        static_cast<unsigned long>(usb->GUSBCFG),
-        static_cast<unsigned long>(usb->GINTSTS),
-        static_cast<unsigned long>(usb->GINTMSK),
-        static_cast<unsigned long>(usb->GRSTCTL),
-        static_cast<unsigned long>(dev->DSTS),
-        static_cast<unsigned long>(dev->DCTL),
-        static_cast<unsigned long>(pcgcctl)
-    );
-}
+#include <usbd_cdc_if.h>
+extern PCD_HandleTypeDef hpcd_USB_OTG_FS;
+extern USBD_HandleTypeDef hUsbDeviceFS;
 #endif
 
 // === core setup ===
@@ -296,21 +273,6 @@ static void TIM7_TIM6_Init()
     HAL_TIM_Base_Start_IT(&tim6);
 }
 
-#if HAVE_USB_DEVICE
-
-extern PCD_HandleTypeDef hpcd_USB_OTG_FS;
-
-/**
-  * @brief This function handles USB OTG FS global interrupt.
-  */
-extern "C" void OTG_FS_IRQHandler(void)
-{
-    irqCount++;
-    HAL_PCD_IRQHandler(&hpcd_USB_OTG_FS);
-}
-
-#endif
-
 #if HAVE_HAL_CRC
 
 CRC_HandleTypeDef hcrc;
@@ -391,29 +353,7 @@ int main(void)
     #endif
     TIM7_TIM6_Init();
     #if HAVE_USB_DEVICE
-        /*
-
-        AFTER manually disabling vbus sensing in the USB_OTG_FS->GCCFG register, the USB device
-        does not detect the cable in one direction, check PCB ... in one direction the cable is detecetd
-        and fires 2 interrupts, but does not enumerate.. try different usb hub etc...
-        check if tvs diode blocks usb_dp or usb_dm
-        check if reverse usb connector pins are not soldered properly = one direction only/could be a bad cable as well
-
-        OUTCOME: the connector had a solder bridge and might have connected vbus to d+ or d- damaging the mcu
-        until the MCU is replaced i cannot test this further
-
-
-        */
-
-        debug_usb_otg_state("pre-init");
         MX_USB_DEVICE_Init();
-        /* F107 workaround: disable VBUS sensing when VBUS detect is not wired. */
-        hpcd_USB_OTG_FS.Instance->GCCFG &= ~(USB_OTG_GCCFG_VBUSASEN | USB_OTG_GCCFG_VBUSBSEN);
-        debug_usb_otg_state("post-init");
-        for(;;) {
-            debug_usb_otg_state("loop");
-            WatchDog::delay(500);
-        }
     #endif
     setup();
     EXTI_Init();

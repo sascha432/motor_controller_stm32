@@ -208,6 +208,20 @@ extern "C" void HAL_WWDG_EarlyWakeupCallback(WWDG_HandleTypeDef *hwwdg)
     call_default_error_handler(InterruptErrorType::WATCHDOG_TIMEOUT);
 }
 
+#if HAVE_USB_DEVICE
+
+extern PCD_HandleTypeDef hpcd_USB_OTG_FS;
+
+/**
+  * @brief This function handles USB OTG FS global interrupt.
+  */
+extern "C" void OTG_FS_IRQHandler(void)
+{
+    HAL_PCD_IRQHandler(&hpcd_USB_OTG_FS);
+}
+
+#endif
+
 #if (!defined(DEBUG_DISABLE_O3) || (!DEBUG_DISABLE_O3)) && defined(__GNUC__) && !defined(__clang__)
 #pragma GCC pop_options
 #endif

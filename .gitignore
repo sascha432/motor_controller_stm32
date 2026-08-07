@@ -9,7 +9,6 @@ cubemx/Core/*
 cubemx/Drivers/*
 cubemx/EWARM/*
 cubemx/Middlewares/*
-cubemx/USB_DEVICE/*
 cubemx/cubemx.pdf
 cubemx/cubemx.txt
 cubemx/.mxproject
