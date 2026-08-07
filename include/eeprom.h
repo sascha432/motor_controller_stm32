@@ -34,12 +34,9 @@ struct EEPROM
     };
 
     enum class SensorDirection : uint8_t {
-        Forward = 0,
-        Reverse = 1
+        Forward = static_cast<uint8_t>(MotorDirection::Forward),
+        Reverse = static_cast<uint8_t>(MotorDirection::Reverse)
     };
-
-    static_assert(static_cast<uint8_t>(MotorDirection::Forward) == static_cast<uint8_t>(SensorDirection::Forward), "Motor and Sensor direction enum values must match");
-    static_assert(static_cast<uint8_t>(MotorDirection::Reverse) == static_cast<uint8_t>(SensorDirection::Reverse), "Motor and Sensor direction enum values must match");
 
     /**
      * @brief EEPROM data structure

@@ -57,7 +57,7 @@ extern "C" void TIM6_IRQHandler(void)
  */
 extern "C" void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-    if (htim->Instance == TIM6) { // every 5us
+    if (htim->Instance == TIM6) { // PidController::kOcpTickInterval
         TIM6_Handler();
     }
 }
@@ -209,10 +209,10 @@ extern "C" void OTG_FS_IRQHandler(void)
 
 #endif
 
-// for disabled interrupts, not precise
+// for disabled interrupts
 static void delay_ms(uint32_t ms)
 {
-    volatile uint32_t count = ms * 5000;
+    volatile uint32_t count = ms * (F_CPU / 10697);
     while (count--) {
         __NOP();
     }
@@ -264,13 +264,13 @@ extern "C" void Error_Handler(void)
     // infinite loop to signal error via LED flashes
     while (1) {
         LEDs::onLEDError();
-        delay_ms(1000);
+        delay_ms(500);
         // signal error type via LED flashes
         for(int i = 0; i <= (int)interruptErrorType; i++) {
             LEDs::off();
-            delay_ms(500);
+            delay_ms(250);
             LEDs::onLEDWarning();
-            delay_ms(500);
+            delay_ms(250);
         }
         LEDs::off();
         delay_ms(500);

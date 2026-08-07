@@ -53,7 +53,7 @@ void ADC::init()
     ADC1->SMPR1 |= (kSampleTimeCH15 << ((15 - 10) * 3)); // CH15
 
     // Enable DMA
-    RCC->AHBENR |= RCC_AHBENR_DMA1EN;
+    __HAL_RCC_DMA1_CLK_ENABLE();
 
     // Configure DMA
     DMA1_Channel1->CCR &= ~DMA_CCR_EN;
@@ -138,7 +138,7 @@ void ADC::isr()
     mosfetTemperatureFiltered = filterValue<uint16_t, 16>(mosfetTemperatureFiltered, getMosfetNTCValue());
 
     dmaTransferComplete = true;
-    if (pid.running || pid.releaseBreakCounter) { // update as fast as possible while running or braking
+    if (pid.running || pid.releaseBreakCounter) { // update as fast as possible while running (OCP/OVP) or braking (OVP)
         startDMA();
     }
 }
