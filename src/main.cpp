@@ -364,11 +364,11 @@ int main(void)
 {
     // system init
     HAL_Init();
+    DWT_Init();
     SystemClock_Config();
     #if HAVE_HAL_CRC
         MX_CRC_Init();
     #endif
-    DWT_Init();
     TIM7_TIM6_Init();
     #if HAVE_USB_DEVICE
         MX_USB_DEVICE_Init();
