@@ -225,8 +225,6 @@ void debug_init(void);
 
 // === profiler ===
 
-#define HAVE_DWT_TICK_PROFILER 1
-
 #if HAVE_DWT_TICK_PROFILER
 
 struct TickProfiler {

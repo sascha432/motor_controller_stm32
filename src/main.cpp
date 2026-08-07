@@ -362,7 +362,9 @@ int main(void)
     #if HAVE_HAL_CRC
         MX_CRC_Init();
     #endif
-    DWT_Init();
+    #if HAVE_DWT_TICK_PROFILER
+        DWT_Init();
+    #endif
     TIM7_TIM6_Init();
     #if HAVE_USB_DEVICE
         MX_USB_DEVICE_Init();
