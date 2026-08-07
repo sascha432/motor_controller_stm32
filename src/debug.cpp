@@ -223,8 +223,7 @@ void debug_usb_printf(const char *fmt, ...)
 void debug_init(void)
 {
     #if DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL
+        //TODO replace old arduino code
         Serial.begin(115200);
-    #elif DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL4
-        Serial4.begin(115200);
     #endif
 }

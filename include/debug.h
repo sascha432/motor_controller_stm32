@@ -46,8 +46,12 @@ struct SWO
     enum class EnableState : uint8_t {
         DISABLED = 0,
         SWO = 1,
-        USB = 2,
-        SERIAL = 3,
+        #if HAVE_USB_DEVICE
+            USB = 2,
+        #endif
+        #if HAVE_SERIAL
+            SERIAL = 3,
+        #endif
     };
     struct DataType {
         volatile float Kp;
@@ -70,9 +74,8 @@ struct SWO
 
 #define DEBUG_OUTPUT_NONE       0
 #define DEBUG_OUTPUT_SERIAL     1
-#define DEBUG_OUTPUT_SERIAL4    2
-#define DEBUG_OUTPUT_SWO        3
-#define DEBUG_OUTPUT_USB        4
+#define DEBUG_OUTPUT_SWO        2
+#define DEBUG_OUTPUT_USB        3
 
 #ifndef DEBUG_OUTPUT
     #define DEBUG_OUTPUT        DEBUG_OUTPUT_SERIAL
@@ -173,23 +176,6 @@ void debug_init(void);
             if ((uint32_t)(DEBUG_LEVEL) & (uint32_t)(level)) { \
                 char _debug_function[96]; \
                 Serial.printf("[%06lu] %s %s " msg "\n", HAL_GetTick(), debugLevelToString(level), debug_function_name(DEBUG_FUNCTION_SIG, _debug_function, sizeof(_debug_function)), ##__VA_ARGS__); \
-            } \
-        } while(0)
-
-#elif DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL4
-
-    #define DEBUG_PRINT_MSG(level, msg, ...) \
-        do { \
-            if ((uint32_t)(DEBUG_LEVEL) & (uint32_t)(level)) { \
-                Serial4.printf(msg "\n", ##__VA_ARGS__); \
-            } \
-        } while(0)
-
-    #define DEBUG_PRINT(level, msg, ...) \
-        do { \
-            if ((uint32_t)(DEBUG_LEVEL) & (uint32_t)(level)) { \
-                char _debug_function[96]; \
-                Serial4.printf("[%06lu] %s %s " msg "\n", HAL_GetTick(), debugLevelToString(level), debug_function_name(DEBUG_FUNCTION_SIG, _debug_function, sizeof(_debug_function)), ##__VA_ARGS__); \
             } \
         } while(0)
 

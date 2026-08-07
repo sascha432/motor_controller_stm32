@@ -272,6 +272,9 @@ extern "C" void Error_Handler(void)
         case InterruptErrorType::WATCHDOG_TIMEOUT:
             SWO::write(0, "WD\n", sizeof("WD\n") - 1);
             break;
+        case InterruptErrorType::WATCHDOG_TICK_TIMEOUT:
+            SWO::write(0, "WT\n", sizeof("WT\n") - 1);
+            break;
     }
     #endif
 

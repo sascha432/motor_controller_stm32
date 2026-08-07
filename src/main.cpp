@@ -174,11 +174,16 @@ static void loop()
                     break;
                 }
             }
+            #if HAVE_USB_DEVICE
             else if (SWO::data.enabled == SWO::EnableState::USB) {
                 // not implemented yet
-            } else if (SWO::data.enabled == SWO::EnableState::SERIAL) {
+            }
+            #endif
+            #if HAVE_SERIAL
+            else if (SWO::data.enabled == SWO::EnableState::SERIAL) {
                 // not implemented yet
             }
+            #endif
         }
     }
 }

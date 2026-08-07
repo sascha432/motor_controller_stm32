@@ -477,12 +477,13 @@ private:
 // global error handling
 enum class InterruptErrorType : uint32_t {
     ERROR_HANDLER = 0,
-    NMI_HANDLER,
+    WATCHDOG_TIMEOUT,
+    WATCHDOG_TICK_TIMEOUT,
     HARD_FAULT_HANDLER,
     MEM_MANAGE_HANDLER,
+    NMI_HANDLER,
     BUS_FAULT_HANDLER,
     USAGE_FAULT_HANDLER,
-    WATCHDOG_TIMEOUT,
 };
 
 extern InterruptErrorType interruptErrorType;
@@ -550,7 +551,7 @@ inline void WatchDog::tickHandler()
 {
     WWDG->CR = 0x7F; // feed the watchdog
     if (++ticks >= kTimeoutMs) { // 1000ms timeout
-        call_default_error_handler(InterruptErrorType::WATCHDOG_TIMEOUT);
+        call_default_error_handler(InterruptErrorType::WATCHDOG_TICK_TIMEOUT);
     }
 }
 
