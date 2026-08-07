@@ -212,8 +212,15 @@ extern "C" void OTG_FS_IRQHandler(void)
 // for disabled interrupts
 static void delay_ms(uint32_t ms)
 {
-    volatile uint32_t count = ms * (F_CPU / 10697);
-    while (count--) {
+    constexpr uint32_t kTicksPerMs = F_CPU / 1000;
+    constexpr uint32_t kMaxMillis = UINT32_MAX / kTicksPerMs;
+    while(ms > kMaxMillis) {
+        ms -= kMaxMillis;
+        delay_ms(kMaxMillis);
+    }
+    uint32_t start = DWT->CYCCNT;
+    uint32_t ticks = ms * kTicksPerMs;
+    while ((DWT->CYCCNT - start) < ticks) {
         __NOP();
     }
 }

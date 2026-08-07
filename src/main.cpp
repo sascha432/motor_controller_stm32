@@ -297,8 +297,6 @@ void MX_CRC_Init(void)
 
 // === DWT cycle counter ===
 
-#if HAVE_DWT_TICK_PROFILER
-
 static inline void DWT_Init(void)
 {
     // Enable trace
@@ -308,8 +306,6 @@ static inline void DWT_Init(void)
     // Enable cycle counter
     DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
 }
-
-#endif
 
 // === core clock configuration ===
 
@@ -372,9 +368,7 @@ int main(void)
     #if HAVE_HAL_CRC
         MX_CRC_Init();
     #endif
-    #if HAVE_DWT_TICK_PROFILER
-        DWT_Init();
-    #endif
+    DWT_Init();
     TIM7_TIM6_Init();
     #if HAVE_USB_DEVICE
         MX_USB_DEVICE_Init();
