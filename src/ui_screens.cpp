@@ -817,7 +817,7 @@ void DashboardScreen::_refreshGraphLegend(int32_t range)
 
     const int32_t height = Screen::kDashboardScreenGraphHeight - 1 - fontHeight;
     for (int32_t i = 0; i < tickCount; ++i) {
-        const int32_t rpmValue = ((tickCount - 1 - i) * range) / (tickCount - 1);
+        const int32_t rpmValue = (((tickCount - 1 - i) * range) / ((tickCount - 1) * 10)) * 10;
         snprintf(graphLegendLabelBuf[i], sizeof(graphLegendLabelBuf[i]), "%u", static_cast<unsigned>(rpmValue));
         lv_label_set_text_static(graphLegendLabels[i], graphLegendLabelBuf[i]);
 
