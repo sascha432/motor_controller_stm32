@@ -746,9 +746,9 @@ void Menu::handleButtonPress()
                     break;
             }
             break;
-        // === diagnostics screen ===
+        // === dashboard screen ===
         case Screen::Type::DASHBOARD:
-            {
+            if (eeprom.isPIDMode()) {
                 DashboardScreen &dashboard = *reinterpret_cast<DashboardScreen *>(screenFlow.getScreen());
                 switch(dashboard.incrSelectedValue()) {
                     case DashboardScreen::SelectedValueType::SPEED:

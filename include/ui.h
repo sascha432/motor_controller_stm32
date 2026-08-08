@@ -176,6 +176,7 @@ struct Screen
     static constexpr lv_coord_t kDashboardScreenMosfetTempOffsetY = 18;
     static constexpr lv_coord_t kDashboardScreenRpmOffsetY = (kScreenHeight / 2) - 12;
     static constexpr lv_coord_t kDashboardScreenValueBottomOffsetY = kDashboardScreenContainerHeight - 24;
+    static constexpr lv_coord_t kDashboardScreenValueTuningOffsetY = 40;
 
     // start screen style constants
     static constexpr const lv_font_t *kStartScreenDirectionFont = &lv_font_montserrat_24;
@@ -449,7 +450,8 @@ struct DashboardScreen : public Screen
         mosfetTempLabel(nullptr),
         rpmLabel(nullptr),
         valueLabel(nullptr),
-        selectedValue(SelectedValueType::SPEED)
+        selectedValue(SelectedValueType::SPEED),
+        lastSelectedValue(SelectedValueType::MAX)
     {
         maxAcceleration = eeprom.isPIDMode() ? UIConstants::kStepsRPM : UIConstants::kStepsPWM;
     }
@@ -500,6 +502,7 @@ protected:
     lv_obj_t *rpmLabel;
     lv_obj_t *valueLabel;
     SelectedValueType selectedValue;
+    SelectedValueType lastSelectedValue;
 };
 
 // === Start Screen ===

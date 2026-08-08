@@ -566,6 +566,7 @@ void DiagnosticsScreen::_refreshVisuals()
 
 void DashboardScreen::load()
 {
+    lastSelectedValue = SelectedValueType::MAX;
     Screen::load();
 
     lv_obj_t *container = lv_obj_create(screen);
@@ -613,10 +614,10 @@ void DashboardScreen::load()
 
     valueLabel = lv_label_create(container);
     lv_obj_set_style_text_color(valueLabel, DASHBOARDSCREEN_COLOR_PWM_LABEL, LV_PART_MAIN);
-    lv_obj_set_style_text_font(valueLabel, kDashboardScreenValueFont, LV_PART_MAIN);
+    // lv_obj_set_style_text_font(valueLabel, kDashboardScreenValueFont, LV_PART_MAIN);
     lv_obj_set_width(valueLabel, kDashboardScreenContainerWidth);
     lv_obj_set_style_text_align(valueLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    lv_obj_set_pos(valueLabel, 0, kDashboardScreenValueBottomOffsetY);
+    // lv_obj_set_pos(valueLabel, 0, kDashboardScreenValueBottomOffsetY);
 
     _refreshVisuals();
 
@@ -627,21 +628,33 @@ void DashboardScreen::_refreshVisuals()
 {
     char buf[32];
 
+    if (lastSelectedValue != selectedValue) { // mode changed?
+        switch(selectedValue) {
+            case SelectedValueType::SPEED:
+                lv_obj_set_style_text_font(valueLabel, kDashboardScreenValueFixedFont, LV_PART_MAIN);
+                lv_obj_clear_flag(rpmLabel, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_set_pos(valueLabel, 0, kDashboardScreenValueBottomOffsetY);
+                break;
+            default:
+                lv_obj_set_style_text_font(valueLabel, kDashboardScreenValueFont, LV_PART_MAIN);
+                lv_obj_add_flag(rpmLabel, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_set_pos(valueLabel, 0, kDashboardScreenValueTuningOffsetY);
+                break;
+        }
+        lastSelectedValue = selectedValue;
+    }
+
     start_screen_update_top_status_labels(voltageLabel, currentLabel, motorTempLabel, mosfetTempLabel);
 
-    lv_obj_set_style_text_color(rpmLabel, DASHBOARDSCREEN_COLOR_SPEED, LV_PART_MAIN);
-    lv_obj_set_style_text_font(rpmLabel, kDashboardScreenSpeedFont, LV_PART_MAIN);
-
-    if (eeprom.isPIDMode()) {
-        snprintf(buf, sizeof(buf) - 1, "%u RPM (%u)", (unsigned)pid.clampRPM(pid.stats.rpm.get()), (unsigned)pid.getRPM());
-    }
-    else {
-        snprintf(buf, sizeof(buf) - 1, "%u RPM", (unsigned)pid.clampRPM(pid.stats.rpm.get()));
-    }
-    lv_label_set_text(rpmLabel, buf);
-
-    switch(getSelectedValue()) {
+    switch(selectedValue) {
         case SelectedValueType::SPEED:
+            if (eeprom.isPIDMode()) {
+                snprintf(buf, sizeof(buf) - 1, "%u RPM (%u)", (unsigned)pid.clampRPM(pid.stats.rpm.get()), (unsigned)pid.getRPM());
+            }
+            else {
+                snprintf(buf, sizeof(buf) - 1, "%u RPM", (unsigned)pid.clampRPM(pid.stats.rpm.get()));
+            }
+            lv_label_set_text(rpmLabel, buf);
             lv_label_set_text_fmt(valueLabel, "PWM %d%% %u.%uW", (int)((pid.stats.pwm.get() * 100) / pid.getPWMLevelARR()), CONVERT_TO_FP1(stats.vcc * stats.current / 1000U));
             break;
         case SelectedValueType::KP:
@@ -670,7 +683,7 @@ void DashboardScreen::setValue(uint32_t value)
 {
     Screen::setValue(value);
     // change to font with all available glyphs
-    lv_obj_set_style_text_font(valueLabel, (getSelectedValue() == SelectedValueType::SPEED) ? kDashboardScreenValueFixedFont : kDashboardScreenValueFont, LV_PART_MAIN);
+    // lv_obj_set_style_text_font(valueLabel, (getSelectedValue() == SelectedValueType::SPEED) ? kDashboardScreenValueFixedFont : kDashboardScreenValueFont, LV_PART_MAIN);
 }
 
 void DashboardScreen::update()
