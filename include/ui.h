@@ -186,20 +186,8 @@ struct Screen
     static constexpr lv_coord_t kDashboardScreenGraphY = kDashboardScreenValueTuningOffsetY + kDashboardScreenValueLabelHeight + kDashboardScreenGraphTopGap;
     static constexpr lv_coord_t kDashboardScreenGraphWidth = kDashboardScreenContainerWidth;
     static constexpr lv_coord_t kDashboardScreenGraphHeight = kDashboardScreenContainerHeight - kDashboardScreenGraphY - 1;
-
-    // Dashboard graph behavior constants
-    static constexpr uint32_t kDashboardScreenGraphSamplePeriodMs = 50;
-    static constexpr uint32_t kDashboardScreenGraphHistoryMs = 5000;
-    static constexpr uint32_t kDashboardScreenGraphRedrawDecimation = 1;
-    static constexpr int32_t kDashboardScreenGraphMinRpmSpan = 200;
-    static constexpr bool kDashboardScreenGraphIncludeZeroInScale = true;
-    static constexpr size_t kDashboardScreenGraphPointCount = kDashboardScreenGraphHistoryMs / kDashboardScreenGraphSamplePeriodMs;
-
-    static_assert(kDashboardScreenGraphSamplePeriodMs > 0, "Graph sample period must be greater than 0");
-    static_assert(kDashboardScreenGraphHistoryMs >= kDashboardScreenGraphSamplePeriodMs, "Graph history must be >= sample period");
-    static_assert((kDashboardScreenGraphHistoryMs % kDashboardScreenGraphSamplePeriodMs) == 0, "Graph history must be divisible by sample period");
-    static_assert(kDashboardScreenGraphPointCount >= 2, "Graph requires at least 2 points");
-    static_assert(kDashboardScreenGraphPointCount <= 256, "Graph point count is too large for this target");
+    static constexpr int32_t kDashboardScreenGraphMinRpmSpan = 250;
+    static constexpr size_t kDashboardScreenGraphPointCount = 128;
 
     // start screen style constants
     static constexpr const lv_font_t *kStartScreenDirectionFont = &lv_font_montserrat_24;
@@ -457,8 +445,8 @@ private:
 struct DashboardScreen : public Screen
 {
     struct GraphSample {
-        int16_t rpm;
-        int16_t setRpm;
+        uint16_t rpm;
+        uint16_t setRpm;
     };
 
     enum class SelectedValueType : uint32_t {
@@ -483,9 +471,6 @@ struct DashboardScreen : public Screen
         graphRpmLine(nullptr),
         graphSetRpmLine(nullptr),
         graphWriteIndex(0),
-        graphSampleCount(0),
-        graphSamplesSinceRedraw(0),
-        lastGraphSampleTick(0),
         graphDirty(true),
         selectedValue(SelectedValueType::SPEED),
         lastSelectedValue(SelectedValueType::MAX)
@@ -528,10 +513,15 @@ struct DashboardScreen : public Screen
         return selectedValue;
     }
 
+    /**
+     * @brief Record RPM for the graph in the ring buffer
+     *
+     * @param rpm
+     */
+    void _sampleGraph(int32_t rpm);
+
 protected:
     void _refreshVisuals();
-    void _setGraphVisible(bool visible);
-    void _sampleGraph();
     void _rebuildGraphPoints();
 
 protected:
@@ -547,11 +537,8 @@ protected:
     lv_point_t graphRpmPoints[kDashboardScreenGraphPointCount];
     lv_point_t graphSetRpmPoints[kDashboardScreenGraphPointCount];
     GraphSample graphSamples[kDashboardScreenGraphPointCount];
-    size_t graphWriteIndex;
-    size_t graphSampleCount;
-    uint32_t graphSamplesSinceRedraw;
-    uint32_t lastGraphSampleTick;
-    bool graphDirty;
+    volatile size_t graphWriteIndex;
+    volatile bool graphDirty;
     SelectedValueType selectedValue;
     SelectedValueType lastSelectedValue;
 };

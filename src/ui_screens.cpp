@@ -58,17 +58,10 @@ inline void diagnostic_screen_set_label_row(lv_obj_t *label, int32_t row, int32_
     lv_obj_set_y(label, diagnostic_screen_get_ypos_for_row(row) - scrollOffset);
 }
 
-inline int16_t dashboard_graph_to_i16(int32_t value)
+inline lv_coord_t dashboard_screen_graph_map_y(int32_t value, int32_t minValue, int32_t range)
 {
-    return static_cast<int16_t>(std::clamp<int32_t>(value, -32768, 32767));
-}
-
-inline lv_coord_t dashboard_graph_map_y(int32_t value, int32_t minValue, int32_t maxValue)
-{
-    const int32_t height = std::max<int32_t>(1, Screen::kDashboardScreenGraphHeight - 1);
-    const int32_t clampedValue = std::clamp<int32_t>(value, minValue, maxValue);
-    const int32_t range = std::max<int32_t>(1, maxValue - minValue);
-    const int32_t normalized = ((clampedValue - minValue) * height) / range;
+    constexpr int32_t height = std::max<int32_t>(1, Screen::kDashboardScreenGraphHeight - 1);
+    const int32_t normalized = ((value - minValue) * height) / range;
     return static_cast<lv_coord_t>(height - normalized);
 }
 
@@ -581,17 +574,14 @@ void DiagnosticsScreen::_refreshVisuals()
 void DashboardScreen::load()
 {
     lastSelectedValue = SelectedValueType::MAX;
+
+    // fill graph with initial values
     graphWriteIndex = 0;
-    graphSampleCount = kDashboardScreenGraphPointCount;
-    graphSamplesSinceRedraw = 0;
-    lastGraphSampleTick = HAL_GetTick();
     graphDirty = true;
-
     const GraphSample initialSample = {
-        dashboard_graph_to_i16(pid.stats.rpm.get()),
-        dashboard_graph_to_i16(static_cast<int32_t>(pid.getRPM()))
+        static_cast<uint16_t>(0),
+        static_cast<uint16_t>(pid.getRPM())
     };
-
     for (size_t i = 0; i < kDashboardScreenGraphPointCount; ++i) {
         graphSamples[i] = initialSample;
         graphRpmPoints[i] = {0, kDashboardScreenGraphHeight - 1};
@@ -690,7 +680,7 @@ void DashboardScreen::_refreshVisuals()
                 lv_obj_set_pos(valueLabel, 0, kDashboardScreenValueBottomOffsetY);
                 lv_obj_set_style_text_align(valueLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
 
-                _setGraphVisible(false);
+                lv_obj_add_flag(graphContainer, LV_OBJ_FLAG_HIDDEN);
                 break;
             default:
                 lv_obj_set_style_text_font(rpmLabel, kDashboardScreenValueFixedFont, LV_PART_MAIN);
@@ -714,14 +704,14 @@ void DashboardScreen::_refreshVisuals()
                     lv_obj_set_style_text_align(valueLabel, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
                 }
 
-                _setGraphVisible(true);
+                lv_obj_clear_flag(graphContainer, LV_OBJ_FLAG_HIDDEN);
                 break;
         }
         lastSelectedValue = selectedValue;
     }
 
-    _sampleGraph();
-    if (graphDirty) {
+    if (graphDirty && !lv_obj_has_flag(graphContainer, LV_OBJ_FLAG_HIDDEN)) {
+        // update graph when it is visible and new samples have been added
         _rebuildGraphPoints();
     }
 
@@ -756,7 +746,7 @@ void DashboardScreen::_refreshVisuals()
             break;
         case SelectedValueType::ANTI_WINDUP: {
             if (eeprom.getAntiWindup() == 0) {
-                lv_label_set_text_static(valueLabel, "Anti-windup OFF");
+                lv_label_set_text_static(valueLabel, "Anti-windup DISABLED");
             }
             else {
                 const uint32_t antiWindup = (eeprom.getAntiWindup() * 1000) / UIConstants::kAntiWindupFactor;
@@ -769,116 +759,63 @@ void DashboardScreen::_refreshVisuals()
     }
 }
 
-void DashboardScreen::_setGraphVisible(bool visible)
+void DashboardScreen::_sampleGraph(int32_t rpm)
 {
-    if (!graphContainer) {
-        return;
-    }
-    if (visible) {
-        lv_obj_clear_flag(graphContainer, LV_OBJ_FLAG_HIDDEN);
-    }
-    else {
-        lv_obj_add_flag(graphContainer, LV_OBJ_FLAG_HIDDEN);
-    }
-}
-
-void DashboardScreen::_sampleGraph()
-{
-    const uint32_t now = HAL_GetTick();
-    if ((now - lastGraphSampleTick) < kDashboardScreenGraphSamplePeriodMs) {
-        return;
-    }
-
-    lastGraphSampleTick = now;
-
     graphSamples[graphWriteIndex] = {
-        dashboard_graph_to_i16(pid.stats.rpm.get()),
-        dashboard_graph_to_i16(static_cast<int32_t>(pid.getRPM()))
+        static_cast<uint16_t>(rpm < 0 ? 0 : rpm),
+        static_cast<uint16_t>(pid.getRPM())
     };
-
-    graphWriteIndex = (graphWriteIndex + 1) % kDashboardScreenGraphPointCount;
-    graphSampleCount = std::min<size_t>(graphSampleCount + 1, kDashboardScreenGraphPointCount);
-    graphSamplesSinceRedraw++;
-
-    if (graphSamplesSinceRedraw >= kDashboardScreenGraphRedrawDecimation) {
-        graphDirty = true;
-        graphSamplesSinceRedraw = 0;
+    if (++graphWriteIndex >= kDashboardScreenGraphPointCount) {
+        graphWriteIndex = 0;
     }
+    graphDirty = true;
 }
 
 void DashboardScreen::_rebuildGraphPoints()
 {
-    if (!graphRpmLine || !graphSetRpmLine) {
-        return;
-    }
-
-    if (graphSampleCount < 2) {
-        lv_line_set_points(graphRpmLine, graphRpmPoints, 0);
-        lv_line_set_points(graphSetRpmLine, graphSetRpmPoints, 0);
-        graphDirty = false;
-        return;
-    }
-
-    const size_t count = graphSampleCount;
-    const size_t firstIndex = (graphSampleCount < kDashboardScreenGraphPointCount) ? 0 : graphWriteIndex;
+    const size_t firstIndex = graphWriteIndex;
 
     int32_t minRpm = INT32_MAX;
     int32_t maxRpm = INT32_MIN;
-
-    for (size_t i = 0; i < count; ++i) {
-        const size_t index = (firstIndex + i) % kDashboardScreenGraphPointCount;
-        const int32_t rpm = graphSamples[index].rpm;
-        const int32_t setRpm = graphSamples[index].setRpm;
+    for (const auto &sample : graphSamples) {
+        const int32_t rpm = sample.rpm;
+        const int32_t setRpm = sample.setRpm;
         minRpm = std::min<int32_t>(minRpm, std::min<int32_t>(rpm, setRpm));
         maxRpm = std::max<int32_t>(maxRpm, std::max<int32_t>(rpm, setRpm));
     }
-
-    if (kDashboardScreenGraphIncludeZeroInScale) {
-        minRpm = std::min<int32_t>(minRpm, 0);
-        maxRpm = std::max<int32_t>(maxRpm, 0);
-    }
+    minRpm = std::min<int32_t>(minRpm, 0);
+    maxRpm = std::max<int32_t>(maxRpm, 0);
 
     if (maxRpm - minRpm < kDashboardScreenGraphMinRpmSpan) {
-        if (kDashboardScreenGraphIncludeZeroInScale) {
-            if (minRpm >= 0) {
-                minRpm = 0;
-                maxRpm = minRpm + kDashboardScreenGraphMinRpmSpan;
-            }
-            else if (maxRpm <= 0) {
-                maxRpm = 0;
-                minRpm = maxRpm - kDashboardScreenGraphMinRpmSpan;
-            }
-            else {
-                const int32_t center = (maxRpm + minRpm) / 2;
-                minRpm = center - (kDashboardScreenGraphMinRpmSpan / 2);
-                maxRpm = minRpm + kDashboardScreenGraphMinRpmSpan;
-                minRpm = std::min<int32_t>(minRpm, 0);
-                maxRpm = std::max<int32_t>(maxRpm, 0);
-            }
+        if (minRpm >= 0) {
+            minRpm = 0;
+            maxRpm = minRpm + kDashboardScreenGraphMinRpmSpan;
+        }
+        else if (maxRpm <= 0) {
+            maxRpm = 0;
+            minRpm = maxRpm - kDashboardScreenGraphMinRpmSpan;
         }
         else {
             const int32_t center = (maxRpm + minRpm) / 2;
             minRpm = center - (kDashboardScreenGraphMinRpmSpan / 2);
             maxRpm = minRpm + kDashboardScreenGraphMinRpmSpan;
+            minRpm = std::min<int32_t>(minRpm, 0);
+            maxRpm = std::max<int32_t>(maxRpm, 0);
         }
     }
 
-    const int32_t width = std::max<int32_t>(1, kDashboardScreenGraphWidth - 1);
-    const int32_t denom = std::max<int32_t>(1, static_cast<int32_t>(count - 1));
-
-    for (size_t i = 0; i < count; ++i) {
-        const size_t index = (firstIndex + i) % kDashboardScreenGraphPointCount;
-        const lv_coord_t x = static_cast<lv_coord_t>((static_cast<int32_t>(i) * width) / denom);
-
+    for (int32_t i = 0; i < (int32_t)kDashboardScreenGraphPointCount; ++i) {
+        const lv_coord_t x = static_cast<lv_coord_t>((i * kDashboardScreenGraphWidth) / static_cast<int32_t>(kDashboardScreenGraphPointCount - 1));
         graphRpmPoints[i].x = x;
-        graphRpmPoints[i].y = dashboard_graph_map_y(graphSamples[index].rpm, minRpm, maxRpm);
-
         graphSetRpmPoints[i].x = x;
-        graphSetRpmPoints[i].y = dashboard_graph_map_y(graphSamples[index].setRpm, minRpm, maxRpm);
+        const size_t index = (firstIndex + i) % kDashboardScreenGraphPointCount;
+        const int32_t range = std::max<int32_t>(1, maxRpm - minRpm);
+        graphRpmPoints[i].y = dashboard_screen_graph_map_y(graphSamples[index].rpm, minRpm, range);
+        graphSetRpmPoints[i].y = dashboard_screen_graph_map_y(graphSamples[index].setRpm, minRpm, range);
     }
 
-    lv_line_set_points(graphRpmLine, graphRpmPoints, count);
-    lv_line_set_points(graphSetRpmLine, graphSetRpmPoints, count);
+    lv_line_set_points(graphRpmLine, graphRpmPoints, kDashboardScreenGraphPointCount);
+    lv_line_set_points(graphSetRpmLine, graphSetRpmPoints, kDashboardScreenGraphPointCount);
     graphDirty = false;
 }
 
@@ -896,7 +833,7 @@ void DashboardScreen::update()
 
 void StartScreen::load()
 {
-    Screen::load();
+      Screen::load();
 
     lv_obj_t *container = lv_obj_create(screen);
     lv_obj_remove_style_all(container);

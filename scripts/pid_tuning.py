@@ -43,6 +43,7 @@ NTC_SERIES_RESISTANCE = 10000
 NTC_NOMINAL_RESISTANCE = 10000
 NTC_BETA = 3950
 NTC_NOMINAL_TEMP_C = 25.0
+MAX_RPM = 55000
 
 
 @dataclass
@@ -157,8 +158,8 @@ EEPROM_FIELD_SPECS = (
     ("LED Brightness", "led_brightness", "int", 0, 100, None),
     ("Input Current (mA)", "input_current_limit", "int", 500, 40000, None),
     ("Motor Current (mA)", "motor_current_limit", "int", 500, 40000, None),
-    ("Min RPM", "min_rpm", "int", 10, 55000, None),
-    ("Max RPM", "max_rpm", "int", 10, 55000, None),
+    ("Min RPM", "min_rpm", "int", 10, MAX_RPM, None),
+    ("Max RPM", "max_rpm", "int", 10, MAX_RPM, None),
     ("Motor Direction", "motor_direction", "choice", None, None, (("Forward", 0), ("Reverse", 1))),
     ("Sensor Direction", "sensor_direction", "choice", None, None, (("Forward", 0), ("Reverse", 1))),
     ("Control Mode", "control_mode", "choice", None, None, (("PWM / Open Loop", 0), ("PID / Closed Loop", 1))),
@@ -229,7 +230,7 @@ def decode_pid_item(payload: bytes) -> Optional[Sample]:
     sequence, rpm, pwm, voltage, i_ocp, i_avg, motor_ntc, mosfet_ntc, dac_motor, dac_input, error, integral, derivative, faults = struct.unpack(
         PID_ITEM_STRUCT, payload
     )
-    if rpm > 55000:  # RPM might go negative due to small vibrations when the motor is stalled and the sensor limit is 55k RPM
+    if rpm > MAX_RPM:  # RPM might go negative due to small vibrations when the motor is stalled and the sensor limit is 55k RPM
         rpm = 0
 
     running, drv_fault, ocp_fault, snsout_fault = decode_fault_word(faults)

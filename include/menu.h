@@ -130,6 +130,13 @@ struct Menu
      */
     int32_t updateRotaryValue(int32_t value);
 
+    /**
+     * @brief Sample the current RPM value for the dashboard screen graph
+     *
+     * @param rpm The current RPM value
+     */
+    void sampleRPM(int32_t rpm);
+
 protected:
     /**
      * @brief Update RPM or PWM value

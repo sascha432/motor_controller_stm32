@@ -45,7 +45,7 @@ struct PidController
     // convert RPM to counts per PID interval
     static constexpr uint32_t kRPMToIntCounts(uint32_t value)
     {
-        return static_cast<uint32_t>((value * kCPR) / static_cast<uint32_t>(60000 / kPIDIntervalFloat));
+        return static_cast<uint32_t>((value * kCPR) / static_cast<int32_t>(60000 / kPIDIntervalFloat));
     }
 
     template<int32_t VALUE>
@@ -57,7 +57,7 @@ struct PidController
     // convert counts per PID interval to RPM
     static constexpr int32_t kIntCountsToRPM(int32_t value)
     {
-        return static_cast<int32_t>((value * static_cast<uint32_t>(60000 / kPIDIntervalFloat)) / kCPR);
+        return static_cast<int32_t>((value * static_cast<int32_t>(60000 / kPIDIntervalFloat)) / kCPR);
     }
 
     enum class ErrorCodeType : int32_t {
