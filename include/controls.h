@@ -18,11 +18,13 @@
 template<uint8_t GPIO_PIN, bool ACTIVE_STATE, uint32_t kDebounceTimeMs = 50>
 struct Button
 {
+    using CallbackType = void (*)(uint32_t duration);
+
     /**
      * @brief Initialize GPIO and states for the button
      *
      */
-    void init();
+    void init(CallbackType releaseCallback = nullptr, CallbackType isDownCallback = nullptr);
 
     /**
      * @brief remove pressed state
@@ -32,7 +34,8 @@ struct Button
     {
         __disable_irq();
         lastDebounceTime = 0;
-        state = readState();;
+        lastPressedTime = HAL_GetTick();
+        state = readState();
         pressed = (state == ACTIVE_STATE);
         released = !pressed;
         __enable_irq();
@@ -43,20 +46,20 @@ struct Button
      *
      * This method can be used to detect a single button release event
      *
-     * @return true if the button has been released
-     * @return false otherwise
+     * @return duration in milliseconds if the button has been released
+     * @return 0 otherwise
      */
-    inline bool isReleased()
+    inline uint32_t isReleased()
     {
         __disable_irq();
         // check if the button has been pressed and released
         if (released && pressed) {
             pressed = false; // clear pressed flag
             __enable_irq();
-            return true;
+            return (HAL_GetTick() - lastPressedTime) + 1;
         }
         __enable_irq();
-        return false;
+        return 0;
     }
 
     /**
@@ -89,6 +92,12 @@ struct Button
     void isr(uint32_t idr);
 
     /**
+     * @brief Interrupt service routine to be called when the button is pressed down
+     *
+     */
+    void isDownIsr();
+
+    /**
      * @brief Call ISR with the PINs value register
      *
      */
@@ -110,7 +119,10 @@ protected:
     }
 
 protected:
+    CallbackType releaseCallback;
+    CallbackType isDownCallback;
     uint32_t lastDebounceTime;
+    uint32_t lastPressedTime;
     volatile bool state;
     volatile bool pressed;
     volatile bool released;

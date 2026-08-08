@@ -30,6 +30,7 @@ static inline void TIM6_Handler(void)
         pid.isr();
         if (kIsDivisible<kTicksPerKnobIsr>(timer6Counter)) {
             knob.isr();
+            backButton.isDownIsr();
         }
     }
     timer6Counter++;

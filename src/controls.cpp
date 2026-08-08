@@ -12,8 +12,11 @@ BackButton backButton;
 TIM_HandleTypeDef tim3;
 
 template <uint8_t GPIO_PIN, bool ACTIVE_STATE, uint32_t kDebounceTimeMs>
-void Button<GPIO_PIN, ACTIVE_STATE, kDebounceTimeMs>::init()
+void Button<GPIO_PIN, ACTIVE_STATE, kDebounceTimeMs>::init(CallbackType releaseCallback, CallbackType isDownCallback)
 {
+    this->releaseCallback = releaseCallback;
+    this->isDownCallback = isDownCallback;
+
     // Enable GPIO clock
     __HAL_RCC_GPIOx_CLK_ENABLE<GPIO_PIN>();
 
@@ -24,6 +27,14 @@ void Button<GPIO_PIN, ACTIVE_STATE, kDebounceTimeMs>::init()
     HAL_GPIO_Init(digitalPinToGPIO<GPIO_PIN>(), &GPIO_InitStruct);
 
     reset();
+}
+
+template <uint8_t GPIO_PIN, bool ACTIVE_STATE, uint32_t kDebounceTimeMs>
+void Button<GPIO_PIN, ACTIVE_STATE, kDebounceTimeMs>::isDownIsr()
+{
+    if (isDownCallback && pressed && !released) {
+        isDownCallback(HAL_GetTick() - lastPressedTime);
+    }
 }
 
 template <uint8_t GPIO_PIN, bool ACTIVE_STATE, uint32_t kDebounceTimeMs>
@@ -38,6 +49,9 @@ void Button<GPIO_PIN, ACTIVE_STATE, kDebounceTimeMs>::isr(uint32_t idr)
             lastDebounceTime = now;
             state = buttonState;
             if (state == ACTIVE_STATE) {
+                if (!pressed) {
+                    lastPressedTime = now;
+                }
                 // once the button is pressed, set pressed to true and released to false
                 pressed = true;
                 released = false;
@@ -45,6 +59,9 @@ void Button<GPIO_PIN, ACTIVE_STATE, kDebounceTimeMs>::isr(uint32_t idr)
             else {
                 // once the button is released, set released to true
                 released = true;
+                if (releaseCallback) {
+                    releaseCallback(now - lastPressedTime);
+                }
             }
         }
     }

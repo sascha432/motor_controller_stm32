@@ -39,6 +39,18 @@ struct Menu
     void loadMainMenu();
 
     /**
+     * @brief Load advanced menu screen
+     *
+     */
+    void loadAdvancedMenu();
+
+    /**
+     * @brief Handle custom exit behaviour for advanced menu depending on prev. screen
+     *
+     */
+    void exitAdvancedMenu();
+
+    /**
      * @brief Start motor screen with some info
      *
      */
@@ -109,7 +121,7 @@ struct Menu
      * @brief Handle main button press based on the current screen and selected item
      *
      */
-    void handleButtonPress();
+    void handleButtonPress(uint32_t duration);
 
     /**
      * @brief Handle back button press

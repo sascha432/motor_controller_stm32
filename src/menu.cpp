@@ -311,6 +311,30 @@ void Menu::loadMainMenu()
     clearUserInput();
 }
 
+void Menu::loadAdvancedMenu()
+{
+    screenFlow.next(ScreenFlow::newScreen<MenuScreen>(
+        Screen::Type::ADVANCED_MENU,
+        kAdvancedMenuItems,
+        sizeof_array(kAdvancedMenuItems)
+    ));
+    setValue(0);
+    clearUserInput();
+}
+
+void Menu::exitAdvancedMenu()
+{
+    if (screenFlow.getScreen()->getPrevScreenId() == Screen::Type::MAIN_MENU) {
+        // accessed through main menu
+        restorePreviousMenu();
+    }
+    else {
+        // accessed through long press on start screen
+        saveEEPROMChanges();
+        loadStartScreen();
+    }
+}
+
 void Menu::loadStartScreen()
 {
     screenFlow.setScreen(ScreenFlow::newScreen<StartScreen>());
@@ -404,15 +428,20 @@ void Menu::applyEEPROMSettings()
     pid.applyPIDParams();
 }
 
-void Menu::handleButtonPress()
+void Menu::handleButtonPress(uint32_t duration)
 {
-    DEBUG_PRINT(DebugType::UI, "enter screen=%p id=%d value=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), getValue());
+    DEBUG_PRINT(DebugType::UI, "enter screen=%p id=%d prev=%d value=%d duration=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), static_cast<int>(screenFlow->getPrevScreenId()), getValue(), duration);
     Screen *screen;
     // Handle button press based on the current screen
     switch(screenFlow->getId()) {
         // === start screen ===
         case Screen::Type::START:
-            loadMainMenu();
+            if (duration >= UIConstants::kLongPressDuration) {
+                loadAdvancedMenu();
+            }
+            else {
+                loadMainMenu();
+            }
             break;
         // === main menu ===
         case Screen::Type::MAIN_MENU:
@@ -491,12 +520,7 @@ void Menu::handleButtonPress()
                     setValue(eeprom.getMotorBrake());
                     break;
                 case MainMenuItemType::ADVANCED:
-                    screenFlow.next(ScreenFlow::newScreen<MenuScreen>(
-                        Screen::Type::ADVANCED_MENU,
-                        kAdvancedMenuItems,
-                        sizeof_array(kAdvancedMenuItems)
-                    ));
-                    setValue(0);
+                    loadAdvancedMenu();
                     break;
                 case MainMenuItemType::RESTORE_DEFAULTS:
                     screenFlow.next(ScreenFlow::newScreen<MenuScreen>(
@@ -644,7 +668,7 @@ void Menu::handleButtonPress()
                     break;
                 #endif
                 case AdvancedMenuItemType::BACK:
-                    restorePreviousMenu();
+                    exitAdvancedMenu();
                     break;
             }
             break;
@@ -812,7 +836,7 @@ void Menu::handleButtonPress()
             // no button action
             break;
     }
-    DEBUG_PRINT(DebugType::UI, "leave screen=%p id=%d value=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), getValue());
+    DEBUG_PRINT(DebugType::UI, "leave screen=%p id=%d prev=%d value=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), static_cast<int>(screenFlow->getPrevScreenId()), getValue());
 }
 
 void Menu::handleBackButtonPress()
@@ -832,6 +856,9 @@ void Menu::handleBackButtonPress()
         case Screen::Type::MAIN_MENU:
             saveEEPROMChanges();
             loadStartScreen();
+            break;
+        case Screen::Type::ADVANCED_MENU:
+            exitAdvancedMenu();
             break;
         default:
             // default is back

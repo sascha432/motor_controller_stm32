@@ -220,6 +220,16 @@ struct Screen
     Type getId() const;
 
     /**
+     * @brief Get the Prev Screen Id
+     *
+     * @return Type Id or WELCOME if no previous screen is set
+     */
+    Type getPrevScreenId() const
+    {
+        return prevScreen ? prevScreen->getId() : Type::WELCOME;
+    }
+
+    /**
      * @brief Set the value and normalize, update any visual elements on the screen to reflect the new value
      *
      * @param value

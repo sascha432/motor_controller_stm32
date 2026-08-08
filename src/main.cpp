@@ -43,7 +43,14 @@ static void setup()
 
     // buttons
     knobButton.init();
-    backButton.init();
+    backButton.init(nullptr, [](uint32_t duration) {
+        // do hard reset after holding the back button for 5 seconds
+        if (duration >= 5000) {
+            pid.running = false;
+            PID_WRITE_MOTOR_PWM_OFF();
+            NVIC_SystemReset();
+        }
+    });
     startButton.init();
 
     // rotary encoder knob
@@ -100,8 +107,9 @@ static void loop()
     WatchDog::feed();
 
     // handle buttons
-    if (knobButton.isReleased()) {
-        menu.handleButtonPress();
+    uint32_t dur;
+    if ((dur = knobButton.isReleased()) != 0) {
+        menu.handleButtonPress(dur);
     }
     if (backButton.isReleased()) {
         menu.handleBackButtonPress();

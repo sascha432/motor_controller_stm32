@@ -19,7 +19,7 @@
 // === UI constants ===
 struct UIConstants
 {
-    // ui slider min/max values^
+    // ui slider min/max values
     static constexpr uint32_t kStepInputCurrent = 100;                      // input current step in mA
     static constexpr uint32_t kMinInputCurrent = kStepInputCurrent * 5;     // min. input current in mA
     static constexpr uint32_t kMaxInputCurrent = 40000;                     // max. input current in mA
@@ -88,6 +88,7 @@ struct UIConstants
     // ui menu timeouts
     static constexpr uint32_t kWelcomeScreenTimeout = 2000;                 // WelcomeScreen timeout in milliseconds
     static constexpr uint32_t kInfoScreenTimeout = 1500;                    // Default InfoScreen timeout in milliseconds
+    static constexpr uint32_t kLongPressDuration = 750;                     // Long press duration in milliseconds
 
     static constexpr bool kEnableIlluminationLEDFading = true;              // Enable fading of the illumination LED while showing the welcome screen
 };
