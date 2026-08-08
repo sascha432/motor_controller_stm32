@@ -58,9 +58,8 @@ inline void diagnostic_screen_set_label_row(lv_obj_t *label, int32_t row, int32_
     lv_obj_set_y(label, diagnostic_screen_get_ypos_for_row(row) - scrollOffset);
 }
 
-inline lv_coord_t dashboard_screen_graph_map_y(int32_t value, int32_t range)
+inline lv_coord_t dashboard_screen_graph_map_y(int32_t value, int32_t range, int32_t height)
 {
-    constexpr int32_t height = std::max<int32_t>(1, Screen::kDashboardScreenGraphHeight - 1);
     return static_cast<lv_coord_t>(height - ((value * height) / range));
 }
 
@@ -794,13 +793,14 @@ void DashboardScreen::_rebuildGraphPoints()
 {
     const size_t firstIndex = stats.graphWriteIndex;
     const int32_t range = dashboard_screen_graph_compute_range();
+    constexpr int32_t height = Screen::kDashboardScreenGraphHeight - 1;
     for (int32_t i = 0; i < static_cast<int32_t>(kDashboardScreenGraphPointCount); ++i) {
         const lv_coord_t x = static_cast<lv_coord_t>((i * kDashboardScreenGraphWidth) / static_cast<int32_t>(kDashboardScreenGraphPointCount - 1));
         graphRpmPoints[i].x = x;
         graphSetRpmPoints[i].x = x;
         const size_t index = (firstIndex + i) % kDashboardScreenGraphPointCount;
-        graphRpmPoints[i].y = dashboard_screen_graph_map_y(stats.graphSamples[index].rpm, range);
-        graphSetRpmPoints[i].y = dashboard_screen_graph_map_y(stats.graphSamples[index].setRpm, range);
+        graphRpmPoints[i].y = dashboard_screen_graph_map_y(stats.graphSamples[index].rpm, range, height);
+        graphSetRpmPoints[i].y = dashboard_screen_graph_map_y(stats.graphSamples[index].setRpm, range, height);
     }
     lv_line_set_points(graphRpmLine, graphRpmPoints, kDashboardScreenGraphPointCount);
     lv_line_set_points(graphSetRpmLine, graphSetRpmPoints, kDashboardScreenGraphPointCount);
@@ -815,13 +815,14 @@ void DashboardScreen::_refreshGraphLegend(int32_t range)
     constexpr lv_coord_t minY = kDashboardScreenGraphY;
     const lv_coord_t maxY = kDashboardScreenGraphY + kDashboardScreenGraphHeight - fontHeight;
 
+    const int32_t height = Screen::kDashboardScreenGraphHeight - 1 - fontHeight;
     for (int32_t i = 0; i < tickCount; ++i) {
         const int32_t rpmValue = ((tickCount - 1 - i) * range) / (tickCount - 1);
         snprintf(graphLegendLabelBuf[i], sizeof(graphLegendLabelBuf[i]), "%u", static_cast<unsigned>(rpmValue));
         lv_label_set_text_static(graphLegendLabels[i], graphLegendLabelBuf[i]);
 
-        const lv_coord_t y = dashboard_screen_graph_map_y(rpmValue, range);
-        lv_coord_t labelY = kDashboardScreenGraphY + y - (fontHeight / 2);
+        const lv_coord_t y = dashboard_screen_graph_map_y(rpmValue, range, height);
+        lv_coord_t labelY = kDashboardScreenGraphY + y;
         labelY = std::clamp<lv_coord_t>(labelY, minY, maxY);
         lv_obj_set_pos(graphLegendLabels[i], 0, labelY);
     }
