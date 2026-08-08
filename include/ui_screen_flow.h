@@ -71,11 +71,13 @@ struct ScreenFlow {
         lv_timer_handler();
     }
 
+    #define USE_STATIC_SCREEN_ALLOC 0
+
     template<typename T, typename... Args>
     static T *newScreen(Args&&... args)
     {
         static_assert(std::is_base_of_v<Screen, T>, "T must derive from Screen");
-        #if 0
+        #if !USE_STATIC_SCREEN_ALLOC
         return new T(std::forward<Args>(args)...);
         #else
         // testing static allocation for singletons
@@ -92,7 +94,7 @@ struct ScreenFlow {
 
     static void deleteScreen(Screen *screen)
     {
-        #if 0
+        #if !USE_STATIC_SCREEN_ALLOC
         delete screen;
         #else
         switch(screen->getId()) {

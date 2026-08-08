@@ -11,7 +11,21 @@
 
 /* Memory */
 #define LV_MEM_CUSTOM 0
-#define LV_MEM_SIZE (8U * 1024U)
+#if DEBUG
+#define LV_MEM_SIZE (16U * 1024U)
+#define LV_BUFFER_LINES 24
+// redraw performance start and pid tuning graph
+// 10 lines start=128ms graph=169ms
+// 16 lines start=117ms graph=159ms
+// 20 lines start=102ms graph=144ms
+// 24 lines start=102ms graph=134ms
+// 32 lines start=102ms graph=134ms
+// 70 lines start= 92ms graph=130ms
+#else
+#define LV_MEM_SIZE (16U * 1024U)
+#define LV_BUFFER_LINES (24)
+#endif
+
 
 /* Timing */
 #define LV_TICK_CUSTOM 1

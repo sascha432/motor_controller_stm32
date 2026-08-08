@@ -180,6 +180,7 @@ static void loop()
 
         // update UI, this might take a couple 100ms
         screenFlow.refresh();
+        // DEBUG_PRINT_MSG(DebugType::UI, "lv_timer_handler=%ums\n", HAL_GetTick() - lastLvHandler);
         lastLvHandler = HAL_GetTick();
     }
 

@@ -19,7 +19,6 @@
 #endif
 
 // get dimensions from lvgl conf
-#define LV_BUFFER_LINES             (LV_VER_RES_MAX / 2)                // at least 10 horizontal lines, increase if RAM is available
 #define LV_BUFFER_SIZE              (LV_HOR_RES_MAX * LV_BUFFER_LINES)
 
 #define TFT_DMA_CH                  DMA1_Channel5
