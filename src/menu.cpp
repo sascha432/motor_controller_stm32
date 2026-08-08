@@ -721,7 +721,7 @@ void Menu::handleButtonPress()
                         "%",
                         anti_windup_format_callback
                     ));
-                    screenFlow->setSteps(UIConstants::kAntiWindupFactor / 100);
+                    screenFlow->setSteps(UIConstants::kStepsAntiWindup);
                     setValue(eeprom.getAntiWindup());
                     break;
                 case PIDParametersItemType::BACK:
@@ -752,7 +752,9 @@ void Menu::handleButtonPress()
                 DashboardScreen &dashboard = *reinterpret_cast<DashboardScreen *>(screenFlow.getScreen());
                 switch(dashboard.incrSelectedValue()) {
                     case DashboardScreen::SelectedValueType::SPEED:
+                    case DashboardScreen::SelectedValueType::SPEED2:
                         dashboard.setMaxAcceleration(eeprom.isPIDMode() ? UIConstants::kStepsRPM : UIConstants::kStepsPWM);
+                        screenFlow->setSteps(1);
                         setValue(eeprom.getSpeed());
                         break;
                     case DashboardScreen::SelectedValueType::KP:
@@ -772,6 +774,7 @@ void Menu::handleButtonPress()
                         break;
                     case DashboardScreen::SelectedValueType::ANTI_WINDUP:
                         dashboard.setMaxAcceleration(std::sqrt(UIConstants::kMaxAntiWindup - UIConstants::kMinAntiWindup));
+                        screenFlow->setSteps(UIConstants::kStepsAntiWindup);
                         setValue(eeprom.getAntiWindup());
                         break;
                     case DashboardScreen::SelectedValueType::MAX:
@@ -867,6 +870,7 @@ int32_t Menu::updateRotaryValue(int32_t value)
         case Screen::Type::DASHBOARD:
             switch(reinterpret_cast<DashboardScreen *>(screenFlow.getScreen())->getSelectedValue()) {
                 case DashboardScreen::SelectedValueType::SPEED:
+                case DashboardScreen::SelectedValueType::SPEED2:
                     updateSpeedValue();
                     break;
                 case DashboardScreen::SelectedValueType::KP:
