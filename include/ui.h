@@ -20,6 +20,7 @@
 #define COLOR_PALETTE_WHITE                     lv_color_make(255, 255, 255)
 #define COLOR_PALETTE_BLACK                     lv_color_make(0, 0, 0)
 #define COLOR_PALETTE_DARK_GRAY                 lv_color_make(8, 8, 8)
+#define COLOR_PALETTE_MEDIUM_GRAY               lv_color_make(24, 24, 24)
 #define COLOR_PALETTE_LIGHT_GRAY                lv_color_make(64, 64, 64)
 #define COLOR_PALETTE_RED                       lv_color_make(255, 0, 0)
 #define COLOR_PALETTE_GREEN                     lv_color_make(0, 255, 0)
@@ -63,6 +64,7 @@
 #define DASHBOARDSCREEN_COLOR_PWM_LABEL         COLOR_PALETTE_CYAN
 #define DASHBOARDSCREEN_COLOR_GRAPH_BG          COLOR_PALETTE_BLACK
 #define DASHBOARDSCREEN_COLOR_GRAPH_BORDER      COLOR_PALETTE_DARK_GRAY
+#define DASHBOARDSCREEN_COLOR_GRAPH_Y_LEGEND    COLOR_PALETTE_MEDIUM_GRAY
 #define DASHBOARDSCREEN_COLOR_GRAPH_RPM         COLOR_PALETTE_CYAN
 #define DASHBOARDSCREEN_COLOR_GRAPH_SET_RPM     COLOR_PALETTE_YELLOW
 
@@ -168,6 +170,7 @@ struct Screen
     static constexpr const lv_font_t *kDashboardScreenSpeedFont = &lv_font_dejavu_sans_mono_24;
     static constexpr const lv_font_t *kDashboardScreenValueFixedFont = &lv_font_dejavu_sans_mono_14;
     static constexpr const lv_font_t *kDashboardScreenValueFont = &lv_font_montserrat_14;
+    static constexpr const lv_font_t *kDashboardScreenGraphLegendFont = &lv_font_montserrat_10_digits;
     static constexpr lv_coord_t kDashboardScreenContainerX = 8;
     static constexpr lv_coord_t kDashboardScreenContainerY = 6;
     static constexpr lv_coord_t kDashboardScreenContainerWidth = kScreenWidth - (kDashboardScreenContainerX * 2);
@@ -180,11 +183,13 @@ struct Screen
     static constexpr lv_coord_t kDashboardScreenValueTuningOffsetY = 40;
     static constexpr lv_coord_t kDashboardScreenValueLabelHeight = 14;
     static constexpr lv_coord_t kDashboardScreenGraphTopGap = 4;
-    static constexpr lv_coord_t kDashboardScreenGraphX = 0;
+    static constexpr lv_coord_t kDashboardScreenGraphLegendWidth = 24;
+    static constexpr lv_coord_t kDashboardScreenGraphX = kDashboardScreenGraphLegendWidth;
     static constexpr lv_coord_t kDashboardScreenGraphY = kDashboardScreenValueTuningOffsetY + kDashboardScreenValueLabelHeight + kDashboardScreenGraphTopGap;
-    static constexpr lv_coord_t kDashboardScreenGraphWidth = kDashboardScreenContainerWidth;
+    static constexpr lv_coord_t kDashboardScreenGraphWidth = kDashboardScreenContainerWidth - kDashboardScreenGraphLegendWidth;
     static constexpr lv_coord_t kDashboardScreenGraphHeight = kDashboardScreenContainerHeight - kDashboardScreenGraphY - 1;
     static constexpr int32_t kDashboardScreenGraphMinRpmSpan = 250;
+    static constexpr size_t kDashboardScreenGraphLegendCount = 4;
     static constexpr size_t kDashboardScreenGraphPointCount = sizeof_array(stats.graphSamples);
 
     // start screen style constants
@@ -464,6 +469,7 @@ struct DashboardScreen : public Screen
         graphContainer(nullptr),
         graphRpmLine(nullptr),
         graphSetRpmLine(nullptr),
+        graphLegendLabels{},
         selectedValue(SelectedValueType::SPEED),
         lastSelectedValue(SelectedValueType::MAX)
     {
@@ -508,6 +514,7 @@ struct DashboardScreen : public Screen
 protected:
     void _refreshVisuals();
     void _rebuildGraphPoints();
+    void _refreshGraphLegend(int32_t range);
 
 protected:
     lv_obj_t *voltageLabel;
@@ -519,6 +526,7 @@ protected:
     lv_obj_t *graphContainer;
     lv_obj_t *graphRpmLine;
     lv_obj_t *graphSetRpmLine;
+    lv_obj_t *graphLegendLabels[kDashboardScreenGraphLegendCount];
     SelectedValueType selectedValue;
     SelectedValueType lastSelectedValue;
     lv_point_t graphRpmPoints[kDashboardScreenGraphPointCount];
@@ -529,6 +537,7 @@ protected:
     char mosfetTempLabelBuf[8];
     char rpmLabelBuf[16];
     char valueLabelBuf[24];
+    char graphLegendLabelBuf[kDashboardScreenGraphLegendCount][8];
 };
 
 // === Start Screen ===

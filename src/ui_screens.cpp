@@ -64,6 +64,17 @@ inline lv_coord_t dashboard_screen_graph_map_y(int32_t value, int32_t range)
     return static_cast<lv_coord_t>(height - ((value * height) / range));
 }
 
+inline int32_t dashboard_screen_graph_compute_range()
+{
+    int32_t maxRpm = 0;
+    for (const auto &sample : stats.graphSamples) {
+        maxRpm = std::max<int32_t>(maxRpm, std::max<int32_t>(sample.rpm, sample.setRpm));
+    }
+    maxRpm = ((maxRpm + 19) * 294) / 256;
+    maxRpm = (maxRpm / 20) * 20;
+    return std::max<int32_t>(Screen::kDashboardScreenGraphMinRpmSpan, maxRpm);
+}
+
 void start_screen_update_top_status_labels(lv_obj_t *voltageLabel, lv_obj_t *currentLabel, lv_obj_t *motorTempLabel, lv_obj_t *mosfetTempLabel, char *voltageLabelBuf, size_t voltageLabelBufSize, char *currentLabelBuf, size_t currentLabelBufSize, char *motorTempLabelBuf, size_t motorTempLabelBufSize, char *mosfetTempLabelBuf, size_t mosfetTempLabelBufSize)
 {
     snprintf(voltageLabelBuf, voltageLabelBufSize, "%u.%uV (%u.%uV)", CONVERT_TO_FP1(stats.vcc), CONVERT_TO_FP1(stats.max.vcc));
@@ -637,6 +648,17 @@ void DashboardScreen::load()
     lv_obj_set_width(valueLabel, kDashboardScreenContainerWidth);
     lv_obj_set_style_text_align(valueLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
 
+    for (size_t i = 0; i < kDashboardScreenGraphLegendCount; ++i) {
+        graphLegendLabels[i] = lv_label_create(container);
+        lv_obj_set_style_text_color(graphLegendLabels[i], DASHBOARDSCREEN_COLOR_GRAPH_Y_LEGEND, LV_PART_MAIN);
+        lv_obj_set_style_text_font(graphLegendLabels[i], kDashboardScreenGraphLegendFont, LV_PART_MAIN);
+        lv_obj_set_width(graphLegendLabels[i], kDashboardScreenGraphLegendWidth - 2);
+        lv_obj_set_style_text_align(graphLegendLabels[i], LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
+        lv_label_set_long_mode(graphLegendLabels[i], LV_LABEL_LONG_CLIP);
+        // lv_label_set_text_static(graphLegendLabels[i], "0");
+        lv_obj_set_pos(graphLegendLabels[i], 0, kDashboardScreenGraphY);
+    }
+
     graphContainer = lv_obj_create(container);
     lv_obj_remove_style_all(graphContainer);
     lv_obj_set_pos(graphContainer, kDashboardScreenGraphX, kDashboardScreenGraphY);
@@ -678,6 +700,9 @@ void DashboardScreen::_refreshVisuals()
                 lv_obj_set_style_text_align(valueLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
 
                 lv_obj_add_flag(graphContainer, LV_OBJ_FLAG_HIDDEN);
+                for (auto *label : graphLegendLabels) {
+                    lv_obj_add_flag(label, LV_OBJ_FLAG_HIDDEN);
+                }
                 break;
             default:
                 lv_obj_set_style_text_font(rpmLabel, kDashboardScreenValueFixedFont, LV_PART_MAIN);
@@ -702,6 +727,9 @@ void DashboardScreen::_refreshVisuals()
                 }
 
                 lv_obj_clear_flag(graphContainer, LV_OBJ_FLAG_HIDDEN);
+                for (auto *label : graphLegendLabels) {
+                    lv_obj_clear_flag(label, LV_OBJ_FLAG_HIDDEN);
+                }
                 break;
         }
         lastSelectedValue = selectedValue;
@@ -765,25 +793,38 @@ void DashboardScreen::_refreshVisuals()
 void DashboardScreen::_rebuildGraphPoints()
 {
     const size_t firstIndex = stats.graphWriteIndex;
-    int32_t maxRpm = 0;
-    for (const auto &sample : stats.graphSamples) {
-        maxRpm = std::max<int32_t>(maxRpm, std::max<int32_t>(sample.rpm, sample.setRpm));
-    }
-    maxRpm = ((maxRpm + 19) * 294) / 256;
-    maxRpm = (maxRpm / 20) * 20;
-    const int32_t range = std::max<int32_t>(kDashboardScreenGraphMinRpmSpan, maxRpm);
-    constexpr int32_t height = std::max<int32_t>(1, Screen::kDashboardScreenGraphHeight - 1);
-    for (int32_t i = 0; i < (int32_t)kDashboardScreenGraphPointCount; ++i) {
+    const int32_t range = dashboard_screen_graph_compute_range();
+    for (int32_t i = 0; i < static_cast<int32_t>(kDashboardScreenGraphPointCount); ++i) {
         const lv_coord_t x = static_cast<lv_coord_t>((i * kDashboardScreenGraphWidth) / static_cast<int32_t>(kDashboardScreenGraphPointCount - 1));
         graphRpmPoints[i].x = x;
         graphSetRpmPoints[i].x = x;
         const size_t index = (firstIndex + i) % kDashboardScreenGraphPointCount;
-        graphRpmPoints[i].y = static_cast<lv_coord_t>(height - ((stats.graphSamples[index].rpm * height) / range));
-        graphSetRpmPoints[i].y = static_cast<lv_coord_t>(height - ((stats.graphSamples[index].setRpm * height) / range));
+        graphRpmPoints[i].y = dashboard_screen_graph_map_y(stats.graphSamples[index].rpm, range);
+        graphSetRpmPoints[i].y = dashboard_screen_graph_map_y(stats.graphSamples[index].setRpm, range);
     }
     lv_line_set_points(graphRpmLine, graphRpmPoints, kDashboardScreenGraphPointCount);
     lv_line_set_points(graphSetRpmLine, graphSetRpmPoints, kDashboardScreenGraphPointCount);
+    _refreshGraphLegend(range);
     stats.graphDirty = false;
+}
+
+void DashboardScreen::_refreshGraphLegend(int32_t range)
+{
+    constexpr int32_t tickCount = static_cast<int32_t>(kDashboardScreenGraphLegendCount);
+    const lv_coord_t fontHeight = lv_font_get_line_height(kDashboardScreenGraphLegendFont);
+    constexpr lv_coord_t minY = kDashboardScreenGraphY;
+    const lv_coord_t maxY = kDashboardScreenGraphY + kDashboardScreenGraphHeight - fontHeight;
+
+    for (int32_t i = 0; i < tickCount; ++i) {
+        const int32_t rpmValue = ((tickCount - 1 - i) * range) / (tickCount - 1);
+        snprintf(graphLegendLabelBuf[i], sizeof(graphLegendLabelBuf[i]), "%u", static_cast<unsigned>(rpmValue));
+        lv_label_set_text_static(graphLegendLabels[i], graphLegendLabelBuf[i]);
+
+        const lv_coord_t y = dashboard_screen_graph_map_y(rpmValue, range);
+        lv_coord_t labelY = kDashboardScreenGraphY + y - (fontHeight / 2);
+        labelY = std::clamp<lv_coord_t>(labelY, minY, maxY);
+        lv_obj_set_pos(graphLegendLabels[i], 0, labelY);
+    }
 }
 
 void DashboardScreen::setValue(uint32_t value)
