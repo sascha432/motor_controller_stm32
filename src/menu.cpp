@@ -977,7 +977,7 @@ int32_t Menu::updateRotaryValue(int32_t value)
             eeprom.setMotorStallTimeout(getValue());
             break;
         case Screen::Type::PID_KP:
-            eeprom.setKp(EEPROM::kUint32ToPIDParam(value));
+            eeprom.setKp(EEPROM::kUint32ToPIDParam(getValue()));
             pid.applyPIDParams();
             break;
         case Screen::Type::PID_KI:
