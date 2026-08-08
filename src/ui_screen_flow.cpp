@@ -42,13 +42,7 @@ void ScreenFlow::back()
         auto tmp = screen->prevScreen;
         delete screen;
         screen = tmp;
-        if (kUIKeepScreenObjectsInMemory) {
-            lv_scr_load(screen->screen);
-            knob.setMaxAcceleration(screen->maxAcceleration);
-        }
-        else {
-            screen->load();
-        }
+        screen->load();
     }
 }
 
@@ -56,7 +50,7 @@ void ScreenFlow::next(Screen *nextScreen)
 {
     DEBUG_PRINT(DebugType::UI, "next=%p current=%p", nextScreen, screen);
     nextScreen->prevScreen = screen;
-    if (kUIKeepScreenObjectsInMemory == false && nextScreen->prevScreen) {
+    if (nextScreen->prevScreen) {
         lv_obj_clean(nextScreen->prevScreen->screen);
     }
     screen = nextScreen;

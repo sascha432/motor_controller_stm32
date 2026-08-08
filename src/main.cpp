@@ -16,6 +16,13 @@
 #include "helpers.h"
 #include "debug.h"
 
+#if LV_USE_LOG
+static void lvgl_log_cb(const char *buf)
+{
+    DEBUG_PRINT_MSG(DebugType::UI, "LVGL: %s", buf ? buf : "<null>");
+}
+#endif
+
 // === core setup ===
 
 static void setup()
@@ -64,6 +71,9 @@ static void user_setup()
 
     // Initialize LVGL and register flush callback
     lv_init();
+    #if LV_USE_LOG
+        lv_log_register_print_cb(lvgl_log_cb);
+    #endif
     tft_driver_lvgl_init();
 
     // start the watchdog after startup is complete

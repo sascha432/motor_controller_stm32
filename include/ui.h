@@ -15,9 +15,6 @@
 #include "debug.h"
 #include "stats.h"
 
-// set to true to keep screen objects in memory when switching screens
-static constexpr bool kUIKeepScreenObjectsInMemory = false;
-
 // === Color palette and schema ===
 
 #define COLOR_PALETTE_WHITE                     lv_color_make(255, 255, 255)
@@ -381,6 +378,7 @@ private:
     lv_obj_t *sliderKnob;
     lv_obj_t *valueLabel;
     FormatCallbackType formatCallback;
+    char valueLabelBuf[24];
 };
 
 // === PID Slider Screen ===
@@ -525,6 +523,12 @@ protected:
     static lv_point_t graphSetRpmPoints[kDashboardScreenGraphPointCount];
     SelectedValueType selectedValue;
     SelectedValueType lastSelectedValue;
+    char voltageLabelBuf[14];
+    char currentLabelBuf[14];
+    char motorTempLabelBuf[8];
+    char mosfetTempLabelBuf[8];
+    char rpmLabelBuf[16];
+    char valueLabelBuf[24];
 };
 
 // === Start Screen ===
@@ -556,6 +560,12 @@ private:
     lv_obj_t *mosfetTempLabel;
     lv_obj_t *directionLabel;
     lv_obj_t *speedLabel;
+    char voltageLabelBuf[14];
+    char currentLabelBuf[14];
+    char motorTempLabelBuf[8];
+    char mosfetTempLabelBuf[8];
+    char directionLabelBuf[16];
+    char speedLabelBuf[16];
 };
 
 #include "ui_screen_flow.h"

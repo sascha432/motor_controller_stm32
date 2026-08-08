@@ -167,7 +167,7 @@ void debug_init(void);
     #define DEBUG_PRINT_MSG(level, msg, ...) \
         do { \
             if ((uint32_t)(DEBUG_LEVEL) & (uint32_t)(level)) { \
-                Serial.printf(msg "\n", ##__VA_ARGS__); \
+                Serial.printf(msg, ##__VA_ARGS__); \
             } \
         } while(0)
 
@@ -186,7 +186,7 @@ void debug_init(void);
     #define DEBUG_PRINT_MSG(level, msg, ...) \
         do { \
             if ((uint32_t)(DEBUG_LEVEL) & (uint32_t)(level)) { \
-                debug_swd_printf(msg "\n", ##__VA_ARGS__); \
+                debug_swd_printf(msg, ##__VA_ARGS__); \
             } \
         } while(0)
 
@@ -206,7 +206,7 @@ void debug_init(void);
     #define DEBUG_PRINT_MSG(level, msg, ...) \
         do { \
             if ((uint32_t)(DEBUG_LEVEL) & (uint32_t)(level)) { \
-                debug_usb_printf(msg "\n", ##__VA_ARGS__); \
+                debug_usb_printf(msg, ##__VA_ARGS__); \
             } \
         } while(0)
 

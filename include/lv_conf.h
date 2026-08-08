@@ -23,12 +23,25 @@
 #define LV_DRAW_COMPLEX 1
 
 /* Logging and asserts */
+
+#ifndef LV_USE_LOG
 #define LV_USE_LOG 0
-#define LV_USE_ASSERT_NULL 0
+#endif
+
+#if LV_USE_LOG
+#define LV_LOG_LEVEL LV_LOG_LEVEL_WARN
+#define LV_USE_ASSERT_MALLOC 1
+#define LV_USE_ASSERT_MEM_INTEGRITY 1
+#define LV_USE_ASSERT_NULL 1
+#define LV_USE_ASSERT_STYLE 1
+#define LV_USE_ASSERT_OBJ 1
+#else
 #define LV_USE_ASSERT_MALLOC 0
-#define LV_USE_ASSERT_STYLE 0
 #define LV_USE_ASSERT_MEM_INTEGRITY 0
+#define LV_USE_ASSERT_NULL 0
+#define LV_USE_ASSERT_STYLE 0
 #define LV_USE_ASSERT_OBJ 0
+#endif
 
 /* Theme/layout */
 #define LV_USE_THEME_DEFAULT 0

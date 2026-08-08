@@ -64,21 +64,19 @@ inline lv_coord_t dashboard_screen_graph_map_y(int32_t value, int32_t range)
     return static_cast<lv_coord_t>(height - ((value * height) / range));
 }
 
-void start_screen_update_top_status_labels(lv_obj_t *voltageLabel, lv_obj_t *currentLabel, lv_obj_t *motorTempLabel, lv_obj_t *mosfetTempLabel)
+void start_screen_update_top_status_labels(lv_obj_t *voltageLabel, lv_obj_t *currentLabel, lv_obj_t *motorTempLabel, lv_obj_t *mosfetTempLabel, char *voltageLabelBuf, size_t voltageLabelBufSize, char *currentLabelBuf, size_t currentLabelBufSize, char *motorTempLabelBuf, size_t motorTempLabelBufSize, char *mosfetTempLabelBuf, size_t mosfetTempLabelBufSize)
 {
-    char buf[32];
+    snprintf(voltageLabelBuf, voltageLabelBufSize, "%u.%uV (%u.%uV)", CONVERT_TO_FP1(stats.vcc), CONVERT_TO_FP1(stats.max.vcc));
+    lv_label_set_text_static(voltageLabel, voltageLabelBuf);
 
-    snprintf(buf, sizeof(buf) - 1, "%u.%uV (%u.%uV)", CONVERT_TO_FP1(stats.vcc), CONVERT_TO_FP1(stats.max.vcc));
-    lv_label_set_text(voltageLabel, buf);
+    snprintf(currentLabelBuf, currentLabelBufSize, "%u.%uA (%u.%uA)", CONVERT_TO_FP1(stats.current), CONVERT_TO_FP1(stats.max.current));
+    lv_label_set_text_static(currentLabel, currentLabelBuf);
 
-    snprintf(buf, sizeof(buf) - 1, "%u.%uA (%u.%uA)", CONVERT_TO_FP1(stats.current), CONVERT_TO_FP1(stats.max.current));
-    lv_label_set_text(currentLabel, buf);
+    snprintf(motorTempLabelBuf, motorTempLabelBufSize, "%d" DEGREE_UTF8 "C", stats.motorTemp);
+    lv_label_set_text_static(motorTempLabel, motorTempLabelBuf);
 
-    snprintf(buf, sizeof(buf) - 1, "%d" DEGREE_UTF8 "C", stats.motorTemp);
-    lv_label_set_text(motorTempLabel, buf);
-
-    snprintf(buf, sizeof(buf) - 1, "%d" DEGREE_UTF8 "C", stats.mosfetTemp);
-    lv_label_set_text(mosfetTempLabel, buf);
+    snprintf(mosfetTempLabelBuf, mosfetTempLabelBufSize, "%d" DEGREE_UTF8 "C", stats.mosfetTemp);
+    lv_label_set_text_static(mosfetTempLabel, mosfetTempLabelBuf);
 }
 
 void menuscreen_style_menu_row(lv_obj_t *row, bool selected)
@@ -409,15 +407,15 @@ void SliderScreen::_refreshVisuals()
     lv_obj_set_size(sliderFillAfter, remaining + 8 - 2, sliderFillHeight);
 
     if (formatCallback) {
-        char buf[64];
-        lv_label_set_text(valueLabel, formatCallback(value, buf, sizeof(buf) - 1));
+        lv_label_set_text_static(valueLabel, formatCallback(value, valueLabelBuf, sizeof(valueLabelBuf) - 1));
     }
     else {
         if (zeroLabel && value == 0) {
             lv_label_set_text_static(valueLabel, zeroLabel);
         }
         else {
-            lv_label_set_text_fmt(valueLabel, "%u%s", static_cast<unsigned>(value), unit);
+            snprintf(valueLabelBuf, sizeof(valueLabelBuf) - 1, "%u%s", static_cast<unsigned>(value), unit);
+            lv_label_set_text_static(valueLabel, valueLabelBuf);
         }
     }
 }
@@ -670,8 +668,6 @@ void DashboardScreen::load()
 
 void DashboardScreen::_refreshVisuals()
 {
-    char buf[32];
-
     if (lastSelectedValue != selectedValue) { // mode changed
         switch(selectedValue) {
             case SelectedValueType::SPEED:
@@ -720,41 +716,48 @@ void DashboardScreen::_refreshVisuals()
     }
 
     if (eeprom.isPIDMode()) {
-        snprintf(buf, sizeof(buf) - 1, "%u RPM (%u)", (unsigned)pid.clampRPM(pid.stats.rpm.get()), (unsigned)pid.getRPM());
+        snprintf(rpmLabelBuf, sizeof(rpmLabelBuf) - 1, "%u RPM (%u)", (unsigned)pid.clampRPM(pid.stats.rpm.get()), (unsigned)pid.getRPM());
     }
     else {
-        snprintf(buf, sizeof(buf) - 1, "%u RPM", (unsigned)pid.clampRPM(pid.stats.rpm.get()));
+        snprintf(rpmLabelBuf, sizeof(rpmLabelBuf) - 1, "%u RPM", (unsigned)pid.clampRPM(pid.stats.rpm.get()));
     }
-    lv_label_set_text(rpmLabel, buf);
+    lv_label_set_text_static(rpmLabel, rpmLabelBuf);
 
-    start_screen_update_top_status_labels(voltageLabel, currentLabel, motorTempLabel, mosfetTempLabel);
+    start_screen_update_top_status_labels(voltageLabel, currentLabel, motorTempLabel, mosfetTempLabel, voltageLabelBuf, sizeof(voltageLabelBuf), currentLabelBuf, sizeof(currentLabelBuf), motorTempLabelBuf, sizeof(motorTempLabelBuf), mosfetTempLabelBuf, sizeof(mosfetTempLabelBuf));
 
     switch(selectedValue) {
         case SelectedValueType::SPEED:
-            lv_label_set_text_fmt(valueLabel, "PWM %d%% %u.%uW", (int)((pid.stats.pwm.get() * 100) / pid.getPWMLevelARR()), CONVERT_TO_FP1(stats.vcc * stats.current / 1000U));
+            snprintf(valueLabelBuf, sizeof(valueLabelBuf) - 1, "PWM %d%% %u.%uW", (int)((pid.stats.pwm.get() * 100) / pid.getPWMLevelARR()), CONVERT_TO_FP1(stats.vcc * stats.current / 1000U));
+            lv_label_set_text_static(valueLabel, valueLabelBuf);
             break;
         case SelectedValueType::SPEED2:
-            lv_label_set_text_fmt(valueLabel, "PWM %d%%", (int)((pid.stats.pwm.get() * 100) / pid.getPWMLevelARR()));
+            snprintf(valueLabelBuf, sizeof(valueLabelBuf) - 1, "PWM %d%%", (int)((pid.stats.pwm.get() * 100) / pid.getPWMLevelARR()));
+            lv_label_set_text_static(valueLabel, valueLabelBuf);
             break;
         case SelectedValueType::KP:
-            FloatToString::convertTrimmed(buf, sizeof(buf) - 1, eeprom.getKp(), 6);
-            lv_label_set_text_fmt(valueLabel, "Kp %s", buf);
+            memcpy(valueLabelBuf, "Kp ", 3);
+            FloatToString::convertTrimmed(valueLabelBuf + 3, sizeof(valueLabelBuf) - 4, eeprom.getKp(), 6);
+            lv_label_set_text_static(valueLabel, valueLabelBuf);
             break;
         case SelectedValueType::KI:
-            FloatToString::convertTrimmed(buf, sizeof(buf) - 1, eeprom.getKi(), 6);
-            lv_label_set_text_fmt(valueLabel, "Ki %s", buf);
+            memcpy(valueLabelBuf, "Ki ", 3);
+            FloatToString::convertTrimmed(valueLabelBuf + 3, sizeof(valueLabelBuf) - 4, eeprom.getKi(), 6);
+            lv_label_set_text_static(valueLabel, valueLabelBuf);
             break;
         case SelectedValueType::KD:
-            FloatToString::convertTrimmed(buf, sizeof(buf) - 1, eeprom.getKd(), 6);
-            lv_label_set_text_fmt(valueLabel, "Kd %s", buf);
+            memcpy(valueLabelBuf, "Kd ", 3);
+            FloatToString::convertTrimmed(valueLabelBuf + 3, sizeof(valueLabelBuf) - 4, eeprom.getKd(), 6);
+            lv_label_set_text_static(valueLabel, valueLabelBuf);
             break;
         case SelectedValueType::ANTI_WINDUP: {
             if (eeprom.getAntiWindup() == 0) {
-                lv_label_set_text_static(valueLabel, "Anti-windup DISABLED");
+                snprintf(valueLabelBuf, sizeof(valueLabelBuf) - 1, "Anti-windup DISABLED");
+                lv_label_set_text_static(valueLabel, valueLabelBuf);
             }
             else {
                 const uint32_t antiWindup = (eeprom.getAntiWindup() * 1000) / UIConstants::kAntiWindupFactor;
-                lv_label_set_text_fmt(valueLabel, "Anti-windup " SPRINTF_FP2_FMT "%%", CONVERT_TO_FP2(antiWindup));
+                snprintf(valueLabelBuf, sizeof(valueLabelBuf) - 1, "Anti-windup " SPRINTF_FP2_FMT "%%", CONVERT_TO_FP2(antiWindup));
+                lv_label_set_text_static(valueLabel, valueLabelBuf);
             }
             break;
         }
@@ -865,14 +868,12 @@ void StartScreen::load()
 
 void StartScreen::_refreshVisuals()
 {
-    char buf[32];
-
-    start_screen_update_top_status_labels(voltageLabel, currentLabel, motorTempLabel, mosfetTempLabel);
+    start_screen_update_top_status_labels(voltageLabel, currentLabel, motorTempLabel, mosfetTempLabel, voltageLabelBuf, sizeof(voltageLabelBuf), currentLabelBuf, sizeof(currentLabelBuf), motorTempLabelBuf, sizeof(motorTempLabelBuf), mosfetTempLabelBuf, sizeof(mosfetTempLabelBuf));
 
     // blink any errors
     if (((HAL_GetTick() / 1024) & 0x01) == 0 && pid.hasErrorCode()) {
-        pid.errorPrintf(buf, sizeof(buf) - 1);
-        lv_label_set_text(directionLabel, buf);
+        pid.errorPrintf(directionLabelBuf, sizeof(directionLabelBuf) - 1);
+        lv_label_set_text_static(directionLabel, directionLabelBuf);
         lv_obj_set_style_text_color(directionLabel, STARTSCREEN_COLOR_ERROR, LV_PART_MAIN);
         lv_obj_set_style_border_color(directionLabel, STARTSCREEN_COLOR_ERROR_LABEL, LV_PART_MAIN);
         lv_obj_set_style_bg_color(directionLabel, STARTSCREEN_COLOR_ERROR_BG, LV_PART_MAIN);
@@ -884,8 +885,8 @@ void StartScreen::_refreshVisuals()
         lv_obj_set_style_bg_color(directionLabel, STARTSCREEN_COLOR_START_BG, LV_PART_MAIN);
     }
 
-    snprintf(buf, sizeof(buf) - 1, eeprom.isPIDMode() ? "%u RPM" : "%u%% PWM", (unsigned)eeprom.getSpeed());
-    lv_label_set_text(speedLabel, buf);
+    snprintf(speedLabelBuf, sizeof(speedLabelBuf) - 1, eeprom.isPIDMode() ? "%u RPM" : "%u%% PWM", (unsigned)eeprom.getSpeed());
+    lv_label_set_text_static(speedLabel, speedLabelBuf);
 }
 
 void StartScreen::update()
