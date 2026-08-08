@@ -1,9 +1,5 @@
 # DC Motor Controller Firmware for STM32F107/DRV8701
 
-## TODOs
-
- - PID tuning over USB and/or UART for PCB Rev1.1
-
 ## Software Features
 
 - Start/dashboard workflow for quick motor start-stop and live runtime status
@@ -44,6 +40,8 @@
 ## Some pictures
 
 ![Enclosure and motor](stl/enclosure_and_motor.jpg)
+
+![PID tuning](stl/pid_tuning.jpg)
 
 ![PCB front](stl/pcb_front.jpg)
 
