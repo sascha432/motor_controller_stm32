@@ -69,6 +69,7 @@ struct EEPROM
         uint16_t anti_windup;
         uint16_t ovp_protection;
         uint16_t pwm_frequency;
+        bool motor_chime;
 
         /**
          * @brief Construct a new Data object with default settings
@@ -99,7 +100,8 @@ struct EEPROM
             Kd(UIConstants::kDefaultKd),
             anti_windup(UIConstants::kDefaultAntiWindup),
             ovp_protection(UIConstants::kDefaultOvpProtection),
-            pwm_frequency(UIConstants::kDefaultPWMFrequency)
+            pwm_frequency(UIConstants::kDefaultPWMFrequency),
+            motor_chime(UIConstants::kDefaultMotorChime)
         {}
 
         /**
@@ -433,6 +435,16 @@ struct EEPROM
     uint16_t getPWMFrequency() const
     {
         return data.pwm_frequency;
+    }
+
+    bool getMotorChime() const
+    {
+        return data.motor_chime;
+    }
+
+    void setMotorChime(bool value)
+    {
+        data.motor_chime = value;
     }
 
 protected:

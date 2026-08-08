@@ -420,7 +420,10 @@ void SliderScreen::_refreshVisuals()
         lv_label_set_text_static(valueLabel, formatCallback(value, valueLabelBuf, sizeof(valueLabelBuf) - 1));
     }
     else {
-        if (zeroLabel && value == 0) {
+        if (minValue == 0 && maxValue == 1) {
+            lv_label_set_text_static(valueLabel, value ? "ON" : "OFF");
+        }
+        else if (zeroLabel && value == 0) {
             lv_label_set_text_static(valueLabel, zeroLabel);
         }
         else {

@@ -84,6 +84,7 @@ struct UIConstants
     static constexpr uint16_t kDefaultAntiWindup = 90 * kAntiWindupFactor;  // Default PID anti-windup in percentage (0-100) * kAntiWindupFactor
     static constexpr uint16_t kDefaultOvpProtection = 36500;                // Default OVP protection in millivolts
     static constexpr uint16_t kDefaultPWMFrequency = 16500;                 // Default PWM frequency in Hz
+    static constexpr bool kDefaultMotorChime = true;                        // Default welcome chime enabled
 
     // ui menu timeouts
     static constexpr uint32_t kWelcomeScreenTimeout = 2000;                 // WelcomeScreen timeout in milliseconds

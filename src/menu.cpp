@@ -50,6 +50,7 @@ enum class AdvancedMenuItemType {
     PID_PARAMETERS,
     PWM_FREQUENCY,
     OVP_PROTECTION,
+    WELCOME_CHIME,
     DIAGNOSTICS,
 #if HAVE_IMPERIAL_MARCH
     PLAY_IMPERIAL_MARCH,
@@ -67,9 +68,10 @@ static const char *kAdvancedMenuItems[] = {
     "PID Parameters",           // 6
     "PWM Frequency",            // 7
     "OVP Protection",           // 8
-    "Diagnostics",              // 9
+    "Welcome Chime",            // 9
+    "Diagnostics",              // 10
 #if HAVE_IMPERIAL_MARCH
-    "Play Imperial March",      // 10
+    "Play Imperial March",      // 11
 #endif
     "Back"
 };
@@ -244,7 +246,10 @@ void Menu::loadWelcomeScreen()
 
         #if HAVE_MOTOR_VIBES
             MotorVibes chime;
-            chime.init();
+            const bool play = eeprom.getMotorChime();
+            if (play) {
+                chime.init();
+            }
 
             const uint8_t chimeFrequency50msInterval[] = {
                 104, 104, 104,  // 520 Hz
@@ -283,15 +288,19 @@ void Menu::loadWelcomeScreen()
             ((elapsed / 500) & 0x01) ? LEDs::onLEDError() : LEDs::onLEDWarning();
             #if HAVE_MOTOR_VIBES
                 // play chime tone
-                const uint32_t index = i / 5;
-                chime.playTone((index >= sizeof(chimeFrequency50msInterval)) ? 0 : (chimeFrequency50msInterval[index] * 5));
+                if (play) {
+                    const uint32_t index = i / 5;
+                    chime.playTone((index >= sizeof(chimeFrequency50msInterval)) ? 0 : (chimeFrequency50msInterval[index] * 5));
+                }
             #endif
             WatchDog::delay(kLoopDelay);
         }
         LEDs::off();
         #if HAVE_MOTOR_VIBES
-            chime.stopTone();
-            chime.deinit();
+            if (play) {
+                chime.stopTone();
+                chime.deinit();
+            }
         #endif
     }
     else {
@@ -438,6 +447,7 @@ void Menu::handleButtonPress(uint32_t duration)
         // === start screen ===
         case Screen::Type::START:
             if (duration >= UIConstants::kLongPressDuration) {
+                screenFlow.destroy();
                 loadAdvancedMenu();
             }
             else {
@@ -663,6 +673,16 @@ void Menu::handleButtonPress(uint32_t duration)
                     screenFlow.next(ScreenFlow::newScreen<DiagnosticsScreen>(Screen::Type::DIAGNOSTICS));
                     setValue(0);
                     break;
+                case AdvancedMenuItemType::WELCOME_CHIME:
+                    screenFlow.next(ScreenFlow::newScreen<SliderScreen>(
+                        Screen::Type::WELCOME_CHIME,
+                        "Welcome Chime",
+                        0,
+                        1,
+                        ""
+                    ));
+                    setValue(eeprom.getMotorChime());
+                    break;
                 #if HAVE_IMPERIAL_MARCH
                 case AdvancedMenuItemType::PLAY_IMPERIAL_MARCH:
                     playImperialMarch();
@@ -829,6 +849,7 @@ void Menu::handleButtonPress(uint32_t duration)
         case Screen::Type::PID_ANTI_WINDUP:
         case Screen::Type::OVP_PROTECTION:
         case Screen::Type::PWM_FREQUENCY:
+        case Screen::Type::WELCOME_CHIME:
             restorePreviousMenu();
             break;
         case Screen::Type::WELCOME:
@@ -997,6 +1018,9 @@ int32_t Menu::updateRotaryValue(int32_t value)
             break;
         case Screen::Type::PWM_FREQUENCY:
             eeprom.setPWMFrequency(getValue());
+            break;
+        case Screen::Type::WELCOME_CHIME:
+            eeprom.setMotorChime(getValue());
             break;
         case Screen::Type::WELCOME:
         case Screen::Type::EEPROM_SAVED:

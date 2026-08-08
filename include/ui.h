@@ -114,6 +114,7 @@ struct Screen
         PID_KD,
         PID_ANTI_WINDUP,
         OVP_PROTECTION,
+        WELCOME_CHIME,
     };
 
     // screen dimensions
