@@ -58,6 +58,20 @@ inline void diagnostic_screen_set_label_row(lv_obj_t *label, int32_t row, int32_
     lv_obj_set_y(label, diagnostic_screen_get_ypos_for_row(row) - scrollOffset);
 }
 
+inline int16_t dashboard_graph_to_i16(int32_t value)
+{
+    return static_cast<int16_t>(std::clamp<int32_t>(value, -32768, 32767));
+}
+
+inline lv_coord_t dashboard_graph_map_y(int32_t value, int32_t minValue, int32_t maxValue)
+{
+    const int32_t height = std::max<int32_t>(1, Screen::kDashboardScreenGraphHeight - 1);
+    const int32_t clampedValue = std::clamp<int32_t>(value, minValue, maxValue);
+    const int32_t range = std::max<int32_t>(1, maxValue - minValue);
+    const int32_t normalized = ((clampedValue - minValue) * height) / range;
+    return static_cast<lv_coord_t>(height - normalized);
+}
+
 void start_screen_update_top_status_labels(lv_obj_t *voltageLabel, lv_obj_t *currentLabel, lv_obj_t *motorTempLabel, lv_obj_t *mosfetTempLabel)
 {
     char buf[32];
@@ -567,6 +581,23 @@ void DiagnosticsScreen::_refreshVisuals()
 void DashboardScreen::load()
 {
     lastSelectedValue = SelectedValueType::MAX;
+    graphWriteIndex = 0;
+    graphSampleCount = kDashboardScreenGraphPointCount;
+    graphSamplesSinceRedraw = 0;
+    lastGraphSampleTick = HAL_GetTick();
+    graphDirty = true;
+
+    const GraphSample initialSample = {
+        dashboard_graph_to_i16(pid.stats.rpm.get()),
+        dashboard_graph_to_i16(static_cast<int32_t>(pid.getRPM()))
+    };
+
+    for (size_t i = 0; i < kDashboardScreenGraphPointCount; ++i) {
+        graphSamples[i] = initialSample;
+        graphRpmPoints[i] = {0, kDashboardScreenGraphHeight - 1};
+        graphSetRpmPoints[i] = {0, kDashboardScreenGraphHeight - 1};
+    }
+
     Screen::load();
 
     lv_obj_t *container = lv_obj_create(screen);
@@ -614,10 +645,29 @@ void DashboardScreen::load()
 
     valueLabel = lv_label_create(container);
     lv_obj_set_style_text_color(valueLabel, DASHBOARDSCREEN_COLOR_PWM_LABEL, LV_PART_MAIN);
-    // lv_obj_set_style_text_font(valueLabel, kDashboardScreenValueFont, LV_PART_MAIN);
     lv_obj_set_width(valueLabel, kDashboardScreenContainerWidth);
     lv_obj_set_style_text_align(valueLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    // lv_obj_set_pos(valueLabel, 0, kDashboardScreenValueBottomOffsetY);
+
+    graphContainer = lv_obj_create(container);
+    lv_obj_remove_style_all(graphContainer);
+    lv_obj_set_pos(graphContainer, kDashboardScreenGraphX, kDashboardScreenGraphY);
+    lv_obj_set_size(graphContainer, kDashboardScreenGraphWidth, kDashboardScreenGraphHeight);
+    lv_obj_set_style_bg_color(graphContainer, DASHBOARDSCREEN_COLOR_GRAPH_BG, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(graphContainer, LV_OPA_30, LV_PART_MAIN);
+    lv_obj_set_style_border_color(graphContainer, DASHBOARDSCREEN_COLOR_GRAPH_BORDER, LV_PART_MAIN);
+    lv_obj_set_style_border_width(graphContainer, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(graphContainer, 0, LV_PART_MAIN);
+    lv_obj_set_style_radius(graphContainer, 0, LV_PART_MAIN);
+
+    graphRpmLine = lv_line_create(graphContainer);
+    lv_obj_set_style_line_color(graphRpmLine, DASHBOARDSCREEN_COLOR_GRAPH_RPM, LV_PART_MAIN);
+    lv_obj_set_style_line_width(graphRpmLine, 2, LV_PART_MAIN);
+    lv_line_set_points(graphRpmLine, graphRpmPoints, 0);
+
+    graphSetRpmLine = lv_line_create(graphContainer);
+    lv_obj_set_style_line_color(graphSetRpmLine, DASHBOARDSCREEN_COLOR_GRAPH_SET_RPM, LV_PART_MAIN);
+    lv_obj_set_style_line_width(graphSetRpmLine, 1, LV_PART_MAIN);
+    lv_line_set_points(graphSetRpmLine, graphSetRpmPoints, 0);
 
     _refreshVisuals();
 
@@ -628,37 +678,69 @@ void DashboardScreen::_refreshVisuals()
 {
     char buf[32];
 
-    if (lastSelectedValue != selectedValue) { // mode changed?
+    if (lastSelectedValue != selectedValue) { // mode changed
         switch(selectedValue) {
             case SelectedValueType::SPEED:
-                lv_obj_set_style_text_font(valueLabel, kDashboardScreenValueFixedFont, LV_PART_MAIN);
+                lv_obj_set_style_text_font(rpmLabel, kDashboardScreenSpeedFont, LV_PART_MAIN);
+                lv_obj_set_pos(rpmLabel, 0, kDashboardScreenRpmOffsetY);
+                lv_obj_set_style_text_align(rpmLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
                 lv_obj_clear_flag(rpmLabel, LV_OBJ_FLAG_HIDDEN);
+
+                lv_obj_set_style_text_font(valueLabel, kDashboardScreenValueFixedFont, LV_PART_MAIN);
                 lv_obj_set_pos(valueLabel, 0, kDashboardScreenValueBottomOffsetY);
-                //TODO hide graph
+                lv_obj_set_style_text_align(valueLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+
+                _setGraphVisible(false);
                 break;
             default:
-                // change to font with all available glyphs
-                lv_obj_set_style_text_font(valueLabel, kDashboardScreenValueFont, LV_PART_MAIN);
-                lv_obj_add_flag(rpmLabel, LV_OBJ_FLAG_HIDDEN);
-                lv_obj_set_pos(valueLabel, 0, kDashboardScreenValueTuningOffsetY);
-                // TODO show graph
+                lv_obj_set_style_text_font(rpmLabel, kDashboardScreenValueFixedFont, LV_PART_MAIN);
+                lv_obj_set_style_text_align(rpmLabel, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
+                lv_obj_set_pos(rpmLabel, 0, kDashboardScreenValueTuningOffsetY);
+
+                if (selectedValue == SelectedValueType::SPEED2) {
+                    lv_obj_set_style_text_font(valueLabel, kDashboardScreenValueFixedFont, LV_PART_MAIN);
+                    lv_obj_set_pos(valueLabel, 0, kDashboardScreenValueTuningOffsetY);
+                }
+                else {
+                    lv_obj_set_style_text_font(valueLabel, kDashboardScreenValueFont, LV_PART_MAIN);
+                    lv_obj_set_pos(valueLabel, 0, kDashboardScreenValueTuningOffsetY - 3);
+                }
+                if (selectedValue == SelectedValueType::ANTI_WINDUP) {
+                    lv_obj_add_flag(rpmLabel, LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_set_style_text_align(valueLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+                }
+                else {
+                    lv_obj_clear_flag(rpmLabel, LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_set_style_text_align(valueLabel, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
+                }
+
+                _setGraphVisible(true);
                 break;
         }
         lastSelectedValue = selectedValue;
     }
 
+    _sampleGraph();
+    if (graphDirty) {
+        _rebuildGraphPoints();
+    }
+
+    if (eeprom.isPIDMode()) {
+        snprintf(buf, sizeof(buf) - 1, "%u RPM (%u)", (unsigned)pid.clampRPM(pid.stats.rpm.get()), (unsigned)pid.getRPM());
+    }
+    else {
+        snprintf(buf, sizeof(buf) - 1, "%u RPM", (unsigned)pid.clampRPM(pid.stats.rpm.get()));
+    }
+    lv_label_set_text(rpmLabel, buf);
+
     start_screen_update_top_status_labels(voltageLabel, currentLabel, motorTempLabel, mosfetTempLabel);
 
     switch(selectedValue) {
         case SelectedValueType::SPEED:
-            if (eeprom.isPIDMode()) {
-                snprintf(buf, sizeof(buf) - 1, "%u RPM (%u)", (unsigned)pid.clampRPM(pid.stats.rpm.get()), (unsigned)pid.getRPM());
-            }
-            else {
-                snprintf(buf, sizeof(buf) - 1, "%u RPM", (unsigned)pid.clampRPM(pid.stats.rpm.get()));
-            }
-            lv_label_set_text(rpmLabel, buf);
             lv_label_set_text_fmt(valueLabel, "PWM %d%% %u.%uW", (int)((pid.stats.pwm.get() * 100) / pid.getPWMLevelARR()), CONVERT_TO_FP1(stats.vcc * stats.current / 1000U));
+            break;
+        case SelectedValueType::SPEED2:
+            lv_label_set_text_fmt(valueLabel, "PWM %d%%", (int)((pid.stats.pwm.get() * 100) / pid.getPWMLevelARR()));
             break;
         case SelectedValueType::KP:
             FloatToString::convertTrimmed(buf, sizeof(buf) - 1, eeprom.getKp(), 6);
@@ -673,13 +755,131 @@ void DashboardScreen::_refreshVisuals()
             lv_label_set_text_fmt(valueLabel, "Kd %s", buf);
             break;
         case SelectedValueType::ANTI_WINDUP: {
-            const uint32_t antiWindup = (eeprom.getAntiWindup() * 1000) / UIConstants::kAntiWindupFactor;
-            lv_label_set_text_fmt(valueLabel, "Anti-windup " SPRINTF_FP2_FMT "%%", CONVERT_TO_FP2(antiWindup));
+            if (eeprom.getAntiWindup() == 0) {
+                lv_label_set_text_static(valueLabel, "Anti-windup OFF");
+            }
+            else {
+                const uint32_t antiWindup = (eeprom.getAntiWindup() * 1000) / UIConstants::kAntiWindupFactor;
+                lv_label_set_text_fmt(valueLabel, "Anti-windup " SPRINTF_FP2_FMT "%%", CONVERT_TO_FP2(antiWindup));
+            }
             break;
         }
         case SelectedValueType::MAX:
             break;
     }
+}
+
+void DashboardScreen::_setGraphVisible(bool visible)
+{
+    if (!graphContainer) {
+        return;
+    }
+    if (visible) {
+        lv_obj_clear_flag(graphContainer, LV_OBJ_FLAG_HIDDEN);
+    }
+    else {
+        lv_obj_add_flag(graphContainer, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
+void DashboardScreen::_sampleGraph()
+{
+    const uint32_t now = HAL_GetTick();
+    if ((now - lastGraphSampleTick) < kDashboardScreenGraphSamplePeriodMs) {
+        return;
+    }
+
+    lastGraphSampleTick = now;
+
+    graphSamples[graphWriteIndex] = {
+        dashboard_graph_to_i16(pid.stats.rpm.get()),
+        dashboard_graph_to_i16(static_cast<int32_t>(pid.getRPM()))
+    };
+
+    graphWriteIndex = (graphWriteIndex + 1) % kDashboardScreenGraphPointCount;
+    graphSampleCount = std::min<size_t>(graphSampleCount + 1, kDashboardScreenGraphPointCount);
+    graphSamplesSinceRedraw++;
+
+    if (graphSamplesSinceRedraw >= kDashboardScreenGraphRedrawDecimation) {
+        graphDirty = true;
+        graphSamplesSinceRedraw = 0;
+    }
+}
+
+void DashboardScreen::_rebuildGraphPoints()
+{
+    if (!graphRpmLine || !graphSetRpmLine) {
+        return;
+    }
+
+    if (graphSampleCount < 2) {
+        lv_line_set_points(graphRpmLine, graphRpmPoints, 0);
+        lv_line_set_points(graphSetRpmLine, graphSetRpmPoints, 0);
+        graphDirty = false;
+        return;
+    }
+
+    const size_t count = graphSampleCount;
+    const size_t firstIndex = (graphSampleCount < kDashboardScreenGraphPointCount) ? 0 : graphWriteIndex;
+
+    int32_t minRpm = INT32_MAX;
+    int32_t maxRpm = INT32_MIN;
+
+    for (size_t i = 0; i < count; ++i) {
+        const size_t index = (firstIndex + i) % kDashboardScreenGraphPointCount;
+        const int32_t rpm = graphSamples[index].rpm;
+        const int32_t setRpm = graphSamples[index].setRpm;
+        minRpm = std::min<int32_t>(minRpm, std::min<int32_t>(rpm, setRpm));
+        maxRpm = std::max<int32_t>(maxRpm, std::max<int32_t>(rpm, setRpm));
+    }
+
+    if (kDashboardScreenGraphIncludeZeroInScale) {
+        minRpm = std::min<int32_t>(minRpm, 0);
+        maxRpm = std::max<int32_t>(maxRpm, 0);
+    }
+
+    if (maxRpm - minRpm < kDashboardScreenGraphMinRpmSpan) {
+        if (kDashboardScreenGraphIncludeZeroInScale) {
+            if (minRpm >= 0) {
+                minRpm = 0;
+                maxRpm = minRpm + kDashboardScreenGraphMinRpmSpan;
+            }
+            else if (maxRpm <= 0) {
+                maxRpm = 0;
+                minRpm = maxRpm - kDashboardScreenGraphMinRpmSpan;
+            }
+            else {
+                const int32_t center = (maxRpm + minRpm) / 2;
+                minRpm = center - (kDashboardScreenGraphMinRpmSpan / 2);
+                maxRpm = minRpm + kDashboardScreenGraphMinRpmSpan;
+                minRpm = std::min<int32_t>(minRpm, 0);
+                maxRpm = std::max<int32_t>(maxRpm, 0);
+            }
+        }
+        else {
+            const int32_t center = (maxRpm + minRpm) / 2;
+            minRpm = center - (kDashboardScreenGraphMinRpmSpan / 2);
+            maxRpm = minRpm + kDashboardScreenGraphMinRpmSpan;
+        }
+    }
+
+    const int32_t width = std::max<int32_t>(1, kDashboardScreenGraphWidth - 1);
+    const int32_t denom = std::max<int32_t>(1, static_cast<int32_t>(count - 1));
+
+    for (size_t i = 0; i < count; ++i) {
+        const size_t index = (firstIndex + i) % kDashboardScreenGraphPointCount;
+        const lv_coord_t x = static_cast<lv_coord_t>((static_cast<int32_t>(i) * width) / denom);
+
+        graphRpmPoints[i].x = x;
+        graphRpmPoints[i].y = dashboard_graph_map_y(graphSamples[index].rpm, minRpm, maxRpm);
+
+        graphSetRpmPoints[i].x = x;
+        graphSetRpmPoints[i].y = dashboard_graph_map_y(graphSamples[index].setRpm, minRpm, maxRpm);
+    }
+
+    lv_line_set_points(graphRpmLine, graphRpmPoints, count);
+    lv_line_set_points(graphSetRpmLine, graphSetRpmPoints, count);
+    graphDirty = false;
 }
 
 void DashboardScreen::setValue(uint32_t value)

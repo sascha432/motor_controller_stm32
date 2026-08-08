@@ -54,6 +54,7 @@ struct UIConstants
     static constexpr uint32_t kMinAntiWindup = 0;                           // Min. PID anti-windup factor in percentage (0-100) * 100
     static constexpr uint32_t kMaxAntiWindup = 100 * kAntiWindupFactor;     // Max. PID anti-windup factor in percentage (0-100) * kAntiWindupFactor
     static constexpr int32_t kLowestAntiWindup = 50 * kAntiWindupFactor;    // Below 50% disable anti-windup
+    static constexpr uint32_t kStepsAntiWindup = kAntiWindupFactor / 50;    // Steps for anti-windup selection
     static constexpr uint32_t kMinOvpProtection = 8000;                     // Min. OVP protection in millivolts
     static constexpr uint32_t kMaxOvpProtection = 40000;                    // Max. OVP protection in millivolts
     static constexpr uint32_t kStepOvpProtection = 100;                     // OVP protection step in millivolts

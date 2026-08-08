@@ -47,7 +47,7 @@
 #define LV_USE_DROPDOWN 0
 #define LV_USE_IMG 0
 #define LV_USE_LABEL 1
-#define LV_USE_LINE 0
+#define LV_USE_LINE 1
 #define LV_USE_ROLLER 0
 #define LV_USE_SLIDER 0
 #define LV_USE_SWITCH 0
