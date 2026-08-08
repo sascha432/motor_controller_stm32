@@ -75,7 +75,7 @@ struct ScreenFlow {
     static T *newScreen(Args&&... args)
     {
         static_assert(std::is_base_of_v<Screen, T>, "T must derive from Screen");
-        #if 1
+        #if 0
         return new T(std::forward<Args>(args)...);
         #else
         // testing static allocation for singletons
@@ -92,12 +92,12 @@ struct ScreenFlow {
 
     static void deleteScreen(Screen *screen)
     {
-        #if 1
+        #if 0
         delete screen;
         #else
         switch(screen->getId()) {
             case Screen::Type::DASHBOARD:
-                reinterpret_cast<Screen *>(screen)->~Screen();
+                reinterpret_cast<DashboardScreen *>(screen)->~DashboardScreen();
                 break;
             default:
                 delete screen;
