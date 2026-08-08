@@ -1014,11 +1014,3 @@ int32_t Menu::clampAntiWindupValue()
     setValue(clampedValue);
     return clampedValue;
 }
-
-void Menu::sampleRPM(int32_t rpm)
-{
-    if (screenFlow->getId() == Screen::Type::DASHBOARD) {
-        DashboardScreen &dashboard = *reinterpret_cast<DashboardScreen *>(screenFlow.getScreen());
-        dashboard._sampleGraph(rpm);
-    }
-}

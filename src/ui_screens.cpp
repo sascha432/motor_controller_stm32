@@ -58,11 +58,10 @@ inline void diagnostic_screen_set_label_row(lv_obj_t *label, int32_t row, int32_
     lv_obj_set_y(label, diagnostic_screen_get_ypos_for_row(row) - scrollOffset);
 }
 
-inline lv_coord_t dashboard_screen_graph_map_y(int32_t value, int32_t minValue, int32_t range)
+inline lv_coord_t dashboard_screen_graph_map_y(int32_t value, int32_t range)
 {
     constexpr int32_t height = std::max<int32_t>(1, Screen::kDashboardScreenGraphHeight - 1);
-    const int32_t normalized = ((value - minValue) * height) / range;
-    return static_cast<lv_coord_t>(height - normalized);
+    return static_cast<lv_coord_t>(height - ((value * height) / range));
 }
 
 void start_screen_update_top_status_labels(lv_obj_t *voltageLabel, lv_obj_t *currentLabel, lv_obj_t *motorTempLabel, lv_obj_t *mosfetTempLabel)
@@ -571,22 +570,27 @@ void DiagnosticsScreen::_refreshVisuals()
 
 // === Dashboard Screen ===
 
+lv_point_t DashboardScreen::graphRpmPoints[kDashboardScreenGraphPointCount];
+lv_point_t DashboardScreen::graphSetRpmPoints[kDashboardScreenGraphPointCount];
+
 void DashboardScreen::load()
 {
     lastSelectedValue = SelectedValueType::MAX;
 
     // fill graph with initial values
-    graphWriteIndex = 0;
-    graphDirty = true;
-    const GraphSample initialSample = {
+    __disable_irq();
+    stats.graphWriteIndex = 0;
+    stats.graphDirty = true;
+    const Stats::GraphSample initialSample = {
         static_cast<uint16_t>(0),
         static_cast<uint16_t>(pid.getRPM())
     };
     for (size_t i = 0; i < kDashboardScreenGraphPointCount; ++i) {
-        graphSamples[i] = initialSample;
+        stats.graphSamples[i] = initialSample;
         graphRpmPoints[i] = {0, kDashboardScreenGraphHeight - 1};
         graphSetRpmPoints[i] = {0, kDashboardScreenGraphHeight - 1};
     }
+    __enable_irq();
 
     Screen::load();
 
@@ -710,7 +714,7 @@ void DashboardScreen::_refreshVisuals()
         lastSelectedValue = selectedValue;
     }
 
-    if (graphDirty && !lv_obj_has_flag(graphContainer, LV_OBJ_FLAG_HIDDEN)) {
+    if (::stats.graphDirty && !lv_obj_has_flag(graphContainer, LV_OBJ_FLAG_HIDDEN)) {
         // update graph when it is visible and new samples have been added
         _rebuildGraphPoints();
     }
@@ -759,64 +763,27 @@ void DashboardScreen::_refreshVisuals()
     }
 }
 
-void DashboardScreen::_sampleGraph(int32_t rpm)
-{
-    graphSamples[graphWriteIndex] = {
-        static_cast<uint16_t>(rpm < 0 ? 0 : rpm),
-        static_cast<uint16_t>(pid.getRPM())
-    };
-    if (++graphWriteIndex >= kDashboardScreenGraphPointCount) {
-        graphWriteIndex = 0;
-    }
-    graphDirty = true;
-}
-
 void DashboardScreen::_rebuildGraphPoints()
 {
-    const size_t firstIndex = graphWriteIndex;
+    const size_t firstIndex = stats.graphWriteIndex;
 
-    int32_t minRpm = INT32_MAX;
-    int32_t maxRpm = INT32_MIN;
-    for (const auto &sample : graphSamples) {
-        const int32_t rpm = sample.rpm;
-        const int32_t setRpm = sample.setRpm;
-        minRpm = std::min<int32_t>(minRpm, std::min<int32_t>(rpm, setRpm));
-        maxRpm = std::max<int32_t>(maxRpm, std::max<int32_t>(rpm, setRpm));
+    int32_t maxRpm = 0;
+    for (const auto &sample : stats.graphSamples) {
+        maxRpm = std::max<int32_t>(maxRpm, std::max<int32_t>(sample.rpm, sample.setRpm));
     }
-    minRpm = std::min<int32_t>(minRpm, 0);
-    maxRpm = std::max<int32_t>(maxRpm, 0);
-
-    if (maxRpm - minRpm < kDashboardScreenGraphMinRpmSpan) {
-        if (minRpm >= 0) {
-            minRpm = 0;
-            maxRpm = minRpm + kDashboardScreenGraphMinRpmSpan;
-        }
-        else if (maxRpm <= 0) {
-            maxRpm = 0;
-            minRpm = maxRpm - kDashboardScreenGraphMinRpmSpan;
-        }
-        else {
-            const int32_t center = (maxRpm + minRpm) / 2;
-            minRpm = center - (kDashboardScreenGraphMinRpmSpan / 2);
-            maxRpm = minRpm + kDashboardScreenGraphMinRpmSpan;
-            minRpm = std::min<int32_t>(minRpm, 0);
-            maxRpm = std::max<int32_t>(maxRpm, 0);
-        }
-    }
-
+    const int32_t range = std::max<int32_t>(kDashboardScreenGraphMinRpmSpan, maxRpm);
     for (int32_t i = 0; i < (int32_t)kDashboardScreenGraphPointCount; ++i) {
         const lv_coord_t x = static_cast<lv_coord_t>((i * kDashboardScreenGraphWidth) / static_cast<int32_t>(kDashboardScreenGraphPointCount - 1));
         graphRpmPoints[i].x = x;
         graphSetRpmPoints[i].x = x;
         const size_t index = (firstIndex + i) % kDashboardScreenGraphPointCount;
-        const int32_t range = std::max<int32_t>(1, maxRpm - minRpm);
-        graphRpmPoints[i].y = dashboard_screen_graph_map_y(graphSamples[index].rpm, minRpm, range);
-        graphSetRpmPoints[i].y = dashboard_screen_graph_map_y(graphSamples[index].setRpm, minRpm, range);
+        graphRpmPoints[i].y = dashboard_screen_graph_map_y(stats.graphSamples[index].rpm, range);
+        graphSetRpmPoints[i].y = dashboard_screen_graph_map_y(stats.graphSamples[index].setRpm, range);
     }
 
     lv_line_set_points(graphRpmLine, graphRpmPoints, kDashboardScreenGraphPointCount);
     lv_line_set_points(graphSetRpmLine, graphSetRpmPoints, kDashboardScreenGraphPointCount);
-    graphDirty = false;
+    stats.graphDirty = false;
 }
 
 void DashboardScreen::setValue(uint32_t value)

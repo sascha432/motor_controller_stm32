@@ -6,6 +6,7 @@
 #include "mt6701_encoder.h"
 #include "leds.h"
 #include "menu.h"
+#include "stats.h"
 
 PidController pid;
 MotorEncoder motorEncoder;
@@ -306,7 +307,7 @@ void PidController::isr()
     // update rpm stats
     const int32_t deltaRPM = kIntCountsToRPM(delta);
     stats.rpm.update(deltaRPM);
-    menu.sampleRPM(deltaRPM);
+    ::stats.sampleRPM(deltaRPM);
 
     if (running) {
         // initial stall and sensor check

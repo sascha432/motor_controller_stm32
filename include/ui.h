@@ -13,6 +13,7 @@
 #include "controls.h"
 #include "eeprom.h"
 #include "debug.h"
+#include "stats.h"
 
 // set to true to keep screen objects in memory when switching screens
 static constexpr bool kUIKeepScreenObjectsInMemory = false;
@@ -187,7 +188,7 @@ struct Screen
     static constexpr lv_coord_t kDashboardScreenGraphWidth = kDashboardScreenContainerWidth;
     static constexpr lv_coord_t kDashboardScreenGraphHeight = kDashboardScreenContainerHeight - kDashboardScreenGraphY - 1;
     static constexpr int32_t kDashboardScreenGraphMinRpmSpan = 250;
-    static constexpr size_t kDashboardScreenGraphPointCount = 128;
+    static constexpr size_t kDashboardScreenGraphPointCount = sizeof_array(stats.graphSamples);
 
     // start screen style constants
     static constexpr const lv_font_t *kStartScreenDirectionFont = &lv_font_montserrat_24;
@@ -444,11 +445,6 @@ private:
 
 struct DashboardScreen : public Screen
 {
-    struct GraphSample {
-        uint16_t rpm;
-        uint16_t setRpm;
-    };
-
     enum class SelectedValueType : uint32_t {
         SPEED,      // speed, pwm and power
         SPEED2,     // speed with tuning graph
@@ -470,8 +466,6 @@ struct DashboardScreen : public Screen
         graphContainer(nullptr),
         graphRpmLine(nullptr),
         graphSetRpmLine(nullptr),
-        graphWriteIndex(0),
-        graphDirty(true),
         selectedValue(SelectedValueType::SPEED),
         lastSelectedValue(SelectedValueType::MAX)
     {
@@ -513,13 +507,6 @@ struct DashboardScreen : public Screen
         return selectedValue;
     }
 
-    /**
-     * @brief Record RPM for the graph in the ring buffer
-     *
-     * @param rpm
-     */
-    void _sampleGraph(int32_t rpm);
-
 protected:
     void _refreshVisuals();
     void _rebuildGraphPoints();
@@ -534,11 +521,8 @@ protected:
     lv_obj_t *graphContainer;
     lv_obj_t *graphRpmLine;
     lv_obj_t *graphSetRpmLine;
-    lv_point_t graphRpmPoints[kDashboardScreenGraphPointCount];
-    lv_point_t graphSetRpmPoints[kDashboardScreenGraphPointCount];
-    GraphSample graphSamples[kDashboardScreenGraphPointCount];
-    volatile size_t graphWriteIndex;
-    volatile bool graphDirty;
+    static lv_point_t graphRpmPoints[kDashboardScreenGraphPointCount];
+    static lv_point_t graphSetRpmPoints[kDashboardScreenGraphPointCount];
     SelectedValueType selectedValue;
     SelectedValueType lastSelectedValue;
 };

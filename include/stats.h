@@ -5,6 +5,7 @@
 #pragma once
 
 #include "adc.h"
+#include "eeprom.h"
 
 namespace Helpers {
 
@@ -234,7 +235,8 @@ namespace Helpers {
 struct Stats
 {
     void update();
-    void reset()
+
+    inline void reset()
     {
         minMax.vcc.reset();
         minMax.current.reset();
@@ -260,6 +262,27 @@ struct Stats
         int16_t motorTemp;
         int16_t mosfetTemp;
     } max;
+
+    // rpm/rpm setpoint graph
+    static constexpr uint32_t kGraphSampleCount = 128;
+
+    inline void sampleRPM(int32_t rpm)
+    {
+        graphSamples[graphWriteIndex] = {
+            static_cast<uint16_t>(rpm < 0 ? 0 : rpm),
+            static_cast<uint16_t>(eeprom.getMotorRPM())
+        };
+        graphWriteIndex = (graphWriteIndex + 1) % kGraphSampleCount;
+        graphDirty = true;
+    }
+
+    struct GraphSample {
+        uint16_t rpm;
+        uint16_t setRpm;
+    };
+    GraphSample graphSamples[kGraphSampleCount];
+    volatile size_t graphWriteIndex;
+    volatile bool graphDirty;
 
 protected:
     // stats
