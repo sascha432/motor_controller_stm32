@@ -568,9 +568,6 @@ void DiagnosticsScreen::_refreshVisuals()
 
 // === Dashboard Screen ===
 
-lv_point_t DashboardScreen::graphRpmPoints[kDashboardScreenGraphPointCount];
-lv_point_t DashboardScreen::graphSetRpmPoints[kDashboardScreenGraphPointCount];
-
 void DashboardScreen::load()
 {
     lastSelectedValue = SelectedValueType::MAX;
@@ -647,7 +644,7 @@ void DashboardScreen::load()
     lv_obj_set_style_bg_color(graphContainer, DASHBOARDSCREEN_COLOR_GRAPH_BG, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(graphContainer, LV_OPA_30, LV_PART_MAIN);
     lv_obj_set_style_border_color(graphContainer, DASHBOARDSCREEN_COLOR_GRAPH_BORDER, LV_PART_MAIN);
-    lv_obj_set_style_border_width(graphContainer, 0, LV_PART_MAIN);
+    lv_obj_set_style_border_width(graphContainer, 1, LV_PART_MAIN);
     lv_obj_set_style_pad_all(graphContainer, 0, LV_PART_MAIN);
     lv_obj_set_style_radius(graphContainer, 0, LV_PART_MAIN);
 
@@ -751,8 +748,7 @@ void DashboardScreen::_refreshVisuals()
             break;
         case SelectedValueType::ANTI_WINDUP: {
             if (eeprom.getAntiWindup() == 0) {
-                snprintf(valueLabelBuf, sizeof(valueLabelBuf) - 1, "Anti-windup DISABLED");
-                lv_label_set_text_static(valueLabel, valueLabelBuf);
+                lv_label_set_text_static(valueLabel, "Anti-windup DISABLED");
             }
             else {
                 const uint32_t antiWindup = (eeprom.getAntiWindup() * 1000) / UIConstants::kAntiWindupFactor;
@@ -769,21 +765,22 @@ void DashboardScreen::_refreshVisuals()
 void DashboardScreen::_rebuildGraphPoints()
 {
     const size_t firstIndex = stats.graphWriteIndex;
-
     int32_t maxRpm = 0;
     for (const auto &sample : stats.graphSamples) {
         maxRpm = std::max<int32_t>(maxRpm, std::max<int32_t>(sample.rpm, sample.setRpm));
     }
+    maxRpm = ((maxRpm + 19) * 294) / 256;
+    maxRpm = (maxRpm / 20) * 20;
     const int32_t range = std::max<int32_t>(kDashboardScreenGraphMinRpmSpan, maxRpm);
+    constexpr int32_t height = std::max<int32_t>(1, Screen::kDashboardScreenGraphHeight - 1);
     for (int32_t i = 0; i < (int32_t)kDashboardScreenGraphPointCount; ++i) {
         const lv_coord_t x = static_cast<lv_coord_t>((i * kDashboardScreenGraphWidth) / static_cast<int32_t>(kDashboardScreenGraphPointCount - 1));
         graphRpmPoints[i].x = x;
         graphSetRpmPoints[i].x = x;
         const size_t index = (firstIndex + i) % kDashboardScreenGraphPointCount;
-        graphRpmPoints[i].y = dashboard_screen_graph_map_y(stats.graphSamples[index].rpm, range);
-        graphSetRpmPoints[i].y = dashboard_screen_graph_map_y(stats.graphSamples[index].setRpm, range);
+        graphRpmPoints[i].y = static_cast<lv_coord_t>(height - ((stats.graphSamples[index].rpm * height) / range));
+        graphSetRpmPoints[i].y = static_cast<lv_coord_t>(height - ((stats.graphSamples[index].setRpm * height) / range));
     }
-
     lv_line_set_points(graphRpmLine, graphRpmPoints, kDashboardScreenGraphPointCount);
     lv_line_set_points(graphSetRpmLine, graphSetRpmPoints, kDashboardScreenGraphPointCount);
     stats.graphDirty = false;

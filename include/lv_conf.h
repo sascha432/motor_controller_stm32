@@ -99,6 +99,7 @@
 #define LV_USE_QRCODE 0
 
 /* Fonts */
+#define LV_FONT_MONTSERRAT_8 1
 #define LV_FONT_MONTSERRAT_12 1
 #define LV_FONT_MONTSERRAT_14 1
 #define LV_FONT_MONTSERRAT_18 1

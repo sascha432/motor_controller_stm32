@@ -21,7 +21,7 @@ void ScreenFlow::destroy()
     DEBUG_PRINT(DebugType::UI, "screen=%p", screen);
     if (screen) {
         lv_scr_load(Screen::emptyScreen);
-        delete screen;
+        deleteScreen(screen);
     }
     screen = nullptr;
 }
@@ -40,7 +40,7 @@ void ScreenFlow::back()
     if (screen->prevScreen) {
         lv_scr_load(Screen::emptyScreen);
         auto tmp = screen->prevScreen;
-        delete screen;
+        deleteScreen(screen);
         screen = tmp;
         screen->load();
     }

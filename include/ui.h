@@ -61,8 +61,8 @@
 #define DASHBOARDSCREEN_COLOR_TEMPERATURE       SCREEN_COLOR_TEMPERATURE
 #define DASHBOARDSCREEN_COLOR_SPEED             COLOR_PALETTE_PURPLE
 #define DASHBOARDSCREEN_COLOR_PWM_LABEL         COLOR_PALETTE_CYAN
-#define DASHBOARDSCREEN_COLOR_GRAPH_BG          COLOR_PALETTE_DARK_GRAY
-#define DASHBOARDSCREEN_COLOR_GRAPH_BORDER      COLOR_PALETTE_LIGHT_GRAY
+#define DASHBOARDSCREEN_COLOR_GRAPH_BG          COLOR_PALETTE_BLACK
+#define DASHBOARDSCREEN_COLOR_GRAPH_BORDER      COLOR_PALETTE_DARK_GRAY
 #define DASHBOARDSCREEN_COLOR_GRAPH_RPM         COLOR_PALETTE_CYAN
 #define DASHBOARDSCREEN_COLOR_GRAPH_SET_RPM     COLOR_PALETTE_YELLOW
 
@@ -519,10 +519,10 @@ protected:
     lv_obj_t *graphContainer;
     lv_obj_t *graphRpmLine;
     lv_obj_t *graphSetRpmLine;
-    static lv_point_t graphRpmPoints[kDashboardScreenGraphPointCount];
-    static lv_point_t graphSetRpmPoints[kDashboardScreenGraphPointCount];
     SelectedValueType selectedValue;
     SelectedValueType lastSelectedValue;
+    lv_point_t graphRpmPoints[kDashboardScreenGraphPointCount];
+    lv_point_t graphSetRpmPoints[kDashboardScreenGraphPointCount];
     char voltageLabelBuf[14];
     char currentLabelBuf[14];
     char motorTempLabelBuf[8];
