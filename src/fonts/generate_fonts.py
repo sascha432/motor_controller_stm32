@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
 
-"""Generate the DejaVuSansMono LVGL fonts used by the UI.
-
-This script recreates the 14 px and 24 px fonts in this folder.
-It uses a broad ASCII range plus the degree sign so the UI text
-can render without missing-glyph boxes.
+"""Generate the LVGL fonts used by the UI.
 """
 
 from __future__ import annotations
@@ -18,7 +14,15 @@ from pathlib import Path
 FONT_SPECS = (
     # Edit these symbol strings directly when the UI starts using new characters.
     # Keep each entry readable instead of converting them into hex ranges.
-    (14, "lv_font_dejavu_sans_mono_14.c", (
+    ("Montserrat-Regular.ttf", 10, "lv_font_montserrat_10_digits.c", (
+        " ",
+        "0123456789",
+        "",                                             # ABCDEFGHIJKLMNOPQRSTUVWXYZ
+        "",                                             # "abcdefghijklmnopqrstuvwxyz"
+        ".,",                                           # !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~
+        "",
+    )),
+    ("DejaVuSansMono.ttf", 14, "lv_font_dejavu_sans_mono_14.c", (
         " ",
         "0123456789",
         "RPMWVAC",                                      # ABCDEFGHIJKLMNOPQRSTUVWXYZ
@@ -26,7 +30,7 @@ FONT_SPECS = (
         "().%",                                         # !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~
         "°",
     )),
-    (24, "lv_font_dejavu_sans_mono_24.c", (
+    ("DejaVuSansMono.ttf", 24, "lv_font_dejavu_sans_mono_24.c", (
         " ",
         "0123456789",
         "RPMWVAC",                                      # ABCDEFGHIJKLMNOPQRSTUVWXYZ
@@ -41,7 +45,7 @@ def find_repo_root(script_path: Path) -> Path:
     return script_path.resolve().parents[2]
 
 
-def find_source_font(repo_root: Path, override: str | None) -> Path:
+def find_source_font(repo_root: Path, font_name: str, override: str | None) -> Path:
     if override:
         candidate = Path(override).expanduser().resolve()
         if not candidate.is_file():
@@ -49,15 +53,16 @@ def find_source_font(repo_root: Path, override: str | None) -> Path:
         return candidate
 
     candidates = (
-        repo_root / ".venv" / "Lib" / "site-packages" / "matplotlib" / "mpl-data" / "fonts" / "ttf" / "DejaVuSansMono.ttf",
-        Path(r"C:\\Windows\\Fonts\\DejaVuSansMono.ttf"),
+        repo_root / ".venv" / "Lib" / "site-packages" / "matplotlib" / "mpl-data" / "fonts" / "ttf" / font_name,
+        repo_root / "src" / "fonts" / font_name,
+        Path(r"C:\\Windows\\Fonts\\" + font_name),
     )
     for candidate in candidates:
         if candidate.is_file():
             return candidate
 
     raise FileNotFoundError(
-        "Could not find DejaVuSansMono.ttf. Pass --font-path explicitly."
+        f"Could not find {font_name}"
     )
 
 
@@ -115,15 +120,15 @@ def run_font_conv(repo_root: Path, source_font: Path, size: int, output_file: Pa
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--font-path", help="Path to DejaVuSansMono.ttf")
+    parser.add_argument("--font-path", help="Path to .ttf folder")
     args = parser.parse_args()
 
     script_path = Path(__file__)
     repo_root = find_repo_root(script_path)
-    source_font = find_source_font(repo_root, args.font_path)
     output_dir = script_path.parent
 
-    for size, filename, symbol_groups in FONT_SPECS:
+    for source_font_name, size, filename, symbol_groups in FONT_SPECS:
+        source_font = find_source_font(repo_root, source_font_name, args.font_path)
         run_font_conv(repo_root, source_font, size, output_dir / filename, symbol_groups)
 
     return 0
