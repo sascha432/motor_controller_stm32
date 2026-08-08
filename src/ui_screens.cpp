@@ -138,6 +138,11 @@ Screen::Screen(Type id) :
 Screen::~Screen()
 {
     DEBUG_PRINT(DebugType::UI, "screen=%p", screen);
+    #if DEBUG
+    if (prevScreen) {
+        DEBUG_PRINT(DebugType::ERROR, "prev. screen=%p not null", prevScreen);
+    }
+    #endif
      if (screen) {
         lv_scr_load(emptyScreen);
         lv_obj_del(screen);
@@ -163,11 +168,6 @@ void Screen::load()
 void Screen::update()
 {
     DEBUG_PRINT(DebugType::UI, "screen=%p", screen);
-}
-
-Screen::Type Screen::getId() const
-{
-    return id;
 }
 
 void Screen::setValue(uint32_t value)

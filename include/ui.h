@@ -217,16 +217,19 @@ struct Screen
      *
      * @return Type
      */
-    Type getId() const;
+    inline Type getId() const
+    {
+        return id;
+    }
 
     /**
-     * @brief Get the Prev Screen Id
+     * @brief Get the Prev Screen
      *
-     * @return Type Id or WELCOME if no previous screen is set
+     * @return Screen* or nullptr if no previous screen is set
      */
-    Type getPrevScreenId() const
+    inline Screen *getPrevScreen() const
     {
-        return prevScreen ? prevScreen->getId() : Type::WELCOME;
+        return prevScreen;
     }
 
     /**

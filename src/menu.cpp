@@ -324,7 +324,8 @@ void Menu::loadAdvancedMenu()
 
 void Menu::exitAdvancedMenu()
 {
-    if (screenFlow.getScreen()->getPrevScreenId() == Screen::Type::MAIN_MENU) {
+    DEBUG_PRINT(DebugType::UI, "prev. screen=%p", screenFlow.getScreen()->getPrevScreen());
+    if (screenFlow.getScreen()->getPrevScreen()) {
         // accessed through main menu
         restorePreviousMenu();
     }
@@ -430,7 +431,7 @@ void Menu::applyEEPROMSettings()
 
 void Menu::handleButtonPress(uint32_t duration)
 {
-    DEBUG_PRINT(DebugType::UI, "enter screen=%p id=%d prev=%d value=%d duration=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), static_cast<int>(screenFlow->getPrevScreenId()), getValue(), duration);
+    DEBUG_PRINT(DebugType::UI, "enter screen=%p prev=%p id=%d value=%d duration=%d", screenFlow.getScreen(), screenFlow->getPrevScreen(), static_cast<int>(screenFlow->getId()), getValue(), duration);
     Screen *screen;
     // Handle button press based on the current screen
     switch(screenFlow->getId()) {
@@ -836,7 +837,7 @@ void Menu::handleButtonPress(uint32_t duration)
             // no button action
             break;
     }
-    DEBUG_PRINT(DebugType::UI, "leave screen=%p id=%d prev=%d value=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), static_cast<int>(screenFlow->getPrevScreenId()), getValue());
+    DEBUG_PRINT(DebugType::UI, "leave screen=%p prev=%p id=%d value=%d", screenFlow.getScreen(), screenFlow->getPrevScreen(), static_cast<int>(screenFlow->getId()), getValue());
 }
 
 void Menu::handleBackButtonPress()
