@@ -634,11 +634,14 @@ void DashboardScreen::_refreshVisuals()
                 lv_obj_set_style_text_font(valueLabel, kDashboardScreenValueFixedFont, LV_PART_MAIN);
                 lv_obj_clear_flag(rpmLabel, LV_OBJ_FLAG_HIDDEN);
                 lv_obj_set_pos(valueLabel, 0, kDashboardScreenValueBottomOffsetY);
+                //TODO hide graph
                 break;
             default:
+                // change to font with all available glyphs
                 lv_obj_set_style_text_font(valueLabel, kDashboardScreenValueFont, LV_PART_MAIN);
                 lv_obj_add_flag(rpmLabel, LV_OBJ_FLAG_HIDDEN);
                 lv_obj_set_pos(valueLabel, 0, kDashboardScreenValueTuningOffsetY);
+                // TODO show graph
                 break;
         }
         lastSelectedValue = selectedValue;
@@ -682,8 +685,6 @@ void DashboardScreen::_refreshVisuals()
 void DashboardScreen::setValue(uint32_t value)
 {
     Screen::setValue(value);
-    // change to font with all available glyphs
-    // lv_obj_set_style_text_font(valueLabel, (getSelectedValue() == SelectedValueType::SPEED) ? kDashboardScreenValueFixedFont : kDashboardScreenValueFont, LV_PART_MAIN);
 }
 
 void DashboardScreen::update()
