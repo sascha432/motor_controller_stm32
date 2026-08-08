@@ -269,7 +269,7 @@ void PidController::isr()
                 #if PID_USE_FLOATING_POINT_MATH
                     setIntegral(getIntegral() * antiWindup * (0.01f / UIConstants::kAntiWindupFactor));
                 #else
-                    setIntegral((getIntegral() * antiWindup) / (UIConstants::kAntiWindupFactor * 100));
+                    setIntegral((getIntegral() * antiWindup) / static_cast<PidValueType>(UIConstants::kAntiWindupFactor * 100));
                 #endif
             }
         }
