@@ -35,9 +35,6 @@ static void setup()
     eeprom.init();
     eeprom.read();
 
-    // LEDs
-    LEDs::init();
-
     // motor encoder
     motorEncoder.init();
 
@@ -297,8 +294,6 @@ static void TIM7_TIM6_Init()
     HAL_TIM_Base_Start_IT(&tim6);
 }
 
-#if HAVE_HAL_CRC
-
 CRC_HandleTypeDef hcrc;
 
 void MX_CRC_Init(void)
@@ -311,8 +306,6 @@ void MX_CRC_Init(void)
         Error_Handler();
     }
 }
-
-#endif
 
 // === DWT cycle counter ===
 
@@ -384,10 +377,9 @@ int main(void)
     // system init
     HAL_Init();
     DWT_Init();
+    LEDs::init();
     SystemClock_Config();
-    #if HAVE_HAL_CRC
-        MX_CRC_Init();
-    #endif
+    MX_CRC_Init();
     TIM7_TIM6_Init();
     #if HAVE_USB_DEVICE
         MX_USB_DEVICE_Init();

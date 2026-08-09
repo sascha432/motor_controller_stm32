@@ -149,7 +149,7 @@ struct Tone {
     uint8_t duration;
 };
 
-const Tone imperial_march[] = {
+static const Tone imperial_march[] = {
     {65, 125}, {65, 125}, {65, 125}, {51, 93}, {77, 31}, {65, 125}, {51, 93}, {77, 31}, {65, 250},
     {97, 125}, {97, 125}, {97, 125}, {103, 93}, {77, 31}, {65, 125}, {51, 93}, {77, 31}, {65, 250},
     {130, 125}, {65, 93}, {65, 31}, {130, 125}, {123, 93}, {116, 31}, {110, 31}, {103, 31}, {110, 125},
@@ -181,9 +181,7 @@ static void playImperialMarch()
     while (menu.isAnyButtonDown()) {
         WatchDog::feed();
     }
-    menu.clearUserInput();
-    screenFlow.back();
-    screenFlow.refresh();
+    menu.restorePreviousMenu();
 }
 
 #endif
@@ -251,7 +249,7 @@ void Menu::loadWelcomeScreen()
                 chime.init();
             }
 
-            const uint8_t chimeFrequency50msInterval[] = {
+            static const uint8_t chimeFrequency50msInterval[] = {
                 104, 104, 104,  // 520 Hz
                 0,
                 132, 132, 132,  // 660 Hz

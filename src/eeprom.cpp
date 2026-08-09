@@ -46,8 +46,7 @@ void EEPROM::read()
     tmp.invalidate();
     bool result = eepromReadBytes(EEPROM_DEFAULT_OFFSET, reinterpret_cast<uint8_t *>(&tmp), sizeof(tmp));
     DEBUG_PRINT(DebugType::INFO, "read=%u magic=%08x version=%d sequence=%d", (int)result, tmp.magic, tmp.version, tmp.sequence);
-
-    if (!result || tmp.magic != kMagic || tmp.version != kVersion) {
+    if (!result || tmp.magic != kMagic || tmp.version != kVersion || tmp.validateCRC() == kInvalidCRC) {
         resetDefaults();
         return;
     }
@@ -62,6 +61,7 @@ bool EEPROM::write()
     tmp.invalidate();
     bool result = eepromReadBytes(EEPROM_DEFAULT_OFFSET, reinterpret_cast<uint8_t *>(&tmp), sizeof(tmp));
     if (result) {
+        tmp.validateCRC();
         if (tmp == data) {
             DEBUG_PRINT(DebugType::INFO, "EEPROM write skipped, no changes");
             return false;
@@ -73,6 +73,7 @@ bool EEPROM::write()
 
     // write data to EEPROM
     data.sequence++;
+    data.crc = data.calculateCRC();
     result = eepromWriteBytes(EEPROM_DEFAULT_OFFSET, reinterpret_cast<uint8_t *>(&data), sizeof(data));
     if (!result) {
         data.sequence--;
@@ -82,7 +83,8 @@ bool EEPROM::write()
     #if EEPROM_VALIDATE_WRITE
         tmp.invalidate();
         result = eepromReadBytes(EEPROM_DEFAULT_OFFSET, reinterpret_cast<uint8_t *>(&tmp), sizeof(tmp));
-        DEBUG_PRINT(DebugType::NOTICE, "verify=%u magic=%08x version=%d sequence=%d", result, tmp.magic, tmp.version, tmp.sequence);
+        tmp.validateCRC();
+        DEBUG_PRINT(DebugType::NOTICE, "verify=%u magic=%08x version=%d sequence=%d crc=%08x", result, tmp.magic, tmp.version, tmp.sequence, tmp.crc);
     #endif
     return result;
 }
@@ -90,6 +92,7 @@ bool EEPROM::write()
 void EEPROM::resetDefaults()
 {
     data = Data();
+    data.crc = data.calculateCRC();
     updateTemperatureLimits();
 }
 

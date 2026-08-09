@@ -1,5 +1,24 @@
 # DC Motor Controller Firmware for STM32F107/DRV8701
 
+## Navigation
+
+### Start Button
+
+- Start screen: start motor
+- Dashboard screen: stop motor
+
+### Back Button
+
+- Start screen: toggle motor direction
+- Dashboard screen: stop motor
+- Menus: go back to previous menu
+- Long press (5 seconds): firmware reset
+
+### Rotary Knob Button
+
+- Start screen: open main menu (long press opens advanced menu)
+- Dashboard screen: select value to change (RPM/PWM/PID parameters, etc.)
+
 ## Software Features
 
 - Start/dashboard workflow for quick motor start-stop and live runtime status

@@ -10,10 +10,13 @@
 #include "i2c.h"
 #include "adc_converters.h"
 
+extern CRC_HandleTypeDef hcrc;
+
 struct EEPROM
 {
     static constexpr uint32_t kMagic = 0xDEADBEEF;
-    static constexpr uint32_t kVersion = 4;
+    static constexpr uint32_t kInvalidCRC = 0xffffffff;
+    static constexpr uint32_t kVersion = 5;
 
     static constexpr uint32_t kPIDParamToUint32(float value) {
         return static_cast<uint32_t>(value * UIConstants::kPIDParamFactor);
@@ -47,6 +50,7 @@ struct EEPROM
         uint32_t magic;
         uint32_t version;
         uint32_t sequence;
+        uint32_t crc;
         uint8_t tft_brightness;
         uint8_t led_brightness;
         uint16_t input_current_limit;
@@ -79,6 +83,7 @@ struct EEPROM
             magic(kMagic),
             version(kVersion),
             sequence(1),
+            crc(kInvalidCRC),
             tft_brightness(UIConstants::kDefaultTFTBrightness),
             led_brightness(UIConstants::kDefaultLEDBrightness),
             input_current_limit(UIConstants::kDefaultInputCurrent),
@@ -113,11 +118,35 @@ struct EEPROM
          */
         bool operator==(const Data &other) const
         {
+            if (crc == kInvalidCRC || other.crc == kInvalidCRC) {
+                // invalid data
+                return false;
+            }
+            // compare data directly, CRC is updated during read and write only
             return memcmp(
                 &reinterpret_cast<const uint8_t *>(this)[offsetof(Data, tft_brightness)],
                 &reinterpret_cast<const uint8_t *>(&other)[offsetof(Data, tft_brightness)],
                 sizeof(Data) - offsetof(Data, tft_brightness)
             ) == 0;
+        }
+
+        uint32_t validateCRC()
+        {
+            uint32_t newCrc = calculateCRC();
+            if (crc != newCrc) {
+                DEBUG_PRINT(DebugType::ERROR, "EEPROM CRC mismatch: expected=%08x calculated=%08x", crc, newCrc);
+                // mark as invalid
+                crc = kInvalidCRC;
+            }
+            return crc;
+        }
+
+        uint32_t calculateCRC() const
+        {
+            return HAL_CRC_Calculate(&hcrc,
+                (uint32_t *)&reinterpret_cast<const uint8_t *>(this)[offsetof(Data, tft_brightness)],
+                (sizeof(Data) - offsetof(Data, tft_brightness)) / sizeof(uint32_t)
+            );
         }
 
         /**
@@ -129,6 +158,7 @@ struct EEPROM
             magic = 0xcccccccc;
             version = 0xcccccccc;
             sequence = 0;
+            crc = kInvalidCRC;
         }
     };
 
