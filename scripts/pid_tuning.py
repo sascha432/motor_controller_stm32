@@ -108,7 +108,7 @@ SWO_DATA_EEPROM_COMMIT_OFFSET = 24
 SWO_DATA_STRUCT = "<fffHHB?2xI?3x"
 SWO_DATA_SIZE = struct.calcsize(SWO_DATA_STRUCT)
 SWO_DATA_ENABLED_OFFSET = struct.calcsize("<fffHH")
-EEPROM_DATA_STRUCT = "<IIIBBHHHHHBBBBBBBBHxxfffHHH"
+EEPROM_DATA_STRUCT = "<IIIIBBHHHHHBBBBBBBBHxxfffHHH?x"
 EEPROM_DATA_SIZE = struct.calcsize(EEPROM_DATA_STRUCT)
 
 
@@ -129,6 +129,7 @@ class EEPROMData:
     magic: int
     version: int
     sequence: int
+    crc: int
     tft_brightness: int
     led_brightness: int
     input_current_limit: int
@@ -151,6 +152,7 @@ class EEPROMData:
     anti_windup: int
     ovp_protection: int
     pwm_frequency: int
+    motor_chime: bool
 
 
 EEPROM_FIELD_SPECS = (
@@ -176,6 +178,7 @@ EEPROM_FIELD_SPECS = (
     ("Anti-Windup (%)", "anti_windup", "percent", 0.0, 100.0, None),
     ("OVP Protection (mV)", "ovp_protection", "int", 8000, 40000, None),
     ("PWM Frequency (Hz)", "pwm_frequency", "int", 5000, 40000, None),
+    ("Welcome Chime", "motor_chime", "choice", None, None, (("Off", 0), ("On", 1))),
 )
 
 
@@ -1005,6 +1008,7 @@ class PIDTuningApp:
             data.magic,
             data.version,
             data.sequence,
+            data.crc,
             data.tft_brightness,
             data.led_brightness,
             data.input_current_limit,
@@ -1027,6 +1031,7 @@ class PIDTuningApp:
             data.anti_windup,
             data.ovp_protection,
             data.pwm_frequency,
+            data.motor_chime,
         )
 
     def _unpack_eeprom_data(self, payload: bytes) -> EEPROMData:
@@ -1193,6 +1198,7 @@ class PIDTuningApp:
         summary_vars["magic"].set(f"0x{data.magic:08X}")
         summary_vars["version"].set(str(data.version))
         summary_vars["sequence"].set(str(data.sequence))
+        summary_vars["crc"].set(f"0x{data.crc:08X}")
         summary_vars["address"].set(f"0x{self._eeprom_dialog_address:08X}")
         summary_vars["commit"].set("set" if swo_data.eeprom_commit else "clear")
 
@@ -1213,6 +1219,7 @@ class PIDTuningApp:
             "magic": self._eeprom_dialog_source.magic,
             "version": self._eeprom_dialog_source.version,
             "sequence": self._eeprom_dialog_source.sequence,
+            "crc": self._eeprom_dialog_source.crc,
         }
 
         for spec in EEPROM_FIELD_SPECS:
@@ -1301,6 +1308,7 @@ class PIDTuningApp:
             "magic": tk.StringVar(value="..."),
             "version": tk.StringVar(value="..."),
             "sequence": tk.StringVar(value="..."),
+            "crc": tk.StringVar(value="..."),
             "address": tk.StringVar(value="..."),
             "commit": tk.StringVar(value="..."),
         }
@@ -1309,8 +1317,9 @@ class PIDTuningApp:
             ("Magic", "magic", 0),
             ("Version", "version", 2),
             ("Sequence", "sequence", 4),
-            ("RAM Address", "address", 0),
-            ("Commit Flag", "commit", 2),
+            ("CRC", "crc", 0),
+            ("RAM Address", "address", 2),
+            ("Commit Flag", "commit", 4),
         )
         for label_text, key, column in header_items[:3]:
             row = 0
