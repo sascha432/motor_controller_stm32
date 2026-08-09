@@ -41,13 +41,13 @@ static const char *kMainMenuItems[] = {
 };
 
 enum class AdvancedMenuItemType {
-    TFT_BRIGHTNESS = 0,
+    PID_PARAMETERS = 0,
+    TFT_BRIGHTNESS,
     MOSFET_TEMPERATURE,
     MOTOR_TEMPERATURE,
     MOTOR_RPM_SETTINGS,
     MOTOR_DIRECTION,
     SENSOR_DIRECTION,
-    PID_PARAMETERS,
     PWM_FREQUENCY,
     OVP_PROTECTION,
     WELCOME_CHIME,
@@ -59,13 +59,13 @@ enum class AdvancedMenuItemType {
 };
 
 static const char *kAdvancedMenuItems[] = {
-    "TFT Brightness",           // 0
-    "MOSFET Temperature",       // 1
-    "Motor Temperature",        // 2
-    "Motor RPM Settings",       // 3
-    "Motor Direction",          // 4
-    "Sensor Direction",         // 5
-    "PID Parameters",           // 6
+    "PID Parameters",           // 0
+    "TFT Brightness",           // 1
+    "MOSFET Temperature",       // 2
+    "Motor Temperature",        // 3
+    "Motor RPM Settings",       // 4
+    "Motor Direction",          // 5
+    "Sensor Direction",         // 6
     "PWM Frequency",            // 7
     "OVP Protection",           // 8
     "Welcome Chime",            // 9

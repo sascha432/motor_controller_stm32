@@ -39,7 +39,7 @@ void ScreenFlow::back()
     DEBUG_PRINT(DebugType::UI, "prev=%p current=%p", screen->prevScreen, screen);
     if (screen->prevScreen) {
         lv_scr_load(Screen::emptyScreen);
-        auto tmp = screen->prevScreen;
+        auto tmp = screen->removePrevScreen();
         deleteScreen(screen);
         screen = tmp;
         screen->load();
@@ -49,10 +49,10 @@ void ScreenFlow::back()
 void ScreenFlow::next(Screen *nextScreen)
 {
     DEBUG_PRINT(DebugType::UI, "next=%p current=%p", nextScreen, screen);
-    nextScreen->prevScreen = screen;
-    if (nextScreen->prevScreen) {
-        lv_obj_clean(nextScreen->prevScreen->screen);
+    if (screen) {
+        lv_obj_clean(screen->screen);
     }
+    nextScreen->prevScreen = screen;
     screen = nextScreen;
     screen->load();
 }

@@ -234,6 +234,18 @@ struct Screen
     }
 
     /**
+     * @brief Get the Prev Screen and remove it from object
+     *
+     * @return Screen*
+     */
+    inline Screen *removePrevScreen()
+    {
+        auto tmp = prevScreen;
+        prevScreen = nullptr;
+        return tmp;
+    }
+
+    /**
      * @brief Set the value and normalize, update any visual elements on the screen to reflect the new value
      *
      * @param value
