@@ -13,12 +13,6 @@
 
 // === Helpers ===
 
-inline void screen_style_screen(lv_obj_t *screen)
-{
-    lv_obj_set_style_bg_color(screen, SCREEN_COLOR_BG, LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, LV_PART_MAIN);
-}
-
 inline constexpr lv_coord_t diagnostic_screen_get_ypos_for_row(int32_t row)
 {
     switch(row) {
@@ -157,7 +151,8 @@ void Screen::load()
     else {
         screen = lv_obj_create(nullptr);
     }
-    screen_style_screen(screen);
+    lv_obj_set_style_bg_color(screen, SCREEN_COLOR_BG, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, LV_PART_MAIN);
     knob.setMaxAcceleration(maxAcceleration);
 }
 
@@ -196,19 +191,20 @@ void InfoScreen::load()
     Screen::load();
     label = lv_label_create(screen);
     lv_label_set_text_static(label, message);
-    lv_obj_set_style_text_color(label, INFOSCREEN_COLOR_TEXT, LV_PART_MAIN);
     lv_obj_set_style_text_font(label, font, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(label, LV_OPA_COVER, LV_PART_MAIN);
     switch (theme) {
         case InfoScreenThemeType::INFO:
             lv_obj_set_style_text_color(label, INFOSCREEN_INFO_COLOR_TEXT, LV_PART_MAIN);
             lv_obj_set_style_radius(label, kInfoScreenLabelBorderRadius, LV_PART_MAIN);
             lv_obj_set_style_pad_all(label, kInfoScreenLabelPadding, LV_PART_MAIN);
-            lv_obj_set_style_bg_opa(label, LV_OPA_COVER, LV_PART_MAIN);
             lv_obj_set_style_bg_color(label, INFOSCREEN_INFO_COLOR_BG, LV_PART_MAIN);
             lv_obj_set_style_border_width(label, kInfoScreenLabelBorderWidth, LV_PART_MAIN);
             lv_obj_set_style_border_color(label, INFOSCREEN_INFO_COLOR_TEXT, LV_PART_MAIN);
             break;
         case InfoScreenThemeType::DEFAULT:
+            lv_obj_set_style_text_color(label, INFOSCREEN_COLOR_TEXT, LV_PART_MAIN);
+            lv_obj_set_style_bg_color(label, INFOSCREEN_COLOR_BG, LV_PART_MAIN);
             break;
     }
     lv_obj_center(label);
@@ -873,7 +869,6 @@ void StartScreen::load()
     lv_obj_set_pos(speedLabel, 0, kStartScreenSpeedOffsetY);
 
     _refreshVisuals();
-
     lv_scr_load(screen);
 }
 
