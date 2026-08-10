@@ -133,7 +133,7 @@ Screen::~Screen()
         DEBUG_PRINT(DebugType::ERROR, "prev. screen=%p not null", prevScreen);
     }
     #endif
-     if (screen) {
+    if (screen) {
         lv_scr_load(emptyScreen);
         lv_obj_del(screen);
     }

@@ -12,8 +12,8 @@
 /* Memory */
 #define LV_MEM_CUSTOM 0
 #if DEBUG
-#define LV_MEM_SIZE (16U * 1024U)
-#define LV_BUFFER_LINES 32
+#define LV_MEM_SIZE (8U * 1024U)
+#define LV_BUFFER_LINES 80
 // redraw performance start and pid tuning graph
 // 10 lines start=128ms graph=169ms
 // 16 lines start=117ms graph=159ms
@@ -46,8 +46,8 @@
 #define LV_LOG_LEVEL LV_LOG_LEVEL_WARN
 #define LV_USE_ASSERT_MALLOC 1
 #define LV_USE_ASSERT_MEM_INTEGRITY 1
-#define LV_USE_ASSERT_NULL 1
-#define LV_USE_ASSERT_STYLE 1
+#define LV_USE_ASSERT_NULL 0
+#define LV_USE_ASSERT_STYLE 0
 #define LV_USE_ASSERT_OBJ 1
 #else
 #define LV_USE_ASSERT_MALLOC 0
