@@ -282,5 +282,9 @@ extern "C" void Error_Handler(void)
         }
         LEDs::off();
         delay_ms(500);
+        // check if the back button is pressed and reset MCU
+        if (backButton.readGPIOState()) {
+            NVIC_SystemReset();
+        }
     }
 }

@@ -106,6 +106,17 @@ struct Button
         isr(digitalPinToGPIO<GPIO_PIN>()->IDR);
     }
 
+    /**
+     * @brief Read GPIO pin state directly and return true if the button is pressed (active)
+     *
+     * @return true
+     * @return false
+     */
+    bool readGPIOState() const
+    {
+        return (readState() == ACTIVE_STATE);
+    }
+
 protected:
     /**
      * @brief Read the current state of the button PIN
@@ -113,7 +124,7 @@ protected:
      * @return true
      * @return false
      */
-    inline bool readState()
+    inline bool readState() const
     {
         return digitalRead<GPIO_PIN>();
     }
