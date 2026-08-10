@@ -1045,7 +1045,6 @@ class PIDTuningApp:
             and abs(data.kp - 1.0) < 1e-6
             and abs(data.ki - 1.0) < 1e-6
             and abs(data.kd - 0.0) < 1e-6
-            and data.anti_windup == 0
             and data.rpm == 0
         )
 
