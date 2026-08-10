@@ -78,13 +78,13 @@ bool EEPROM::write()
     if (!result) {
         data.sequence--;
     }
-    DEBUG_PRINT(result ? DebugType::INFO : DebugType::ERROR, "write=%u magic=%08x version=%d sequence=%d", (int)result, data.magic, data.version, data.sequence);
+    DEBUG_PRINT(result ? DebugType::INFO : DebugType::ERROR, "write=%u magic=%08x version=%d sequence=%d", (unsigned)result, data.magic, data.version, data.sequence);
 
     #if EEPROM_VALIDATE_WRITE
         tmp.invalidate();
         result = eepromReadBytes(EEPROM_DEFAULT_OFFSET, reinterpret_cast<uint8_t *>(&tmp), sizeof(tmp));
         tmp.validateCRC();
-        DEBUG_PRINT(DebugType::NOTICE, "verify=%u magic=%08x version=%d sequence=%d crc=%08x", result, tmp.magic, tmp.version, tmp.sequence, tmp.crc);
+        DEBUG_PRINT(DebugType::NOTICE, "verify=%u magic=%08x version=%d sequence=%d crc=%08x", (unsigned)result, tmp.magic, tmp.version, tmp.sequence, tmp.crc);
     #endif
     return result;
 }

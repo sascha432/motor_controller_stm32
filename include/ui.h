@@ -37,6 +37,8 @@
 #define SCREEN_COLOR_TEMPERATURE                COLOR_PALETTE_CYAN
 
 #define INFOSCREEN_COLOR_TEXT                   SCREEN_COLOR_TEXT
+#define INFOSCREEN_INFO_COLOR_TEXT              COLOR_PALETTE_LIGHT_GRAY
+#define INFOSCREEN_INFO_COLOR_BG                COLOR_PALETTE_BLUE
 
 #define DIAGNOSTICSCREEN_COLOR_TEXT             COLOR_PALETTE_CYAN
 #define DIAGNOSTICSCREEN_COLOR_SCROLLBAR_BG     COLOR_PALETTE_DARK_GRAY
@@ -126,6 +128,9 @@ struct Screen
 
     // info screen style constants
     static constexpr const lv_font_t *kInfoScreenLabelFont = &lv_font_montserrat_24;
+    static constexpr lv_coord_t kInfoScreenLabelBorderRadius = 16;
+    static constexpr lv_coord_t kInfoScreenLabelPadding = 8;
+    static constexpr lv_coord_t kInfoScreenLabelBorderWidth = 2;
 
     // menu screen style constants
     static constexpr const lv_font_t *kMenuScreenLabelFont = &lv_font_montserrat_18;
@@ -153,6 +158,7 @@ struct Screen
     static constexpr lv_coord_t kSliderScreenSliderBorder = 2;
     static constexpr lv_coord_t kSliderScreenSliderRadius = 6;
     static constexpr lv_coord_t kSliderScreenKnobSize = 30;
+    static constexpr lv_coord_t kSliderScreenKnobBorderWidth = 2;
 
     // diagnostics screen style constants
     static constexpr const lv_font_t *kDiagnosticsScreenLabelFont = &lv_font_montserrat_14;
@@ -160,11 +166,13 @@ struct Screen
     static constexpr lv_coord_t kDiagnosticScreenViewportY = 10;
     static constexpr lv_coord_t kDiagnosticScreenMargin = 20;
     static constexpr lv_coord_t kDiagnosticScreenScrollbarWidth = 4;
+    static constexpr lv_coord_t kDiagnosticScreenScrollbarThumbHeight = 16;
     static constexpr lv_coord_t kDiagnosticScreenRowHeight = 16;
     static constexpr int32_t kDiagnosticScreenRowCount = 7;
     static constexpr lv_coord_t kDiagnosticViewportWidth = kScreenWidth - kDiagnosticScreenMargin;
     static constexpr lv_coord_t kDiagnosticViewportHeight = kScreenHeight - kDiagnosticScreenMargin;
     static constexpr lv_coord_t kDiagnosticTextWidth = kDiagnosticViewportWidth - kDiagnosticScreenScrollbarWidth - 4;
+    static constexpr lv_coord_t kDiagnosticScreenScrollbarRadius = 2;
 
     // dashboard screen style constants
     static constexpr const lv_font_t *kDashboardScreenMetricsFont = &lv_font_dejavu_sans_mono_14;
@@ -177,8 +185,10 @@ struct Screen
     static constexpr lv_coord_t kDashboardScreenContainerWidth = kScreenWidth - (kDashboardScreenContainerX * 2);
     static constexpr lv_coord_t kDashboardScreenContainerHeight = kScreenHeight - (kDashboardScreenContainerY * 2);
     static constexpr lv_coord_t kDashboardScreenColumnWidth = (kDashboardScreenContainerWidth / 2) - 4;
-    static constexpr lv_coord_t kDashboardScreenMotorTempOffsetY = 0;
-    static constexpr lv_coord_t kDashboardScreenMosfetTempOffsetY = 18;
+    static constexpr lv_coord_t kDashboardScreenVoltageOffsetY = 0;
+    static constexpr lv_coord_t kDashboardScreenCurrentOffsetY = 18;
+    static constexpr lv_coord_t kDashboardScreenMotorTempOffsetY = kDashboardScreenVoltageOffsetY;
+    static constexpr lv_coord_t kDashboardScreenMosfetTempOffsetY = kDashboardScreenCurrentOffsetY;
     static constexpr lv_coord_t kDashboardScreenRpmOffsetY = (kScreenHeight / 2) - 12;
     static constexpr lv_coord_t kDashboardScreenValueBottomOffsetY = kDashboardScreenContainerHeight - 24;
     static constexpr lv_coord_t kDashboardScreenValueTuningOffsetY = 40;
@@ -202,6 +212,8 @@ struct Screen
     static constexpr lv_coord_t kStartScreenContainerWidth = kScreenWidth - (kStartScreenContainerX * 2);
     static constexpr lv_coord_t kStartScreenContainerHeight = kScreenHeight - (kStartScreenContainerY * 2);
     static constexpr lv_coord_t kStartScreenColumnWidth = (kStartScreenContainerWidth / 2) - 4;
+    static constexpr lv_coord_t kStartScreenVoltageOffsetY = kDashboardScreenVoltageOffsetY;
+    static constexpr lv_coord_t kStartScreenCurrentOffsetY = kDashboardScreenCurrentOffsetY;
     static constexpr lv_coord_t kStartScreenMotorTempOffsetY = kDashboardScreenMotorTempOffsetY;
     static constexpr lv_coord_t kStartScreenMosfetTempOffsetY = kDashboardScreenMosfetTempOffsetY;
     static constexpr lv_coord_t kStartScreenDirectionOffsetY = (kScreenHeight / 2) - 16;
@@ -318,10 +330,19 @@ protected:
 
 struct InfoScreen : public Screen
 {
-    InfoScreen(Type id, const char *message = nullptr, const lv_font_t *font = Screen::kInfoScreenLabelFont) :
+    enum class InfoScreenThemeType {
+        DEFAULT,
+        INFO
+    };
+
+    InfoScreen(Type id, const char *message = nullptr, const lv_font_t *font = Screen::kInfoScreenLabelFont, InfoScreenThemeType theme = InfoScreenThemeType::DEFAULT) :
         Screen(id),
         message(message),
-        font(font)
+        font(font),
+        theme(theme)
+    {}
+
+    InfoScreen(Type id, const char *message = nullptr, InfoScreenThemeType theme = InfoScreenThemeType::DEFAULT) : InfoScreen(id, message, Screen::kInfoScreenLabelFont, theme)
     {}
 
     virtual void load() override;
@@ -329,6 +350,7 @@ struct InfoScreen : public Screen
 protected:
     const char *message;
     const lv_font_t *font;
+    InfoScreenThemeType theme;
     lv_obj_t *label;
 };
 
@@ -430,7 +452,6 @@ struct DiagnosticsScreen :  public Screen
 {
     DiagnosticsScreen(Type id) : Screen(id),
         viewport(nullptr),
-        content(nullptr),
         firmwareLabel(nullptr),
         vccLabel(nullptr),
         currentLabel(nullptr),
@@ -456,7 +477,6 @@ protected:
 
 private:
     lv_obj_t *viewport;
-    lv_obj_t *content;
     lv_obj_t *firmwareLabel;
     lv_obj_t *vccLabel;
     lv_obj_t *currentLabel;
@@ -468,6 +488,12 @@ private:
     lv_obj_t *scrollbarThumb;
     int32_t scrollOffset;
     int32_t scrollMax;
+    char vccLabelBuf[32];
+    char currentLabelBuf[32];
+    char motorTempLabelBuf[32];
+    char mosfetTempLabelBuf[32];
+    char rpmLabelBuf[24];
+    char lastErrorLabelBuf[32];
 };
 
 // === Dashboard Screen ===

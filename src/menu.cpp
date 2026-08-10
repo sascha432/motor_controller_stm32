@@ -421,7 +421,7 @@ void Menu::clearUserInput()
 void Menu::saveEEPROMChanges()
 {
     if (eeprom.write()) {
-        screenFlow.setScreen(ScreenFlow::newScreen<InfoScreen>(Screen::Type::EEPROM_SAVED, "Saved"));
+        screenFlow.setScreen(ScreenFlow::newScreen<InfoScreen>(Screen::Type::EEPROM_SAVED, "Saved", InfoScreen::InfoScreenThemeType::INFO));
         screenFlow.refresh();
         abortableDelay(UIConstants::kInfoScreenTimeout);
     }
@@ -779,7 +779,7 @@ void Menu::handleButtonPress(uint32_t duration)
                     eeprom.resetDefaults();
                     eeprom.write();
                     menu.applyEEPROMSettings();
-                    screenFlow.next(ScreenFlow::newScreen<InfoScreen>(Screen::Type::EEPROM_RESTORED, "Restored"));
+                    screenFlow.next(ScreenFlow::newScreen<InfoScreen>(Screen::Type::EEPROM_RESTORED, "Restored", InfoScreen::InfoScreenThemeType::INFO));
                     screenFlow.refresh();
                     abortableDelay(UIConstants::kInfoScreenTimeout);
                     loadMainMenu();
