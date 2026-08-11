@@ -213,3 +213,90 @@ void MotorVibes::stopTone()
 }
 
 #endif
+
+#if HAVE_USE_LV_MEM_ALLOC
+
+// == use lvgl memory allocation functions for new/delete operators ===
+
+#include <new>
+#include "lvgl.h"
+
+void *operator new(std::size_t size) noexcept
+{
+    void *ptr = lv_mem_alloc(size);
+    #if LV_MEM_DEBUG
+    if (!ptr) {
+        DEBUG_PRINT(DebugType::MEM, "operator new failed size=%u", static_cast<unsigned>(size));
+        throw std::bad_alloc();
+    }
+    #endif
+    return ptr;
+}
+
+void operator delete(void *ptr) noexcept
+{
+    lv_mem_free(ptr);
+}
+
+void operator delete(void *ptr, std::size_t) noexcept
+{
+    lv_mem_free(ptr);
+}
+
+void *operator new[](std::size_t size) noexcept
+{
+    void *ptr = lv_mem_alloc(size);
+    #if LV_MEM_DEBUG
+    if (!ptr) {
+        DEBUG_PRINT(DebugType::MEM, "operator new[] failed size=%u", static_cast<unsigned>(size));
+        throw std::bad_alloc();
+    }
+    #endif
+    return ptr;
+}
+
+void operator delete[](void *ptr) noexcept
+{
+    lv_mem_free(ptr);
+}
+
+void operator delete[](void *ptr, std::size_t) noexcept
+{
+    lv_mem_free(ptr);
+}
+
+void *operator new(std::size_t size, const std::nothrow_t &) noexcept
+{
+    void *ptr = lv_mem_alloc(size);
+    #if LV_MEM_DEBUG
+    if (!ptr) {
+        DEBUG_PRINT(DebugType::MEM, "operator new failed size=%u", static_cast<unsigned>(size));
+        return nullptr;
+    }
+    #endif
+    return ptr;
+}
+
+void operator delete(void *ptr, const std::nothrow_t &) noexcept
+{
+    lv_mem_free(ptr);
+}
+
+void *operator new[](std::size_t size, const std::nothrow_t &) noexcept
+{
+    void *ptr = lv_mem_alloc(size);
+    #if LV_MEM_DEBUG
+    if (!ptr) {
+        DEBUG_PRINT(DebugType::MEM, "operator new[] failed size=%u", static_cast<unsigned>(size));
+        return nullptr;
+    }
+    #endif
+    return ptr;
+}
+
+void operator delete[](void *ptr, const std::nothrow_t &) noexcept
+{
+    lv_mem_free(ptr);
+}
+
+#endif

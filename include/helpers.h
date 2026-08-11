@@ -31,6 +31,11 @@
 #define F_CPU                               72000000UL
 #endif
 
+// use lv_mem_alloc() for new/delete operators
+#ifndef HAVE_USE_LV_MEM_ALLOC
+#define HAVE_USE_LV_MEM_ALLOC               1
+#endif
+
 // === define arduino pin macros if not defined ===
 #ifndef PA0
 #if defined(STM32F107xC)

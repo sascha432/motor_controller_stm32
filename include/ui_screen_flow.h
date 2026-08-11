@@ -71,43 +71,6 @@ struct ScreenFlow {
         lv_timer_handler();
     }
 
-    #define USE_STATIC_SCREEN_ALLOC 0
-
-    template<typename T, typename... Args>
-    static T *newScreen(Args&&... args)
-    {
-        static_assert(std::is_base_of_v<Screen, T>, "T must derive from Screen");
-        #if !USE_STATIC_SCREEN_ALLOC
-        return new T(std::forward<Args>(args)...);
-        #else
-        // testing static allocation for singletons
-        if constexpr (std::is_same_v<T, DashboardScreen>) {
-            static T staticScreen(std::forward<Args>(args)...);
-            new (&staticScreen) T(std::forward<Args>(args)...);
-            return &staticScreen;
-        }
-        else {
-            return new T(std::forward<Args>(args)...);
-        }
-        #endif
-    }
-
-    static void deleteScreen(Screen *screen)
-    {
-        #if !USE_STATIC_SCREEN_ALLOC
-        delete screen;
-        #else
-        switch(screen->getId()) {
-            case Screen::Type::DASHBOARD:
-                reinterpret_cast<DashboardScreen *>(screen)->~DashboardScreen();
-                break;
-            default:
-                delete screen;
-                break;
-        }
-        #endif
-    }
-
 protected:
     Screen *screen;
 };

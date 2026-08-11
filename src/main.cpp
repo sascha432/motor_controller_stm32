@@ -11,7 +11,6 @@
 #include "tft_driver.h"
 #include "ui.h"
 #include "menu.h"
-#include "mem_debug.h"
 #include "eeprom.h"
 #include "stats.h"
 #include "helpers.h"
@@ -203,15 +202,29 @@ static void loop()
             DEBUG_PRINT(DebugType::INFO, "SWO screenshot sent");
         }
         #endif
-        #if MEM_DEBUG
-        if (!debug_heap_check()) {
-            DEBUG_PRINT(DebugType::MEM, "heap corruption detected during main loop");
-            debug_heap_dump();
-        }
-        #endif
         // DEBUG_PRINT_MSG(DebugType::UI, "lv_timer_handler=%ums\n", HAL_GetTick() - lastLvHandler);
         lastLvHandler = HAL_GetTick();
     }
+
+    #if LV_MEM_DEBUG
+    static uint32_t lastMemStats = 0;
+    if ((HAL_GetTick() - lastMemStats) >= 1000U) {
+        lv_mem_monitor_t monitor;
+        lv_mem_monitor(&monitor);
+        DEBUG_PRINT(DebugType::MEM,
+            "LVGL heap total=%lu free=%lu used=%u%% frag=%u%% largest=%lu max=%lu allocs=%lu free_cnt=%lu",
+            static_cast<unsigned long>(monitor.total_size),
+            static_cast<unsigned long>(monitor.free_size),
+            static_cast<unsigned>(monitor.used_pct),
+            static_cast<unsigned>(monitor.frag_pct),
+            static_cast<unsigned long>(monitor.free_biggest_size),
+            static_cast<unsigned long>(monitor.max_used),
+            static_cast<unsigned long>(monitor.used_cnt),
+            static_cast<unsigned long>(monitor.free_cnt)
+        );
+        lastMemStats = HAL_GetTick();
+    }
+    #endif
 
     if (SWO::data.enabled != SWO::EnableState::DISABLED) {
         // send PID tuning data

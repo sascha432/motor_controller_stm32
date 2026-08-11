@@ -11,15 +11,11 @@
 
 /* Memory */
 #if DEBUG
-#if MEM_DEBUG
-#undef LV_MEM_CUSTOM
-#define LV_MEM_CUSTOM 1
-#endif
-#ifndef LV_MEM_CUSTOM
 #define LV_MEM_CUSTOM 0
-#endif
-#define LV_MEM_SIZE (16U * 1024U)
-#define LV_BUFFER_LINES 32
+#define LV_MEM_SIZE (24U * 1024U)
+// 8kb was enough, 6kb caused some out of memory issues after the fragmentation increased, recommendation is at least 16kb
+// lvgl and new/delete is using the same block
+#define LV_BUFFER_LINES 64
 // redraw performance start and pid tuning graph
 // 10 lines start=128ms graph=169ms
 // 16 lines start=117ms graph=159ms
@@ -27,13 +23,10 @@
 // 24 lines start=102ms graph=134ms
 // 32 lines start=102ms graph=134ms
 // 70 lines start= 92ms graph=130ms
-#define LV_MEM_CUSTOM_INCLUDE "mem_debug.h"
-#define LV_MEM_CUSTOM_ALLOC   debug_malloc
-#define LV_MEM_CUSTOM_FREE    debug_free
-#define LV_MEM_CUSTOM_REALLOC debug_realloc
 #else
-#define LV_MEM_SIZE (16U * 1024U)
-#define LV_BUFFER_LINES (32)
+#define LV_MEM_CUSTOM 0
+#define LV_MEM_SIZE (24U * 1024U)
+#define LV_BUFFER_LINES (64)
 #endif
 
 

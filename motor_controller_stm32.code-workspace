@@ -142,6 +142,7 @@
 			"CMAR",
 			"CNDTR",
 			"CPAR",
+			"cubemx",
 			"CYCCNT",
 			"DASHBOARDSCREEN",
 			"dejavu",
@@ -229,6 +230,8 @@
 			"TIM_SMCR_TS_Pos",
 			"TRCENA",
 			"USBD",
+			"usbd_ctlreq",
+			"usbd_ioreq",
 			"VREF",
 			"WWDG"
 		],
