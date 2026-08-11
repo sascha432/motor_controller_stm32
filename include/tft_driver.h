@@ -52,4 +52,9 @@ void tft_driver_lvgl_init(void);
 void tft_clear_display(uint16_t color = 0x0000);
 void tft_write_window_pixels(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, const uint16_t *pixels, uint32_t pixel_count);
 
+#if HAVE_SWO_SCREENSHOTS
+bool tft_driver_screenshot_begin(void);
+void tft_driver_screenshot_end(void);
+#endif
+
 // EOF

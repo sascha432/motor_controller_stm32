@@ -65,7 +65,8 @@ struct SWO
             volatile uint32_t address;
             volatile bool commit;
         } EEPROM;
-        DataType() : Kp(0), Ki(0), Kd(0), antiWindup(0), rpm(0), enabled(EnableState::DISABLED), changed(false), EEPROM{0, false} {}
+        volatile bool sendScreenshot;
+        DataType() : Kp(0), Ki(0), Kd(0), antiWindup(0), rpm(0), enabled(EnableState::DISABLED), changed(false), EEPROM{0, false}, sendScreenshot(false) {}
     };
     static DataType data;
 };

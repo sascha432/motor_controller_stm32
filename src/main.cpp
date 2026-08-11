@@ -177,7 +177,29 @@ static void loop()
         }
 
         // update UI, this might take a couple 100ms
+        #if HAVE_SWO_SCREENSHOTS
+        bool screenshotRequested = false;
+        if (SWO::data.sendScreenshot) {
+            SWO::data.sendScreenshot = false;
+            screenshotRequested = tft_driver_screenshot_begin();
+            if (screenshotRequested) {
+                DEBUG_PRINT(DebugType::INFO, "SWO screenshot started");
+                lv_obj_invalidate(lv_scr_act());
+            }
+            else {
+                DEBUG_PRINT(DebugType::INFO, "SWO screenshot failed to start");
+            }
+        }
+        #endif
         screenFlow.refresh();
+
+        #if HAVE_SWO_SCREENSHOTS
+        if (screenshotRequested) {
+            tft_driver_screenshot_end();
+            DEBUG_PRINT(DebugType::INFO, "SWO screenshot sent");
+        }
+        #endif
+
         #if MEM_DEBUG
         if (!debug_heap_check()) {
             DEBUG_PRINT(DebugType::MEM, "heap corruption detected during main loop");

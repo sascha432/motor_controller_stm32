@@ -34,6 +34,11 @@ static void debug_swd_init()
         ITM->TER |= (1UL << 1);
     #endif
 
+    #if HAVE_SWO_SCREENSHOTS
+        // Enable stimulus 2 for screenshot tiles.
+        ITM->TER |= (1UL << 2);
+    #endif
+
 }
 
 bool SWO::state = false;
@@ -57,6 +62,10 @@ void SWO::deinit()
 
     // Disable stimulus ports 0 and 1.
     ITM->TER &= ~((1UL << 0) | (1UL << 1));
+
+    #if HAVE_SWO_SCREENSHOTS
+    ITM->TER &= ~(1UL << 2);
+    #endif
 
     // Lock ITM
     ITM->LAR = 0;

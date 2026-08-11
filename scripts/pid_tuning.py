@@ -3,6 +3,8 @@
 
 Author: sascha_lammers@gmx.de
 
+*** Mostly AI generated code be aware of utter garbage that i might have missed ***
+
 The backend connects to pyOCD gdbserver and decodes raw SWV ITM packets.
 Port 1 is interpreted as PidController::PidLoopType binary frames.
 """
@@ -20,11 +22,13 @@ import sys
 import threading
 import time
 import tkinter as tk
+from pathlib import Path
 from collections import deque
 from dataclasses import dataclass
 from tkinter import ttk
 from typing import Callable, Iterable, List, Optional, Tuple
 
+from PIL import Image
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
@@ -92,6 +96,41 @@ PID_FRAME_MAGIC = b"PID1"
 # C++ PidLoopType has 2 bytes padding before float members for 4-byte alignment.
 PID_ITEM_STRUCT = "<I9H2xfffI"
 PID_ITEM_SIZE = struct.calcsize(PID_ITEM_STRUCT)
+SCREENSHOT_FRAME_MAGIC = b"IMG1"
+SCREENSHOT_TILE_MAGIC = b"TIL1"
+SCREENSHOT_END_MAGIC = b"END1"
+SCREENSHOT_PIXEL_FORMAT_RGB565 = 1
+# Font-safe screenshot tone mapping.
+# Keep gamma moderate to preserve anti-aliased text edges.
+SCREENSHOT_GAMMA = 0.20
+
+
+def _build_screenshot_lut(gamma: float) -> bytes:
+    gamma = max(0.1, float(gamma))
+    return bytes(
+        max(
+            0,
+            min(
+                255,
+                int(
+                    round(
+                        pow(i / 255.0, gamma)
+                        * 255.0
+                    )
+                ),
+            ),
+        )
+        for i in range(256)
+    )
+
+
+SCREENSHOT_GAMMA_LUT = _build_screenshot_lut(SCREENSHOT_GAMMA)
+
+SCREENSHOT_PORT = 2
+SCREENSHOT_FRAME_STRUCT = "<4sHHBB"
+SCREENSHOT_FRAME_SIZE = struct.calcsize(SCREENSHOT_FRAME_STRUCT)
+SCREENSHOT_TILE_STRUCT = "<4sHHHHI"
+SCREENSHOT_TILE_SIZE = struct.calcsize(SCREENSHOT_TILE_STRUCT)
 # PID_PWM_MAX_LEVEL = 3599.0
 PID_PWM_MAX_LEVEL = 100.0
 ANTI_WINDUP_FACTOR = 512.0
@@ -101,11 +140,14 @@ SWO_ENABLE_SWO = 1
 SWO_ENABLE_USB = 2
 SWO_DATA_EEPROM_ADDRESS_OFFSET = 20
 SWO_DATA_EEPROM_COMMIT_OFFSET = 24
+SWO_DATA_SEND_SCREENSHOT_OFFSET = 28
+# FOR THE AI: REMEMBER THIS IS 32BIT AND 32BIT PADDED (AND DONT REMOVE THIS COMMENT)
 # C++ SWO::DataType layout:
 # float Kp, float Ki, float Kd, uint16_t antiWindup, uint16_t rpm,
 # uint8_t enabled, bool changed, 2 bytes padding,
-# uint32_t EEPROM.address, bool EEPROM.commit, 3 bytes padding.
-SWO_DATA_STRUCT = "<fffHHB?2xI?3x"
+# uint32_t EEPROM.address, bool EEPROM.commit, 3 bytes padding,
+# bool sendScreenshot, 3 bytes padding.
+SWO_DATA_STRUCT = "<fffHHB?2xI?3x?3x"
 SWO_DATA_SIZE = struct.calcsize(SWO_DATA_STRUCT)
 SWO_DATA_ENABLED_OFFSET = struct.calcsize("<fffHH")
 EEPROM_DATA_STRUCT = "<IIIIBBHHHHHBBBBBBBBHxxfffHHH?x"
@@ -122,6 +164,7 @@ class SWOData:
     changed: bool
     eeprom_address: int
     eeprom_commit: bool
+    send_screenshot: bool
 
 
 @dataclass
@@ -335,16 +378,62 @@ class SWOBackend:
         self,
         config: AppConfig,
         log_callback: Callable[[str], None],
+        screenshot_event_callback: Callable[[str, object], None],
         sample_callback: Callable[[Sample], None],
     ) -> None:
         self.config = config
         self.log = log_callback
+        self._screenshot_event_callback = screenshot_event_callback
         self.sample_callback = sample_callback
         self.proc: Optional[subprocess.Popen] = None
         self.stop_event = threading.Event()
         self.stdout_thread: Optional[threading.Thread] = None
         self.swv_thread: Optional[threading.Thread] = None
         self.running = False
+        self._screenshot_lock = threading.RLock()
+        self._screenshot_output_path: Optional[Path] = None
+        self._screenshot_buffer = bytearray()
+        self._screenshot_image: Optional[Image.Image] = None
+        self._screenshot_width = 0
+        self._screenshot_height = 0
+        self._screenshot_format = 0
+        self._screenshot_last_packet_time = 0.0
+
+    def request_screenshot(self, output_path: Path) -> None:
+        with self._screenshot_lock:
+            self._screenshot_output_path = output_path
+            self._screenshot_buffer.clear()
+            self._screenshot_image = None
+            self._screenshot_width = 0
+            self._screenshot_height = 0
+            self._screenshot_format = 0
+            self._screenshot_last_packet_time = time.monotonic()
+
+    def cancel_screenshot(self) -> None:
+        with self._screenshot_lock:
+            self._screenshot_output_path = None
+            self._screenshot_buffer.clear()
+            self._screenshot_image = None
+            self._screenshot_width = 0
+            self._screenshot_height = 0
+            self._screenshot_format = 0
+            self._screenshot_last_packet_time = 0.0
+
+    def has_pending_screenshot(self) -> bool:
+        with self._screenshot_lock:
+            return self._screenshot_output_path is not None
+
+    def try_finalize_screenshot_if_idle(self, idle_seconds: float) -> bool:
+        with self._screenshot_lock:
+            if self._screenshot_output_path is None or self._screenshot_image is None:
+                return False
+            if self._screenshot_last_packet_time <= 0.0:
+                return False
+            if (time.monotonic() - self._screenshot_last_packet_time) < idle_seconds:
+                return False
+
+        self._finalize_screenshot_stream()
+        return True
 
     def build_pyocd_command(self, reset_run: bool) -> List[str]:
         cmd = [
@@ -409,6 +498,7 @@ class SWOBackend:
 
     def stop(self) -> None:
         self.stop_event.set()
+        self.cancel_screenshot()
 
         if self.proc and self.proc.poll() is None:
             self.proc.terminate()
@@ -487,16 +577,17 @@ class SWOBackend:
         self.running = False
 
     def _read_raw_swv(self) -> None:
-        accumulated = bytearray()
-        pid_bytes = bytearray()
         last_connect_log = 0.0
-        last_sequence: Optional[int] = None
 
         while not self.stop_event.is_set():
             try:
                 with socket.create_connection(("127.0.0.1", self.config.raw_port), timeout=1.0) as sock:
                     sock.settimeout(1.0)
                     self.log(f"Connected to SWV raw stream on tcp://127.0.0.1:{self.config.raw_port}")
+
+                    accumulated = bytearray()
+                    pid_bytes = bytearray()
+                    last_sequence: Optional[int] = None
 
                     while not self.stop_event.is_set():
                         try:
@@ -509,6 +600,15 @@ class SWOBackend:
 
                         accumulated.extend(chunk)
                         for port, payload in parse_itm_packets(accumulated):
+                            if port == 0:
+                                # Port 0 text is already mirrored by pyOCD stdout because
+                                # semihost_console_type=console is enabled.
+                                continue
+
+                            if port == SCREENSHOT_PORT:
+                                self._consume_screenshot_payload(payload)
+                                continue
+
                             if port != self.config.pid_port:
                                 continue
 
@@ -541,11 +641,152 @@ class SWOBackend:
                                 del pid_bytes[0]
 
             except OSError:
+                accumulated = bytearray()
+                pid_bytes = bytearray()
                 now = time.monotonic()
                 if now - last_connect_log > 2.0:
                     self.log(f"Waiting for SWV raw server on tcp://127.0.0.1:{self.config.raw_port}...")
                     last_connect_log = now
                 time.sleep(0.2)
+
+    @staticmethod
+    def _rgb565_to_rgb_bytes(payload: bytes) -> bytes:
+        if len(payload) % 2 != 0:
+            raise ValueError("RGB565 payload length must be even")
+
+        rgb = bytearray((len(payload) // 2) * 3)
+        lut = SCREENSHOT_GAMMA_LUT
+        dst = 0
+        for src in range(0, len(payload), 2):
+            value = payload[src] | (payload[src + 1] << 8)
+            red = ((value >> 11) & 0x1F) * 255 // 31
+            green = ((value >> 5) & 0x3F) * 255 // 63
+            blue = (value & 0x1F) * 255 // 31
+            rgb[dst] = lut[red]
+            rgb[dst + 1] = lut[green]
+            rgb[dst + 2] = lut[blue]
+            dst += 3
+        return bytes(rgb)
+
+    def _reset_screenshot_stream(self) -> None:
+        with self._screenshot_lock:
+            self._screenshot_buffer.clear()
+            self._screenshot_image = None
+            self._screenshot_width = 0
+            self._screenshot_height = 0
+            self._screenshot_format = 0
+
+    def _finalize_screenshot_stream(self) -> None:
+        with self._screenshot_lock:
+            image = self._screenshot_image
+            output_path = self._screenshot_output_path
+            self._screenshot_output_path = None
+            self._screenshot_buffer.clear()
+            self._screenshot_image = None
+            self._screenshot_width = 0
+            self._screenshot_height = 0
+            self._screenshot_format = 0
+
+        if image is None or output_path is None:
+            return
+
+        try:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            image.save(output_path, format="PNG")
+        except Exception as exc:  # pragma: no cover - defensive path
+            self._screenshot_event_callback("screenshot-error", f"Failed to save screenshot: {exc}")
+            return
+
+        self._screenshot_event_callback("screenshot-complete", str(output_path))
+
+    def _consume_screenshot_payload(self, payload: bytes) -> None:
+        with self._screenshot_lock:
+            if self._screenshot_output_path is None:
+                return
+            self._screenshot_last_packet_time = time.monotonic()
+            self._screenshot_buffer.extend(payload)
+
+            while True:
+                if self._screenshot_image is None:
+                    if len(self._screenshot_buffer) < SCREENSHOT_FRAME_SIZE:
+                        return
+
+                    header_index = self._screenshot_buffer.find(SCREENSHOT_FRAME_MAGIC)
+                    if header_index < 0:
+                        keep = len(SCREENSHOT_FRAME_MAGIC) - 1
+                        if len(self._screenshot_buffer) > keep:
+                            del self._screenshot_buffer[:-keep]
+                        return
+
+                    if header_index > 0:
+                        del self._screenshot_buffer[:header_index]
+                        if len(self._screenshot_buffer) < SCREENSHOT_FRAME_SIZE:
+                            return
+
+                    magic, width, height, pixel_format, reserved = struct.unpack(
+                        SCREENSHOT_FRAME_STRUCT,
+                        self._screenshot_buffer[:SCREENSHOT_FRAME_SIZE],
+                    )
+                    if magic != SCREENSHOT_FRAME_MAGIC:
+                        del self._screenshot_buffer[0]
+                        continue
+                    if pixel_format != SCREENSHOT_PIXEL_FORMAT_RGB565:
+                        self._screenshot_event_callback("screenshot-error", f"Unsupported screenshot format: {pixel_format}")
+                        self._reset_screenshot_stream()
+                        return
+
+                    self._screenshot_width = width
+                    self._screenshot_height = height
+                    self._screenshot_format = pixel_format
+                    self._screenshot_image = Image.new("RGB", (width, height))
+                    del self._screenshot_buffer[:SCREENSHOT_FRAME_SIZE]
+                    continue
+
+                if len(self._screenshot_buffer) < 4:
+                    return
+
+                if self._screenshot_buffer.startswith(SCREENSHOT_END_MAGIC):
+                    del self._screenshot_buffer[:len(SCREENSHOT_END_MAGIC)]
+                    self._finalize_screenshot_stream()
+                    return
+
+                if len(self._screenshot_buffer) < SCREENSHOT_TILE_SIZE:
+                    return
+
+                if not self._screenshot_buffer.startswith(SCREENSHOT_TILE_MAGIC):
+                    del self._screenshot_buffer[0]
+                    continue
+
+                magic, x, y, width, height, byte_count = struct.unpack(
+                    SCREENSHOT_TILE_STRUCT,
+                    self._screenshot_buffer[:SCREENSHOT_TILE_SIZE],
+                )
+                if magic != SCREENSHOT_TILE_MAGIC:
+                    del self._screenshot_buffer[0]
+                    continue
+
+                if len(self._screenshot_buffer) < SCREENSHOT_TILE_SIZE + byte_count:
+                    return
+
+                tile_bytes = bytes(
+                    self._screenshot_buffer[SCREENSHOT_TILE_SIZE : SCREENSHOT_TILE_SIZE + byte_count]
+                )
+                del self._screenshot_buffer[:SCREENSHOT_TILE_SIZE + byte_count]
+
+                if self._screenshot_image is None:
+                    continue
+
+                if width == 0 or height == 0:
+                    continue
+
+                if x + width > self._screenshot_width or y + height > self._screenshot_height:
+                    self._screenshot_event_callback("screenshot-error", "Screenshot tile out of bounds")
+                    self._reset_screenshot_stream()
+                    return
+
+                rgb_bytes = self._rgb565_to_rgb_bytes(tile_bytes)
+                tile_image = Image.frombytes("RGB", (width, height), rgb_bytes)
+                self._screenshot_image.paste(tile_image, (x, y))
 
 
 class GDBMemoryClient:
@@ -707,6 +948,7 @@ class PIDTuningApp:
         self.backend = SWOBackend(
             config,
             log_callback=lambda msg: self.event_queue.put(("log", msg)),
+            screenshot_event_callback=lambda kind, payload: self.event_queue.put((kind, payload)),
             sample_callback=lambda sample: self.event_queue.put(("sample", sample)),
         )
 
@@ -734,6 +976,8 @@ class PIDTuningApp:
         self._eeprom_dialog_commit_button: Optional[ttk.Button] = None
         self._eeprom_dialog_source: Optional[EEPROMData] = None
         self._eeprom_dialog_address: Optional[int] = None
+        self.screenshot_in_progress = False
+        self._screenshot_deadline = 0.0
         self._install_pid_field_traces()
 
         self.data_address: Optional[int] = SWO_DATA_FIXED_RAM_ADDRESS
@@ -948,13 +1192,16 @@ class PIDTuningApp:
         self.eeprom_button = ttk.Button(pid_group, text="EEPROM...", command=self._open_eeprom_dialog, state=tk.DISABLED)
         self.eeprom_button.grid(row=6, column=0, columnspan=2, padx=6, pady=(0, 6), sticky="ew")
 
+        self.screenshot_button = ttk.Button(pid_group, text="Screenshot", command=self._request_screenshot, state=tk.DISABLED)
+        self.screenshot_button.grid(row=7, column=0, columnspan=2, padx=6, pady=(0, 6), sticky="ew")
+
         self.reset_firmware_button = ttk.Button(
             pid_group,
             text="Reset Firmware",
             command=self._reset_firmware_manual,
             state=tk.DISABLED,
         )
-        self.reset_firmware_button.grid(row=7, column=0, columnspan=2, padx=6, pady=(0, 6), sticky="ew")
+        self.reset_firmware_button.grid(row=8, column=0, columnspan=2, padx=6, pady=(0, 6), sticky="ew")
 
         ttk.Label(
             outer,
@@ -967,12 +1214,13 @@ class PIDTuningApp:
         data: SWOData,
         eeprom_address: int,
         eeprom_commit: bool,
+        send_screenshot: bool = False,
         enabled_state: int = SWO_ENABLE_DISABLED,
         changed: bool = True,
     ) -> bytes:
         # C++ layout: float Kp, float Ki, float Kd, uint16_t antiWindup,
         # uint16_t rpm, enum class EnableState : uint8_t enabled, bool changed,
-        # padding, then struct { uint32_t address; bool commit; } EEPROM.
+        # padding, then struct { uint32_t address; bool commit; bool sendScreenshot; } EEPROM.
         return struct.pack(
             SWO_DATA_STRUCT,
             data.kp,
@@ -984,10 +1232,11 @@ class PIDTuningApp:
             changed,
             eeprom_address,
             eeprom_commit,
+            send_screenshot,
         )
 
     def _unpack_swo_data(self, payload: bytes) -> SWOData:
-        kp, ki, kd, anti_windup_raw, rpm, _enabled_state, changed, eeprom_address, eeprom_commit = struct.unpack(
+        kp, ki, kd, anti_windup_raw, rpm, _enabled_state, changed, eeprom_address, eeprom_commit, send_screenshot = struct.unpack(
             SWO_DATA_STRUCT,
             payload[:SWO_DATA_SIZE],
         )
@@ -1000,6 +1249,7 @@ class PIDTuningApp:
             changed=changed,
             eeprom_address=eeprom_address,
             eeprom_commit=eeprom_commit,
+            send_screenshot=send_screenshot,
         )
 
     def _pack_eeprom_data(self, data: EEPROMData) -> bytes:
@@ -1106,14 +1356,65 @@ class PIDTuningApp:
     def _set_eeprom_button_enabled(self, enabled: bool) -> None:
         self.eeprom_button.configure(state=(tk.NORMAL if enabled else tk.DISABLED))
 
+    def _set_screenshot_button_enabled(self, enabled: bool) -> None:
+        self.screenshot_button.configure(state=(tk.NORMAL if enabled else tk.DISABLED))
+
     def _set_reset_firmware_button_enabled(self, enabled: bool) -> None:
         self.reset_firmware_button.configure(state=(tk.NORMAL if enabled else tk.DISABLED))
 
     def _update_control_button_states(self) -> None:
         eeprom_enabled = self.backend.running and not self.reset_in_progress and self._eeprom_dialog is None
+        screenshot_enabled = self.backend.running and not self.reset_in_progress and not self.screenshot_in_progress
         reset_enabled = not self.reset_in_progress and self._eeprom_dialog is None
         self._set_eeprom_button_enabled(eeprom_enabled)
+        self._set_screenshot_button_enabled(screenshot_enabled)
         self._set_reset_firmware_button_enabled(reset_enabled)
+
+    def _next_screenshot_path(self) -> Path:
+        script_dir = Path(__file__).resolve().parent
+        index = 0
+        while True:
+            candidate = script_dir / f"ss{index:06d}.png"
+            if not candidate.exists():
+                return candidate
+            index += 1
+
+    def _request_screenshot(self) -> None:
+        if self.data_address is None:
+            self._append_log("Cannot take screenshot: no dataAddress received yet")
+            return
+        if not self.backend.running or self.reset_in_progress:
+            self._append_log("Cannot take screenshot: monitor is not running")
+            return
+        if self.screenshot_in_progress:
+            self._append_log("Screenshot already in progress")
+            return
+
+        output_path = self._next_screenshot_path()
+        self.screenshot_in_progress = True
+        self._screenshot_deadline = time.monotonic() + 10.0
+        self._update_control_button_states()
+
+        def worker() -> None:
+            try:
+                payload = self.gdb_mem.read_memory(self.data_address, SWO_DATA_SIZE)
+                self._validate_swo_payload(payload)
+                self.backend.request_screenshot(output_path)
+                self.gdb_mem.write_memory(
+                    self.data_address + SWO_DATA_SEND_SCREENSHOT_OFFSET,
+                    b"\x01",
+                )
+                verify = self.gdb_mem.read_memory(self.data_address + SWO_DATA_SEND_SCREENSHOT_OFFSET, 1)
+                if verify not in (b"\x00", b"\x01"):
+                    raise RuntimeError(f"Screenshot flag write failed: {verify.hex()}")
+                if verify == b"\x00":
+                    self.event_queue.put(("log", "Screenshot flag consumed immediately by firmware"))
+                self.event_queue.put(("log", f"Requested screenshot -> {output_path.name}"))
+            except Exception as exc:
+                self.backend.cancel_screenshot()
+                self.event_queue.put(("screenshot-error", f"Screenshot request failed: {exc}"))
+
+        threading.Thread(target=worker, daemon=True).start()
 
     def _set_target_enabled(self, enabled: bool, quiet: bool = False) -> None:
         if self.data_address is None:
@@ -1502,6 +1803,7 @@ class PIDTuningApp:
             changed=True,
             eeprom_address=0,
             eeprom_commit=False,
+            send_screenshot=False,
         )
 
         def worker() -> None:
@@ -1516,6 +1818,7 @@ class PIDTuningApp:
                         changed=True,
                         eeprom_address=current_data.eeprom_address,
                         eeprom_commit=current_data.eeprom_commit,
+                        send_screenshot=current_data.send_screenshot,
                     ),
                 )
                 self.event_queue.put(("log", "Synced PID params to SWO::data (changed=true)"))
@@ -1717,6 +2020,9 @@ class PIDTuningApp:
         self._cancel_startup_sync_job()
         self._waiting_for_first_sample = False
         self._first_sample_deadline = 0.0
+        self.screenshot_in_progress = False
+        self._screenshot_deadline = 0.0
+        self.backend.cancel_screenshot()
         self._set_sync_enabled(False)
         self._update_control_button_states()
 
@@ -1739,6 +2045,9 @@ class PIDTuningApp:
         self.sync_in_progress = False
         self._set_sync_enabled(False)
         self.start_reset_retried = False
+        self.screenshot_in_progress = False
+        self._screenshot_deadline = 0.0
+        self.backend.cancel_screenshot()
         self._set_fault_indicator(self.ocp_indicator, False)
         self._set_fault_indicator(self.driver_fault_indicator, False)
         self._set_fault_indicator(self.driver_ocp_indicator, False)
@@ -1897,6 +2206,7 @@ class PIDTuningApp:
                             changed=self._last_loaded_swo_data.changed,
                             eeprom_address=self._last_loaded_swo_data.eeprom_address,
                             eeprom_commit=self._last_loaded_swo_data.eeprom_commit,
+                            send_screenshot=self._last_loaded_swo_data.send_screenshot,
                         )
 
                     self._append_log(
@@ -1914,11 +2224,36 @@ class PIDTuningApp:
                     self._eeprom_dialog_status_var.set(f"EEPROM commit failed: {message}")
                 self._append_log(f"EEPROM commit failed: {message}")
                 self._set_eeprom_dialog_editable(True)
+            elif kind == "screenshot-complete":
+                filename = str(payload)
+                self.screenshot_in_progress = False
+                self._screenshot_deadline = 0.0
+                self._append_log(f"Saved screenshot to {filename}")
+                self._update_control_button_states()
+            elif kind == "screenshot-error":
+                message = str(payload)
+                self.screenshot_in_progress = False
+                self._screenshot_deadline = 0.0
+                self.backend.cancel_screenshot()
+                self._append_log(message)
+                self._update_control_button_states()
 
         now = time.monotonic()
         if got_sample and (now - self._last_plot_refresh) >= 0.10:
             self._refresh_plot()
             self._last_plot_refresh = now
+
+        if self.screenshot_in_progress and now >= self._screenshot_deadline:
+            self.screenshot_in_progress = False
+            self.backend.cancel_screenshot()
+            self._append_log("Screenshot request timed out")
+            self._update_control_button_states()
+
+        if self.screenshot_in_progress and self.backend.try_finalize_screenshot_if_idle(0.75):
+            self.screenshot_in_progress = False
+            self._screenshot_deadline = 0.0
+            self._append_log("Saved screenshot from idle stream")
+            self._update_control_button_states()
 
         if self._waiting_for_first_sample and self.backend.running and now >= self._first_sample_deadline:
             self._request_firmware_reset(
