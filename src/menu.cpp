@@ -791,6 +791,12 @@ void Menu::handleButtonPress(uint32_t duration)
             break;
         // === dashboard screen ===
         case Screen::Type::DASHBOARD:
+            #if HAVE_SWO_SCREENSHOTS
+            if (duration >= 1000) {
+                SWO::data.sendScreenshot = true;
+            }
+            else
+            #endif
             if (eeprom.isPIDMode()) {
                 DashboardScreen &dashboard = *reinterpret_cast<DashboardScreen *>(screenFlow.getScreen());
                 switch(dashboard.incrSelectedValue()) {

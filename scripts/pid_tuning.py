@@ -100,6 +100,11 @@ SCREENSHOT_FRAME_MAGIC = b"IMG1"
 SCREENSHOT_TILE_MAGIC = b"TIL1"
 SCREENSHOT_END_MAGIC = b"END1"
 SCREENSHOT_PIXEL_FORMAT_RGB565 = 1
+SCREENSHOT_MAX_WIDTH = 320
+SCREENSHOT_MAX_HEIGHT = 320
+SCREENSHOT_MAX_PIXELS = SCREENSHOT_MAX_WIDTH * SCREENSHOT_MAX_HEIGHT
+SCREENSHOT_BUFFER_SOFT_LIMIT = 65536
+SCREENSHOT_BUFFER_TAIL_KEEP = 256
 
 SCREENSHOT_PORT = 2
 SCREENSHOT_FRAME_STRUCT = "<4sHHBB"
@@ -353,11 +358,13 @@ class SWOBackend:
         self,
         config: AppConfig,
         log_callback: Callable[[str], None],
+        screenshot_path_factory: Callable[[], Path],
         screenshot_event_callback: Callable[[str, object], None],
         sample_callback: Callable[[Sample], None],
     ) -> None:
         self.config = config
         self.log = log_callback
+        self._screenshot_path_factory = screenshot_path_factory
         self._screenshot_event_callback = screenshot_event_callback
         self.sample_callback = sample_callback
         self.proc: Optional[subprocess.Popen] = None
@@ -369,9 +376,11 @@ class SWOBackend:
         self._screenshot_output_path: Optional[Path] = None
         self._screenshot_buffer = bytearray()
         self._screenshot_image: Optional[Image.Image] = None
+        self._screenshot_tiles: list[tuple[int, int, int, int, bytes]] = []
         self._screenshot_width = 0
         self._screenshot_height = 0
         self._screenshot_format = 0
+        self._screenshot_has_explicit_frame = False
         self._screenshot_last_packet_time = 0.0
 
     def request_screenshot(self, output_path: Path) -> None:
@@ -379,9 +388,11 @@ class SWOBackend:
             self._screenshot_output_path = output_path
             self._screenshot_buffer.clear()
             self._screenshot_image = None
+            self._screenshot_tiles = []
             self._screenshot_width = 0
             self._screenshot_height = 0
             self._screenshot_format = 0
+            self._screenshot_has_explicit_frame = False
             self._screenshot_last_packet_time = time.monotonic()
 
     def cancel_screenshot(self) -> None:
@@ -389,9 +400,11 @@ class SWOBackend:
             self._screenshot_output_path = None
             self._screenshot_buffer.clear()
             self._screenshot_image = None
+            self._screenshot_tiles = []
             self._screenshot_width = 0
             self._screenshot_height = 0
             self._screenshot_format = 0
+            self._screenshot_has_explicit_frame = False
             self._screenshot_last_packet_time = 0.0
 
     def has_pending_screenshot(self) -> bool:
@@ -550,6 +563,13 @@ class SWOBackend:
                 buffer.clear()
 
         self.running = False
+        return_code = None
+        try:
+            if self.proc is not None:
+                return_code = self.proc.poll()
+        except Exception:
+            return_code = None
+        self.log(f"pyOCD stdout loop ended (return code: {return_code})")
 
     def _read_raw_swv(self) -> None:
         last_connect_log = 0.0
@@ -581,7 +601,14 @@ class SWOBackend:
                                 continue
 
                             if port == SCREENSHOT_PORT:
-                                self._consume_screenshot_payload(payload)
+                                try:
+                                    self._consume_screenshot_payload(payload)
+                                except Exception as exc:  # pragma: no cover - defensive path
+                                    self._screenshot_event_callback(
+                                        "screenshot-error",
+                                        f"Screenshot stream decode failed: {exc}",
+                                    )
+                                    self._reset_screenshot_stream()
                                 continue
 
                             if port != self.config.pid_port:
@@ -646,25 +673,34 @@ class SWOBackend:
         with self._screenshot_lock:
             self._screenshot_buffer.clear()
             self._screenshot_image = None
+            self._screenshot_tiles = []
             self._screenshot_width = 0
             self._screenshot_height = 0
             self._screenshot_format = 0
+            self._screenshot_has_explicit_frame = False
 
     def _finalize_screenshot_stream(self) -> None:
         with self._screenshot_lock:
             image = self._screenshot_image
+            tiles = self._screenshot_tiles
             output_path = self._screenshot_output_path
             self._screenshot_output_path = None
             self._screenshot_buffer.clear()
             self._screenshot_image = None
+            self._screenshot_tiles = []
             self._screenshot_width = 0
             self._screenshot_height = 0
             self._screenshot_format = 0
+            self._screenshot_has_explicit_frame = False
 
         if image is None or output_path is None:
             return
 
         try:
+            for x, y, width, height, tile_bytes in tiles:
+                rgb_bytes = self._rgb565_to_rgb_bytes(tile_bytes)
+                tile_image = Image.frombytes("RGB", (width, height), rgb_bytes)
+                image.paste(tile_image, (x, y))
             output_path.parent.mkdir(parents=True, exist_ok=True)
             image.save(output_path, format="PNG")
         except Exception as exc:  # pragma: no cover - defensive path
@@ -673,46 +709,174 @@ class SWOBackend:
 
         self._screenshot_event_callback("screenshot-complete", str(output_path))
 
+    def _begin_screenshot_capture_locked(self, source: str) -> bool:
+        if self._screenshot_output_path is not None:
+            return True
+        try:
+            self._screenshot_output_path = self._screenshot_path_factory()
+            self._screenshot_event_callback(
+                "screenshot-started",
+                str(self._screenshot_output_path),
+            )
+            self.log(
+                f"Auto-capturing unsolicited screenshot ({source}) -> {self._screenshot_output_path.name}"
+            )
+            return True
+        except Exception as exc:
+            self._screenshot_event_callback(
+                "screenshot-error",
+                f"Failed to allocate screenshot path: {exc}",
+            )
+            self._reset_screenshot_stream()
+            return False
+
+    def _expand_screenshot_canvas_locked(self, required_width: int, required_height: int) -> bool:
+        if required_width <= self._screenshot_width and required_height <= self._screenshot_height:
+            return True
+        if required_width > SCREENSHOT_MAX_WIDTH or required_height > SCREENSHOT_MAX_HEIGHT:
+            return False
+        if self._screenshot_image is None:
+            return False
+
+        new_width = max(self._screenshot_width, required_width)
+        new_height = max(self._screenshot_height, required_height)
+        expanded = Image.new("RGB", (new_width, new_height))
+        expanded.paste(self._screenshot_image, (0, 0))
+        self._screenshot_image = expanded
+        self._screenshot_width = new_width
+        self._screenshot_height = new_height
+        return True
+
+    def _fail_screenshot_stream_locked(self, message: str) -> None:
+        self._screenshot_event_callback("screenshot-error", message)
+        self._reset_screenshot_stream()
+
+    @staticmethod
+    def _validate_frame_dimensions(width: int, height: int) -> Optional[str]:
+        if width == 0 or height == 0:
+            return "Invalid screenshot frame dimensions"
+        if width > SCREENSHOT_MAX_WIDTH or height > SCREENSHOT_MAX_HEIGHT:
+            return f"Screenshot frame too large: {width}x{height}"
+        if (width * height) > SCREENSHOT_MAX_PIXELS:
+            return f"Screenshot pixel count too large: {width * height}"
+        return None
+
+    @staticmethod
+    def _validate_tile_payload(width: int, height: int, byte_count: int) -> Optional[str]:
+        if width == 0 or height == 0:
+            return "Invalid screenshot tile dimensions"
+        expected_bytes = int(width) * int(height) * 2
+        if byte_count != expected_bytes or (byte_count % 2) != 0:
+            return f"Invalid screenshot tile payload size: got {byte_count}, expected {expected_bytes}"
+        return None
+
+    def _start_tile_first_capture_locked(self, x: int, y: int, width: int, height: int) -> bool:
+        if not self._begin_screenshot_capture_locked("tile-first"):
+            return False
+
+        required_width = x + width
+        required_height = y + height
+        if required_width <= 0 or required_height <= 0:
+            self._fail_screenshot_stream_locked("Invalid screenshot tile bounds")
+            return False
+        if required_width > SCREENSHOT_MAX_WIDTH or required_height > SCREENSHOT_MAX_HEIGHT:
+            self._fail_screenshot_stream_locked(
+                f"Screenshot tile exceeds max bounds: {required_width}x{required_height}"
+            )
+            return False
+
+        self._screenshot_width = required_width
+        self._screenshot_height = required_height
+        self._screenshot_format = SCREENSHOT_PIXEL_FORMAT_RGB565
+        self._screenshot_has_explicit_frame = False
+        self._screenshot_image = Image.new("RGB", (required_width, required_height))
+        self._screenshot_tiles = []
+        return True
+
     def _consume_screenshot_payload(self, payload: bytes) -> None:
         with self._screenshot_lock:
-            if self._screenshot_output_path is None:
-                return
             self._screenshot_last_packet_time = time.monotonic()
             self._screenshot_buffer.extend(payload)
 
             while True:
                 if self._screenshot_image is None:
                     if len(self._screenshot_buffer) < SCREENSHOT_FRAME_SIZE:
+                        # Do not trim here: unsolicited transfers can arrive in tiny ITM chunks,
+                        # and aggressively truncating prevents IMG1/TIL1 headers from assembling.
+                        if self._screenshot_output_path is None and len(self._screenshot_buffer) > SCREENSHOT_BUFFER_SOFT_LIMIT:
+                            # Guard against unbounded growth on noisy streams while still keeping
+                            # enough history to recover magic boundaries.
+                            del self._screenshot_buffer[:-SCREENSHOT_BUFFER_TAIL_KEEP]
                         return
 
                     header_index = self._screenshot_buffer.find(SCREENSHOT_FRAME_MAGIC)
-                    if header_index < 0:
+                    tile_index = self._screenshot_buffer.find(SCREENSHOT_TILE_MAGIC)
+                    if header_index < 0 and tile_index < 0:
                         keep = len(SCREENSHOT_FRAME_MAGIC) - 1
                         if len(self._screenshot_buffer) > keep:
                             del self._screenshot_buffer[:-keep]
                         return
+
+                    use_tile_header = tile_index >= 0 and (header_index < 0 or tile_index < header_index)
+
+                    if use_tile_header:
+                        if tile_index > 0:
+                            del self._screenshot_buffer[:tile_index]
+                        if len(self._screenshot_buffer) < SCREENSHOT_TILE_SIZE:
+                            return
+
+                        magic, x, y, width, height, byte_count = struct.unpack(
+                            SCREENSHOT_TILE_STRUCT,
+                            self._screenshot_buffer[:SCREENSHOT_TILE_SIZE],
+                        )
+                        if magic != SCREENSHOT_TILE_MAGIC:
+                            del self._screenshot_buffer[0]
+                            continue
+                        tile_error = self._validate_tile_payload(width, height, byte_count)
+                        if tile_error is not None:
+                            self._fail_screenshot_stream_locked(tile_error)
+                            return
+
+                        if len(self._screenshot_buffer) < SCREENSHOT_TILE_SIZE + byte_count:
+                            return
+
+                        if not self._start_tile_first_capture_locked(x, y, width, height):
+                            return
+                        continue
 
                     if header_index > 0:
                         del self._screenshot_buffer[:header_index]
                         if len(self._screenshot_buffer) < SCREENSHOT_FRAME_SIZE:
                             return
 
-                    magic, width, height, pixel_format, reserved = struct.unpack(
+                    magic, width, height, pixel_format, _reserved = struct.unpack(
                         SCREENSHOT_FRAME_STRUCT,
                         self._screenshot_buffer[:SCREENSHOT_FRAME_SIZE],
                     )
                     if magic != SCREENSHOT_FRAME_MAGIC:
                         del self._screenshot_buffer[0]
                         continue
+
+                    if not self._begin_screenshot_capture_locked("frame-header"):
+                        return
+
                     if pixel_format != SCREENSHOT_PIXEL_FORMAT_RGB565:
-                        self._screenshot_event_callback("screenshot-error", f"Unsupported screenshot format: {pixel_format}")
-                        self._reset_screenshot_stream()
+                        self._fail_screenshot_stream_locked(
+                            f"Unsupported screenshot format: {pixel_format}"
+                        )
+                        return
+
+                    frame_error = self._validate_frame_dimensions(width, height)
+                    if frame_error is not None:
+                        self._fail_screenshot_stream_locked(frame_error)
                         return
 
                     self._screenshot_width = width
                     self._screenshot_height = height
                     self._screenshot_format = pixel_format
+                    self._screenshot_has_explicit_frame = True
                     self._screenshot_image = Image.new("RGB", (width, height))
+                    self._screenshot_tiles = []
                     del self._screenshot_buffer[:SCREENSHOT_FRAME_SIZE]
                     continue
 
@@ -750,17 +914,21 @@ class SWOBackend:
                 if self._screenshot_image is None:
                     continue
 
-                if width == 0 or height == 0:
-                    continue
-
-                if x + width > self._screenshot_width or y + height > self._screenshot_height:
-                    self._screenshot_event_callback("screenshot-error", "Screenshot tile out of bounds")
-                    self._reset_screenshot_stream()
+                tile_error = self._validate_tile_payload(width, height, byte_count)
+                if tile_error is not None:
+                    self._fail_screenshot_stream_locked(tile_error)
                     return
 
-                rgb_bytes = self._rgb565_to_rgb_bytes(tile_bytes)
-                tile_image = Image.frombytes("RGB", (width, height), rgb_bytes)
-                self._screenshot_image.paste(tile_image, (x, y))
+                if x + width > self._screenshot_width or y + height > self._screenshot_height:
+                    if self._screenshot_has_explicit_frame:
+                        self._fail_screenshot_stream_locked("Screenshot tile out of bounds")
+                        return
+
+                    if not self._expand_screenshot_canvas_locked(x + width, y + height):
+                        self._fail_screenshot_stream_locked("Screenshot tile exceeds dynamic bounds")
+                        return
+
+                self._screenshot_tiles.append((x, y, width, height, tile_bytes))
 
 
 class GDBMemoryClient:
@@ -922,6 +1090,7 @@ class PIDTuningApp:
         self.backend = SWOBackend(
             config,
             log_callback=lambda msg: self.event_queue.put(("log", msg)),
+            screenshot_path_factory=self._next_screenshot_path,
             screenshot_event_callback=lambda kind, payload: self.event_queue.put((kind, payload)),
             sample_callback=lambda sample: self.event_queue.put(("sample", sample)),
         )
@@ -1346,12 +1515,13 @@ class PIDTuningApp:
 
     def _next_screenshot_path(self) -> Path:
         script_dir = Path(__file__).resolve().parent
-        index = 0
-        while True:
-            candidate = script_dir / f"ss{index:06d}.png"
-            if not candidate.exists():
-                return candidate
-            index += 1
+        existing = [
+            int(p.stem[2:])
+            for p in script_dir.glob("ss*.png")
+            if p.stem[2:].isdigit() and len(p.stem) == 8
+        ]
+        index = (max(existing) + 1) if existing else 0
+        return script_dir / f"ss{index:06d}.png"
 
     def _request_screenshot(self) -> None:
         if self.data_address is None:
@@ -2204,6 +2374,13 @@ class PIDTuningApp:
                 self._screenshot_deadline = 0.0
                 self._append_log(f"Saved screenshot to {filename}")
                 self._update_control_button_states()
+            elif kind == "screenshot-started":
+                filename = Path(str(payload)).name
+                # Unsolicited screenshots should follow the same timeout/finalize path as button-triggered captures.
+                self.screenshot_in_progress = True
+                self._screenshot_deadline = time.monotonic() + 10.0
+                self._append_log(f"Screenshot stream started -> {filename}")
+                self._update_control_button_states()
             elif kind == "screenshot-error":
                 message = str(payload)
                 self.screenshot_in_progress = False
@@ -2217,13 +2394,15 @@ class PIDTuningApp:
             self._refresh_plot()
             self._last_plot_refresh = now
 
-        if self.screenshot_in_progress and now >= self._screenshot_deadline:
+        pending_capture = self.screenshot_in_progress or self.backend.has_pending_screenshot()
+
+        if pending_capture and self._screenshot_deadline > 0.0 and now >= self._screenshot_deadline:
             self.screenshot_in_progress = False
             self.backend.cancel_screenshot()
             self._append_log("Screenshot request timed out")
             self._update_control_button_states()
 
-        if self.screenshot_in_progress and self.backend.try_finalize_screenshot_if_idle(0.75):
+        if pending_capture and self.backend.try_finalize_screenshot_if_idle(0.75):
             self.screenshot_in_progress = False
             self._screenshot_deadline = 0.0
             self._append_log("Saved screenshot from idle stream")
