@@ -61,10 +61,11 @@
 ![start_screen](docs/images/start_screen.png)
 ![main_menu](docs/images/main_menu.png)
 ![led_brightness_55](docs/images/led_brightness_55.png)
-![mosfet_temperature](docs/images/mosfet_temperature.png)
 
+![mosfet_temperature](docs/images/mosfet_temperature.png)
 ![pid_tuning_graph](docs/images/pid_tuning_graph.png)
 ![motor_stall](docs/images/motor_stall.png)
+
 ![kp_parameter](docs/images/kp_parameter.png)
 ![diagnostic_screen](docs/images/diagnostic_screen.png)
 
