@@ -231,12 +231,8 @@ static void loop()
         PidController::PidLoopType item;
         while (pid.pidLoopBuffer.pop(item)) {
             if (SWO::data.enabled == SWO::EnableState::SWO) {
-                static constexpr char kPidFrameMagic[] = {'P', 'I', 'D', '1'};
-                if (!SWO::write(1, kPidFrameMagic, sizeof(kPidFrameMagic))) {
-                    pid.pidLoopBuffer.clear();
-                    break;
-                }
-                if (!SWO::write(1, item)) {
+                uint8_t size = sizeof(item);
+                if (!SWO::write(1, &size, 1) ||!SWO::write(1, item)) {
                     pid.pidLoopBuffer.clear();
                     break;
                 }

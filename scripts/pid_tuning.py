@@ -92,13 +92,17 @@ class AppConfig:
     gdb_port: int
 
 
-PID_FRAME_MAGIC = b"PID1"
-# C++ PidLoopType has 2 bytes padding before float members for 4-byte alignment.
+# Firmware protocol on SWO port 1: first byte is the payload length, followed by the raw PID item bytes.
+PID_FRAME_LENGTH_PREFIX = 1
 PID_ITEM_STRUCT = "<I9H2xfffI"
 PID_ITEM_SIZE = struct.calcsize(PID_ITEM_STRUCT)
-SCREENSHOT_FRAME_MAGIC = b"IMG1"
-SCREENSHOT_TILE_MAGIC = b"TIL1"
-SCREENSHOT_END_MAGIC = b"END1"
+
+# Screenshot stream uses the same length-prefix scheme: [len][payload], with the tile payload
+# preceded by a 16-bit length and the stream terminated by a single 0 byte.
+SCREENSHOT_FRAME_LENGTH_PREFIX = 1
+SCREENSHOT_TILE_LENGTH_PREFIX = 1
+SCREENSHOT_COLOR_LENGTH_PREFIX = 2
+SCREENSHOT_END_MARKER = 0
 SCREENSHOT_PIXEL_FORMAT_RGB565 = 1
 SCREENSHOT_MAX_WIDTH = 320
 SCREENSHOT_MAX_HEIGHT = 320
@@ -616,21 +620,17 @@ class SWOBackend:
 
                             pid_bytes.extend(payload)
 
-                            while True:
-                                magic_pos = pid_bytes.find(PID_FRAME_MAGIC)
-                                if magic_pos < 0:
-                                    if len(pid_bytes) > len(PID_FRAME_MAGIC) - 1:
-                                        del pid_bytes[: -(len(PID_FRAME_MAGIC) - 1)]
-                                    break
+                            while len(pid_bytes) >= PID_FRAME_LENGTH_PREFIX:
+                                frame_length = pid_bytes[0]
+                                if frame_length == 0:
+                                    del pid_bytes[:1]
+                                    continue
 
-                                if magic_pos > 0:
-                                    del pid_bytes[:magic_pos]
-
-                                frame_size = len(PID_FRAME_MAGIC) + PID_ITEM_SIZE
+                                frame_size = PID_FRAME_LENGTH_PREFIX + frame_length
                                 if len(pid_bytes) < frame_size:
                                     break
 
-                                raw_item = bytes(pid_bytes[len(PID_FRAME_MAGIC):frame_size])
+                                raw_item = bytes(pid_bytes[1:frame_size])
                                 sample = decode_pid_item(raw_item)
                                 if sample and is_plausible_sample(sample, last_sequence):
                                     del pid_bytes[:frame_size]
@@ -638,8 +638,8 @@ class SWOBackend:
                                     self.sample_callback(sample)
                                     continue
 
-                                # Invalid candidate frame: shift by one byte and search again.
-                                # This recovers quickly from partial writes/split frames.
+                                # Invalid candidate frame: shift one byte to recover from partial or malformed
+                                # sequences. The firmware precedes each PID item with a single-byte length.
                                 del pid_bytes[0]
 
             except OSError:
@@ -798,64 +798,45 @@ class SWOBackend:
             self._screenshot_last_packet_time = time.monotonic()
             self._screenshot_buffer.extend(payload)
 
-            while True:
-                if self._screenshot_image is None:
-                    if len(self._screenshot_buffer) < SCREENSHOT_FRAME_SIZE:
-                        # Do not trim here: unsolicited transfers can arrive in tiny ITM chunks,
-                        # and aggressively truncating prevents IMG1/TIL1 headers from assembling.
-                        if self._screenshot_output_path is None and len(self._screenshot_buffer) > SCREENSHOT_BUFFER_SOFT_LIMIT:
-                            # Guard against unbounded growth on noisy streams while still keeping
-                            # enough history to recover magic boundaries.
-                            del self._screenshot_buffer[:-SCREENSHOT_BUFFER_TAIL_KEEP]
-                        return
+            # Prevent unbounded buffer growth from corrupt/stuck state.
+            if len(self._screenshot_buffer) > SCREENSHOT_BUFFER_SOFT_LIMIT:
+                # Keep the tail in case we're in the middle of reading pixel data.
+                self._screenshot_buffer = self._screenshot_buffer[-SCREENSHOT_BUFFER_TAIL_KEEP:]
 
-                    header_index = self._screenshot_buffer.find(SCREENSHOT_FRAME_MAGIC)
-                    tile_index = self._screenshot_buffer.find(SCREENSHOT_TILE_MAGIC)
-                    if header_index < 0 and tile_index < 0:
-                        keep = len(SCREENSHOT_FRAME_MAGIC) - 1
-                        if len(self._screenshot_buffer) > keep:
-                            del self._screenshot_buffer[:-keep]
-                        return
+            while len(self._screenshot_buffer) > 0:
+                # Check for end-of-stream marker.
+                if self._screenshot_buffer[0] == SCREENSHOT_END_MARKER:
+                    del self._screenshot_buffer[:1]
+                    self._finalize_screenshot_stream()
+                    # Clear buffer to prevent stale bytes from being misinterpreted by next capture.
+                    self._screenshot_buffer.clear()
+                    return
 
-                    use_tile_header = tile_index >= 0 and (header_index < 0 or tile_index < header_index)
+                # Need at least 1 byte for the record length prefix.
+                if len(self._screenshot_buffer) < 1:
+                    return
 
-                    if use_tile_header:
-                        if tile_index > 0:
-                            del self._screenshot_buffer[:tile_index]
-                        if len(self._screenshot_buffer) < SCREENSHOT_TILE_SIZE:
-                            return
+                record_length = self._screenshot_buffer[0]
+                record_total_size = 1 + record_length
 
-                        magic, x, y, width, height, byte_count = struct.unpack(
-                            SCREENSHOT_TILE_STRUCT,
-                            self._screenshot_buffer[:SCREENSHOT_TILE_SIZE],
-                        )
-                        if magic != SCREENSHOT_TILE_MAGIC:
-                            del self._screenshot_buffer[0]
-                            continue
-                        tile_error = self._validate_tile_payload(width, height, byte_count)
-                        if tile_error is not None:
-                            self._fail_screenshot_stream_locked(tile_error)
-                            return
+                # Sanity check: record length should be reasonable (6 for frame, 12 for tile).
+                # If we get an unexpected length, skip this byte and try to resync.
+                if record_length not in (6, 12):
+                    # Skip malformed record length byte.
+                    del self._screenshot_buffer[0:1]
+                    continue
 
-                        if len(self._screenshot_buffer) < SCREENSHOT_TILE_SIZE + byte_count:
-                            return
+                # Need the full length-prefixed record.
+                if len(self._screenshot_buffer) < record_total_size:
+                    return
 
-                        if not self._start_tile_first_capture_locked(x, y, width, height):
-                            return
-                        continue
+                # Extract the record payload (without the length prefix).
+                record = bytes(self._screenshot_buffer[1:record_total_size])
+                del self._screenshot_buffer[:record_total_size]
 
-                    if header_index > 0:
-                        del self._screenshot_buffer[:header_index]
-                        if len(self._screenshot_buffer) < SCREENSHOT_FRAME_SIZE:
-                            return
-
-                    magic, width, height, pixel_format, _reserved = struct.unpack(
-                        SCREENSHOT_FRAME_STRUCT,
-                        self._screenshot_buffer[:SCREENSHOT_FRAME_SIZE],
-                    )
-                    if magic != SCREENSHOT_FRAME_MAGIC:
-                        del self._screenshot_buffer[0]
-                        continue
+                # Parse frame header: 6 bytes (width, height, format, reserved).
+                if len(record) == 6:
+                    width, height, pixel_format, _reserved = struct.unpack("<HHBB", record)
 
                     if not self._begin_screenshot_capture_locked("frame-header"):
                         return
@@ -877,58 +858,47 @@ class SWOBackend:
                     self._screenshot_has_explicit_frame = True
                     self._screenshot_image = Image.new("RGB", (width, height))
                     self._screenshot_tiles = []
-                    del self._screenshot_buffer[:SCREENSHOT_FRAME_SIZE]
                     continue
 
-                if len(self._screenshot_buffer) < 4:
-                    return
+                # Parse tile header: 12 bytes (x, y, width, height, byteCount).
+                if len(record) == 12:
+                    x, y, width, height, byte_count = struct.unpack("<HHHHI", record)
 
-                if self._screenshot_buffer.startswith(SCREENSHOT_END_MAGIC):
-                    del self._screenshot_buffer[:len(SCREENSHOT_END_MAGIC)]
-                    self._finalize_screenshot_stream()
-                    return
-
-                if len(self._screenshot_buffer) < SCREENSHOT_TILE_SIZE:
-                    return
-
-                if not self._screenshot_buffer.startswith(SCREENSHOT_TILE_MAGIC):
-                    del self._screenshot_buffer[0]
-                    continue
-
-                magic, x, y, width, height, byte_count = struct.unpack(
-                    SCREENSHOT_TILE_STRUCT,
-                    self._screenshot_buffer[:SCREENSHOT_TILE_SIZE],
-                )
-                if magic != SCREENSHOT_TILE_MAGIC:
-                    del self._screenshot_buffer[0]
-                    continue
-
-                if len(self._screenshot_buffer) < SCREENSHOT_TILE_SIZE + byte_count:
-                    return
-
-                tile_bytes = bytes(
-                    self._screenshot_buffer[SCREENSHOT_TILE_SIZE : SCREENSHOT_TILE_SIZE + byte_count]
-                )
-                del self._screenshot_buffer[:SCREENSHOT_TILE_SIZE + byte_count]
-
-                if self._screenshot_image is None:
-                    continue
-
-                tile_error = self._validate_tile_payload(width, height, byte_count)
-                if tile_error is not None:
-                    self._fail_screenshot_stream_locked(tile_error)
-                    return
-
-                if x + width > self._screenshot_width or y + height > self._screenshot_height:
-                    if self._screenshot_has_explicit_frame:
-                        self._fail_screenshot_stream_locked("Screenshot tile out of bounds")
+                    tile_error = self._validate_tile_payload(width, height, byte_count)
+                    if tile_error is not None:
+                        self._fail_screenshot_stream_locked(tile_error)
                         return
 
-                    if not self._expand_screenshot_canvas_locked(x + width, y + height):
-                        self._fail_screenshot_stream_locked("Screenshot tile exceeds dynamic bounds")
+                    # If this is the first tile, auto-create canvas.
+                    if self._screenshot_image is None:
+                        if not self._start_tile_first_capture_locked(x, y, width, height):
+                            return
+
+                    # Read the pixel data (byteCount bytes).
+                    if len(self._screenshot_buffer) < byte_count:
+                        # Put the record back and wait for more data.
+                        self._screenshot_buffer = bytearray([record_length]) + record + self._screenshot_buffer
                         return
 
-                self._screenshot_tiles.append((x, y, width, height, tile_bytes))
+                    tile_bytes = bytes(self._screenshot_buffer[:byte_count])
+                    del self._screenshot_buffer[:byte_count]
+
+                    # Validate bounds.
+                    if x + width > self._screenshot_width or y + height > self._screenshot_height:
+                        if self._screenshot_has_explicit_frame:
+                            self._fail_screenshot_stream_locked("Screenshot tile out of bounds")
+                            return
+                        if not self._expand_screenshot_canvas_locked(x + width, y + height):
+                            self._fail_screenshot_stream_locked("Screenshot tile exceeds dynamic bounds")
+                            return
+
+                    self._screenshot_tiles.append((x, y, width, height, tile_bytes))
+                    continue
+
+                # Should not reach here given the record_length check above.
+                # Unknown record type; skip one byte and try again.
+                # This helps recover from protocol desynchronization.
+                del self._screenshot_buffer[0:1]
 
 
 class GDBMemoryClient:

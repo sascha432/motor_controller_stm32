@@ -19,16 +19,14 @@ TIM_HandleTypeDef tim2;
 
 struct TFTDriverScreenshot
 {
+    static constexpr uint8_t kPort = 2;
+
     TFTDriverScreenshot() : active(false)
     {}
 
-    static constexpr char kFrameMagic[] = {'I', 'M', 'G', '1'};
-    static constexpr char kTileMagic[] = {'T', 'I', 'L', '1'};
-    static constexpr char kEndMagic[] = {'E', 'N', 'D', '1'};
     static constexpr uint8_t kPixelFormatRgb565 = 1U;
 
     struct __attribute__((packed)) FrameHeader {
-        char magic[4];
         uint16_t width;
         uint16_t height;
         uint8_t format;
@@ -36,16 +34,11 @@ struct TFTDriverScreenshot
     };
 
     struct __attribute__((packed)) TileHeader {
-        char magic[4];
         uint16_t x;
         uint16_t y;
         uint16_t width;
         uint16_t height;
         uint32_t byteCount;
-    };
-
-    struct __attribute__((packed)) EndMarker {
-        char magic[4];
     };
 
     bool write_tile(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, const lv_color_t *color_p);
@@ -70,7 +63,6 @@ bool TFTDriverScreenshot::write_tile(uint16_t x0, uint16_t y0, uint16_t x1, uint
     const uint32_t pixel_count = (static_cast<uint32_t>(x1 - x0 + 1U) * static_cast<uint32_t>(y1 - y0 + 1U));
     const uint32_t byte_count = pixel_count * sizeof(uint16_t);
     TileHeader header = {
-        {'T', 'I', 'L', '1'},
         x0,
         y0,
         static_cast<uint16_t>(x1 - x0 + 1U),
@@ -78,11 +70,16 @@ bool TFTDriverScreenshot::write_tile(uint16_t x0, uint16_t y0, uint16_t x1, uint
         byte_count,
     };
 
-    if (SWO::write(2, header) != sizeof(header)) {
+    const uint8_t size = sizeof(header);
+    if (SWO::write(kPort, &size, sizeof(size)) != sizeof(size)) {
         active = false;
         return false;
     }
-    if (SWO::write(2, color_p, byte_count) != byte_count) {
+    if (SWO::write(kPort, header) != sizeof(header)) {
+        active = false;
+        return false;
+    }
+    if (SWO::write(kPort, color_p, byte_count) != byte_count) {
         active = false;
         return false;
     }
@@ -94,14 +91,17 @@ bool TFTDriverScreenshot::begin()
     if (active) {
         return true;
     }
-        FrameHeader header = {
-        {'I', 'M', 'G', '1'},
+    FrameHeader header = {
         static_cast<uint16_t>(LV_HOR_RES_MAX),
         static_cast<uint16_t>(LV_VER_RES_MAX),
         TFTDriverScreenshot::kPixelFormatRgb565,
         0U,
     };
-    if (SWO::write(2, header) != sizeof(header)) {
+    uint8_t size = sizeof(header);
+    if (SWO::write(kPort, &size, sizeof(size)) != sizeof(size)) {
+        return false;
+    }
+    if (SWO::write(kPort, header) != sizeof(header)) {
         return false;
     }
     active = true;
@@ -113,8 +113,7 @@ void TFTDriverScreenshot::end()
     if (!active) {
         return;
     }
-    EndMarker marker = {{'E', 'N', 'D', '1'}};
-    SWO::write(2, marker);
+    SWO::write(kPort, 0, 1);
     active = false;
 }
 
