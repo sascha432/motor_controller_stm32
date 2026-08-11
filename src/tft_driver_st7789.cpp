@@ -200,17 +200,7 @@ static void ST7789_init(void)
     tft_driver_send_data(vmctr1, 1);
     HAL_Delay(10);
 
-    /* Gamma */
-    tft_driver_send_command(ST7789_GMCTRP1);
-    uint8_t gp[] = {0x10, 0x0E, 0x02, 0x03, 0x0E, 0x07, 0x02, 0x07, 0x0A, 0x12, 0x27, 0x37, 0x00, 0x0D, 0x0E, 0x10};
-    tft_driver_send_data(gp, 16);
-
-    tft_driver_send_command(ST7789_GMCTRN1);
-    uint8_t gn[] = {0x10, 0x0E, 0x03, 0x03, 0x0F, 0x06, 0x02, 0x08, 0x0A, 0x13, 0x26, 0x36, 0x00, 0x0D, 0x0E, 0x10};
-    tft_driver_send_data(gn, 16);
-    HAL_Delay(5);
-
-    /* Exit invert */
+    /* Enable panel inversion (required on this ST7789 module) */
     tft_driver_send_command(ST7789_INVON);
     HAL_Delay(5);
 

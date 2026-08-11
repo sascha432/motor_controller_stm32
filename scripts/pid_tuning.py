@@ -100,31 +100,6 @@ SCREENSHOT_FRAME_MAGIC = b"IMG1"
 SCREENSHOT_TILE_MAGIC = b"TIL1"
 SCREENSHOT_END_MAGIC = b"END1"
 SCREENSHOT_PIXEL_FORMAT_RGB565 = 1
-# Font-safe screenshot tone mapping.
-# Keep gamma moderate to preserve anti-aliased text edges.
-SCREENSHOT_GAMMA = 0.20
-
-
-def _build_screenshot_lut(gamma: float) -> bytes:
-    gamma = max(0.1, float(gamma))
-    return bytes(
-        max(
-            0,
-            min(
-                255,
-                int(
-                    round(
-                        pow(i / 255.0, gamma)
-                        * 255.0
-                    )
-                ),
-            ),
-        )
-        for i in range(256)
-    )
-
-
-SCREENSHOT_GAMMA_LUT = _build_screenshot_lut(SCREENSHOT_GAMMA)
 
 SCREENSHOT_PORT = 2
 SCREENSHOT_FRAME_STRUCT = "<4sHHBB"
@@ -655,16 +630,15 @@ class SWOBackend:
             raise ValueError("RGB565 payload length must be even")
 
         rgb = bytearray((len(payload) // 2) * 3)
-        lut = SCREENSHOT_GAMMA_LUT
         dst = 0
         for src in range(0, len(payload), 2):
             value = payload[src] | (payload[src + 1] << 8)
             red = ((value >> 11) & 0x1F) * 255 // 31
             green = ((value >> 5) & 0x3F) * 255 // 63
             blue = (value & 0x1F) * 255 // 31
-            rgb[dst] = lut[red]
-            rgb[dst + 1] = lut[green]
-            rgb[dst + 2] = lut[blue]
+            rgb[dst] = red
+            rgb[dst + 1] = green
+            rgb[dst + 2] = blue
             dst += 3
         return bytes(rgb)
 
@@ -2225,7 +2199,7 @@ class PIDTuningApp:
                 self._append_log(f"EEPROM commit failed: {message}")
                 self._set_eeprom_dialog_editable(True)
             elif kind == "screenshot-complete":
-                filename = str(payload)
+                filename = Path(str(payload)).name
                 self.screenshot_in_progress = False
                 self._screenshot_deadline = 0.0
                 self._append_log(f"Saved screenshot to {filename}")

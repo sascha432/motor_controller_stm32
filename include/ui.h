@@ -19,16 +19,16 @@
 
 #define COLOR_PALETTE_WHITE                     lv_color_make(255, 255, 255)
 #define COLOR_PALETTE_BLACK                     lv_color_make(0, 0, 0)
-#define COLOR_PALETTE_DARK_GRAY                 lv_color_make(8, 8, 8)
-#define COLOR_PALETTE_MEDIUM_GRAY               lv_color_make(24, 24, 24)
-#define COLOR_PALETTE_LIGHT_GRAY                lv_color_make(64, 64, 64)
+#define COLOR_PALETTE_DARK_GRAY                 lv_color_make(32, 32, 32)
+#define COLOR_PALETTE_MEDIUM_GRAY               lv_color_make(128, 128, 128)
+#define COLOR_PALETTE_LIGHT_GRAY                lv_color_make(210, 210, 210)
 #define COLOR_PALETTE_RED                       lv_color_make(255, 0, 0)
 #define COLOR_PALETTE_GREEN                     lv_color_make(0, 255, 0)
 #define COLOR_PALETTE_YELLOW                    lv_color_make(255, 255, 0)
 #define COLOR_PALETTE_CYAN                      lv_color_make(0, 255, 255)
 #define COLOR_PALETTE_PURPLE                    lv_color_make(255, 0, 255)
 #define COLOR_PALETTE_DARK_PURPLE               lv_color_make(128, 0, 128)
-#define COLOR_PALETTE_BLUE                      lv_color_make(0, 0, 128)
+#define COLOR_PALETTE_BLUE                      lv_color_make(16, 16, 210)
 
 #define SCREEN_COLOR_TEXT                       COLOR_PALETTE_LIGHT_GRAY
 #define SCREEN_COLOR_BG                         COLOR_PALETTE_BLACK
