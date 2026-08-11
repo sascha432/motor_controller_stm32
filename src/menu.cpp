@@ -431,8 +431,8 @@ void Menu::applyEEPROMSettings()
 {
     tft_backlight_pwm_set(eeprom.getTFTBrightness());
     LEDs::illuminationLedSetPWM(eeprom.getLEDBrightness() * LEDs::kIlluminationResolution);
-    adc.setInputCurrentLimit(eeprom.getInputCurrentLimit());
-    adc.setMotorCurrentLimit(eeprom.getMotorCurrentLimit());
+    pid.setInputCurrentLimit(eeprom.getInputCurrentLimit());
+    pid.setMotorCurrentLimit(eeprom.getMotorCurrentLimit());
     pid.applyPIDParams();
 }
 
@@ -826,6 +826,16 @@ void Menu::handleButtonPress(uint32_t duration)
                         screenFlow->setSteps(UIConstants::kStepsAntiWindup);
                         setValue(eeprom.getAntiWindup());
                         break;
+                    case DashboardScreen::SelectedValueType::INPUT_CURRENT_LIMIT:
+                        dashboard.setMaxAcceleration(std::sqrt(UIConstants::kMaxInputCurrent - UIConstants::kMinInputCurrent));
+                        screenFlow->setSteps(UIConstants::kStepInputCurrent);
+                        setValue(eeprom.getInputCurrentLimit());
+                        break;
+                    case DashboardScreen::SelectedValueType::MOTOR_CURRENT_LIMIT:
+                        dashboard.setMaxAcceleration(std::sqrt(UIConstants::kMaxMotorCurrent - UIConstants::kMinMotorCurrent));
+                        screenFlow->setSteps(UIConstants::kStepMotorCurrent);
+                        setValue(eeprom.getMotorCurrentLimit());
+                        break;
                     case DashboardScreen::SelectedValueType::MAX:
                         break;
                 }
@@ -948,6 +958,18 @@ int32_t Menu::updateRotaryValue(int32_t value)
                     eeprom.setAntiWindup(clampAntiWindupValue());
                     pid.applyPIDParams();
                     break;
+                case DashboardScreen::SelectedValueType::INPUT_CURRENT_LIMIT:
+                    clampedValue = std::clamp<int32_t>(getValue(), UIConstants::kMinInputCurrent, UIConstants::kMaxInputCurrent);
+                    eeprom.setInputCurrentLimit(clampedValue);
+                    pid.setInputCurrentLimit(clampedValue);
+                    setValue(clampedValue);
+                    break;
+                case DashboardScreen::SelectedValueType::MOTOR_CURRENT_LIMIT:
+                    clampedValue = std::clamp<int32_t>(getValue(), UIConstants::kMinMotorCurrent, UIConstants::kMaxMotorCurrent);
+                    eeprom.setMotorCurrentLimit(clampedValue);
+                    pid.setMotorCurrentLimit(clampedValue);
+                    setValue(clampedValue);
+                    break;
                 case DashboardScreen::SelectedValueType::MAX:
                     break;
             }
@@ -965,11 +987,11 @@ int32_t Menu::updateRotaryValue(int32_t value)
             break;
         case Screen::Type::INPUT_CURRENT_LIMIT:
             eeprom.setInputCurrentLimit(getValue());
-            adc.setInputCurrentLimit(eeprom.getInputCurrentLimit());
+            pid.setInputCurrentLimit(eeprom.getInputCurrentLimit());
             break;
         case Screen::Type::MOTOR_CURRENT_LIMIT:
             eeprom.setMotorCurrentLimit(getValue());
-            adc.setMotorCurrentLimit(eeprom.getMotorCurrentLimit());
+            pid.setMotorCurrentLimit(eeprom.getMotorCurrentLimit());
             break;
         case Screen::Type::MOTOR_DIRECTION:
             eeprom.setMotorDirection(static_cast<EEPROM::MotorDirection>(getValue()));

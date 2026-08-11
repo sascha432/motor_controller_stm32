@@ -150,10 +150,9 @@ void PidController::reset()
     errorCode = ErrorCodeType::NONE;
     releaseBreakCounter = 0;
     faults.reset();
-    faults.isenseMax = ADCConverter::Current::reverse(eeprom.getInputCurrentLimit());
     faults.vsenseMax = ADCConverter::Voltage::reverse(eeprom.getOvpProtection());
-    adc.setMotorCurrentLimit(eeprom.getMotorCurrentLimit());
-    adc.setInputCurrentLimit(eeprom.getInputCurrentLimit());
+    setMotorCurrentLimit(eeprom.getMotorCurrentLimit());
+    setInputCurrentLimit(eeprom.getInputCurrentLimit());
     lastRpmCounter = PID_READ_RPM_COUNTER();
     lastRpmCounterUpdated = HAL_GetTick();
     ocp.reset();

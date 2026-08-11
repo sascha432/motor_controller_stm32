@@ -508,6 +508,8 @@ struct DashboardScreen : public Screen
         KI,
         KD,
         ANTI_WINDUP,
+        INPUT_CURRENT_LIMIT,
+        MOTOR_CURRENT_LIMIT,
         MAX
     };
 

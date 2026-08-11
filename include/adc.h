@@ -79,6 +79,9 @@ struct ADC
      */
     void isr();
 
+protected:
+    friend PidController;
+
     /**
      * @brief Set DAC voltage for the DRV8701 reference voltage
      *
@@ -99,6 +102,7 @@ struct ADC
         DAC_SET_INPUT_CURRENT(ADCConverter::Current::reverse(value));
     }
 
+public:
     /**
      * @brief Get the Input Current average value. Used to display stable current values.
      *

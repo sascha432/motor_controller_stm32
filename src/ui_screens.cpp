@@ -688,14 +688,7 @@ void DashboardScreen::_refreshVisuals()
                     lv_obj_set_style_text_font(valueLabel, kDashboardScreenValueFont, LV_PART_MAIN);
                     lv_obj_set_pos(valueLabel, 0, kDashboardScreenValueTuningOffsetY - 3);
                 }
-                if (selectedValue == SelectedValueType::ANTI_WINDUP) {
-                    lv_obj_add_flag(rpmLabel, LV_OBJ_FLAG_HIDDEN);
-                    lv_obj_set_style_text_align(valueLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-                }
-                else {
-                    lv_obj_clear_flag(rpmLabel, LV_OBJ_FLAG_HIDDEN);
-                    lv_obj_set_style_text_align(valueLabel, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
-                }
+                lv_obj_set_style_text_align(valueLabel, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
 
                 lv_obj_clear_flag(graphContainer, LV_OBJ_FLAG_HIDDEN);
                 for (auto *label : graphLegendLabels) {
@@ -747,15 +740,23 @@ void DashboardScreen::_refreshVisuals()
             break;
         case SelectedValueType::ANTI_WINDUP: {
             if (eeprom.getAntiWindup() == 0) {
-                lv_label_set_text_static(valueLabel, "Anti-windup DISABLED");
+                lv_label_set_text_static(valueLabel, "AWU OFF");
             }
             else {
                 const uint32_t antiWindup = (eeprom.getAntiWindup() * 1000) / UIConstants::kAntiWindupFactor;
-                snprintf(valueLabelBuf, sizeof(valueLabelBuf), "Anti-windup " SPRINTF_FP2_FMT "%%", CONVERT_TO_FP2(antiWindup));
+                snprintf(valueLabelBuf, sizeof(valueLabelBuf), "AWU " SPRINTF_FP2_FMT "%%", CONVERT_TO_FP2(antiWindup));
                 lv_label_set_text_static(valueLabel, valueLabelBuf);
             }
             break;
         }
+        case SelectedValueType::INPUT_CURRENT_LIMIT:
+            snprintf(valueLabelBuf, sizeof(valueLabelBuf), "Input " SPRINTF_FP1_FMT "A", CONVERT_TO_FP1(eeprom.getInputCurrentLimit()));
+            lv_label_set_text_static(valueLabel, valueLabelBuf);
+            break;
+        case SelectedValueType::MOTOR_CURRENT_LIMIT:
+            snprintf(valueLabelBuf, sizeof(valueLabelBuf), "Motor " SPRINTF_FP1_FMT "A", CONVERT_TO_FP1(eeprom.getMotorCurrentLimit()));
+            lv_label_set_text_static(valueLabel, valueLabelBuf);
+            break;
         case SelectedValueType::MAX:
             break;
     }

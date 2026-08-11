@@ -322,6 +322,27 @@ struct PidController
     }
 
     /**
+     * @brief Set the Input Current Limit
+     *
+     * @param value
+     */
+    void setInputCurrentLimit(uint16_t value)
+    {
+        faults.isenseMax = ADCConverter::Current::reverse(value);
+        adc.setInputCurrentLimit(value);
+    }
+
+    /**
+     * @brief Set the Motor Current Limit
+     *
+     * @param value
+     */
+    void setMotorCurrentLimit(uint16_t value)
+    {
+        adc.setMotorCurrentLimit(value);
+    }
+
+    /**
      * @brief Set the Error Code and stop PID controller
      *
      * @param code
