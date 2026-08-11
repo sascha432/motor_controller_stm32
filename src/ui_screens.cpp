@@ -550,7 +550,8 @@ void DiagnosticsScreen::_refreshVisuals()
     );
     lv_label_set_text_static(rpmPwmLabel, rpmLabelBuf);
 
-    pid.errorPrintf(lastErrorLabelBuf, sizeof(lastErrorLabelBuf));
+    memcpy(lastErrorLabelBuf, "Last Error ", 11);
+    pid.errorPrintf(lastErrorLabelBuf + 11, sizeof(lastErrorLabelBuf) - 11);
     lv_label_set_text_static(lastErrorLabel, lastErrorLabelBuf);
 }
 
@@ -813,7 +814,7 @@ void DashboardScreen::update()
 
 void StartScreen::load()
 {
-      Screen::load();
+    Screen::load();
 
     lv_obj_t *container = lv_obj_create(screen);
     lv_obj_set_pos(container, kStartScreenContainerX, kStartScreenContainerY);
