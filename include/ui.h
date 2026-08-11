@@ -494,7 +494,7 @@ private:
     char motorTempLabelBuf[32];
     char mosfetTempLabelBuf[32];
     char rpmLabelBuf[24];
-    char lastErrorLabelBuf[32];
+    char lastErrorLabelBuf[48];
 };
 
 // === Dashboard Screen ===
