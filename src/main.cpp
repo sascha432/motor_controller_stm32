@@ -11,6 +11,7 @@
 #include "tft_driver.h"
 #include "ui.h"
 #include "menu.h"
+#include "mem_debug.h"
 #include "eeprom.h"
 #include "stats.h"
 #include "helpers.h"
@@ -177,6 +178,12 @@ static void loop()
 
         // update UI, this might take a couple 100ms
         screenFlow.refresh();
+        #if MEM_DEBUG
+        if (!debug_heap_check()) {
+            DEBUG_PRINT(DebugType::MEM, "heap corruption detected during main loop");
+            debug_heap_dump();
+        }
+        #endif
         // DEBUG_PRINT_MSG(DebugType::UI, "lv_timer_handler=%ums\n", HAL_GetTick() - lastLvHandler);
         lastLvHandler = HAL_GetTick();
     }
