@@ -195,7 +195,7 @@ void PidController::motorOff()
         running = false;
         const uint32_t level = clampPWMLevel(eeprom.getMotorBrake() * pwmLevel.getMax() / 100);
         PID_WRITE_MOTOR_PWM_BREAK(level);
-        releaseBreakCounter = (kReleaseBreakTimeMillis / kPIDIntervalFloat) + 1;
+        releaseBreakCounter = (kReleaseBreakTimeMillis / kPIDInterval) + 1;
         __enable_irq();
     }
     else {
@@ -310,7 +310,7 @@ void PidController::isr()
 
     if (running) {
         // initial stall and sensor check
-        if (stats.counter.loop == static_cast<uint32_t>(kInitialSensorCheckTimeMillis / kPIDIntervalFloat)) {
+        if (stats.counter.loop == static_cast<uint32_t>(kInitialSensorCheckTimeMillis / kPIDInterval)) {
             if (stats.counter.pulse < -10) { // sensor counts backwards, wrong direction set
                 setErrorCode(ErrorCodeType::SENSOR_REVERSE);
             }

@@ -27,10 +27,6 @@ static void lvgl_log_cb(const char *buf)
 
 static void setup()
 {
-    // Initialize debugging
-    SWO::init();
-    debug_init();
-
     // Initialize and read EEPROM on I2C1 on PB8/PB9
     eeprom.init();
     eeprom.read();
@@ -147,27 +143,26 @@ static void loop()
     }
 
     #if HAVE_SWO_SCREENSHOTS
-    bool screenshotRequested = false;
-    if (SWO::data.sendScreenshot) {
-        SWO::data.sendScreenshot = false;
-        screenshotRequested = tft_driver_screenshot_begin();
-        if (screenshotRequested) {
-            DEBUG_PRINT(DebugType::INFO, "SWO screenshot started");
-            lv_obj_invalidate(lv_scr_act());
+        bool screenshotRequested = false;
+        if (SWO::data.sendScreenshot) {
+            SWO::data.sendScreenshot = false;
+            screenshotRequested = tft_driver_screenshot_begin();
+            if (screenshotRequested) {
+                DEBUG_PRINT(DebugType::INFO, "SWO screenshot started");
+                lv_obj_invalidate(lv_scr_act());
+            }
+            else {
+                DEBUG_PRINT(DebugType::INFO, "SWO screenshot failed to start");
+            }
         }
-        else {
-            DEBUG_PRINT(DebugType::INFO, "SWO screenshot failed to start");
-        }
-    }
+    #else
+        constexpr bool screenshotRequested = false;
     #endif
 
     // handle ui updates and rotary encoder
     static uint32_t lastLvHandler = 0;
-    if ((HAL_GetTick() - lastLvHandler) >= 5
-    #if HAVE_SWO_SCREENSHOTS
-        || screenshotRequested
-    #endif
-    ) {
+    if ((HAL_GetTick() - lastLvHandler) >= 5 || screenshotRequested)
+    {
         // handle rotary encoder
         int32_t delta = knob.getPositionDelta();
         if (delta) {
@@ -197,33 +192,33 @@ static void loop()
         // update UI, this might take a couple 100ms
         screenFlow.refresh();
         #if HAVE_SWO_SCREENSHOTS
-        if (screenshotRequested) {
-            tft_driver_screenshot_end();
-            DEBUG_PRINT(DebugType::INFO, "SWO screenshot sent");
-        }
+            if (screenshotRequested) {
+                tft_driver_screenshot_end();
+                DEBUG_PRINT(DebugType::INFO, "SWO screenshot sent");
+            }
         #endif
         // DEBUG_PRINT_MSG(DebugType::UI, "lv_timer_handler=%ums\n", HAL_GetTick() - lastLvHandler);
         lastLvHandler = HAL_GetTick();
     }
 
     #if LV_MEM_DEBUG
-    static uint32_t lastMemStats = 0;
-    if ((HAL_GetTick() - lastMemStats) >= 1000U) {
-        lv_mem_monitor_t monitor;
-        lv_mem_monitor(&monitor);
-        DEBUG_PRINT(DebugType::MEM,
-            "LVGL heap total=%lu free=%lu used=%u%% frag=%u%% largest=%lu max=%lu allocs=%lu free_cnt=%lu",
-            static_cast<unsigned long>(monitor.total_size),
-            static_cast<unsigned long>(monitor.free_size),
-            static_cast<unsigned>(monitor.used_pct),
-            static_cast<unsigned>(monitor.frag_pct),
-            static_cast<unsigned long>(monitor.free_biggest_size),
-            static_cast<unsigned long>(monitor.max_used),
-            static_cast<unsigned long>(monitor.used_cnt),
-            static_cast<unsigned long>(monitor.free_cnt)
-        );
-        lastMemStats = HAL_GetTick();
-    }
+        static uint32_t lastMemStats = 0;
+        if ((HAL_GetTick() - lastMemStats) >= 1000U) {
+            lv_mem_monitor_t monitor;
+            lv_mem_monitor(&monitor);
+            DEBUG_PRINT(DebugType::MEM,
+                "LVGL heap total=%lu free=%lu used=%u%% frag=%u%% largest=%lu max=%lu allocs=%lu free_cnt=%lu",
+                static_cast<unsigned long>(monitor.total_size),
+                static_cast<unsigned long>(monitor.free_size),
+                static_cast<unsigned>(monitor.used_pct),
+                static_cast<unsigned>(monitor.frag_pct),
+                static_cast<unsigned long>(monitor.free_biggest_size),
+                static_cast<unsigned long>(monitor.max_used),
+                static_cast<unsigned long>(monitor.used_cnt),
+                static_cast<unsigned long>(monitor.free_cnt)
+            );
+            lastMemStats = HAL_GetTick();
+        }
     #endif
 
     if (SWO::data.enabled != SWO::EnableState::DISABLED) {
@@ -232,7 +227,7 @@ static void loop()
         while (pid.pidLoopBuffer.pop(item)) {
             if (SWO::data.enabled == SWO::EnableState::SWO) {
                 uint8_t size = sizeof(item);
-                if (!SWO::write(1, &size, 1) ||!SWO::write(1, item)) {
+                if (!SWO::write(1, &size, 1) || !SWO::write(1, item)) {
                     pid.pidLoopBuffer.clear();
                     break;
                 }
@@ -417,9 +412,11 @@ int main(void)
 {
     // system init
     HAL_Init();
-    DWT_Init();
     LEDs::init();
+    DWT_Init();
     SystemClock_Config();
+    SWO::init();
+    debug_init();
     MX_CRC_Init();
     TIM7_TIM6_Init();
     #if HAVE_USB_DEVICE

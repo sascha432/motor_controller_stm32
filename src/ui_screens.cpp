@@ -787,15 +787,12 @@ void DashboardScreen::_refreshGraphLegend(int32_t range)
     const lv_coord_t fontHeight = lv_font_get_line_height(kDashboardScreenGraphLegendFont);
     constexpr lv_coord_t minY = kDashboardScreenGraphY;
     const lv_coord_t maxY = kDashboardScreenGraphY + kDashboardScreenGraphHeight - fontHeight;
-
     const int32_t height = Screen::kDashboardScreenGraphHeight - 1 - fontHeight;
     for (int32_t i = 0; i < tickCount; ++i) {
         const int32_t rpmValue = (((tickCount - 1 - i) * range) / ((tickCount - 1) * 10)) * 10;
         snprintf(graphLegendLabelBuf[i], sizeof(graphLegendLabelBuf[i]), "%u", static_cast<unsigned>(rpmValue));
         lv_label_set_text_static(graphLegendLabels[i], graphLegendLabelBuf[i]);
-
-        const lv_coord_t y = dashboard_screen_graph_map_y(rpmValue, range, height);
-        lv_coord_t labelY = kDashboardScreenGraphY + y;
+        lv_coord_t labelY = kDashboardScreenGraphY + dashboard_screen_graph_map_y(rpmValue, range, height);
         labelY = std::clamp<lv_coord_t>(labelY, minY, maxY);
         lv_obj_set_pos(graphLegendLabels[i], 0, labelY);
     }

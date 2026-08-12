@@ -200,7 +200,7 @@ struct Screen
     static constexpr lv_coord_t kDashboardScreenGraphY = kDashboardScreenValueTuningOffsetY + kDashboardScreenValueLabelHeight + kDashboardScreenGraphTopGap;
     static constexpr lv_coord_t kDashboardScreenGraphWidth = kDashboardScreenContainerWidth - kDashboardScreenGraphLegendWidth;
     static constexpr lv_coord_t kDashboardScreenGraphHeight = kDashboardScreenContainerHeight - kDashboardScreenGraphY - 1;
-    static constexpr int32_t kDashboardScreenGraphMinRpmSpan = 250;
+    static constexpr int32_t kDashboardScreenGraphMinRpmSpan = 100;
     static constexpr size_t kDashboardScreenGraphLegendCount = 4;
     static constexpr size_t kDashboardScreenGraphPointCount = sizeof_array(stats.graphSamples);
 

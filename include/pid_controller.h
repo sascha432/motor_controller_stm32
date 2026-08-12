@@ -30,12 +30,12 @@ struct PidController
 
     static constexpr uint16_t kPPR = 1024;                                              // MT6701 PPR
     static constexpr uint16_t kCPR = kPPR * 4;                                          // 4x Mode PPR to CPR
-    static constexpr float kPIDIntervalFloat = 5.12f;                                   // PID update rate in millis used for precise RPM calculation
-    static constexpr uint32_t kPIDInterval = 5;                                         // PID update rate in millis
+    static constexpr float kPIDInterval = 1.28f;                                        // PID update rate in millis used for precise RPM calculation
+    // static constexpr float kPIDInterval = 5.12f;                                        // PID update rate in millis used for precise RPM calculation
     static constexpr uint16_t kAntiWindup = 97 * UIConstants::kAntiWindupFactor;        // reduce integral if error is out of range (97%)
     static constexpr bool kProgramPPR = false;                                          // set to true to program the MT6701 encoder during boot over i2c
     static constexpr uint32_t kMaxRPM = 55000;                                          // max. supported RPM by the encoder
-    static constexpr float kMaxError = kCPR / (60000 / kPIDIntervalFloat) * kMaxRPM;    // factor to reduce error to a value between -1.0 and 1.0 for the PID loop
+    static constexpr float kMaxError = kCPR / (60000 / kPIDInterval) * kMaxRPM;    // factor to reduce error to a value between -1.0 and 1.0 for the PID loop
     #if PID_USE_FLOATING_POINT_MATH
         static constexpr int32_t kFPFactor = 1;
     #else
@@ -45,7 +45,7 @@ struct PidController
     // convert RPM to counts per PID interval
     static constexpr uint32_t kRPMToIntCounts(uint32_t value)
     {
-        return static_cast<uint32_t>((value * kCPR) / static_cast<int32_t>(60000 / kPIDIntervalFloat));
+        return static_cast<uint32_t>((value * kCPR) / static_cast<int32_t>(60000 / kPIDInterval));
     }
 
     template<int32_t VALUE>
@@ -57,7 +57,7 @@ struct PidController
     // convert counts per PID interval to RPM
     static constexpr int32_t kIntCountsToRPM(int32_t value)
     {
-        return static_cast<int32_t>((value * static_cast<int32_t>(60000 / kPIDIntervalFloat)) / kCPR);
+        return static_cast<int32_t>((value * static_cast<int32_t>(60000 / kPIDInterval)) / kCPR);
     }
 
     enum class ErrorCodeType : int32_t {
@@ -496,8 +496,8 @@ public:
     // === Statistics data structure ===
     struct StatsType
     {
-        Helpers::FixedLowPass<kPIDInterval, kPIDInterval * 8, 512, volatile int32_t> rpm;     // filtered RPM for displaying
-        Helpers::FixedLowPass<kPIDInterval, kPIDInterval * 2, 256, volatile int32_t> pwm;     // filtered PWM for displaying
+        Helpers::FixedLowPass<(uint32_t)kPIDInterval, (uint32_t)(kPIDInterval * 8), 512, volatile int32_t> rpm;     // filtered RPM for displaying
+        Helpers::FixedLowPass<(uint32_t)kPIDInterval, (uint32_t)(kPIDInterval * 2), 256, volatile int32_t> pwm;     // filtered PWM for displaying
 
         struct {
             volatile uint32_t loop;                  // number of times the PID loop has been called

@@ -22,8 +22,8 @@ InterruptErrorType interruptErrorType;
  */
 static inline void TIM6_Handler(void)
 {
-    constexpr uint32_t kTicksPerPidIsr = (PidController::kPIDIntervalFloat * 1000.0f) / PidController::kOcpTickInterval; // every 5.12ms
-    constexpr uint32_t kTicksPerKnobIsr = kTicksPerPidIsr * 5; // every 25.6ms
+    constexpr uint32_t kTicksPerPidIsr = (PidController::kPIDInterval * 1000.0f) / PidController::kOcpTickInterval;
+    constexpr uint32_t kTicksPerKnobIsr = kTicksPerPidIsr * (uint32_t)(25.0f / PidController::kPIDInterval);
     static uint32_t timer6Counter = 0;
     pid.ocp_isr();
     if (kIsDivisible<kTicksPerPidIsr>(timer6Counter)) {
