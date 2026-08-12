@@ -52,7 +52,6 @@ MAX_RPM = 55000
 
 @dataclass
 class Sample:
-    sequence: int
     rpm: int
     pwm_level: int
     voltage_adc: int
@@ -94,9 +93,9 @@ class AppConfig:
 
 # Firmware protocol on SWO port 1: first byte is the payload length, followed by the raw PID item bytes.
 PID_FRAME_LENGTH_PREFIX = 1
-PID_ITEM_STRUCT = "<I9H2xfffI"
+PID_ITEM_STRUCT = "<HB10HB"
 PID_ITEM_SIZE = struct.calcsize(PID_ITEM_STRUCT)
-PID_INTERVAL = 2.56
+PID_INTERVAL = 1.28
 PID_SAMPLE_HZ_DEFAULT = int(1000 / PID_INTERVAL)
 
 # Screenshot stream uses the same length-prefix scheme: [len][payload], with the tile payload
@@ -255,19 +254,26 @@ def anti_windup_percent_to_raw(percent_value: float) -> int:
     return int(round(percent_value * ANTI_WINDUP_FACTOR))
 
 
+def _uint16_to_float(raw_value: int) -> float:
+    return float(raw_value) * 65535.0
+
+
 def decode_pid_item(payload: bytes) -> Optional[Sample]:
     if len(payload) != PID_ITEM_SIZE:
         return None
 
-    sequence, rpm, pwm, voltage, i_ocp, i_avg, motor_ntc, mosfet_ntc, dac_motor, dac_input, error, integral, derivative, faults = struct.unpack(
+    rpm, pwm, voltage, i_ocp, i_avg, motor_ntc, mosfet_ntc, dac_motor, dac_input, error_raw, integral_raw, derivative_raw, faults = struct.unpack(
         PID_ITEM_STRUCT, payload
     )
+    error = _uint16_to_float(error_raw)
+    integral = _uint16_to_float(integral_raw)
+    derivative = _uint16_to_float(derivative_raw)
+
     if rpm > MAX_RPM:  # RPM might go negative due to small vibrations when the motor is stalled and the sensor limit is 55k RPM
         rpm = 0
 
     running, drv_fault, ocp_fault, snsout_fault = decode_fault_word(faults)
     return Sample(
-        sequence=sequence,
         rpm=rpm,
         pwm_level=pwm,
         voltage_adc=voltage,
@@ -294,7 +300,7 @@ def decode_pid_item(payload: bytes) -> Optional[Sample]:
     )
 
 
-def is_plausible_sample(sample: Sample, last_sequence: Optional[int]) -> bool:
+def is_plausible_sample(sample: Sample) -> bool:
     for value in (
         sample.voltage_adc,
         sample.current_ocp_adc,
@@ -316,12 +322,7 @@ def is_plausible_sample(sample: Sample, last_sequence: Optional[int]) -> bool:
     if sample.snsout_fault not in (0, 1):
         return False
 
-    if last_sequence is None:
-        return True
-
-    # Only reject exact duplicates. Sequence jumps can legitimately happen
-    # after partial frame loss and should not lock out future valid samples.
-    return sample.sequence != last_sequence
+    return True
 
 
 def parse_itm_packets(buffer: bytearray) -> Iterable[Tuple[int, bytes]]:
@@ -588,7 +589,7 @@ class SWOBackend:
 
                     accumulated = bytearray()
                     pid_bytes = bytearray()
-                    last_sequence: Optional[int] = None
+                    last_sample_payload: Optional[bytes] = None
 
                     while not self.stop_event.is_set():
                         try:
@@ -634,9 +635,9 @@ class SWOBackend:
 
                                 raw_item = bytes(pid_bytes[1:frame_size])
                                 sample = decode_pid_item(raw_item)
-                                if sample and is_plausible_sample(sample, last_sequence):
+                                if sample and raw_item != last_sample_payload and is_plausible_sample(sample):
                                     del pid_bytes[:frame_size]
-                                    last_sequence = sample.sequence
+                                    last_sample_payload = raw_item
                                     self.sample_callback(sample)
                                     continue
 

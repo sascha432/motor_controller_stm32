@@ -30,7 +30,8 @@ struct PidController
 
     static constexpr uint16_t kPPR = 1024;                                              // MT6701 PPR
     static constexpr uint16_t kCPR = kPPR * 4;                                          // 4x Mode PPR to CPR
-    static constexpr float kPIDInterval = 2.56f;                                        // PID update rate in millis used for precise RPM calculation
+    // tested with 1.28, 2.56 and 5.12...
+    static constexpr float kPIDInterval = 1.28f;                                        // PID update rate in millis used for precise RPM calculation
     // static constexpr float kPIDInterval = 5.12f;                                        // PID update rate in millis used for precise RPM calculation
     static constexpr uint16_t kAntiWindup = 97 * UIConstants::kAntiWindupFactor;        // reduce integral if error is out of range (97%)
     static constexpr bool kProgramPPR = false;                                          // set to true to program the MT6701 encoder during boot over i2c
@@ -515,11 +516,10 @@ public:
     };
 
     // === PID tuning data structure ===
-    struct PidLoopType
+    struct __attribute__((packed)) PidLoopType
     {
-        uint32_t sequence;
         uint16_t rpm;
-        uint16_t pwmLevel;
+        uint8_t pwmLevel;
         uint16_t voltage;
         uint16_t currentOcp;
         uint16_t currentAverage;
@@ -527,14 +527,13 @@ public:
         uint16_t mosfetTemperature;
         uint16_t dacMotorCurrent;
         uint16_t dacInputCurrent;
-        float error;
-        float integral;
-        float derivative;
+        uint16_t error;
+        uint16_t integral;
+        uint16_t derivative;
         uint32_t running: 1;
         uint32_t drv8701Fault : 1;
         uint32_t ocpFault : 1;
         uint32_t snsoutFault : 1;
-        uint32_t ___reserved : 28;
     };
     static constexpr size_t kPidLoopTypeSize = sizeof(PidLoopType);
 
@@ -652,7 +651,7 @@ public:
     volatile ErrorCodeType errorCode;               // last error
     // buffer for PID loop data for PID tuning
     // adjust size to the interval
-    RingBuffer<PidLoopType, std::clamp<size_t>((100 / kPIDInterval), 16, 64)> pidLoopBuffer;
+    RingBuffer<PidLoopType, std::clamp<size_t>((110 / kPIDInterval), 16, 80)> pidLoopBuffer;
     static constexpr size_t kPidLoopBufferSize = sizeof(pidLoopBuffer);
 
     volatile bool running;                          // true if the PID controller is running

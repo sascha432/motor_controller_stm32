@@ -665,3 +665,5 @@ private:
     #define HAVE_MOTOR_VIBES 0
     #define HAVE_IMPERIAL_MARCH 0
 #endif
+
+static constexpr float kFloatToUint16Multiplier = 65535.0f;

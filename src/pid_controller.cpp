@@ -338,9 +338,8 @@ void PidController::isr()
     // send PID tuning data if tuning is enabled
     if (SWO::data.enabled != SWO::EnableState::DISABLED) {
         PidLoopType item;
-        item.sequence = stats.counter.loop;
         item.rpm = static_cast<uint16_t>(deltaRPM);
-        item.pwmLevel = static_cast<uint16_t>((clampedPwmLevel * 100) / pwmLevel.getARR());
+        item.pwmLevel = static_cast<uint8_t>((clampedPwmLevel * 100) / pwmLevel.getARR());
         item.voltage = adc.getVSenseValue();
         item.currentOcp = adc.getISenseOcpFilteredValue();
         item.currentAverage = adc.getISenseAverageValue();
@@ -349,14 +348,14 @@ void PidController::isr()
         item.dacMotorCurrent = DAC_GET_MOTOR_CURRENT();
         item.dacInputCurrent =  DAC_GET_INPUT_CURRENT();
         #if PID_USE_FLOATING_POINT_MATH
-            item.error = getLastError();
-            item.integral = getIntegral();
-            item.derivative = getLastDerivative();
+            item.error = static_cast<uint16_t>(getLastError() * kFloatToUint16Multiplier);
+            item.integral = static_cast<uint16_t>(getIntegral() * kFloatToUint16Multiplier);
+            item.derivative = static_cast<uint16_t>(getLastDerivative() * kFloatToUint16Multiplier);
         #else
-            constexpr float tmp = 1.0f / PidController::kFPFactor;
-            item.error = getLastError() * tmp;
-            item.integral = getIntegral() * tmp;
-            item.derivative = getLastDerivative() * tmp;
+            constexpr float tmp = (1.0f / PidController::kFPFactor) * kFloatToUint16Multiplier;
+            item.error = static_cast<uint16_t>(getLastError() * tmp);
+            item.integral = static_cast<uint16_t>(getIntegral() * tmp);
+            item.derivative = static_cast<uint16_t>(getLastDerivative() * tmp);
         #endif
         item.running = running ? 1U : 0U;
         item.drv8701Fault = faults.drv8701Fault ? 1U : 0U;
