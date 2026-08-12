@@ -96,7 +96,7 @@ class AppConfig:
 PID_FRAME_LENGTH_PREFIX = 1
 PID_ITEM_STRUCT = "<I9H2xfffI"
 PID_ITEM_SIZE = struct.calcsize(PID_ITEM_STRUCT)
-PID_INTERVAL = 1.28
+PID_INTERVAL = 2.56
 PID_SAMPLE_HZ_DEFAULT = int(1000 / PID_INTERVAL)
 
 # Screenshot stream uses the same length-prefix scheme: [len][payload], with the tile payload
