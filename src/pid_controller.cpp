@@ -151,13 +151,11 @@ void PidController::reset()
     releaseBreakCounter = 0;
     faults.reset();
     faults.vsenseMax = ADCConverter::Voltage::reverse(eeprom.getOvpProtection());
-    setMotorCurrentLimit(eeprom.getMotorCurrentLimit());
-    setInputCurrentLimit(eeprom.getInputCurrentLimit());
     lastRpmCounter = PID_READ_RPM_COUNTER();
     lastRpmCounterUpdated = HAL_GetTick();
+    applyPIDParams();
     ocp.reset();
     resetFaults();
-    applyPIDParams();
 
     DEBUG_PRINT(DebugType::PID, "Kp=%s Ki=%s Kd=%s RPM=%u windup=%s OCP=%u/%u OVP=%u",
         debugFloatToString(Kp, 6, true),

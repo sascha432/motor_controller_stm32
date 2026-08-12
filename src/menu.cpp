@@ -432,8 +432,6 @@ void Menu::applyEEPROMSettings()
 {
     tft_backlight_pwm_set(eeprom.getTFTBrightness());
     LEDs::illuminationLedSetPWM(eeprom.getLEDBrightness() * LEDs::kIlluminationResolution);
-    pid.setInputCurrentLimit(eeprom.getInputCurrentLimit());
-    pid.setMotorCurrentLimit(eeprom.getMotorCurrentLimit());
     pid.applyPIDParams();
 }
 
@@ -941,24 +939,24 @@ int32_t Menu::updateRotaryValue(int32_t value)
                 case DashboardScreen::SelectedValueType::KP:
                     clampedValue = std::clamp<int32_t>(getValue(), UIConstants::kMinKp, UIConstants::kMaxKp); // clamp value, usually done in the slider screen
                     eeprom.setKp(EEPROM::kUint32ToPIDParam(clampedValue));
-                    pid.applyPIDParams(); // apply or live tuning otherwise only a reset will apply the new values
+                    pid.setKp(eeprom.getKp()); // apply or live tuning otherwise only a reset will apply the new values
                     setValue(clampedValue);
                     break;
                 case DashboardScreen::SelectedValueType::KI:
                     clampedValue = std::clamp<int32_t>(getValue(), UIConstants::kMinKi, UIConstants::kMaxKi);
                     eeprom.setKi(EEPROM::kUint32ToPIDParam(clampedValue));
-                    pid.applyPIDParams();
+                    pid.setKi(eeprom.getKi());
                     setValue(clampedValue);
                     break;
                 case DashboardScreen::SelectedValueType::KD:
                     clampedValue = std::clamp<int32_t>(getValue(), UIConstants::kMinKd, UIConstants::kMaxKd);
                     eeprom.setKd(EEPROM::kUint32ToPIDParam(clampedValue));
-                    pid.applyPIDParams();
+                    pid.setKd(eeprom.getKd());
                     setValue(clampedValue);
                     break;
                 case DashboardScreen::SelectedValueType::ANTI_WINDUP:
                     eeprom.setAntiWindup(clampAntiWindupValue());
-                    pid.applyPIDParams();
+                    pid.setAntiWindup(eeprom.getAntiWindup());
                     break;
                 case DashboardScreen::SelectedValueType::INPUT_CURRENT_LIMIT:
                     clampedValue = std::clamp<int32_t>(getValue(), UIConstants::kMinInputCurrent, UIConstants::kMaxInputCurrent);
@@ -1027,19 +1025,19 @@ int32_t Menu::updateRotaryValue(int32_t value)
             break;
         case Screen::Type::PID_KP:
             eeprom.setKp(EEPROM::kUint32ToPIDParam(getValue()));
-            pid.applyPIDParams();
+            pid.setKp(eeprom.getKp());
             break;
         case Screen::Type::PID_KI:
             eeprom.setKi(EEPROM::kUint32ToPIDParam(getValue()));
-            pid.applyPIDParams();
+            pid.setKi(eeprom.getKi());
             break;
         case Screen::Type::PID_KD:
             eeprom.setKd(EEPROM::kUint32ToPIDParam(getValue()));
-            pid.applyPIDParams();
+            pid.setKd(eeprom.getKd());
             break;
         case Screen::Type::PID_ANTI_WINDUP:
             eeprom.setAntiWindup(clampAntiWindupValue());
-            pid.applyPIDParams();
+            pid.setAntiWindup(eeprom.getAntiWindup());
             break;
         case Screen::Type::OVP_PROTECTION:
             eeprom.setOvpProtection(getValue());
