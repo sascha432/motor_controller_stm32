@@ -28,7 +28,7 @@
 ### Rotary Knob Button
 
 - Start screen: open main menu (long press opens advanced menu)
-- Dashboard screen: select value to change (RPM/PWM/PID parameters, etc.)
+- Dashboard screen: select next value to change (RPM/PWM/PID parameters, etc.), long press selects prev. value
 
 ### Start Button
 

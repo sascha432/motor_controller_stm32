@@ -144,6 +144,7 @@ static void loop()
 
     #if HAVE_SWO_SCREENSHOTS
         bool screenshotRequested = false;
+        // check if a screenshot was requested
         if (SWO::data.sendScreenshot) {
             SWO::data.sendScreenshot = false;
             screenshotRequested = tft_driver_screenshot_begin();
@@ -192,6 +193,7 @@ static void loop()
         // update UI, this might take a couple 100ms
         screenFlow.refresh();
         #if HAVE_SWO_SCREENSHOTS
+            // finalize requested screenshot
             if (screenshotRequested) {
                 tft_driver_screenshot_end();
                 DEBUG_PRINT(DebugType::INFO, "SWO screenshot sent");

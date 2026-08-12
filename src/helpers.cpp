@@ -22,7 +22,7 @@ void delay_us(uint32_t us)
 
 #if DEBUG
 
-static char floatBuffer[128] = { 0 };
+static char floatBuffer[128];
 size_t floatBufferPos = 0;
 
 const char *debugFloatToString(float value, uint8_t precision, bool trimTrailingZeros)

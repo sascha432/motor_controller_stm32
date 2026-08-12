@@ -29,15 +29,15 @@ enum class MainMenuItemType {
 };
 
 static const char *kMainMenuItems[] = {
-    "Speed",                    // 0
-    "Mode",                     // 1
-    "LED Brightness",           // 2
-    "Current Limits",           // 3
-    "Stall Time",               // 4
-    "Motor Brake",              // 5
-    "Advanced",                 // 6
-    "Restore Defaults",         // 7
-    "Save & Exit",              // 8
+    "Speed",
+    "Mode",
+    "LED Brightness",
+    "Current Limits",
+    "Stall Time",
+    "Motor Brake",
+    "Advanced",
+    "Restore Defaults",
+    "Save & Exit",
 };
 
 enum class AdvancedMenuItemType {
@@ -59,19 +59,19 @@ enum class AdvancedMenuItemType {
 };
 
 static const char *kAdvancedMenuItems[] = {
-    "PID Parameters",           // 0
-    "TFT Brightness",           // 1
-    "MOSFET Temperature",       // 2
-    "Motor Temperature",        // 3
-    "Motor RPM Settings",       // 4
-    "Motor Direction",          // 5
-    "Sensor Direction",         // 6
-    "PWM Frequency",            // 7
-    "OVP Protection",           // 8
-    "Welcome Chime",            // 9
-    "Diagnostics",              // 10
+    "PID Parameters",
+    "TFT Brightness",
+    "MOSFET Temperature",
+    "Motor Temperature",
+    "Motor RPM Settings",
+    "Motor Direction",
+    "Sensor Direction",
+    "PWM Frequency",
+    "OVP Protection",
+    "Welcome Chime",
+    "Diagnostics",
 #if HAVE_IMPERIAL_MARCH
-    "Play Imperial March",      // 11
+    "Play Imperial March",
 #endif
     "Back"
 };
@@ -85,11 +85,11 @@ enum class PIDParametersItemType {
 };
 
 static const char *kPIDParametersItems[] = {
-    "Kp",                       // 0
-    "Ki",                       // 1
-    "Kd",                       // 2
-    "Anti-Windup",              // 3
-    "Back"                      // 4
+    "Kp",
+    "Ki",
+    "Kd",
+    "Anti-Windup",
+    "Back"
 };
 
 enum class MotorRPMSettingsItemType {
@@ -99,9 +99,9 @@ enum class MotorRPMSettingsItemType {
 };
 
 static const char *kMotorRPMSettingsItems[] = {
-    "Minimum RPM",              // 0
-    "Maximum RPM",              // 1
-    "Back"                      // 2
+    "Minimum RPM",
+    "Maximum RPM",
+    "Back"
 };
 
 enum class CurrentLimitItemType {
@@ -111,9 +111,9 @@ enum class CurrentLimitItemType {
 };
 
 static const char *kCurrentLimitItems[] = {
-    "Input Current Limit",      // 0
-    "Motor Current Limit",      // 1
-    "Back"                      // 2
+    "Input Current Limit",
+    "Motor Current Limit",
+    "Back"
 };
 
 enum class ControlModeItemType {
@@ -123,13 +123,13 @@ enum class ControlModeItemType {
 };
 
 static const char *kControlModeItems[] = {
-    "PWM / Open Loop",          // 0
-    "PID / Closed Loop"         // 1
+    "PWM / Open Loop",
+    "PID / Closed Loop"
 };
 
 static const char *kDirectionItems[] = {
-    "Forward",                  // 0
-    "Reverse"                   // 1
+    "Forward",
+    "Reverse"
 };
 
 enum class RestoreDefaultsItemType {
@@ -138,8 +138,8 @@ enum class RestoreDefaultsItemType {
 };
 
 static const char *kRestoreDefaultsMenuItems[] = {
-    "Restore",                  // 0
-    "Cancel"                    // 1
+    "Restore",
+    "Cancel"
 };
 
 #if HAVE_IMPERIAL_MARCH
@@ -364,7 +364,8 @@ void Menu::loadDashboardScreen()
 void Menu::restorePreviousMenu()
 {
     DEBUG_PRINT(DebugType::UI, "value=%d", getValue());
-    screenFlow.back(); // restore previous screen
+    // restore previous screen
+    screenFlow.back();
     clearUserInput();
 }
 
@@ -799,7 +800,8 @@ void Menu::handleButtonPress(uint32_t duration)
             #endif
             if (eeprom.isPIDMode()) {
                 DashboardScreen &dashboard = *reinterpret_cast<DashboardScreen *>(screenFlow.getScreen());
-                switch(dashboard.incrSelectedValue()) {
+                // short press advances to the next editable value, long press moves backward through the same selection cycle
+                switch(duration < UIConstants::kLongPressDuration ? dashboard.incrSelectedValue() : dashboard.decrSelectedValue()) {
                     case DashboardScreen::SelectedValueType::SPEED:
                     case DashboardScreen::SelectedValueType::SPEED2:
                         dashboard.setMaxAcceleration(eeprom.isPIDMode() ? UIConstants::kStepsRPM : UIConstants::kStepsPWM);

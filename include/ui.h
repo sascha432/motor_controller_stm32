@@ -566,6 +566,17 @@ struct DashboardScreen : public Screen
         return selectedValue;
     }
 
+    /**
+     * @brief Decrement the value that is selected for adjustment (speed, PID parameters, etc...) and wrap around to the last value if the first value is reached
+     *
+     * @return SelectedValueType New selected value
+     */
+    SelectedValueType decrSelectedValue()
+    {
+        selectedValue = static_cast<SelectedValueType>((static_cast<uint32_t>(selectedValue) + static_cast<uint32_t>(SelectedValueType::MAX) - 1) % static_cast<uint32_t>(SelectedValueType::MAX));
+        return selectedValue;
+    }
+
 protected:
     void _refreshVisuals();
     void _rebuildGraphPoints();
