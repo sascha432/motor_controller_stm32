@@ -93,7 +93,7 @@ class AppConfig:
 
 # Firmware protocol on SWO port 1: first byte is the payload length, followed by the raw PID item bytes.
 PID_FRAME_LENGTH_PREFIX = 1
-PID_ITEM_STRUCT = "<HB10HB"
+PID_ITEM_STRUCT = "<H10HBB"
 PID_ITEM_SIZE = struct.calcsize(PID_ITEM_STRUCT)
 PID_INTERVAL = 1.28
 PID_SAMPLE_HZ_DEFAULT = int(1000 / PID_INTERVAL)
@@ -262,7 +262,7 @@ def decode_pid_item(payload: bytes) -> Optional[Sample]:
     if len(payload) != PID_ITEM_SIZE:
         return None
 
-    rpm, pwm, voltage, i_ocp, i_avg, motor_ntc, mosfet_ntc, dac_motor, dac_input, error_raw, integral_raw, derivative_raw, faults = struct.unpack(
+    rpm, voltage, i_ocp, i_avg, motor_ntc, mosfet_ntc, dac_motor, dac_input, error_raw, integral_raw, derivative_raw, pwm, faults = struct.unpack(
         PID_ITEM_STRUCT, payload
     )
     error = _uint16_to_float(error_raw)

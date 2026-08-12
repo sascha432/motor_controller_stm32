@@ -519,7 +519,6 @@ public:
     struct __attribute__((packed)) PidLoopType
     {
         uint16_t rpm;
-        uint8_t pwmLevel;
         uint16_t voltage;
         uint16_t currentOcp;
         uint16_t currentAverage;
@@ -530,10 +529,12 @@ public:
         uint16_t error;
         uint16_t integral;
         uint16_t derivative;
-        uint32_t running: 1;
-        uint32_t drv8701Fault : 1;
-        uint32_t ocpFault : 1;
-        uint32_t snsoutFault : 1;
+        uint8_t pwmLevel;
+        uint8_t running: 1;
+        uint8_t drv8701Fault : 1;
+        uint8_t ocpFault : 1;
+        uint8_t snsoutFault : 1;
+        uint8_t reserved : 4;
     };
     static constexpr size_t kPidLoopTypeSize = sizeof(PidLoopType);
 

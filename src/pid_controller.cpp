@@ -339,7 +339,6 @@ void PidController::isr()
     if (SWO::data.enabled != SWO::EnableState::DISABLED) {
         PidLoopType item;
         item.rpm = static_cast<uint16_t>(deltaRPM);
-        item.pwmLevel = static_cast<uint8_t>((clampedPwmLevel * 100) / pwmLevel.getARR());
         item.voltage = adc.getVSenseValue();
         item.currentOcp = adc.getISenseOcpFilteredValue();
         item.currentAverage = adc.getISenseAverageValue();
@@ -357,6 +356,7 @@ void PidController::isr()
             item.integral = static_cast<uint16_t>(getIntegral() * tmp);
             item.derivative = static_cast<uint16_t>(getLastDerivative() * tmp);
         #endif
+        item.pwmLevel = static_cast<uint8_t>((clampedPwmLevel * 100) / pwmLevel.getARR());
         item.running = running ? 1U : 0U;
         item.drv8701Fault = faults.drv8701Fault ? 1U : 0U;
         item.ocpFault = (ocp.state != OcpStateType::NONE) ? 1U : 0U;
