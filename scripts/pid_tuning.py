@@ -96,6 +96,8 @@ class AppConfig:
 PID_FRAME_LENGTH_PREFIX = 1
 PID_ITEM_STRUCT = "<I9H2xfffI"
 PID_ITEM_SIZE = struct.calcsize(PID_ITEM_STRUCT)
+PID_INTERVAL = 1.28
+PID_SAMPLE_HZ_DEFAULT = int(1000 / PID_INTERVAL)
 
 # Screenshot stream uses the same length-prefix scheme: [len][payload], with the tile payload
 # preceded by a 16-bit length and the stream terminated by a single 0 byte.
@@ -2422,7 +2424,7 @@ def parse_args() -> AppConfig:
     parser.add_argument(
         "--sample-hz",
         type=int,
-        default=200,
+        default=PID_SAMPLE_HZ_DEFAULT,
         help="Expected PID sample rate used for window buffer sizing",
     )
 
