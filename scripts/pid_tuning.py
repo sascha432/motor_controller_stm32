@@ -585,6 +585,7 @@ class SWOBackend:
 
                     accumulated = bytearray()
                     pid_bytes = bytearray()
+                    itm_text = bytearray()
                     last_sample_payload: Optional[bytes] = None
 
                     while not self.stop_event.is_set():
@@ -599,8 +600,15 @@ class SWOBackend:
                         accumulated.extend(chunk)
                         for port, payload in parse_itm_packets(accumulated):
                             if port == 0:
-                                # Port 0 text is already mirrored by pyOCD stdout because
-                                # semihost_console_type=console is enabled.
+                                # ITM_SendChar writes text on port 0. pyOCD's stdout is
+                                # not guaranteed to mirror raw SWV port 0 traffic.
+                                itm_text.extend(payload)
+                                while b"\n" in itm_text:
+                                    line_end = itm_text.index(0x0A)
+                                    line = bytes(itm_text[:line_end]).rstrip(b"\r")
+                                    del itm_text[: line_end + 1]
+                                    if line:
+                                        self.log(line.decode("utf-8", errors="replace"))
                                 continue
 
                             if port == SCREENSHOT_PORT:
@@ -971,7 +979,7 @@ class GDBMemoryClient:
         self.close()
 
     def _detach_and_close(self, sock: socket.socket) -> None:
-        # Detach so target resumes, then close this short-lived RSP session.
+        # Detach so the target resumes, then close this short-lived RSP session.
         try:
             response = self._send_packet(sock, "D")
             if response not in ("OK", ""):
@@ -1401,16 +1409,6 @@ class PIDTuningApp:
         values = struct.unpack(EEPROM_DATA_STRUCT, payload[:EEPROM_DATA_SIZE])
         return EEPROMData(*values)
 
-    @staticmethod
-    def _is_invalid_swo_default_signature(data: SWOData) -> bool:
-        return (
-            not data.changed
-            and abs(data.kp - 1.0) < 1e-6
-            and abs(data.ki - 1.0) < 1e-6
-            and abs(data.kd - 0.0) < 1e-6
-            and data.rpm == 0
-        )
-
     def _validate_swo_payload(self, payload: bytes) -> Tuple[SWOData, int]:
         if len(payload) < SWO_DATA_SIZE:
             raise RuntimeError(f"SWO::data read returned too few bytes ({len(payload)} < {SWO_DATA_SIZE})")
@@ -1425,7 +1423,7 @@ class PIDTuningApp:
             if not math.isfinite(value):
                 raise RuntimeError(f"Invalid SWO::data {name}: not finite")
 
-        if not (0 <= data.rpm <= 65535):
+        if not (0 <= data.rpm <= MAX_RPM):
             raise RuntimeError(f"Invalid SWO::data RPM: {data.rpm}")
 
         if not (0 <= data.anti_windup <= anti_windup_percent_to_raw(100.0)):
@@ -1435,9 +1433,6 @@ class PIDTuningApp:
 
         if data.eeprom_address == 0:
             raise RuntimeError("Invalid SWO::data EEPROM address: 0")
-
-        if self._is_invalid_swo_default_signature(data):
-            raise RuntimeError("Invalid SWO::data signature detected")
 
         return data, enabled_state
 
