@@ -2,6 +2,8 @@
   Author: sascha_lammers@gmx.de
 
   Baremetal SPI driver for ST7735 - DMA TX based
+
+  THIS CODE HAS NOT BEEN MAINTAINED OR OPTIMIZED
 */
 
 #include <stm32f1xx.h>

@@ -62,9 +62,9 @@ void tft_driver_gpio_tim_init(void);
 void tft_driver_spi_init(void);
 void tft_driver_spi_send_buffer_dma_raw(const void *data, uint16_t len);
 void tft_driver_spi_send_byte(uint8_t byte);
-void tft_driver_spi_send_buffer(const uint8_t *data, uint16_t len) ;
+void tft_driver_spi_send_buffer(const void *data, uint16_t len) ;
 void tft_driver_send_command(uint8_t cmd);
-void tft_driver_send_data(const uint8_t *data, uint16_t len);
+void tft_driver_send_data(const void *data, uint16_t len);
 
 // Custom functions for each TFT driver
 void tft_driver_init(void);

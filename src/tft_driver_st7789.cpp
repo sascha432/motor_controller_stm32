@@ -5,6 +5,7 @@
 */
 
 #include <stm32f1xx.h>
+#include <algorithm>
 #include <memory>
 #include "tft_driver.h"
 
@@ -47,8 +48,8 @@
 
 static uint32_t dma_transfer_buffer[TFT_DMA_TX_CHUNK_PIXELS / 2];
 
-static void set_column(uint16_t x0, uint16_t x1);
-static void set_row(uint16_t y0, uint16_t y1);
+static inline void set_column(uint16_t x0, uint16_t x1);
+static inline void set_row(uint16_t y0, uint16_t y1);
 
 /**
  * Write repeated RGB565 color pixels using chunked DMA transfers.
@@ -71,8 +72,6 @@ static void write_color_pixels(uint16_t color, uint32_t pixels)
     tft_driver_delay();
     TFT_PIN_CS_HIGH();
 }
-
-#include <algorithm>
 
 /**
  * Write an RGB565 pixel buffer as big-endian bytes using chunked DMA transfers.
@@ -123,29 +122,23 @@ void tft_write_window_pixels(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1,
 /**
  * Set column address range
  */
-static void set_column(uint16_t x0, uint16_t x1)
+static inline void set_column(uint16_t x0, uint16_t x1)
 {
-    #if ST7789_ROW_OFS != 0
-        x0 += ST7789_COL_OFS;
-        x1 += ST7789_COL_OFS;
-    #endif
-    uint8_t data[4] = {(uint8_t)(x0 >> 8), (uint8_t)(x0 & 0xFF), (uint8_t)(x1 >> 8), (uint8_t)(x1 & 0xFF)};
+    constexpr uint32_t kRowOfs = ST7789_COL_OFS;
+    const uint32_t data = __REV16((static_cast<uint32_t>(x1 + kRowOfs) << 16U) | static_cast<uint32_t>(x0 + kRowOfs));
     tft_driver_send_command(ST7789_CASET);
-    tft_driver_send_data(data, 4);
+    tft_driver_send_data(&data, sizeof(data));
 }
 
 /**
  * Set row address range
  */
-static void set_row(uint16_t y0, uint16_t y1)
+static inline void set_row(uint16_t y0, uint16_t y1)
 {
-    #if ST7789_ROW_OFS != 0
-        y0 += ST7789_ROW_OFS;
-        y1 += ST7789_ROW_OFS;
-    #endif
-    uint8_t data[4] = {(uint8_t)(y0 >> 8), (uint8_t)(y0 & 0xFF), (uint8_t)(y1 >> 8), (uint8_t)(y1 & 0xFF)};
+    constexpr uint32_t kRowOfs = ST7789_ROW_OFS;
+    const uint32_t data = __REV16((static_cast<uint32_t>(y1 + kRowOfs) << 16U) | static_cast<uint32_t>(y0 + kRowOfs));
     tft_driver_send_command(ST7789_RASET);
-    tft_driver_send_data(data, 4);
+    tft_driver_send_data(&data, sizeof(data));
 }
 
 /**

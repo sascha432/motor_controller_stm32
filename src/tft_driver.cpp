@@ -295,7 +295,7 @@ void tft_driver_spi_send_byte(uint8_t byte)
 /**
  * Send data buffer via SPI (DMA)
  */
-void tft_driver_spi_send_buffer(const uint8_t *data, uint16_t len)
+void tft_driver_spi_send_buffer(const void *data, uint16_t len)
 {
     TFT_PIN_CS_LOW();
     tft_driver_delay();
@@ -319,7 +319,7 @@ void tft_driver_send_command(uint8_t cmd)
 /**
  * Send SPI data bytes (with RS=1)
  */
-void tft_driver_send_data(const uint8_t *data, uint16_t len)
+void tft_driver_send_data(const void *data, uint16_t len)
 {
     TFT_PIN_RS_HIGH();
     tft_driver_spi_send_buffer(data, len);
