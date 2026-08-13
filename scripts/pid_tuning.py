@@ -117,13 +117,13 @@ SWO_DATA_FIXED_RAM_ADDRESS = 0x2000F000
 SWO_ENABLE_DISABLED = 0
 SWO_ENABLE_SWO = 1
 SWO_ENABLE_USB = 2
-SWO_DATA_EEPROM_ADDRESS_OFFSET = 20
-SWO_DATA_EEPROM_COMMIT_OFFSET = 24
-SWO_DATA_SEND_SCREENSHOT_OFFSET = 28
-# FOR THE AI: REMEMBER THIS IS 32BIT AND 32BIT PADDED (AND DONT REMOVE THIS COMMENT) C++ SWO::DataType layout:
+# FOR THE AI: REMEMBER THIS IS 32BIT AND 32BIT PADDED (AND DONT REMOVE THIS COMMENT) C++ SWO::DataType layout
 SWO_DATA_STRUCT = "<fffHHI?3xI?3x?3x"
 SWO_DATA_SIZE = struct.calcsize(SWO_DATA_STRUCT)
 SWO_DATA_ENABLED_OFFSET = struct.calcsize("<fffHH")
+SWO_DATA_EEPROM_ADDRESS_OFFSET = struct.calcsize("<fffHHI?3x")
+SWO_DATA_EEPROM_COMMIT_OFFSET = SWO_DATA_EEPROM_ADDRESS_OFFSET + 4
+SWO_DATA_SEND_SCREENSHOT_OFFSET = SWO_DATA_EEPROM_COMMIT_OFFSET + 4
 
 EEPROM_DATA_STRUCT = "<IIIIBBHHHHHBBBBBBBBHxxfffHHH?x"
 EEPROM_DATA_SIZE = struct.calcsize(EEPROM_DATA_STRUCT)
@@ -1340,7 +1340,7 @@ class PIDTuningApp:
             data.kd,
             data.anti_windup,
             data.rpm,
-            enabled_state & 0xFF,
+            enabled_state,
             changed,
             eeprom_address,
             eeprom_commit,
@@ -1383,7 +1383,7 @@ class PIDTuningApp:
         values = struct.unpack(EEPROM_DATA_STRUCT, payload[:EEPROM_DATA_SIZE])
         return EEPROMData(*values)
 
-    def _validate_swo_payload(self, payload: bytes) -> Tuple[SWOData, int]:
+    def _validate_swo_payload(self, payload: bytes) -> SWOData:
         if len(payload) < SWO_DATA_SIZE:
             raise RuntimeError(f"SWO::data read returned too few bytes ({len(payload)} < {SWO_DATA_SIZE})")
 
@@ -1775,7 +1775,7 @@ class PIDTuningApp:
         def worker() -> None:
             try:
                 swo_payload = self.gdb_mem.read_memory(self.data_address, SWO_DATA_SIZE)
-                swo_data, _enabled_state = self._validate_swo_payload(swo_payload)
+                swo_data = self._validate_swo_payload(swo_payload)
                 eeprom_payload = self.gdb_mem.read_memory(swo_data.eeprom_address, EEPROM_DATA_SIZE)
                 eeprom_data = self._unpack_eeprom_data(eeprom_payload)
                 self.event_queue.put(("eeprom-load", (swo_data, eeprom_data)))
@@ -1837,7 +1837,7 @@ class PIDTuningApp:
         def worker() -> None:
             try:
                 payload = self.gdb_mem.read_memory(self.data_address, SWO_DATA_SIZE)
-                data, _enabled_state = self._validate_swo_payload(payload)
+                data = self._validate_swo_payload(payload)
                 self.event_queue.put(("swo-read", (data, reason)))
             except Exception as exc:
                 self.event_queue.put(("log", f"Read SWO::data failed: {exc}"))
@@ -1892,7 +1892,8 @@ class PIDTuningApp:
         def worker() -> None:
             try:
                 current_payload = self.gdb_mem.read_memory(self.data_address, SWO_DATA_SIZE)
-                current_data, enabled_state = self._validate_swo_payload(current_payload)
+                current_data = self._validate_swo_payload(current_payload)
+                enabled_state = current_payload[SWO_DATA_ENABLED_OFFSET]
                 self.gdb_mem.write_memory(
                     self.data_address,
                     self._pack_swo_data(
@@ -1907,7 +1908,7 @@ class PIDTuningApp:
                 self.event_queue.put(("log", "Synced PID params to SWO::data (changed=true)"))
                 # Read back once after write for confirmation.
                 payload = self.gdb_mem.read_memory(self.data_address, SWO_DATA_SIZE)
-                data_verify, _enabled_state_verify = self._validate_swo_payload(payload)
+                data_verify = self._validate_swo_payload(payload)
                 self.event_queue.put(("swo-read", (data_verify, "after write")))
             except Exception as exc:
                 self.event_queue.put(("log", f"Write SWO::data failed: {exc}"))
