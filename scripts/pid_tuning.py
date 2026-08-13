@@ -98,8 +98,7 @@ PID_SAMPLE_HZ_DEFAULT = int(1000 / PID_INTERVAL)
 PID_PWM_MAX_LEVEL = 100.0
 PID_ANTI_WINDUP_FACTOR = 512.0
 
-# Screenshot stream uses the same length-prefix scheme: [len][payload], with the tile payload
-# preceded by a 16-bit length and the stream terminated by a single 0 byte.
+# Screenshot stream uses the same length-prefix scheme: [len][payload] and the stream terminated by a single 0 byte [0][no payload]
 SCREENSHOT_END_MARKER = 0
 SCREENSHOT_PIXEL_FORMAT_RGB565 = 1
 SCREENSHOT_MAX_WIDTH = 320
@@ -113,15 +112,16 @@ SCREENSHOT_FRAME_HEADER_STRUCT = "<HHI"
 SCREENSHOT_FRAME_HEADER_SIZE = struct.calcsize(SCREENSHOT_FRAME_HEADER_STRUCT)
 SCREENSHOT_PORT = 2
 
+# SWO::DataType layout in firmware with fixed RAM address
 SWO_DATA_FIXED_RAM_ADDRESS = 0x2000F000
 SWO_ENABLE_DISABLED = 0
 SWO_ENABLE_SWO = 1
 SWO_ENABLE_USB = 2
-# FOR THE AI: REMEMBER THIS IS 32BIT AND 32BIT PADDED (AND DONT REMOVE THIS COMMENT) C++ SWO::DataType layout
 SWO_DATA_STRUCT = "<fffHHI?3xI?3x?3x"
 SWO_DATA_SIZE = struct.calcsize(SWO_DATA_STRUCT)
 SWO_DATA_SEND_SCREENSHOT_OFFSET = struct.calcsize("<fffHHI?3xI?3x")
 
+# EEPROM::DataType layout in firmware with dynamic EEPROM address from SWO::DataType
 EEPROM_DATA_STRUCT = "<IIIIBBHHHHHBBBBBBBBHxxfffHHH?x"
 EEPROM_DATA_SIZE = struct.calcsize(EEPROM_DATA_STRUCT)
 
