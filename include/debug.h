@@ -43,7 +43,7 @@ struct SWO
     }
 
     static bool state;
-    enum class EnableState : uint8_t {
+    enum class EnableState : uint32_t {
         DISABLED = 0,
         SWO = 1,
         #if HAVE_USB_DEVICE
@@ -68,6 +68,7 @@ struct SWO
         volatile bool sendScreenshot;
         DataType() : Kp(0), Ki(0), Kd(0), antiWindup(0), rpm(0), enabled(EnableState::DISABLED), changed(false), EEPROM{0, false}, sendScreenshot(false) {}
     };
+    static constexpr size_t kDataTypeSize = sizeof(DataType);
     static DataType data;
 };
 

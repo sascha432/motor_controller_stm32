@@ -126,6 +126,7 @@
 			"USBD",
 			"usbd_ctlreq",
 			"usbd_ioreq",
+			"vmctr1",
 			"VREF",
 			"WWDG"
 		],

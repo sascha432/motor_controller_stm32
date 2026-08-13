@@ -64,7 +64,7 @@ static void write_color_pixels(uint16_t color, uint32_t pixels)
     tft_driver_delay();
 
     while (pixels > 0) {
-        uint16_t chunk_pixels = (pixels > TFT_DMA_TX_CHUNK_PIXELS) ? TFT_DMA_TX_CHUNK_PIXELS : pixels;
+        const uint16_t chunk_pixels = (pixels > TFT_DMA_TX_CHUNK_PIXELS) ? TFT_DMA_TX_CHUNK_PIXELS : pixels;
         tft_driver_spi_send_buffer_dma_raw(dma_transfer_buffer, chunk_pixels * 2U);
         pixels -= chunk_pixels;
     }

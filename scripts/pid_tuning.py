@@ -18,7 +18,6 @@ import re
 import socket
 import struct
 import subprocess
-import sys
 import threading
 import time
 import tkinter as tk
@@ -121,13 +120,8 @@ SWO_ENABLE_USB = 2
 SWO_DATA_EEPROM_ADDRESS_OFFSET = 20
 SWO_DATA_EEPROM_COMMIT_OFFSET = 24
 SWO_DATA_SEND_SCREENSHOT_OFFSET = 28
-# FOR THE AI: REMEMBER THIS IS 32BIT AND 32BIT PADDED (AND DONT REMOVE THIS COMMENT)
-# C++ SWO::DataType layout:
-# float Kp, float Ki, float Kd, uint16_t antiWindup, uint16_t rpm,
-# uint8_t enabled, bool changed, 2 bytes padding,
-# uint32_t EEPROM.address, bool EEPROM.commit, 3 bytes padding,
-# bool sendScreenshot, 3 bytes padding.
-SWO_DATA_STRUCT = "<fffHHB?2xI?3x?3x"
+# FOR THE AI: REMEMBER THIS IS 32BIT AND 32BIT PADDED (AND DONT REMOVE THIS COMMENT) C++ SWO::DataType layout:
+SWO_DATA_STRUCT = "<fffHHI?3xI?3x?3x"
 SWO_DATA_SIZE = struct.calcsize(SWO_DATA_STRUCT)
 SWO_DATA_ENABLED_OFFSET = struct.calcsize("<fffHH")
 
@@ -1055,7 +1049,6 @@ class GDBMemoryClient:
 
 class PIDTuningApp:
     PRESETS = (5, 10, 20, 30)
-    STARTUP_SYNC_DELAY_MS = 200
     STARTUP_PACKET_TIMEOUT_SECONDS = 5.0
 
     @staticmethod
@@ -1088,7 +1081,6 @@ class PIDTuningApp:
         self._pid_fields_updating = False
         self._pid_fields_dirty = False
         self._last_loaded_swo_data: Optional[SWOData] = None
-        self._target_running = False
         self._eeprom_dialog: Optional[tk.Toplevel] = None
         self._eeprom_dialog_status_var: Optional[tk.StringVar] = None
         self._eeprom_dialog_vars: dict[str, tk.StringVar] = {}
@@ -1104,7 +1096,6 @@ class PIDTuningApp:
         self.data_address: Optional[int] = SWO_DATA_FIXED_RAM_ADDRESS
         self.pending_initial_sync = False
         self.sync_in_progress = False
-        self.start_reset_retried = False
         self.reset_in_progress = False
         self._auto_restart_after_reset = False
         self._startup_sync_job: Optional[str] = None
@@ -1356,23 +1347,6 @@ class PIDTuningApp:
             send_screenshot,
         )
 
-    def _unpack_swo_data(self, payload: bytes) -> SWOData:
-        kp, ki, kd, anti_windup_raw, rpm, _enabled_state, changed, eeprom_address, eeprom_commit, send_screenshot = struct.unpack(
-            SWO_DATA_STRUCT,
-            payload[:SWO_DATA_SIZE],
-        )
-        return SWOData(
-            kp=kp,
-            ki=ki,
-            kd=kd,
-            anti_windup=anti_windup_raw,
-            rpm=rpm,
-            changed=changed,
-            eeprom_address=eeprom_address,
-            eeprom_commit=eeprom_commit,
-            send_screenshot=send_screenshot,
-        )
-
     def _pack_eeprom_data(self, data: EEPROMData) -> bytes:
         return struct.pack(
             EEPROM_DATA_STRUCT,
@@ -1413,8 +1387,21 @@ class PIDTuningApp:
         if len(payload) < SWO_DATA_SIZE:
             raise RuntimeError(f"SWO::data read returned too few bytes ({len(payload)} < {SWO_DATA_SIZE})")
 
-        data = self._unpack_swo_data(payload)
-        enabled_state = payload[SWO_DATA_ENABLED_OFFSET]
+        kp, ki, kd, anti_windup_raw, rpm, enabled_state, changed, eeprom_address, eeprom_commit, send_screenshot = struct.unpack(
+            SWO_DATA_STRUCT,
+            payload[:SWO_DATA_SIZE],
+        )
+        data = SWOData(
+            kp=kp,
+            ki=ki,
+            kd=kd,
+            anti_windup=anti_windup_raw,
+            rpm=rpm,
+            changed=changed,
+            eeprom_address=eeprom_address,
+            eeprom_commit=eeprom_commit,
+            send_screenshot=send_screenshot,
+        )
 
         if enabled_state not in (SWO_ENABLE_DISABLED, SWO_ENABLE_SWO, SWO_ENABLE_USB):
             raise RuntimeError(f"Invalid SWO::data enabled state: {enabled_state}")
@@ -1434,7 +1421,7 @@ class PIDTuningApp:
         if data.eeprom_address == 0:
             raise RuntimeError("Invalid SWO::data EEPROM address: 0")
 
-        return data, enabled_state
+        return data
 
     def _install_pid_field_traces(self) -> None:
         for var in (self.kp_var, self.ki_var, self.kd_var, self.anti_windup_var, self.rpm_var):
@@ -1501,7 +1488,7 @@ class PIDTuningApp:
 
         output_path = self._next_screenshot_path()
         self.screenshot_in_progress = True
-        self._screenshot_deadline = time.monotonic() + 10.0
+        self._screenshot_deadline = time.monotonic() + 5.0
         self._update_control_button_states()
 
         def worker() -> None:
@@ -1532,13 +1519,10 @@ class PIDTuningApp:
         def worker() -> None:
             try:
                 payload = self.gdb_mem.read_memory(self.data_address, SWO_DATA_SIZE)
-                current_data, _enabled_state = self._validate_swo_payload(payload)
+                current_data = self._validate_swo_payload(payload)
                 data = bytearray(payload)
                 data[SWO_DATA_ENABLED_OFFSET] = SWO_ENABLE_SWO if enabled else SWO_ENABLE_DISABLED
-                data[SWO_DATA_EEPROM_ADDRESS_OFFSET:SWO_DATA_EEPROM_ADDRESS_OFFSET + 4] = struct.pack(
-                    "<I",
-                    current_data.eeprom_address,
-                )
+                data[SWO_DATA_EEPROM_ADDRESS_OFFSET:SWO_DATA_EEPROM_ADDRESS_OFFSET + 4] = struct.pack("<I", current_data.eeprom_address)
                 data[SWO_DATA_EEPROM_COMMIT_OFFSET] = 1 if current_data.eeprom_commit else 0
                 self.gdb_mem.write_memory(self.data_address, bytes(data))
             except Exception as exc:
@@ -1841,16 +1825,6 @@ class PIDTuningApp:
             pass
         self._startup_sync_job = None
 
-    def _run_scheduled_startup_sync(self) -> None:
-        self._startup_sync_job = None
-        if not self.backend.running:
-            return
-        if not self.pending_initial_sync:
-            return
-        if self.data_address is None:
-            return
-        self._request_read_swo_data("startup")
-
     def _request_read_swo_data(self, reason: str) -> None:
         if self.data_address is None:
             self._append_log("Cannot read SWO::data yet: dataAddress not available")
@@ -1896,8 +1870,8 @@ class PIDTuningApp:
             if anti_windup < 0.0 or anti_windup > 100.0:
                 raise ValueError("Anti-windup out of range (0.00..100.00)")
             rpm = int(self.rpm_var.get().strip())
-            if rpm < 0 or rpm > 65535:
-                raise ValueError("RPM out of range (0..65535)")
+            if rpm < 0 or rpm > MAX_RPM:
+                raise ValueError("RPM out of range (0..%u)" % MAX_RPM)
         except Exception as exc:
             self._append_log(f"Invalid PID input: {exc}")
             return
@@ -2032,7 +2006,6 @@ class PIDTuningApp:
     def _handle_sample(self, sample: Sample) -> None:
         self._waiting_for_first_sample = False
         self._first_sample_deadline = 0.0
-        self._target_running = bool(sample.running)
         self.filled = min(self.filled + 1, self.samples_per_window)
 
         pwm_percent = (float(sample.pwm_level) * 100.0) / PID_PWM_MAX_LEVEL
@@ -2153,14 +2126,12 @@ class PIDTuningApp:
         self.pending_initial_sync = False
         self.sync_in_progress = False
         self._set_sync_enabled(False)
-        self.start_reset_retried = False
         self.screenshot_in_progress = False
         self._screenshot_deadline = 0.0
         self.backend.cancel_screenshot()
         self._set_fault_indicator(self.ocp_indicator, False)
         self._set_fault_indicator(self.driver_fault_indicator, False)
         self._set_fault_indicator(self.driver_ocp_indicator, False)
-        self._target_running = False
         self._waiting_for_first_sample = False
         self._first_sample_deadline = 0.0
         self._update_control_button_states()
@@ -2174,7 +2145,6 @@ class PIDTuningApp:
     def _start_monitoring(self) -> None:
         self._cancel_startup_sync_job()
         self._set_sync_enabled(False)
-        self.start_reset_retried = False
         started = self.backend.start(reset_run=False)
         if started:
             self._set_target_enabled(True)
@@ -2182,7 +2152,6 @@ class PIDTuningApp:
             self.status_var.set("Running")
             self.pending_initial_sync = True
             self.sync_in_progress = False
-            self.start_reset_retried = False
             self._waiting_for_first_sample = True
             self._first_sample_deadline = time.monotonic() + self.STARTUP_PACKET_TIMEOUT_SECONDS
             self._update_control_button_states()
@@ -2256,13 +2225,11 @@ class PIDTuningApp:
                 if reset_ok:
                     self.start_stop_button.configure(text="Start")
                     self.status_var.set("Stopped")
-                    self.start_reset_retried = False
                     self.pending_initial_sync = False
                     self.sync_in_progress = False
                     self._set_fault_indicator(self.ocp_indicator, False)
                     self._set_fault_indicator(self.driver_fault_indicator, False)
                     self._set_fault_indicator(self.driver_ocp_indicator, False)
-                    self._target_running = False
                     self._update_control_button_states()
                     if auto_restart:
                         self._append_log("Firmware reset complete; restarting monitor")
@@ -2382,7 +2349,6 @@ class PIDTuningApp:
         if not self.backend.running and self.start_stop_button.cget("text") == "Stop":
             self.start_stop_button.configure(text="Start")
             self.status_var.set("Stopped")
-            self._target_running = False
             self._waiting_for_first_sample = False
             self._first_sample_deadline = 0.0
             self._update_control_button_states()
