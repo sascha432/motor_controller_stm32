@@ -8,6 +8,8 @@
 #include "debug.h"
 #include "tft_driver.h"
 
+static constexpr uint32_t kDMATimeout = 200000;
+
 lv_disp_draw_buf_t s_lvgl_draw_buf;
 lv_color_t s_lvgl_buf_1[LV_BUFFER_SIZE];
 lv_disp_drv_t s_lvgl_disp_drv;
@@ -234,30 +236,7 @@ void tft_driver_spi_init(void)
     RCC->AHBENR |= RCC_AHBENR_DMA1EN;
 
     TFT_DMA_CH->CCR = 0;
-    TFT_DMA_CH->CPAR = (uint32_t)&SPI2->DR;
-}
-
-/**
- * @brief Set the raw PWM value for the backlight
- *
- * @param value PWM value (0-999)
- */
-void tft_backlight_pwm_set_raw(uint16_t value)
-{
-    if (value > 999) {
-        value = 999;
-    }
-    UI_TFT_BACKLIGHT_SET_PWM(value);
-}
-
-/**
- * @brief Set the PWM value for the backlight
- *
- * @param value PWM value (0-100)
- */
-void tft_backlight_pwm_set(uint8_t value)
-{
-    tft_backlight_pwm_set_raw(value * 10U);
+    TFT_DMA_CH->CPAR = reinterpret_cast<const uint32_t>(&SPI2->DR);
 }
 
 /**
@@ -268,14 +247,14 @@ void tft_driver_spi_send_buffer_dma_raw(const void *data, uint16_t len)
     TFT_DMA_CH->CCR &= ~DMA_CCR_EN;
     DMA1->IFCR = DMA_IFCR_CGIF5 | DMA_IFCR_CTCIF5 | DMA_IFCR_CHTIF5 | DMA_IFCR_CTEIF5;
 
-    TFT_DMA_CH->CMAR = (uint32_t)data;
+    TFT_DMA_CH->CMAR = reinterpret_cast<const uint32_t>(data);
     TFT_DMA_CH->CNDTR = len;
     TFT_DMA_CH->CCR = DMA_CCR_MINC | DMA_CCR_DIR | DMA_CCR_PL_1;
 
     SPI2->CR2 |= SPI_CR2_TXDMAEN;
     TFT_DMA_CH->CCR |= DMA_CCR_EN;
 
-    volatile int timeout = 200000;
+    volatile int timeout = kDMATimeout;
     while (!(DMA1->ISR & DMA_ISR_TCIF5) && timeout--) {
     }
 
@@ -283,11 +262,11 @@ void tft_driver_spi_send_buffer_dma_raw(const void *data, uint16_t len)
     SPI2->CR2 &= ~SPI_CR2_TXDMAEN;
     DMA1->IFCR = DMA_IFCR_CGIF5 | DMA_IFCR_CTCIF5 | DMA_IFCR_CHTIF5 | DMA_IFCR_CTEIF5;
 
-    timeout = 200000;
+    timeout = kDMATimeout;
     while (((SPI2->SR & SPI_SR_TXE) == 0U) && timeout--) {
     }
 
-    timeout = 200000;
+    timeout = kDMATimeout;
     while ((SPI2->SR & SPI_SR_BSY) && timeout--) {
     }
 
@@ -351,13 +330,13 @@ void tft_driver_send_data(const uint8_t *data, uint16_t len)
  */
 void tft_driver_lvgl_flush_cb(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p)
 {
-    uint16_t x0 = (uint16_t)area->x1;
-    uint16_t y0 = (uint16_t)area->y1;
-    uint16_t x1 = (uint16_t)area->x2;
-    uint16_t y1 = (uint16_t)area->y2;
-    uint32_t px = (uint32_t)(x1 - x0 + 1U) * (uint32_t)(y1 - y0 + 1U);
+    uint16_t x0 = area->x1;
+    uint16_t y0 = area->y1;
+    uint16_t x1 = area->x2;
+    uint16_t y1 = area->y2;
+    uint32_t px = static_cast<uint32_t>(x1 - x0 + 1U) * static_cast<uint32_t>(y1 - y0 + 1U);
 
-    tft_write_window_pixels(x0, y0, x1, y1, (const uint16_t *)color_p, px);
+    tft_write_window_pixels(x0, y0, x1, y1, reinterpret_cast<const uint16_t *>(color_p), px);
 
     #if HAVE_SWO_SCREENSHOTS
     if (screenshot.isActive()) {

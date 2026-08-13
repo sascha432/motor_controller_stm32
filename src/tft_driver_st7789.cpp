@@ -55,23 +55,24 @@ static void set_row(uint16_t y0, uint16_t y1);
  */
 static void write_color_pixels(uint16_t color, uint32_t pixels)
 {
-    color = __REV16(color);
-    const uint32_t pixel_pattern = (static_cast<uint32_t>(color) << 16U) | color;
-    std::fill_n(dma_transfer_buffer, TFT_DMA_TX_CHUNK_PIXELS / 2, pixel_pattern);
+    const uint32_t pixel_pattern = __REV16((static_cast<uint32_t>(color) << 16U) | color);
+    std::fill(std::begin(dma_transfer_buffer), std::end(dma_transfer_buffer), pixel_pattern);
 
     TFT_PIN_RS_HIGH();
     TFT_PIN_CS_LOW();
     tft_driver_delay();
 
     while (pixels > 0) {
-        uint16_t chunk_pixels = (pixels > TFT_DMA_TX_CHUNK_PIXELS) ? TFT_DMA_TX_CHUNK_PIXELS : static_cast<uint16_t>(pixels);
-        tft_driver_spi_send_buffer_dma_raw(dma_transfer_buffer, static_cast<uint16_t>(chunk_pixels * 2U));
+        uint16_t chunk_pixels = (pixels > TFT_DMA_TX_CHUNK_PIXELS) ? TFT_DMA_TX_CHUNK_PIXELS : pixels;
+        tft_driver_spi_send_buffer_dma_raw(dma_transfer_buffer, chunk_pixels * 2U);
         pixels -= chunk_pixels;
     }
 
     tft_driver_delay();
     TFT_PIN_CS_HIGH();
 }
+
+#include <algorithm>
 
 /**
  * Write an RGB565 pixel buffer as big-endian bytes using chunked DMA transfers.
@@ -91,7 +92,7 @@ static void write_pixel_buffer_rgb565(const uint16_t *pixels, uint32_t pixel_cou
             for (uint16_t i = 0; i < TFT_DMA_TX_CHUNK_PIXELS / 2; i++) {
                 *dma_buffer++ = __REV16(*pixel_buffer++);
             }
-            tft_driver_spi_send_buffer_dma_raw(dma_transfer_buffer, static_cast<uint16_t>(TFT_DMA_TX_CHUNK_PIXELS * 2U));
+            tft_driver_spi_send_buffer_dma_raw(dma_transfer_buffer, TFT_DMA_TX_CHUNK_PIXELS * 2U);
             offset += TFT_DMA_TX_CHUNK_PIXELS;
         }
         else {
@@ -102,7 +103,7 @@ static void write_pixel_buffer_rgb565(const uint16_t *pixels, uint32_t pixel_cou
             for (uint16_t i = 0; i < chunk_pixels; i++) {
                 *dma_buffer++ = __REV16(*pixel_buffer++);
             }
-            tft_driver_spi_send_buffer_dma_raw(dma_transfer_buffer, static_cast<uint16_t>(chunk_pixels * 2U));
+            tft_driver_spi_send_buffer_dma_raw(dma_transfer_buffer, chunk_pixels * 2U);
             offset += chunk_pixels;
         }
     }
@@ -219,7 +220,7 @@ void tft_clear_display(uint16_t color)
     set_row(0, LV_VER_RES_MAX - 1);
     tft_driver_send_command(ST7789_RAMWR);
 
-    write_color_pixels(color, (uint32_t)LV_HOR_RES_MAX * LV_VER_RES_MAX);
+    write_color_pixels(color, LV_HOR_RES_MAX * LV_VER_RES_MAX);
 }
 
 /**

@@ -34,8 +34,28 @@ inline void tft_driver_delay()
     __NOP();
 }
 
-void tft_backlight_pwm_set_raw(uint16_t value);
-void tft_backlight_pwm_set(uint8_t value);
+/**
+ * @brief Set the raw PWM value for the backlight
+ *
+ * @param value PWM value (0-999)
+ */
+inline void tft_backlight_pwm_set_raw(uint16_t value)
+{
+    if (value > 999) {
+        value = 999;
+    }
+    UI_TFT_BACKLIGHT_SET_PWM(value);
+}
+
+/**
+ * @brief Set the PWM value for the backlight
+ *
+ * @param value PWM value (0-100)
+ */
+inline void tft_backlight_pwm_set(uint8_t value)
+{
+    tft_backlight_pwm_set_raw(value * 10U);
+}
 
 // Common functions for all TFT drivers
 void tft_driver_gpio_tim_init(void);
