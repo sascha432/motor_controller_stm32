@@ -516,7 +516,7 @@ public:
     };
 
     // === PID tuning data structure ===
-    struct __attribute__((packed)) PidLoopType
+    struct PidLoopType
     {
         uint16_t rpm;
         uint16_t voltage;
@@ -537,7 +537,7 @@ public:
         uint8_t reserved : 4;
     };
     static constexpr size_t kPidLoopTypeSize = sizeof(PidLoopType);
-    static_assert(sizeof(PidLoopType) % 4 == 0, "PidLoopType must be 4-byte aligned");
+    static_assert(kPidLoopTypeSize % 4 == 0, "PidLoopType must be 4-byte aligned");
 
     // === OCP state machine and constants ===
     static constexpr float kMinADCTimeMicros = 1000000 / ADC::kTotalSamplesPerSecond;   // sample time for current measurement in microseconds, limits retrigger timeout and recovery interval

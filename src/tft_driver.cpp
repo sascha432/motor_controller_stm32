@@ -32,7 +32,7 @@ struct TFTDriverScreenshot
         uint32_t format: 1;
         uint32_t reserved: 31;
     };
-    static constexpr size_t kFrameHeaderSize = sizeof(FrameHeader);
+    static_assert(sizeof(FrameHeader) % 4 == 0, "FrameHeader must be 4-byte aligned");
 
     struct TileHeader {
         uint16_t x;
@@ -41,7 +41,7 @@ struct TFTDriverScreenshot
         uint16_t height;
         uint32_t byteCount;
     };
-    static constexpr size_t kTileHeaderSize = sizeof(TileHeader);
+    static_assert(sizeof(TileHeader) % 4 == 0, "TileHeader must be 4-byte aligned");
 
     bool write_tile(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, const lv_color_t *color_p);
     bool begin();
