@@ -84,27 +84,18 @@ static void write_pixel_buffer_rgb565(const uint16_t *pixels, uint32_t pixel_cou
 
     uint32_t offset = 0;
     while (offset < pixel_count) {
-        if (pixel_count - offset > TFT_DMA_TX_CHUNK_PIXELS) {
-            // 32bit transfer
-            uint32_t *dma_buffer = reinterpret_cast<uint32_t *>(dma_transfer_buffer);
-            const uint32_t *pixel_buffer = reinterpret_cast<const uint32_t *>(pixels + offset);
-            for (uint16_t i = 0; i < TFT_DMA_TX_CHUNK_PIXELS / 2; i++) {
-                *dma_buffer++ = __REV16(*pixel_buffer++);
-            }
-            tft_driver_spi_send_buffer_dma_raw(dma_transfer_buffer, TFT_DMA_TX_CHUNK_PIXELS * 2U);
-            offset += TFT_DMA_TX_CHUNK_PIXELS;
+        const uint16_t pixels_left = pixel_count - offset;
+        const uint16_t chunk_pixels = (pixels_left > TFT_DMA_TX_CHUNK_PIXELS) ? TFT_DMA_TX_CHUNK_PIXELS : pixels_left;
+        const uint16_t copy_words = (chunk_pixels + 1) / 2; // always copy 32bit words, out of bounds is safe because we only copy to the dma_transfer_buffer which is large enough
+
+        // 32bit transfer
+        uint32_t *dma_buffer = reinterpret_cast<uint32_t *>(dma_transfer_buffer);
+        const uint32_t *pixel_buffer = reinterpret_cast<const uint32_t *>(pixels + offset);
+        for (uint16_t i = 0; i < copy_words; i++) {
+            *dma_buffer++ = __REV16(*pixel_buffer++);
         }
-        else {
-            // 16bit transfer
-            const uint16_t chunk_pixels = pixel_count - offset;
-            const uint16_t *pixel_buffer = pixels + offset;
-            uint16_t *dma_buffer = reinterpret_cast<uint16_t *>(dma_transfer_buffer);
-            for (uint16_t i = 0; i < chunk_pixels; i++) {
-                *dma_buffer++ = __REV16(*pixel_buffer++);
-            }
-            tft_driver_spi_send_buffer_dma_raw(dma_transfer_buffer, chunk_pixels * 2U);
-            offset += chunk_pixels;
-        }
+        tft_driver_spi_send_buffer_dma_raw(dma_transfer_buffer, chunk_pixels * 2U);
+        offset += chunk_pixels;
     }
 
     tft_driver_delay();
