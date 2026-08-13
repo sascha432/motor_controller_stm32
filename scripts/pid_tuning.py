@@ -120,10 +120,7 @@ SWO_ENABLE_USB = 2
 # FOR THE AI: REMEMBER THIS IS 32BIT AND 32BIT PADDED (AND DONT REMOVE THIS COMMENT) C++ SWO::DataType layout
 SWO_DATA_STRUCT = "<fffHHI?3xI?3x?3x"
 SWO_DATA_SIZE = struct.calcsize(SWO_DATA_STRUCT)
-SWO_DATA_ENABLED_OFFSET = struct.calcsize("<fffHH")
-SWO_DATA_EEPROM_ADDRESS_OFFSET = struct.calcsize("<fffHHI?3x")
-SWO_DATA_EEPROM_COMMIT_OFFSET = SWO_DATA_EEPROM_ADDRESS_OFFSET + 4
-SWO_DATA_SEND_SCREENSHOT_OFFSET = SWO_DATA_EEPROM_COMMIT_OFFSET + 4
+SWO_DATA_SEND_SCREENSHOT_OFFSET = struct.calcsize("<fffHHI?3xI?3x")
 
 EEPROM_DATA_STRUCT = "<IIIIBBHHHHHBBBBBBBBHxxfffHHH?x"
 EEPROM_DATA_SIZE = struct.calcsize(EEPROM_DATA_STRUCT)
@@ -136,6 +133,7 @@ class SWOData:
     kd: float
     anti_windup: int
     rpm: int
+    enabled_state: int
     changed: bool
     eeprom_address: int
     eeprom_commit: bool
@@ -1326,11 +1324,6 @@ class PIDTuningApp:
     def _pack_swo_data(
         self,
         data: SWOData,
-        eeprom_address: int,
-        eeprom_commit: bool,
-        send_screenshot: bool = False,
-        enabled_state: int = SWO_ENABLE_DISABLED,
-        changed: bool = True,
     ) -> bytes:
         # C++ layout: float Kp, float Ki, float Kd, uint16_t antiWindup,
         # uint16_t rpm, enum class EnableState : uint8_t enabled, bool changed,
@@ -1342,11 +1335,11 @@ class PIDTuningApp:
             data.kd,
             data.anti_windup,
             data.rpm,
-            enabled_state,
-            changed,
-            eeprom_address,
-            eeprom_commit,
-            send_screenshot,
+            data.enabled_state,
+            data.changed,
+            data.eeprom_address,
+            data.eeprom_commit,
+            data.send_screenshot,
         )
 
     def _pack_eeprom_data(self, data: EEPROMData) -> bytes:
@@ -1399,6 +1392,7 @@ class PIDTuningApp:
             kd=kd,
             anti_windup=anti_windup_raw,
             rpm=rpm,
+            enabled_state=enabled_state,
             changed=changed,
             eeprom_address=eeprom_address,
             eeprom_commit=eeprom_commit,
@@ -1420,8 +1414,8 @@ class PIDTuningApp:
                 f"Invalid SWO::data anti-windup raw value: {data.anti_windup}"
             )
 
-        if data.eeprom_address == 0:
-            raise RuntimeError("Invalid SWO::data EEPROM address: 0")
+        if data.eeprom_address < 0x20000000:
+            raise RuntimeError("Invalid SWO::data EEPROM address: %08x" % data.eeprom_address)
 
         return data
 
@@ -1522,11 +1516,8 @@ class PIDTuningApp:
             try:
                 payload = self.gdb_mem.read_memory(self.data_address, SWO_DATA_SIZE)
                 current_data = self._validate_swo_payload(payload)
-                data = bytearray(payload)
-                data[SWO_DATA_ENABLED_OFFSET] = SWO_ENABLE_SWO if enabled else SWO_ENABLE_DISABLED
-                data[SWO_DATA_EEPROM_ADDRESS_OFFSET:SWO_DATA_EEPROM_ADDRESS_OFFSET + 4] = struct.pack("<I", current_data.eeprom_address)
-                data[SWO_DATA_EEPROM_COMMIT_OFFSET] = 1 if current_data.eeprom_commit else 0
-                self.gdb_mem.write_memory(self.data_address, bytes(data))
+                current_data.enabled_state = SWO_ENABLE_SWO if enabled else SWO_ENABLE_DISABLED
+                self.gdb_mem.write_memory(self.data_address, self._pack_swo_data(current_data))
             except Exception as exc:
                 if not quiet:
                     self.event_queue.put(("log", f"Set SWO::data.enabled failed: {exc}"))
@@ -1885,6 +1876,7 @@ class PIDTuningApp:
             kd=kd,
             anti_windup=anti_windup_percent_to_raw(anti_windup),
             rpm=rpm,
+            enabled_state=SWO_ENABLE_DISABLED,
             changed=True,
             eeprom_address=0,
             eeprom_commit=False,
@@ -1895,17 +1887,13 @@ class PIDTuningApp:
             try:
                 current_payload = self.gdb_mem.read_memory(self.data_address, SWO_DATA_SIZE)
                 current_data = self._validate_swo_payload(current_payload)
-                enabled_state = current_payload[SWO_DATA_ENABLED_OFFSET]
+                data.enabled_state = current_data.enabled_state
+                data.eeprom_address = current_data.eeprom_address
+                data.eeprom_commit = current_data.eeprom_commit
+                data.send_screenshot = current_data.send_screenshot
                 self.gdb_mem.write_memory(
                     self.data_address,
-                    self._pack_swo_data(
-                        data,
-                        enabled_state=enabled_state,
-                        changed=True,
-                        eeprom_address=current_data.eeprom_address,
-                        eeprom_commit=current_data.eeprom_commit,
-                        send_screenshot=current_data.send_screenshot,
-                    ),
+                    self._pack_swo_data(data),
                 )
                 self.event_queue.put(("log", "Synced PID params to SWO::data (changed=true)"))
                 # Read back once after write for confirmation.
@@ -2282,6 +2270,7 @@ class PIDTuningApp:
                             kd=committed_eeprom_data.kd,
                             anti_windup=committed_eeprom_data.anti_windup,
                             rpm=committed_eeprom_data.motor_rpm,
+                            enabled_state=self._last_loaded_swo_data.enabled_state,
                             changed=self._last_loaded_swo_data.changed,
                             eeprom_address=self._last_loaded_swo_data.eeprom_address,
                             eeprom_commit=self._last_loaded_swo_data.eeprom_commit,
