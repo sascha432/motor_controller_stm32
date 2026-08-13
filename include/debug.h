@@ -268,7 +268,6 @@ struct TickProfiler {
 
     static void snprintf(char *buf, size_t size, uint32_t slot = 0)
     {
-        const auto &ticks = slots[slot];
         ::snprintf(buf, size, "%u\n", (unsigned)getTicks(slot));
     }
 

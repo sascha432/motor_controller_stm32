@@ -5,6 +5,7 @@
 */
 
 #include <stm32f1xx.h>
+#include <memory>
 #include "tft_driver.h"
 
 #if TFT_DRIVER == TFT_DRIVER_ST7789
@@ -44,8 +45,7 @@
 #define ST7789_GMCTRP1              0xE0
 #define ST7789_GMCTRN1              0xE1
 
-static uint8_t g_tft_color_chunk[TFT_DMA_TX_CHUNK_PIXELS * 2];
-static uint8_t g_tft_pixel_chunk[TFT_DMA_TX_CHUNK_PIXELS * 2];
+static uint32_t dma_transfer_buffer[TFT_DMA_TX_CHUNK_PIXELS / 2];
 
 static void set_column(uint16_t x0, uint16_t x1);
 static void set_row(uint16_t y0, uint16_t y1);
@@ -55,21 +55,17 @@ static void set_row(uint16_t y0, uint16_t y1);
  */
 static void write_color_pixels(uint16_t color, uint32_t pixels)
 {
-    uint8_t high = (uint8_t)((color >> 8) & 0xFF);
-    uint8_t low = (uint8_t)(color & 0xFF);
-
-    for (uint16_t i = 0; i < TFT_DMA_TX_CHUNK_PIXELS; i++) {
-        g_tft_color_chunk[(2U * i)] = high;
-        g_tft_color_chunk[(2U * i) + 1U] = low;
-    }
+    color = __REV16(color);
+    const uint32_t pixel_pattern = (static_cast<uint32_t>(color) << 16U) | color;
+    std::fill_n(dma_transfer_buffer, TFT_DMA_TX_CHUNK_PIXELS / 2, pixel_pattern);
 
     TFT_PIN_RS_HIGH();
     TFT_PIN_CS_LOW();
     tft_driver_delay();
 
     while (pixels > 0) {
-        uint16_t chunk_pixels = (pixels > TFT_DMA_TX_CHUNK_PIXELS) ? TFT_DMA_TX_CHUNK_PIXELS : (uint16_t)pixels;
-        tft_driver_spi_send_buffer_dma_raw(g_tft_color_chunk, (uint16_t)(chunk_pixels * 2U));
+        uint16_t chunk_pixels = (pixels > TFT_DMA_TX_CHUNK_PIXELS) ? TFT_DMA_TX_CHUNK_PIXELS : static_cast<uint16_t>(pixels);
+        tft_driver_spi_send_buffer_dma_raw(dma_transfer_buffer, static_cast<uint16_t>(chunk_pixels * 2U));
         pixels -= chunk_pixels;
     }
 
@@ -82,28 +78,33 @@ static void write_color_pixels(uint16_t color, uint32_t pixels)
  */
 static void write_pixel_buffer_rgb565(const uint16_t *pixels, uint32_t pixel_count)
 {
-    if (!pixels || pixel_count == 0) {
-        return;
-    }
-
     TFT_PIN_RS_HIGH();
     TFT_PIN_CS_LOW();
     tft_driver_delay();
 
     uint32_t offset = 0;
     while (offset < pixel_count) {
-        uint16_t chunk_pixels = (pixel_count - offset > TFT_DMA_TX_CHUNK_PIXELS)
-                                    ? TFT_DMA_TX_CHUNK_PIXELS
-                                    : (uint16_t)(pixel_count - offset);
-
-        for (uint16_t i = 0; i < chunk_pixels; i++) {
-            uint16_t c = pixels[offset + i];
-            g_tft_pixel_chunk[(2U * i)] = (uint8_t)((c >> 8) & 0xFF);
-            g_tft_pixel_chunk[(2U * i) + 1U] = (uint8_t)(c & 0xFF);
+        if (pixel_count - offset > TFT_DMA_TX_CHUNK_PIXELS) {
+            // 32bit transfer
+            uint32_t *dma_buffer = reinterpret_cast<uint32_t *>(dma_transfer_buffer);
+            const uint32_t *pixel_buffer = reinterpret_cast<const uint32_t *>(pixels + offset);
+            for (uint16_t i = 0; i < TFT_DMA_TX_CHUNK_PIXELS / 2; i++) {
+                *dma_buffer++ = __REV16(*pixel_buffer++);
+            }
+            tft_driver_spi_send_buffer_dma_raw(dma_transfer_buffer, static_cast<uint16_t>(TFT_DMA_TX_CHUNK_PIXELS * 2U));
+            offset += TFT_DMA_TX_CHUNK_PIXELS;
         }
-
-        tft_driver_spi_send_buffer_dma_raw(g_tft_pixel_chunk, (uint16_t)(chunk_pixels * 2U));
-        offset += chunk_pixels;
+        else {
+            // 16bit transfer
+            const uint16_t chunk_pixels = pixel_count - offset;
+            const uint16_t *pixel_buffer = pixels + offset;
+            uint16_t *dma_buffer = reinterpret_cast<uint16_t *>(dma_transfer_buffer);
+            for (uint16_t i = 0; i < chunk_pixels; i++) {
+                *dma_buffer++ = __REV16(*pixel_buffer++);
+            }
+            tft_driver_spi_send_buffer_dma_raw(dma_transfer_buffer, static_cast<uint16_t>(chunk_pixels * 2U));
+            offset += chunk_pixels;
+        }
     }
 
     tft_driver_delay();

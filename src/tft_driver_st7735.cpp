@@ -40,8 +40,7 @@
 #define ST7735_GMCTRP1 0xE0
 #define ST7735_GMCTRN1 0xE1
 
-static uint8_t g_tft_color_chunk[TFT_DMA_TX_CHUNK_PIXELS * 2];
-static uint8_t g_tft_pixel_chunk[TFT_DMA_TX_CHUNK_PIXELS * 2];
+static uint8_t dma_transfer_buffer[TFT_DMA_TX_CHUNK_PIXELS * 2];
 
 static void set_column(uint16_t x0, uint16_t x1);
 static void set_row(uint16_t y0, uint16_t y1);
@@ -55,8 +54,8 @@ static void write_color_pixels(uint16_t color, uint32_t pixels)
     uint8_t low = (uint8_t)(color & 0xFF);
 
     for (uint16_t i = 0; i < TFT_DMA_TX_CHUNK_PIXELS; i++) {
-        g_tft_color_chunk[(2U * i)] = high;
-        g_tft_color_chunk[(2U * i) + 1U] = low;
+        dma_transfer_buffer[(2U * i)] = high;
+        dma_transfer_buffer[(2U * i) + 1U] = low;
     }
 
     TFT_PIN_RS_HIGH();
@@ -65,7 +64,7 @@ static void write_color_pixels(uint16_t color, uint32_t pixels)
 
     while (pixels > 0) {
         uint16_t chunk_pixels = (pixels > TFT_DMA_TX_CHUNK_PIXELS) ? TFT_DMA_TX_CHUNK_PIXELS : (uint16_t)pixels;
-        tft_driver_spi_send_buffer_dma_raw(g_tft_color_chunk, (uint16_t)(chunk_pixels * 2U));
+        tft_driver_spi_send_buffer_dma_raw(dma_transfer_buffer, (uint16_t)(chunk_pixels * 2U));
         pixels -= chunk_pixels;
     }
 
@@ -78,10 +77,6 @@ static void write_color_pixels(uint16_t color, uint32_t pixels)
  */
 static void write_pixel_buffer_rgb565(const uint16_t *pixels, uint32_t pixel_count)
 {
-    if (!pixels || pixel_count == 0) {
-        return;
-    }
-
     TFT_PIN_RS_HIGH();
     TFT_PIN_CS_LOW();
     tft_driver_delay();
@@ -94,11 +89,11 @@ static void write_pixel_buffer_rgb565(const uint16_t *pixels, uint32_t pixel_cou
 
         for (uint16_t i = 0; i < chunk_pixels; i++) {
             uint16_t c = pixels[offset + i];
-            g_tft_pixel_chunk[(2U * i)] = (uint8_t)((c >> 8) & 0xFF);
-            g_tft_pixel_chunk[(2U * i) + 1U] = (uint8_t)(c & 0xFF);
+            dma_transfer_buffer[(2U * i)] = (uint8_t)((c >> 8) & 0xFF);
+            dma_transfer_buffer[(2U * i) + 1U] = (uint8_t)(c & 0xFF);
         }
 
-        tft_driver_spi_send_buffer_dma_raw(g_tft_pixel_chunk, (uint16_t)(chunk_pixels * 2U));
+        tft_driver_spi_send_buffer_dma_raw(dma_transfer_buffer, (uint16_t)(chunk_pixels * 2U));
         offset += chunk_pixels;
     }
 

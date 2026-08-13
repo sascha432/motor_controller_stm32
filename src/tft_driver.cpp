@@ -263,12 +263,8 @@ void tft_backlight_pwm_set(uint8_t value)
 /**
  * Send data buffer via SPI2 TX DMA with CS already asserted.
  */
-void tft_driver_spi_send_buffer_dma_raw(const uint8_t *data, uint16_t len)
+void tft_driver_spi_send_buffer_dma_raw(const void *data, uint16_t len)
 {
-    if (!data || len == 0) {
-        return;
-    }
-
     TFT_DMA_CH->CCR &= ~DMA_CCR_EN;
     DMA1->IFCR = DMA_IFCR_CGIF5 | DMA_IFCR_CTCIF5 | DMA_IFCR_CHTIF5 | DMA_IFCR_CTEIF5;
 
@@ -279,9 +275,8 @@ void tft_driver_spi_send_buffer_dma_raw(const uint8_t *data, uint16_t len)
     SPI2->CR2 |= SPI_CR2_TXDMAEN;
     TFT_DMA_CH->CCR |= DMA_CCR_EN;
 
-    int timeout = 200000;
+    volatile int timeout = 200000;
     while (!(DMA1->ISR & DMA_ISR_TCIF5) && timeout--) {
-        __NOP();
     }
 
     TFT_DMA_CH->CCR &= ~DMA_CCR_EN;
@@ -290,12 +285,10 @@ void tft_driver_spi_send_buffer_dma_raw(const uint8_t *data, uint16_t len)
 
     timeout = 200000;
     while (((SPI2->SR & SPI_SR_TXE) == 0U) && timeout--) {
-        __NOP();
     }
 
     timeout = 200000;
     while ((SPI2->SR & SPI_SR_BSY) && timeout--) {
-        __NOP();
     }
 
     while (SPI2->SR & SPI_SR_RXNE) {

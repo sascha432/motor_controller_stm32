@@ -22,7 +22,7 @@
 #define LV_BUFFER_SIZE              (LV_HOR_RES_MAX * LV_BUFFER_LINES)
 
 #define TFT_DMA_CH                  DMA1_Channel5
-#define TFT_DMA_TX_CHUNK_PIXELS     64
+#define TFT_DMA_TX_CHUNK_PIXELS     256
 
 // Function prototypes
 extern lv_disp_draw_buf_t s_lvgl_draw_buf;
@@ -40,7 +40,7 @@ void tft_backlight_pwm_set(uint8_t value);
 // Common functions for all TFT drivers
 void tft_driver_gpio_tim_init(void);
 void tft_driver_spi_init(void);
-void tft_driver_spi_send_buffer_dma_raw(const uint8_t *data, uint16_t len);
+void tft_driver_spi_send_buffer_dma_raw(const void *data, uint16_t len);
 void tft_driver_spi_send_byte(uint8_t byte);
 void tft_driver_spi_send_buffer(const uint8_t *data, uint16_t len) ;
 void tft_driver_send_command(uint8_t cmd);

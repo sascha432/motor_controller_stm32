@@ -192,6 +192,7 @@ static void loop()
 
         // update UI, this might take a couple 100ms
         screenFlow.refresh();
+
         #if HAVE_SWO_SCREENSHOTS
             // finalize requested screenshot
             if (screenshotRequested) {
