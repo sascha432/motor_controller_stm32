@@ -217,10 +217,6 @@ bool PidController::motorToggle()
 
 void PidController::isr()
 {
-    // PID_USE_FLOATING_POINT_MATH == 0
-    // ticks stopped 587 / running ~600-650 (PID mode)
-    // ticks stopped 324 / running ~320-360 (PWM mode)
-
     // most timers are 16bit counters only
     int32_t delta = getCountsDelta(PID_READ_ENCODER_COUNTER());
     // determine direction from fixed sensor, motor and pid motor direction

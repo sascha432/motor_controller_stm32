@@ -4,7 +4,7 @@
 
 #include "debug.h"
 
-static void debug_swd_init()
+static inline void debug_swd_init()
 {
     // Enable TRCENA in DEMCR (Debug Exception and Monitor Control Register)
     CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
@@ -27,10 +27,10 @@ static void debug_swd_init()
     ITM->TCR = ITM_TCR_ITMENA_Msk | ITM_TCR_SYNCENA_Msk | ITM_TCR_TSENA_Msk | (1U << 16);
 
     #if DEBUG_OUTPUT == DEBUG_OUTPUT_SWO
-        // Enable stimulus ports 0 (text logs) and 1 (binary sample stream).
+        // Enable stimulus ports 0 (text logs) and 1 (pid tuning).
         ITM->TER |= (1UL << 0) | (1UL << 1);
     #else
-        // Enable stimulus 1 (binary sample stream).
+        // Enable stimulus 1 (pid tuning).
         ITM->TER |= (1UL << 1);
     #endif
 
@@ -38,7 +38,28 @@ static void debug_swd_init()
         // Enable stimulus 2 for screenshot tiles.
         ITM->TER |= (1UL << 2);
     #endif
+}
 
+static inline void debug_swd_deinit()
+{
+    // do not disable if SWD debugging is enabled
+    #if DEBUG_OUTPUT != DEBUG_OUTPUT_SWO
+        // Disable ITM
+        ITM->TCR = 0;
+
+        // Disable stimulus ports 0 and 1.
+        ITM->TER &= ~((1UL << 0) | (1UL << 1));
+
+        #if HAVE_SWO_SCREENSHOTS
+            ITM->TER &= ~(1UL << 2);
+        #endif
+
+        // Lock ITM
+        ITM->LAR = 0;
+
+        // Disable trace pins and asynchronous SWO
+        DBGMCU->CR &= ~DBGMCU_CR_TRACE_IOEN;
+    #endif
 }
 
 bool SWO::state = false;
@@ -55,28 +76,9 @@ void SWO::init()
 
 void SWO::deinit()
 {
-    // do not disable if SWD debugging is enabled
-    #if DEBUG_OUTPUT != DEBUG_OUTPUT_SWO
-    // Disable ITM
-    ITM->TCR = 0;
-
-    // Disable stimulus ports 0 and 1.
-    ITM->TER &= ~((1UL << 0) | (1UL << 1));
-
-    #if HAVE_SWO_SCREENSHOTS
-    ITM->TER &= ~(1UL << 2);
-    #endif
-
-    // Lock ITM
-    ITM->LAR = 0;
-
-    // Disable trace pins and asynchronous SWO
-    DBGMCU->CR &= ~DBGMCU_CR_TRACE_IOEN;
-
+    debug_swd_deinit();
     SWO::state = false;
-    #endif
 }
-
 
 bool SWO::waitReadyPort(uint32_t port)
 {

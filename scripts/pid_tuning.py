@@ -87,7 +87,6 @@ class AppConfig:
     connect_mode: str
     raw_port: int
     pid_port: int
-    sample_hz: int
     gdb_port: int
 
 
@@ -95,14 +94,13 @@ class AppConfig:
 PID_FRAME_LENGTH_PREFIX = 1
 PID_ITEM_STRUCT = "<H10HBB"
 PID_ITEM_SIZE = struct.calcsize(PID_ITEM_STRUCT)
-PID_INTERVAL = 1.28
+PID_INTERVAL = 2.56
 PID_SAMPLE_HZ_DEFAULT = int(1000 / PID_INTERVAL)
+PID_PWM_MAX_LEVEL = 100.0
+PID_ANTI_WINDUP_FACTOR = 512.0
 
 # Screenshot stream uses the same length-prefix scheme: [len][payload], with the tile payload
 # preceded by a 16-bit length and the stream terminated by a single 0 byte.
-SCREENSHOT_FRAME_LENGTH_PREFIX = 1
-SCREENSHOT_TILE_LENGTH_PREFIX = 1
-SCREENSHOT_COLOR_LENGTH_PREFIX = 2
 SCREENSHOT_END_MARKER = 0
 SCREENSHOT_PIXEL_FORMAT_RGB565 = 1
 SCREENSHOT_MAX_WIDTH = 320
@@ -110,15 +108,12 @@ SCREENSHOT_MAX_HEIGHT = 320
 SCREENSHOT_MAX_PIXELS = SCREENSHOT_MAX_WIDTH * SCREENSHOT_MAX_HEIGHT
 SCREENSHOT_BUFFER_SOFT_LIMIT = 65536
 SCREENSHOT_BUFFER_TAIL_KEEP = 256
-
+SCREENSHOT_TILE_HEADER_STRUCT = "<HHHHI"
+SCREENSHOT_TILE_HEADER_SIZE = struct.calcsize(SCREENSHOT_TILE_HEADER_STRUCT)
+SCREENSHOT_FRAME_HEADER_STRUCT = "<HHI"
+SCREENSHOT_FRAME_HEADER_SIZE = struct.calcsize(SCREENSHOT_FRAME_HEADER_STRUCT)
 SCREENSHOT_PORT = 2
-SCREENSHOT_FRAME_STRUCT = "<4sHHBB"
-SCREENSHOT_FRAME_SIZE = struct.calcsize(SCREENSHOT_FRAME_STRUCT)
-SCREENSHOT_TILE_STRUCT = "<4sHHHHI"
-SCREENSHOT_TILE_SIZE = struct.calcsize(SCREENSHOT_TILE_STRUCT)
-# PID_PWM_MAX_LEVEL = 3599.0
-PID_PWM_MAX_LEVEL = 100.0
-ANTI_WINDUP_FACTOR = 512.0
+
 SWO_DATA_FIXED_RAM_ADDRESS = 0x2000F000
 SWO_ENABLE_DISABLED = 0
 SWO_ENABLE_SWO = 1
@@ -135,6 +130,7 @@ SWO_DATA_SEND_SCREENSHOT_OFFSET = 28
 SWO_DATA_STRUCT = "<fffHHB?2xI?3x?3x"
 SWO_DATA_SIZE = struct.calcsize(SWO_DATA_STRUCT)
 SWO_DATA_ENABLED_OFFSET = struct.calcsize("<fffHH")
+
 EEPROM_DATA_STRUCT = "<IIIIBBHHHHHBBBBBBBBHxxfffHHH?x"
 EEPROM_DATA_SIZE = struct.calcsize(EEPROM_DATA_STRUCT)
 
@@ -247,11 +243,11 @@ def decode_fault_word(word: int) -> Tuple[int, int, int, int]:
 
 
 def anti_windup_raw_to_percent(raw_value: int) -> float:
-    return float(raw_value) / ANTI_WINDUP_FACTOR
+    return float(raw_value) / PID_ANTI_WINDUP_FACTOR
 
 
 def anti_windup_percent_to_raw(percent_value: float) -> int:
-    return int(round(percent_value * ANTI_WINDUP_FACTOR))
+    return int(round(percent_value * PID_ANTI_WINDUP_FACTOR))
 
 
 def _uint16_to_float(raw_value: int) -> float:
@@ -822,9 +818,9 @@ class SWOBackend:
                 record_length = self._screenshot_buffer[0]
                 record_total_size = 1 + record_length
 
-                # Sanity check: record length should be reasonable (6 for frame, 12 for tile).
+                # Sanity check: record length should be reasonable
                 # If we get an unexpected length, skip this byte and try to resync.
-                if record_length not in (6, 12):
+                if record_length not in (SCREENSHOT_FRAME_HEADER_SIZE, SCREENSHOT_TILE_HEADER_SIZE):
                     # Skip malformed record length byte.
                     del self._screenshot_buffer[0:1]
                     continue
@@ -837,9 +833,10 @@ class SWOBackend:
                 record = bytes(self._screenshot_buffer[1:record_total_size])
                 del self._screenshot_buffer[:record_total_size]
 
-                # Parse frame header: 6 bytes (width, height, format, reserved).
-                if len(record) == 6:
-                    width, height, pixel_format, _reserved = struct.unpack("<HHBB", record)
+                # Parse frame header
+                if len(record) == SCREENSHOT_FRAME_HEADER_SIZE:
+                    width, height, format_word = struct.unpack(SCREENSHOT_FRAME_HEADER_STRUCT, record)
+                    pixel_format = format_word & 0x1
 
                     if not self._begin_screenshot_capture_locked("frame-header"):
                         return
@@ -863,9 +860,9 @@ class SWOBackend:
                     self._screenshot_tiles = []
                     continue
 
-                # Parse tile header: 12 bytes (x, y, width, height, byteCount).
-                if len(record) == 12:
-                    x, y, width, height, byte_count = struct.unpack("<HHHHI", record)
+                # Parse tile header
+                if len(record) == SCREENSHOT_TILE_HEADER_SIZE:
+                    x, y, width, height, byte_count = struct.unpack(SCREENSHOT_TILE_HEADER_STRUCT, record)
 
                     tile_error = self._validate_tile_payload(width, height, byte_count)
                     if tile_error is not None:
@@ -1951,7 +1948,7 @@ class PIDTuningApp:
 
     def _init_buffers(self, window_seconds: int) -> None:
         self.window_seconds = max(1, int(window_seconds))
-        self.samples_per_window = max(16, self.window_seconds * self.config.sample_hz)
+        self.samples_per_window = max(16, self.window_seconds * PID_SAMPLE_HZ_DEFAULT)
         self.filled = 0
         self._plot_dirty = False
         self._last_plot_refresh = 0.0
@@ -2372,13 +2369,13 @@ class PIDTuningApp:
         if pending_capture and self._screenshot_deadline > 0.0 and now >= self._screenshot_deadline:
             self.screenshot_in_progress = False
             self.backend.cancel_screenshot()
-            self._append_log("Screenshot request timed out")
+            self._append_log("ERROR: Screenshot request timed out")
             self._update_control_button_states()
 
         if pending_capture and self.backend.try_finalize_screenshot_if_idle(0.75):
             self.screenshot_in_progress = False
             self._screenshot_deadline = 0.0
-            self._append_log("Saved screenshot from idle stream")
+            self._append_log("ERROR: Saved screenshot from idle stream")
             self._update_control_button_states()
 
         if self._waiting_for_first_sample and self.backend.running and now >= self._first_sample_deadline:
@@ -2422,12 +2419,6 @@ def parse_args() -> AppConfig:
     parser.add_argument("--raw-port", type=int, default=3443, help="SWV raw TCP port")
     parser.add_argument("--pid-port", type=int, default=1, help="ITM port for PidLoopType")
     parser.add_argument("--gdb-port", type=int, default=3333, help="pyOCD gdbserver port for memory sync")
-    parser.add_argument(
-        "--sample-hz",
-        type=int,
-        default=PID_SAMPLE_HZ_DEFAULT,
-        help="Expected PID sample rate used for window buffer sizing",
-    )
 
     args = parser.parse_args()
     return AppConfig(
@@ -2439,7 +2430,6 @@ def parse_args() -> AppConfig:
         connect_mode=args.connect_mode,
         raw_port=args.raw_port,
         pid_port=args.pid_port,
-        sample_hz=max(1, args.sample_hz),
         gdb_port=args.gdb_port,
     )
 

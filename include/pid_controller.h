@@ -30,13 +30,13 @@ struct PidController
 
     static constexpr uint16_t kPPR = 1024;                                              // MT6701 PPR
     static constexpr uint16_t kCPR = kPPR * 4;                                          // 4x Mode PPR to CPR
-    // tested with 1.28, 2.56 and 5.12...
-    static constexpr float kPIDInterval = 1.28f;                                        // PID update rate in millis used for precise RPM calculation
-    // static constexpr float kPIDInterval = 5.12f;                                        // PID update rate in millis used for precise RPM calculation
+    // tested with 1.28, 2.56, 5.12 and 10.24...
+    // lower values make the PID controller more responsive, but the graph update rate is reduced to the higher CPU load
+    static constexpr float kPIDInterval = 2.56f;                                        // PID update rate in millis used for precise RPM calculation
     static constexpr uint16_t kAntiWindup = 97 * UIConstants::kAntiWindupFactor;        // reduce integral if error is out of range (97%)
     static constexpr bool kProgramPPR = false;                                          // set to true to program the MT6701 encoder during boot over i2c
     static constexpr uint32_t kMaxRPM = 55000;                                          // max. supported RPM by the encoder
-    static constexpr float kMaxError = kCPR / (60000 / kPIDInterval) * kMaxRPM;    // factor to reduce error to a value between -1.0 and 1.0 for the PID loop
+    static constexpr float kMaxError = kCPR / (60000 / kPIDInterval) * kMaxRPM;         // factor to reduce error to a value between -1.0 and 1.0 for the PID loop
     #if PID_USE_FLOATING_POINT_MATH
         static constexpr int32_t kFPFactor = 1;
     #else
@@ -537,6 +537,7 @@ public:
         uint8_t reserved : 4;
     };
     static constexpr size_t kPidLoopTypeSize = sizeof(PidLoopType);
+    static_assert(sizeof(PidLoopType) % 4 == 0, "PidLoopType must be 4-byte aligned");
 
     // === OCP state machine and constants ===
     static constexpr float kMinADCTimeMicros = 1000000 / ADC::kTotalSamplesPerSecond;   // sample time for current measurement in microseconds, limits retrigger timeout and recovery interval
@@ -594,11 +595,13 @@ public:
             return std::clamp<int32_t>(value, 0, getARR());
         }
 
-        inline uint16_t getMax() const {
+        inline uint16_t getMax() const
+        {
             return level;
         }
 
-        inline uint16_t getARR() const {
+        inline uint16_t getARR() const
+        {
             return PID_MOTOR_PWM_TIMER->ARR; // this is (level - 1)
         }
 
@@ -609,11 +612,13 @@ public:
             lower = -upper;
         }
 
-        inline int32_t getLower() const {
+        inline int32_t getLower() const
+        {
             return lower;
         }
 
-        inline int32_t getUpper() const {
+        inline int32_t getUpper() const
+        {
             return upper;
         }
 
@@ -650,9 +655,12 @@ public:
     OcpState ocp;                                   // OCP state machine
 
     volatile ErrorCodeType errorCode;               // last error
-    // buffer for PID loop data for PID tuning
+
+    // buffer for PID loop data for SWO PID tuning
     // adjust size to the interval
-    RingBuffer<PidLoopType, std::clamp<size_t>((110 / kPIDInterval), 16, 80)> pidLoopBuffer;
+    static constexpr float kPidLoopBufferSeconds = 0.128f; // how much data to store in seconds
+    RingBuffer<PidLoopType, std::clamp<size_t>(((1000 * kPidLoopBufferSeconds) / kPIDInterval), 32, 80)> pidLoopBuffer;
+    static constexpr size_t kPidLoopBufferCount = sizeof(pidLoopBuffer) / sizeof(PidLoopType);
     static constexpr size_t kPidLoopBufferSize = sizeof(pidLoopBuffer);
 
     volatile bool running;                          // true if the PID controller is running

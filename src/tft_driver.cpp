@@ -24,22 +24,24 @@ struct TFTDriverScreenshot
     TFTDriverScreenshot() : active(false)
     {}
 
-    static constexpr uint8_t kPixelFormatRgb565 = 1U;
+    static constexpr uint32_t kPixelFormatRgb565 = 1U;
 
-    struct __attribute__((packed)) FrameHeader {
+    struct FrameHeader {
         uint16_t width;
         uint16_t height;
-        uint8_t format;
-        uint8_t reserved;
+        uint32_t format: 1;
+        uint32_t reserved: 31;
     };
+    static constexpr size_t kFrameHeaderSize = sizeof(FrameHeader);
 
-    struct __attribute__((packed)) TileHeader {
+    struct TileHeader {
         uint16_t x;
         uint16_t y;
         uint16_t width;
         uint16_t height;
         uint32_t byteCount;
     };
+    static constexpr size_t kTileHeaderSize = sizeof(TileHeader);
 
     bool write_tile(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, const lv_color_t *color_p);
     bool begin();
@@ -113,7 +115,8 @@ void TFTDriverScreenshot::end()
     if (!active) {
         return;
     }
-    SWO::write(kPort, 0, 1);
+    uint8_t size = 0;
+    SWO::write(kPort, &size, sizeof(size));
     active = false;
 }
 
