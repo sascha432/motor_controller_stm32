@@ -460,10 +460,13 @@ class SWOBackend:
         self.log("Launching: " + " ".join(cmd))
 
         try:
+            # pyOCD's SWVEventSink writes decoded ITM port 0 text to its stdout, which would be a
+            # second copy of what _read_raw_swv() decodes. Discard stdout and keep stderr, where
+            # pyOCD logging goes.
             self.proc = subprocess.Popen(
                 cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
                 bufsize=0,
             )
         except FileNotFoundError:
@@ -474,7 +477,7 @@ class SWOBackend:
             return False
 
         self.stop_event.clear()
-        self.stdout_thread = threading.Thread(target=self._read_stdout, daemon=True)
+        self.stdout_thread = threading.Thread(target=self._read_pyocd_log, daemon=True)
         self.swv_thread = threading.Thread(target=self._read_raw_swv, daemon=True)
         self.stdout_thread.start()
         self.swv_thread.start()
@@ -542,13 +545,13 @@ class SWOBackend:
             self.log(result.stdout.rstrip())
         return True
 
-    def _read_stdout(self) -> None:
-        if not self.proc or self.proc.stdout is None:
+    def _read_pyocd_log(self) -> None:
+        if not self.proc or self.proc.stderr is None:
             return
 
         buffer = bytearray()
         while not self.stop_event.is_set():
-            chunk = self.proc.stdout.read(1)
+            chunk = self.proc.stderr.read(1)
             if not chunk:
                 if buffer:
                     self.log(buffer.decode("utf-8", errors="replace"))
@@ -566,7 +569,7 @@ class SWOBackend:
                 return_code = self.proc.poll()
         except Exception:
             return_code = None
-        self.log(f"pyOCD stdout loop ended (return code: {return_code})")
+        self.log(f"pyOCD log loop ended (return code: {return_code})")
 
     def _read_raw_swv(self) -> None:
         last_connect_log = 0.0
@@ -594,8 +597,7 @@ class SWOBackend:
                         accumulated.extend(chunk)
                         for port, payload in parse_itm_packets(accumulated):
                             if port == 0:
-                                # ITM_SendChar writes text on port 0. pyOCD's stdout is
-                                # not guaranteed to mirror raw SWV port 0 traffic.
+                                # Sole source of firmware text; pyOCD's own decoded copy on stdout is discarded.
                                 itm_text.extend(payload)
                                 while b"\n" in itm_text:
                                     line_end = itm_text.index(0x0A)
