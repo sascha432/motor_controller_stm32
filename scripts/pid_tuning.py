@@ -119,12 +119,12 @@ SWO_ENABLE_SWO = 1
 SWO_ENABLE_USB = 2
 SWO_DATA_STRUCT = "<fffHHI?3xI?3x?3x"
 SWO_DATA_SIZE = struct.calcsize(SWO_DATA_STRUCT)
+SWO_DATA_EEPROM_COMMIT_OFFSET = struct.calcsize("<fffHHI?3xI")
 SWO_DATA_SEND_SCREENSHOT_OFFSET = struct.calcsize("<fffHHI?3xI?3x")
 
 # EEPROM::DataType layout in firmware with dynamic EEPROM address from SWO::DataType
 EEPROM_DATA_STRUCT = "<IIIIBBHHHHHBBBBBBBBHxxfffHHH?x"
 EEPROM_DATA_SIZE = struct.calcsize(EEPROM_DATA_STRUCT)
-
 
 @dataclass
 class SWOData:

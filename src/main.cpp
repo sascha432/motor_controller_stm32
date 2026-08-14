@@ -230,7 +230,7 @@ static void loop()
         while (pid.pidLoopBuffer.pop(item)) {
             if (SWO::data.enabled == SWO::EnableState::SWO) {
                 uint8_t size = sizeof(item);
-                if (!SWO::write(1, &size, 1) || !SWO::write(1, item)) {
+                if (!SWO::write(1, size) || !SWO::write(1, item)) {
                     pid.pidLoopBuffer.clear();
                     break;
                 }

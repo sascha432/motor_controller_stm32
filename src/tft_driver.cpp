@@ -61,7 +61,7 @@ static TFTDriverScreenshot screenshot;
 
 bool TFTDriverScreenshot::write_tile(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, const lv_color_t *color_p)
 {
-    if (!active || color_p == nullptr) {
+    if (!active) {
         return false;
     }
     const uint32_t pixel_count = (static_cast<uint32_t>(x1 - x0 + 1U) * static_cast<uint32_t>(y1 - y0 + 1U));
@@ -75,7 +75,7 @@ bool TFTDriverScreenshot::write_tile(uint16_t x0, uint16_t y0, uint16_t x1, uint
     };
 
     const uint8_t size = sizeof(header);
-    if (SWO::write(kPort, &size, sizeof(size)) != sizeof(size)) {
+    if (SWO::write(kPort, size) != sizeof(size)) {
         active = false;
         return false;
     }
@@ -102,7 +102,7 @@ bool TFTDriverScreenshot::begin()
         0U,
     };
     uint8_t size = sizeof(header);
-    if (SWO::write(kPort, &size, sizeof(size)) != sizeof(size)) {
+    if (SWO::write(kPort, size) != sizeof(size)) {
         return false;
     }
     if (SWO::write(kPort, header) != sizeof(header)) {
@@ -118,7 +118,7 @@ void TFTDriverScreenshot::end()
         return;
     }
     uint8_t size = 0;
-    SWO::write(kPort, &size, sizeof(size));
+    SWO::write(kPort, size);
     active = false;
 }
 
@@ -330,11 +330,11 @@ void tft_driver_send_data(const void *data, uint16_t len)
  */
 void tft_driver_lvgl_flush_cb(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p)
 {
-    uint16_t x0 = area->x1;
-    uint16_t y0 = area->y1;
-    uint16_t x1 = area->x2;
-    uint16_t y1 = area->y2;
-    uint32_t px = static_cast<uint32_t>(x1 - x0 + 1U) * static_cast<uint32_t>(y1 - y0 + 1U);
+    const uint16_t x0 = area->x1;
+    const uint16_t y0 = area->y1;
+    const uint16_t x1 = area->x2;
+    const uint16_t y1 = area->y2;
+    const uint32_t px = static_cast<uint32_t>(x1 - x0 + 1U) * static_cast<uint32_t>(y1 - y0 + 1U);
 
     tft_write_window_pixels(x0, y0, x1, y1, reinterpret_cast<const uint16_t *>(color_p), px);
 

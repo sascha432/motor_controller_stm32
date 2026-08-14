@@ -2,8 +2,6 @@
   Author: sascha_lammers@gmx.de
 
   Baremetal SPI driver for ST7735 - DMA TX based
-
-  THIS CODE HAS NOT BEEN MAINTAINED OR OPTIMIZED
 */
 
 #include <stm32f1xx.h>
@@ -44,29 +42,21 @@
 
 static uint8_t dma_transfer_buffer[TFT_DMA_TX_CHUNK_PIXELS * 2];
 
-static void set_column(uint16_t x0, uint16_t x1);
-static void set_row(uint16_t y0, uint16_t y1);
-
 /**
  * Write repeated RGB565 color pixels using chunked DMA transfers.
  */
-static void write_color_pixels(uint16_t color, uint32_t pixels)
+static inline void write_color_pixels(uint16_t color, uint32_t pixels)
 {
-    uint8_t high = (uint8_t)((color >> 8) & 0xFF);
-    uint8_t low = (uint8_t)(color & 0xFF);
-
-    for (uint16_t i = 0; i < TFT_DMA_TX_CHUNK_PIXELS; i++) {
-        dma_transfer_buffer[(2U * i)] = high;
-        dma_transfer_buffer[(2U * i) + 1U] = low;
-    }
+    const uint32_t pixel_pattern = __REV16((static_cast<uint32_t>(color) << 16U) | color);
+    std::fill(std::begin(dma_transfer_buffer), std::end(dma_transfer_buffer), pixel_pattern);
 
     TFT_PIN_RS_HIGH();
     TFT_PIN_CS_LOW();
     tft_driver_delay();
 
     while (pixels > 0) {
-        uint16_t chunk_pixels = (pixels > TFT_DMA_TX_CHUNK_PIXELS) ? TFT_DMA_TX_CHUNK_PIXELS : (uint16_t)pixels;
-        tft_driver_spi_send_buffer_dma_raw(dma_transfer_buffer, (uint16_t)(chunk_pixels * 2U));
+        const uint16_t chunk_pixels = (pixels > TFT_DMA_TX_CHUNK_PIXELS) ? TFT_DMA_TX_CHUNK_PIXELS : pixels;
+        tft_driver_spi_send_buffer_dma_raw(dma_transfer_buffer, chunk_pixels * 2U);
         pixels -= chunk_pixels;
     }
 
@@ -77,7 +67,7 @@ static void write_color_pixels(uint16_t color, uint32_t pixels)
 /**
  * Write an RGB565 pixel buffer as big-endian bytes using chunked DMA transfers.
  */
-static void write_pixel_buffer_rgb565(const uint16_t *pixels, uint32_t pixel_count)
+static inline void write_pixel_buffer_rgb565(const uint16_t *pixels, uint32_t pixel_count)
 {
     TFT_PIN_RS_HIGH();
     TFT_PIN_CS_LOW();
@@ -85,17 +75,17 @@ static void write_pixel_buffer_rgb565(const uint16_t *pixels, uint32_t pixel_cou
 
     uint32_t offset = 0;
     while (offset < pixel_count) {
-        uint16_t chunk_pixels = (pixel_count - offset > TFT_DMA_TX_CHUNK_PIXELS)
-                                    ? TFT_DMA_TX_CHUNK_PIXELS
-                                    : (uint16_t)(pixel_count - offset);
+        const uint32_t pixels_left = pixel_count - offset;
+        const uint32_t chunk_pixels = (pixels_left > TFT_DMA_TX_CHUNK_PIXELS) ? TFT_DMA_TX_CHUNK_PIXELS : pixels_left;
+        const uint32_t copy_words = (chunk_pixels + 1) / 2; // always copy 32bit words, out of bounds is safe because we only copy to the dma_transfer_buffer which is large enough
 
-        for (uint16_t i = 0; i < chunk_pixels; i++) {
-            uint16_t c = pixels[offset + i];
-            dma_transfer_buffer[(2U * i)] = (uint8_t)((c >> 8) & 0xFF);
-            dma_transfer_buffer[(2U * i) + 1U] = (uint8_t)(c & 0xFF);
+        // 32bit transfer
+        uint32_t *dma_buffer = reinterpret_cast<uint32_t *>(dma_transfer_buffer);
+        const uint32_t *pixel_buffer = reinterpret_cast<const uint32_t *>(pixels + offset);
+        for (uint32_t i = 0; i < copy_words; i++) {
+            *dma_buffer++ = __REV16(*pixel_buffer++);
         }
-
-        tft_driver_spi_send_buffer_dma_raw(dma_transfer_buffer, (uint16_t)(chunk_pixels * 2U));
+        tft_driver_spi_send_buffer_dma_raw(dma_transfer_buffer, chunk_pixels * 2U);
         offset += chunk_pixels;
     }
 
@@ -103,40 +93,32 @@ static void write_pixel_buffer_rgb565(const uint16_t *pixels, uint32_t pixel_cou
     TFT_PIN_CS_HIGH();
 }
 
-void tft_write_window_pixels(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, const uint16_t *pixels, uint32_t pixel_count)
-{
-    set_column(x0, x1);
-    set_row(y0, y1);
-    tft_driver_send_command(ST7735_RAMWR);
-    write_pixel_buffer_rgb565(pixels, pixel_count);
-}
-
 /**
  * Set column address range
  */
-static void set_column(uint16_t x0, uint16_t x1)
+static inline void set_column(uint16_t x0, uint16_t x1)
 {
-    uint8_t data[4] = {(uint8_t)(x0 >> 8), (uint8_t)(x0 & 0xFF),
-                       (uint8_t)(x1 >> 8), (uint8_t)(x1 & 0xFF)};
+    constexpr uint32_t kColOfs = 0;
+    const uint32_t data = __REV16((static_cast<uint32_t>(x1 + kColOfs) << 16U) | static_cast<uint32_t>(x0 + kColOfs));
     tft_driver_send_command(ST7735_CASET);
-    tft_driver_send_data(data, 4);
+    tft_driver_send_data(&data, sizeof(data));
 }
 
 /**
  * Set row address range
  */
-static void set_row(uint16_t y0, uint16_t y1)
+static inline void set_row(uint16_t y0, uint16_t y1)
 {
-    uint8_t data[4] = {(uint8_t)(y0 >> 8), (uint8_t)(y0 & 0xFF),
-                       (uint8_t)(y1 >> 8), (uint8_t)(y1 & 0xFF)};
+    constexpr uint32_t kRowOfs = 0;
+    const uint32_t data = __REV16((static_cast<uint32_t>(y1 + kRowOfs) << 16U) | static_cast<uint32_t>(y0 + kRowOfs));
     tft_driver_send_command(ST7735_RASET);
-    tft_driver_send_data(data, 4);
+    tft_driver_send_data(&data, sizeof(data));
 }
 
 /**
  * Initialize ST7735 display
  */
-static void st7735_init(void)
+static inline void st7735_init(void)
 {
     /* Hardware reset */
     TFT_PIN_RST_LOW();
@@ -197,6 +179,18 @@ static void st7735_init(void)
 }
 
 /**
+ * Write pixels to a rectangular window on the display
+ */
+void tft_write_window_pixels(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, const uint16_t *pixels, uint32_t pixel_count)
+{
+    set_column(x0, x1);
+    set_row(y0, y1);
+    tft_driver_send_command(ST7735_RAMWR);
+
+    write_pixel_buffer_rgb565(pixels, pixel_count);
+}
+
+/**
  * Initialize driver
  */
 void tft_driver_init(void)
@@ -212,7 +206,7 @@ void tft_clear_display(uint16_t color)
 {
     set_column(0, LV_HOR_RES_MAX - 1);
     set_row(0, LV_VER_RES_MAX - 1);
-    tft_driver_send_command(ST7789_RAMWR);
+    tft_driver_send_command(ST7735_RAMWR);
 
     write_color_pixels(color, (uint32_t)LV_HOR_RES_MAX * LV_VER_RES_MAX);
 }

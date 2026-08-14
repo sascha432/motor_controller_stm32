@@ -48,13 +48,10 @@
 
 static uint32_t dma_transfer_buffer[TFT_DMA_TX_CHUNK_PIXELS / 2];
 
-static inline void set_column(uint16_t x0, uint16_t x1);
-static inline void set_row(uint16_t y0, uint16_t y1);
-
 /**
  * Write repeated RGB565 color pixels using chunked DMA transfers.
  */
-static void write_color_pixels(uint16_t color, uint32_t pixels)
+static inline void write_color_pixels(uint16_t color, uint32_t pixels)
 {
     const uint32_t pixel_pattern = __REV16((static_cast<uint32_t>(color) << 16U) | color);
     std::fill(std::begin(dma_transfer_buffer), std::end(dma_transfer_buffer), pixel_pattern);
@@ -76,7 +73,7 @@ static void write_color_pixels(uint16_t color, uint32_t pixels)
 /**
  * Write an RGB565 pixel buffer as big-endian bytes using chunked DMA transfers.
  */
-static void write_pixel_buffer_rgb565(const uint16_t *pixels, uint32_t pixel_count)
+static inline void write_pixel_buffer_rgb565(const uint16_t *pixels, uint32_t pixel_count)
 {
     TFT_PIN_RS_HIGH();
     TFT_PIN_CS_LOW();
@@ -84,14 +81,14 @@ static void write_pixel_buffer_rgb565(const uint16_t *pixels, uint32_t pixel_cou
 
     uint32_t offset = 0;
     while (offset < pixel_count) {
-        const uint16_t pixels_left = pixel_count - offset;
-        const uint16_t chunk_pixels = (pixels_left > TFT_DMA_TX_CHUNK_PIXELS) ? TFT_DMA_TX_CHUNK_PIXELS : pixels_left;
-        const uint16_t copy_words = (chunk_pixels + 1) / 2; // always copy 32bit words, out of bounds is safe because we only copy to the dma_transfer_buffer which is large enough
+        const uint32_t pixels_left = pixel_count - offset;
+        const uint32_t chunk_pixels = (pixels_left > TFT_DMA_TX_CHUNK_PIXELS) ? TFT_DMA_TX_CHUNK_PIXELS : pixels_left;
+        const uint32_t copy_words = (chunk_pixels + 1) / 2; // always copy 32bit words, out of bounds is safe because we only copy to the dma_transfer_buffer which is large enough
 
         // 32bit transfer
         uint32_t *dma_buffer = reinterpret_cast<uint32_t *>(dma_transfer_buffer);
         const uint32_t *pixel_buffer = reinterpret_cast<const uint32_t *>(pixels + offset);
-        for (uint16_t i = 0; i < copy_words; i++) {
+        for (uint32_t i = 0; i < copy_words; i++) {
             *dma_buffer++ = __REV16(*pixel_buffer++);
         }
         tft_driver_spi_send_buffer_dma_raw(dma_transfer_buffer, chunk_pixels * 2U);
@@ -102,21 +99,13 @@ static void write_pixel_buffer_rgb565(const uint16_t *pixels, uint32_t pixel_cou
     TFT_PIN_CS_HIGH();
 }
 
-void tft_write_window_pixels(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, const uint16_t *pixels, uint32_t pixel_count)
-{
-    set_column(x0, x1);
-    set_row(y0, y1);
-    tft_driver_send_command(ST7789_RAMWR);
-    write_pixel_buffer_rgb565(pixels, pixel_count);
-}
-
 /**
  * Set column address range
  */
 static inline void set_column(uint16_t x0, uint16_t x1)
 {
-    constexpr uint32_t kRowOfs = ST7789_COL_OFS;
-    const uint32_t data = __REV16((static_cast<uint32_t>(x1 + kRowOfs) << 16U) | static_cast<uint32_t>(x0 + kRowOfs));
+    constexpr uint32_t kColOfs = ST7789_COL_OFS;
+    const uint32_t data = __REV16((static_cast<uint32_t>(x1 + kColOfs) << 16U) | static_cast<uint32_t>(x0 + kColOfs));
     tft_driver_send_command(ST7789_CASET);
     tft_driver_send_data(&data, sizeof(data));
 }
@@ -135,7 +124,7 @@ static inline void set_row(uint16_t y0, uint16_t y1)
 /**
  * Initialize ST7789 display
  */
-static void ST7789_init(void)
+static inline void ST7789_init(void)
 {
     /* Hardware reset */
     TFT_PIN_RST_LOW();
@@ -193,6 +182,17 @@ static void ST7789_init(void)
     /* Display on */
     tft_driver_send_command(ST7789_DISPON);
     HAL_Delay(50);
+}
+
+/**
+ * Write pixels to a rectangular window on the display
+ */
+void tft_write_window_pixels(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, const uint16_t *pixels, uint32_t pixel_count)
+{
+    set_column(x0, x1);
+    set_row(y0, y1);
+    tft_driver_send_command(ST7789_RAMWR);
+    write_pixel_buffer_rgb565(pixels, pixel_count);
 }
 
 /**

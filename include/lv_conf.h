@@ -9,6 +9,13 @@
 #define LV_HOR_RES_MAX 240
 #define LV_VER_RES_MAX 135
 
+#ifndef LV_USE_PERF_MONITOR
+#define LV_USE_PERF_MONITOR 0
+#endif
+#ifndef LV_USE_MEM_MONITOR
+#define LV_USE_MEM_MONITOR 0
+#endif
+
 /* Memory */
 #if DEBUG
 #define LV_MEM_CUSTOM 0
