@@ -49,6 +49,28 @@ struct TFTDriverScreenshot
     bool begin();
     void end();
 
+    #if HAVE_USB_DEVICE
+
+        inline bool write(const void *data, size_t size)
+        {
+            return USBSerial::writeBinary(USBSerial::BinaryType::SCREENSHOT, data, size) == size;
+        }
+
+    #else
+
+        inline bool write(const void *data, size_t size)
+        {
+            return SWO::write(kPort, size) == size;
+        }
+
+    #endif
+
+    template<typename T>
+    bool write(const T &value)
+    {
+        return write(&value, sizeof(value));
+    }
+
     inline bool isActive() const {
         return active;
     }
@@ -75,15 +97,15 @@ bool TFTDriverScreenshot::write_tile(uint16_t x0, uint16_t y0, uint16_t x1, uint
     };
 
     const uint8_t size = sizeof(header);
-    if (SWO::write(kPort, size) != sizeof(size)) {
+    if (!write(size)) {
         active = false;
         return false;
     }
-    if (SWO::write(kPort, header) != sizeof(header)) {
+    if (!write(header)) {
         active = false;
         return false;
     }
-    if (SWO::write(kPort, color_p, byte_count) != byte_count) {
+    if (!write(color_p, byte_count)) {
         active = false;
         return false;
     }
@@ -102,10 +124,10 @@ bool TFTDriverScreenshot::begin()
         0U,
     };
     uint8_t size = sizeof(header);
-    if (SWO::write(kPort, size) != sizeof(size)) {
+    if (!write(size)) {
         return false;
     }
-    if (SWO::write(kPort, header) != sizeof(header)) {
+    if (!write(header)) {
         return false;
     }
     active = true;
@@ -118,7 +140,7 @@ void TFTDriverScreenshot::end()
         return;
     }
     uint8_t size = 0;
-    SWO::write(kPort, size);
+    write(size);
     active = false;
 }
 

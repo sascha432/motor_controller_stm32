@@ -224,8 +224,7 @@ void debug_usb_printf(const char *fmt, ...)
     int len = vsnprintf(buf, sizeof(buf) - 1, fmt, args);
     va_end(args);
     if (len > 0) {
-        // transmit and ignore any errors
-        CDC_Transmit_FS(reinterpret_cast<uint8_t *>(buf), strlen(buf));
+        USBHelper::write(buf, strlen(buf));
     }
 }
 

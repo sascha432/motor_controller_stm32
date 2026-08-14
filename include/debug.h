@@ -53,6 +53,7 @@ struct SWO
             SERIAL = 3,
         #endif
     };
+
     struct DataType {
         volatile float Kp;
         volatile float Ki;

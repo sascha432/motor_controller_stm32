@@ -667,3 +667,119 @@ private:
 #endif
 
 static constexpr float kFloatToUint16Multiplier = 65535.0f;
+
+// === USB helper class ===
+
+#if HAVE_USB_DEVICE
+
+#include <usbd_cdc_if.h>
+
+extern USBD_HandleTypeDef hUsbDeviceFS;
+
+struct USBSerial
+{
+    static constexpr uint32_t kMagic = 0xDEADBEEF;
+
+    enum class BinaryType : uint16_t {
+        PID,
+        SCREENSHOT,
+    };
+
+    struct BinaryHeader
+    {
+        uint32_t magic;
+        uint16_t size;
+        BinaryType type;
+        uint32_t crc;
+
+        BinaryHeader(BinaryType type, size_t size = 0, uint32_t crc = 0xffffffff) : magic(kMagic), size(size), type(type), crc(crc) {}
+    };
+
+    inline static bool isConnected()
+    {
+        return hUsbDeviceFS.pClassData != nullptr && hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED;
+    }
+
+    inline static bool canWrite()
+    {
+        uint32_t start = HAL_GetTick();
+        while(HAL_GetTick() - start < 100) {
+            if (reinterpret_cast<USBD_CDC_HandleTypeDef *>(hUsbDeviceFS.pClassData)->TxState == 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static int read()
+    {
+        uint8_t buf;
+        if (read(&buf, sizeof(buf)) == sizeof(buf)) {
+            return buf;
+        }
+        return -1;
+    }
+
+    static size_t read(void *data, size_t size)
+    {
+        if (size == 0 || !isConnected()) {
+            return 0;
+        }
+        return CDC_Read_FS(reinterpret_cast<uint8_t *>(data), size);
+    }
+
+    static size_t write(const void *data, size_t size)
+    {
+        if (size == 0 || !isConnected()) {
+            return 0;
+        }
+        if (!canWrite()) {
+            return 0;
+        }
+        return (CDC_Transmit_FS(reinterpret_cast<uint8_t *>(const_cast<void *>(data)), size) == USBD_OK) ? size : 0;
+    }
+
+    static size_t writeBinary(BinaryType type, const void *data, size_t size)
+    {
+        if (size == 0 || !isConnected() || !canWrite()) {
+            return 0;
+        }
+        BinaryHeader hdr(type, size);
+        uint8_t result = CDC_Transmit_FS(reinterpret_cast<uint8_t *>(&hdr), sizeof(hdr));
+        if (result != USBD_OK) {
+            return 0;
+        }
+        if (!canWrite()) {
+            return 0;
+        }
+        return (CDC_Transmit_FS(reinterpret_cast<uint8_t *>(const_cast<void *>(data)), size) == USBD_OK) ? size : 0;
+    }
+};
+
+
+#else
+
+struct USBSerial
+{
+    static bool isConnected()
+    {
+        return false;
+    }
+
+    static int read()
+    {
+        return -1;
+    }
+
+    static int read(void *data, size_t size)
+    {
+        return 0;
+    }
+
+    static int write(const void *data, size_t size)
+    {
+        return 0;
+    }
+};
+
+#endif

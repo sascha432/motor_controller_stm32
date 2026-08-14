@@ -22,12 +22,10 @@
 #endif
 
 /* Memory */
-#if DEBUG
 #define LV_MEM_CUSTOM 0
-#define LV_MEM_SIZE (24U * 1024U)
 // 8kb was enough, 6kb caused some out of memory issues after the fragmentation increased, recommendation is at least 16kb
 // lvgl and new/delete is using the same block
-#define LV_BUFFER_LINES 64
+#define LV_MEM_SIZE (24U * 1024U)
 // redraw performance start and pid tuning graph
 // 10 lines start=128ms graph=169ms
 // 16 lines start=117ms graph=159ms
@@ -35,10 +33,10 @@
 // 24 lines start=102ms graph=134ms
 // 32 lines start=102ms graph=134ms
 // 70 lines start= 92ms graph=130ms
+#if HAVE_USB_DEVICE
+#define LV_BUFFER_LINES 48
 #else
-#define LV_MEM_CUSTOM 0
-#define LV_MEM_SIZE (24U * 1024U)
-#define LV_BUFFER_LINES (64)
+#define LV_BUFFER_LINES 64
 #endif
 
 /* sprintf */
