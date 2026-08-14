@@ -112,6 +112,12 @@ struct Menu
     void saveEEPROMChanges();
 
     /**
+     * @brief Save changes to EEPROM without displaying info screen
+     *
+     */
+    void writePendingEEPROMChanges();
+
+    /**
      * @brief Apply settings from EEPROM to the system after initialization or after restoring defaults
      *
      */

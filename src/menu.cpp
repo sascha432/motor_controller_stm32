@@ -240,7 +240,7 @@ void Menu::loadWelcomeScreen()
     screenFlow.refresh();
     tft_backlight_pwm_set(eeprom.getTFTBrightness());
 
-    if (UIConstants::kEnableIlluminationLEDFading) {
+    if constexpr (UIConstants::kEnableIlluminationLEDFading) {
 
         #if HAVE_MOTOR_VIBES
             MotorVibes chime;
@@ -309,6 +309,7 @@ void Menu::loadWelcomeScreen()
 
 void Menu::loadMainMenu()
 {
+    writePendingEEPROMChanges();
     screenFlow.setScreen(new MenuScreen(
         Screen::Type::MAIN_MENU,
         kMainMenuItems,
@@ -320,6 +321,7 @@ void Menu::loadMainMenu()
 
 void Menu::loadAdvancedMenu()
 {
+    writePendingEEPROMChanges();
     screenFlow.next(new MenuScreen(
         Screen::Type::ADVANCED_MENU,
         kAdvancedMenuItems,
@@ -345,12 +347,9 @@ void Menu::exitAdvancedMenu()
 
 void Menu::loadStartScreen()
 {
+    writePendingEEPROMChanges();
     screenFlow.setScreen(new StartScreen());
     setValue(eeprom.getSpeed());
-    // save any changes when returning to start screen
-    bool success = eeprom.write();
-    (void)success;
-    DEBUG_PRINT(DebugType::UI, "eeprom.write=%d", success);
     clearUserInput();
 }
 
@@ -421,11 +420,20 @@ void Menu::clearUserInput()
 
 void Menu::saveEEPROMChanges()
 {
-    if (eeprom.write()) {
+    bool success = eeprom.write();
+    DEBUG_PRINT(DebugType::UI, "eeprom.write=%d", success);
+    if (success) {
         screenFlow.setScreen(new InfoScreen(Screen::Type::EEPROM_SAVED, "Saved", InfoScreen::InfoScreenThemeType::INFO));
         screenFlow.refresh();
         abortableDelay(UIConstants::kInfoScreenTimeout);
     }
+}
+
+void Menu::writePendingEEPROMChanges()
+{
+    bool success = eeprom.write();
+    (void)success;
+    DEBUG_PRINT(DebugType::UI, "eeprom.write=%d", success);
 }
 
 void Menu::applyEEPROMSettings()

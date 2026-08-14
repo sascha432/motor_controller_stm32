@@ -174,6 +174,7 @@ bool eepromWriteBytes(uint8_t memAddress, const void *data, uint32_t length)
         return false; // out of range
     }
 
+    const uint8_t *src = reinterpret_cast<const uint8_t *>(data);
     while (length > 0) {
         size_t pageOffset  = memAddress % EEPROM::kPageSize;
         size_t spaceInPage = EEPROM::kPageSize - pageOffset;
@@ -181,7 +182,7 @@ bool eepromWriteBytes(uint8_t memAddress, const void *data, uint32_t length)
 
         uint8_t buf[1 + EEPROM::kPageSize];
         buf[0] = memAddress;
-        memcpy(&buf[1], data, chunk);
+        memcpy(&buf[1], src, chunk);
 
         if (!i2c.sendBytes(EEPROM::kAddress, buf, chunk + 1, true)) {
             return false;
@@ -191,7 +192,7 @@ bool eepromWriteBytes(uint8_t memAddress, const void *data, uint32_t length)
         }
 
         memAddress += chunk;
-        data       += chunk;
+        src        += chunk;
         length     -= chunk;
     }
     return true;
