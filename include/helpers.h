@@ -679,6 +679,7 @@ extern USBD_HandleTypeDef hUsbDeviceFS;
 struct USBSerial
 {
     static constexpr uint32_t kMagic = 0xDEADBEEF;
+    static constexpr uint32_t kTimeoutMs = 1000; // timeout in milliseconds before giving up on writing to USB
 
     enum class BinaryType : uint16_t {
         PID,
@@ -703,7 +704,7 @@ struct USBSerial
     inline static bool canWrite()
     {
         uint32_t start = HAL_GetTick();
-        while(HAL_GetTick() - start < 100) {
+        while(HAL_GetTick() - start < kTimeoutMs) {
             if (reinterpret_cast<USBD_CDC_HandleTypeDef *>(hUsbDeviceFS.pClassData)->TxState == 0) {
                 return true;
             }
@@ -746,13 +747,14 @@ struct USBSerial
         }
         BinaryHeader hdr(type, size);
         uint8_t result = CDC_Transmit_FS(reinterpret_cast<uint8_t *>(&hdr), sizeof(hdr));
-        if (result != USBD_OK) {
+        if (result != USBD_OK || !canWrite()) {
             return 0;
         }
-        if (!canWrite()) {
+        result = CDC_Transmit_FS(reinterpret_cast<uint8_t *>(const_cast<void *>(data)), size);
+        if (result != USBD_OK || !canWrite()) {
             return 0;
         }
-        return (CDC_Transmit_FS(reinterpret_cast<uint8_t *>(const_cast<void *>(data)), size) == USBD_OK) ? size : 0;
+        return size;
     }
 };
 

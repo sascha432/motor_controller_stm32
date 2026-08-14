@@ -3,6 +3,7 @@
 */
 
 #include "debug.h"
+#include "helpers.h"
 
 static inline void debug_swd_init()
 {
@@ -224,7 +225,7 @@ void debug_usb_printf(const char *fmt, ...)
     int len = vsnprintf(buf, sizeof(buf) - 1, fmt, args);
     va_end(args);
     if (len > 0) {
-        USBHelper::write(buf, strlen(buf));
+        USBSerial::write(buf, strlen(buf));
     }
 }
 

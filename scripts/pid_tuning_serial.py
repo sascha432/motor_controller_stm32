@@ -337,9 +337,11 @@ class BinaryPacketParser:
         self,
         sample_callback: Callable[[Sample], None],
         log_callback: Callable[[str], None],
+        screenshot_callback: Optional[Callable[[bytes], None]] = None,
     ) -> None:
         self.sample_callback = sample_callback
         self.log_callback = log_callback
+        self.screenshot_callback = screenshot_callback
         self.buffer = bytearray()
         self.debug_text = bytearray()
         self.last_pid_payload: Optional[bytes] = None
@@ -400,6 +402,8 @@ class BinaryPacketParser:
 
     def _dispatch(self, packet_type: int, payload: bytes) -> None:
         if packet_type == BINARY_TYPE_SCREENSHOT:
+            if self.screenshot_callback is not None:
+                self.screenshot_callback(payload)
             return
         if packet_type != BINARY_TYPE_PID:
             return
@@ -1007,18 +1011,24 @@ class SWOBackend:
                 del self._screenshot_buffer[0:1]
 
 
-class SerialBackend:
+class SerialBackend(SWOBackend):
     """Direct USB CDC backend using the firmware BinaryHeader protocol."""
 
     def __init__(
         self,
         config: AppConfig,
         log_callback: Callable[[str], None],
+        screenshot_path_factory: Callable[[], Path],
+        screenshot_event_callback: Callable[[str, object], None],
         sample_callback: Callable[[Sample], None],
     ) -> None:
-        self.config = config
-        self.log = log_callback
-        self.sample_callback = sample_callback
+        super().__init__(
+            config,
+            log_callback,
+            screenshot_path_factory,
+            screenshot_event_callback,
+            sample_callback,
+        )
         self.stop_event = threading.Event()
         self.reader_thread: Optional[threading.Thread] = None
         self.serial_port: Optional[object] = None
@@ -1082,24 +1092,29 @@ class SerialBackend:
         self.running = False
 
     def request_screenshot(self, output_path: Path) -> None:
-        del output_path
-
-    def cancel_screenshot(self) -> None:
-        return
-
-    def has_pending_screenshot(self) -> bool:
-        return False
-
-    def try_finalize_screenshot_if_idle(self, idle_seconds: float) -> bool:
-        del idle_seconds
-        return False
+        super().request_screenshot(output_path)
+        serial_port = self.serial_port
+        if serial_port is None:
+            self.cancel_screenshot()
+            raise RuntimeError("USB serial transport is not running")
+        try:
+            serial_port.write(b"s")  # type: ignore[attr-defined]
+            serial_port.flush()  # type: ignore[attr-defined]
+        except Exception:
+            self.cancel_screenshot()
+            raise
+        self.log(f"Requested screenshot -> {output_path.name}")
 
     def reset_target(self) -> bool:
         self.log("Firmware reset is unavailable in serial transport")
         return False
 
     def _read_serial(self) -> None:
-        parser = BinaryPacketParser(self.sample_callback, self.log)
+        parser = BinaryPacketParser(
+            self.sample_callback,
+            self.log,
+            screenshot_callback=self._consume_screenshot_payload,
+        )
         serial_port = self.serial_port
         if serial_port is None:
             return
@@ -1108,7 +1123,14 @@ class SerialBackend:
             while not self.stop_event.is_set():
                 chunk = serial_port.read(4096)  # type: ignore[attr-defined]
                 if chunk:
-                    parser.feed(bytes(chunk))
+                    try:
+                        parser.feed(bytes(chunk))
+                    except Exception as exc:  # pragma: no cover - defensive path
+                        self._screenshot_event_callback(
+                            "screenshot-error",
+                            f"Screenshot stream decode failed: {exc}",
+                        )
+                        self._reset_screenshot_stream()
         except Exception as exc:
             if not self.stop_event.is_set():
                 self.log(f"Serial read failed: {exc}")
@@ -1276,14 +1298,21 @@ class PIDTuningApp:
         self.event_queue: queue.Queue[Tuple[str, object]] = queue.Queue()
         log_callback = lambda msg: self.event_queue.put(("log", msg))
         sample_callback = lambda sample: self.event_queue.put(("sample", sample))
+        screenshot_event_callback = lambda kind, payload: self.event_queue.put((kind, payload))
         if config.transport == "serial":
-            self.backend = SerialBackend(config, log_callback, sample_callback)
+            self.backend = SerialBackend(
+                config,
+                log_callback=log_callback,
+                screenshot_path_factory=self._next_screenshot_path,
+                screenshot_event_callback=screenshot_event_callback,
+                sample_callback=sample_callback,
+            )
         else:
             self.backend = SWOBackend(
                 config,
                 log_callback=log_callback,
                 screenshot_path_factory=self._next_screenshot_path,
-                screenshot_event_callback=lambda kind, payload: self.event_queue.put((kind, payload)),
+                screenshot_event_callback=screenshot_event_callback,
                 sample_callback=sample_callback,
             )
 
@@ -1677,7 +1706,7 @@ class PIDTuningApp:
     def _update_control_button_states(self) -> None:
         swo_transport = self.config.transport == "swo"
         eeprom_enabled = swo_transport and self.backend.running and not self.reset_in_progress and self._eeprom_dialog is None
-        screenshot_enabled = swo_transport and self.backend.running and not self.reset_in_progress and not self.screenshot_in_progress
+        screenshot_enabled = self.backend.running and not self.reset_in_progress and not self.screenshot_in_progress
         reset_enabled = swo_transport and not self.reset_in_progress and self._eeprom_dialog is None
         self._set_sync_enabled(swo_transport and self.backend.running and not self.reset_in_progress)
         self._set_eeprom_button_enabled(eeprom_enabled)
@@ -1695,10 +1724,7 @@ class PIDTuningApp:
         return script_dir / f"ss{index:06d}.png"
 
     def _request_screenshot(self) -> None:
-        if self.config.transport != "swo":
-            self._append_log("Screenshots require SWO transport")
-            return
-        if self.data_address is None:
+        if self.config.transport == "swo" and self.data_address is None:
             self._append_log("Cannot take screenshot: no dataAddress received yet")
             return
         if not self.backend.running or self.reset_in_progress:
@@ -1715,19 +1741,22 @@ class PIDTuningApp:
 
         def worker() -> None:
             try:
-                payload = self.gdb_mem.read_memory(self.data_address, SWO_DATA_SIZE)
-                self._validate_swo_payload(payload)
-                self.backend.request_screenshot(output_path)
-                self.gdb_mem.write_memory(
-                    self.data_address + SWO_DATA_SEND_SCREENSHOT_OFFSET,
-                    b"\x01",
-                )
-                verify = self.gdb_mem.read_memory(self.data_address + SWO_DATA_SEND_SCREENSHOT_OFFSET, 1)
-                if verify not in (b"\x00", b"\x01"):
-                    raise RuntimeError(f"Screenshot flag write failed: {verify.hex()}")
-                if verify == b"\x00":
-                    self.event_queue.put(("log", "Screenshot flag consumed immediately by firmware"))
-                self.event_queue.put(("log", f"Requested screenshot -> {output_path.name}"))
+                if self.config.transport == "serial":
+                    self.backend.request_screenshot(output_path)
+                else:
+                    payload = self.gdb_mem.read_memory(self.data_address, SWO_DATA_SIZE)
+                    self._validate_swo_payload(payload)
+                    self.backend.request_screenshot(output_path)
+                    self.gdb_mem.write_memory(
+                        self.data_address + SWO_DATA_SEND_SCREENSHOT_OFFSET,
+                        b"\x01",
+                    )
+                    verify = self.gdb_mem.read_memory(self.data_address + SWO_DATA_SEND_SCREENSHOT_OFFSET, 1)
+                    if verify not in (b"\x00", b"\x01"):
+                        raise RuntimeError(f"Screenshot flag write failed: {verify.hex()}")
+                    if verify == b"\x00":
+                        self.event_queue.put(("log", "Screenshot flag consumed immediately by firmware"))
+                    self.event_queue.put(("log", f"Requested screenshot -> {output_path.name}"))
             except Exception as exc:
                 self.backend.cancel_screenshot()
                 self.event_queue.put(("screenshot-error", f"Screenshot request failed: {exc}"))

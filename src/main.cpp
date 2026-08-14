@@ -227,15 +227,20 @@ static void loop()
     #if HAVE_USB_DEVICE
         // handle USB CDC data
         if (USBSerial::isConnected()) {
+            // TODO binary protocol for updating PID values, EEPROM and requesting screenshots
             switch(USBSerial::read()) {
+                case 's':
+                    SWO::data.sendScreenshot = true;
+                    DEBUG_PRINT(DebugType::INFO, "USB screenshot requested");
+                    break;
                 case 'p':
                     if (SWO::data.enabled != SWO::EnableState::USB) {
                         SWO::data.enabled = SWO::EnableState::USB;
-                        DEBUG_PRINT(DebugType::INFO, "PID enabled=USB");
+                        DEBUG_PRINT(DebugType::INFO, "USB PID tuning enabled");
                     }
                     else {
                         SWO::data.enabled = SWO::EnableState::DISABLED;
-                        DEBUG_PRINT(DebugType::INFO, "PID disabled");
+                        DEBUG_PRINT(DebugType::INFO, "USB PID tuning disabled");
                     }
                     break;
             }
