@@ -8,35 +8,22 @@
 
 // === AT24C02CM5/TR prototypes etc... ===
 
-#define EEPROM_ADDRESS          0x50u       // 7-bit device address (A2=A1=A0=0)
-#define EEPROM_PAGE_SIZE        8u          // bytes per page
-#define EEPROM_SIZE             256u        // total bytes
-#define EEPROM_WRITE_MS         5u          // typical write cycle time
-#define EEPROM_WAIT_RETRIES     1000u       // number of retries for waiting for write cycle to complete
-#define EEPROM_VALIDATE_WRITE   0
-#if DEBUG
-// use different offset during debugging
-#define EEPROM_DEFAULT_OFFSET   128
-#else
-#define EEPROM_DEFAULT_OFFSET   0
-#endif
-
 I2CHelper i2c;
 EEPROM eeprom;
 
 bool eepromWriteByte(uint8_t memAddress, uint8_t data);
-int16_t eepromReadByte(uint8_t memAddress);
-bool eepromWriteBytes(uint8_t memAddress, const uint8_t *data, uint16_t length);
-bool eepromReadBytes(uint8_t memAddress, uint8_t *data, uint16_t length);
+int eepromReadByte(uint8_t memAddress);
+bool eepromWriteBytes(uint8_t memAddress, const void *data, uint32_t length);
+bool eepromReadBytes(uint8_t memAddress, void *data, uint32_t length);
 bool eepromWaitReady(void);
 
 // === EEPROM implementation ===
 
 void EEPROM::init()
 {
-    SWO::data.EEPROM.address = (uint32_t)&this->data;
+    SWO::data.EEPROM.address = reinterpret_cast<uint32_t>(&this->data);
     i2c.initI2C1Remapped();
-    bool res = i2c.sendBytes(EEPROM_ADDRESS, nullptr, 0);
+    bool res = i2c.sendBytes(kAddress, nullptr, 0);
     DEBUG_PRINT(DebugType::INFO, "EEPROM detected=%u", (int)res);
 }
 
@@ -44,11 +31,24 @@ void EEPROM::read()
 {
     Data tmp;
     tmp.invalidate();
-    bool result = eepromReadBytes(EEPROM_DEFAULT_OFFSET, reinterpret_cast<uint8_t *>(&tmp), sizeof(tmp));
-    DEBUG_PRINT(DebugType::INFO, "read=%u magic=%08x version=%d sequence=%d", (int)result, tmp.magic, tmp.version, tmp.sequence);
+    bool result = eepromReadBytes(kDefaultOffset, &tmp, sizeof(tmp));
+    DEBUG_PRINT(result ? DebugType::INFO : DebugType::ERROR, "read=%u magic=%08x version=%d sequence=%d ofs=%u", (int)result, tmp.magic, tmp.version, tmp.sequence, kDefaultOffset);
     if (!result || tmp.magic != kMagic || tmp.version != kVersion || tmp.validateCRC() == kInvalidCRC) {
-        resetDefaults();
-        return;
+        if constexpr (kBackupOffset) {
+            tmp.invalidate();
+            result = eepromReadBytes(kBackupOffset, &tmp, sizeof(tmp));
+            DEBUG_PRINT(result ? DebugType::INFO : DebugType::ERROR, "read=%u magic=%08x version=%d sequence=%d ofs=%u (BACKUP)", (int)result, tmp.magic, tmp.version, tmp.sequence, kBackupOffset);
+            if (!result || tmp.magic != kMagic || tmp.version != kVersion || tmp.validateCRC() == kInvalidCRC) {
+                DEBUG_PRINT(DebugType::ERROR, "EEPROM data invalid, resetting to defaults");
+                resetDefaults();
+                return;
+            }
+        }
+        else {
+            DEBUG_PRINT(DebugType::ERROR, "EEPROM data invalid, resetting to defaults");
+            resetDefaults();
+            return;
+        }
     }
     data = tmp;
     updateTemperatureLimits();
@@ -59,7 +59,7 @@ bool EEPROM::write()
     // read EEPROM and compare with current data to avoid unnecessary writes
     Data tmp;
     tmp.invalidate();
-    bool result = eepromReadBytes(EEPROM_DEFAULT_OFFSET, reinterpret_cast<uint8_t *>(&tmp), sizeof(tmp));
+    bool result = eepromReadBytes(kDefaultOffset, &tmp, sizeof(tmp));
     if (result) {
         tmp.validateCRC();
         if (tmp == data) {
@@ -74,18 +74,28 @@ bool EEPROM::write()
     // write data to EEPROM
     data.sequence++;
     data.crc = data.calculateCRC();
-    result = eepromWriteBytes(EEPROM_DEFAULT_OFFSET, reinterpret_cast<uint8_t *>(&data), sizeof(data));
+    result = eepromWriteBytes(kDefaultOffset, &data, sizeof(data));
     if (!result) {
         data.sequence--;
     }
-    DEBUG_PRINT(result ? DebugType::INFO : DebugType::ERROR, "write=%u magic=%08x version=%d sequence=%d", (unsigned)result, data.magic, data.version, data.sequence);
+    DEBUG_PRINT(result ? DebugType::INFO : DebugType::ERROR, "write=%u magic=%08x version=%d sequence=%d ofs=%u", (unsigned)result, data.magic, data.version, data.sequence, kDefaultOffset);
 
-    #if EEPROM_VALIDATE_WRITE
+    if constexpr (kBackupOffset) {
+        result = eepromWriteBytes(kBackupOffset, &data, sizeof(data));
+        DEBUG_PRINT(result ? DebugType::INFO : DebugType::ERROR, "write=%u magic=%08x version=%d sequence=%d ofs=%u (BACKUP)", (unsigned)result, data.magic, data.version, data.sequence, kBackupOffset);
+    }
+
+    if constexpr (kValidateWrite) {
         tmp.invalidate();
-        result = eepromReadBytes(EEPROM_DEFAULT_OFFSET, reinterpret_cast<uint8_t *>(&tmp), sizeof(tmp));
-        tmp.validateCRC();
-        DEBUG_PRINT(DebugType::NOTICE, "verify=%u magic=%08x version=%d sequence=%d crc=%08x", (unsigned)result, tmp.magic, tmp.version, tmp.sequence, tmp.crc);
-    #endif
+        result = eepromReadBytes(kDefaultOffset, &tmp, sizeof(tmp));
+        DEBUG_PRINT(DebugType::INFO, "verify=%u magic=%08x version=%d sequence=%d crc=%08x ofs=%u", (unsigned)result, tmp.magic, tmp.version, tmp.sequence, tmp.crc, kDefaultOffset);
+        if constexpr (kBackupOffset) {
+            tmp.invalidate();
+            result = eepromReadBytes(kBackupOffset, &tmp, sizeof(tmp));
+            tmp.validateCRC();
+            DEBUG_PRINT(DebugType::INFO, "verify=%u magic=%08x version=%d sequence=%d crc=%08x ofs=%u (BACKUP)", (unsigned)result, tmp.magic, tmp.version, tmp.sequence, tmp.crc, kBackupOffset);
+        }
+    }
     return result;
 }
 
@@ -122,13 +132,14 @@ void EEPROM::updateTemperatureLimits()
 //------------------------------------------------------------------
 bool eepromWaitReady(void)
 {
-    volatile uint32_t retries = EEPROM_WAIT_RETRIES;
-    while (!i2c.sendByte(EEPROM_ADDRESS, 0x00, true)) {
-        if (--retries == 0) {
-            return false;
+    uint32_t start = HAL_GetTick();
+    while(HAL_GetTick() - start <= EEPROM::kWriteCycleWaitTimeoutMs) {
+        if (i2c.sendByte(EEPROM::kAddress, 0x00, true)) {
+            return true;
         }
     }
-    return true;
+    DEBUG_PRINT(DebugType::ERROR, "timeout=%u", (unsigned)(HAL_GetTick() - start));
+    return false;
 }
 
 //------------------------------------------------------------------
@@ -136,9 +147,8 @@ bool eepromWaitReady(void)
 //------------------------------------------------------------------
 bool eepromWriteByte(uint8_t memAddress, uint8_t data)
 {
-    uint8_t buf[2] = { memAddress, data };
-
-    if (!i2c.sendBytes(EEPROM_ADDRESS, buf, sizeof(buf), true)) {
+    const uint8_t buf[2] = { memAddress, data };
+    if (!i2c.sendBytes(EEPROM::kAddress, buf, sizeof(buf), true)) {
         return false;
     }
     return eepromWaitReady();
@@ -147,33 +157,33 @@ bool eepromWriteByte(uint8_t memAddress, uint8_t data)
 //------------------------------------------------------------------
 // Single byte read: [dev addr+W][word addr] (repeated start) [dev addr+R][data]
 //------------------------------------------------------------------
-int16_t eepromReadByte(uint8_t memAddress)
+int eepromReadByte(uint8_t memAddress)
 {
-    if (!i2c.sendBytes(EEPROM_ADDRESS, &memAddress, 1, false)) {
+    if (!i2c.sendBytes(EEPROM::kAddress, &memAddress, 1, false)) {
         return -1;
     }
-    return i2c.readByte(EEPROM_ADDRESS);
+    return i2c.readByte(EEPROM::kAddress);
 }
 
 //------------------------------------------------------------------
 // Multi byte write, split into AT24C02 page-aligned chunks (8 bytes/page)
 //------------------------------------------------------------------
-bool eepromWriteBytes(uint8_t memAddress, const uint8_t *data, uint16_t length)
+bool eepromWriteBytes(uint8_t memAddress, const void *data, uint32_t length)
 {
-    if (memAddress + length > EEPROM_SIZE) {
+    if (memAddress + length > EEPROM::kSize) {
         return false; // out of range
     }
 
     while (length > 0) {
-        uint8_t pageOffset  = (uint8_t)(memAddress % EEPROM_PAGE_SIZE);
-        uint8_t spaceInPage = EEPROM_PAGE_SIZE - pageOffset;
-        uint8_t chunk       = (length < spaceInPage) ? (uint8_t)length : spaceInPage;
+        size_t pageOffset  = memAddress % EEPROM::kPageSize;
+        size_t spaceInPage = EEPROM::kPageSize - pageOffset;
+        size_t chunk       = (length < spaceInPage) ? length : spaceInPage;
 
-        uint8_t buf[1 + EEPROM_PAGE_SIZE];
+        uint8_t buf[1 + EEPROM::kPageSize];
         buf[0] = memAddress;
         memcpy(&buf[1], data, chunk);
 
-        if (!i2c.sendBytes(EEPROM_ADDRESS, buf, (uint16_t)(chunk + 1), true)) {
+        if (!i2c.sendBytes(EEPROM::kAddress, buf, chunk + 1, true)) {
             return false;
         }
         if (!eepromWaitReady()) {
@@ -190,15 +200,13 @@ bool eepromWriteBytes(uint8_t memAddress, const uint8_t *data, uint16_t length)
 //------------------------------------------------------------------
 // Multi byte sequential read: word addr write, repeated start, burst read
 //------------------------------------------------------------------
-bool eepromReadBytes(uint8_t memAddress, uint8_t *data, uint16_t length)
+bool eepromReadBytes(uint8_t memAddress, void *data, uint32_t length)
 {
-    if (memAddress + length > EEPROM_SIZE) {
+    if (memAddress + length > EEPROM::kSize) {
         return false; // out of range
     }
-
-    if (!i2c.sendBytes(EEPROM_ADDRESS, &memAddress, 1, false)) {
+    if (!i2c.sendBytes(EEPROM::kAddress, &memAddress, 1, false)) {
         return false;
     }
-
-    return i2c.readBytes(EEPROM_ADDRESS, data, length);
+    return i2c.readBytes(EEPROM::kAddress, reinterpret_cast<uint8_t *>(data), length);
 }

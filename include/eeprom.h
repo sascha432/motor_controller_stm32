@@ -14,8 +14,17 @@ extern CRC_HandleTypeDef hcrc;
 
 struct EEPROM
 {
+    static constexpr uint8_t kAddress = 0x50;                           // 7-bit device address
+    static constexpr size_t kPageSize = 8;                              // bytes per page
+    static constexpr size_t kSize = 256;                                // total bytes
+    static constexpr uint32_t kWriteCycleWaitTimeoutMs = 7;             // wait for write cycle to complete (~5ms)
+    static constexpr size_t kDefaultOffset = 0;                         // default offset for EEPROM data
+    static constexpr size_t kBackupOffset = kSize / 2;                  // offset for backup EEPROM data (0 = DISABLE)
+    static constexpr bool kValidateWrite = false;                       // validate write by reading back data and comparing with original
+
     static constexpr uint32_t kMagic = 0xDEADBEEF;
     static constexpr uint32_t kInvalidCRC = 0xffffffff;
+    static constexpr uint32_t kInvalidData = 0xcccccccc;
     static constexpr uint32_t kVersion = 5;
 
     static constexpr uint32_t kPIDParamToUint32(float value) {
@@ -110,6 +119,26 @@ struct EEPROM
         {}
 
         /**
+         * @brief Get the data pointer without header
+         *
+         * @return uint32_t*
+         */
+        inline uint32_t *getDataPtr() const
+        {
+            return reinterpret_cast<uint32_t *>(const_cast<uint8_t *>(reinterpret_cast<const uint8_t *>(this)) + offsetof(Data, tft_brightness));
+        }
+
+        /**
+         * @brief Get the data size without header
+         *
+         * @return constexpr size_t
+         */
+        constexpr size_t getDataSize() const
+        {
+            return sizeof(Data) - offsetof(Data, tft_brightness);
+        }
+
+        /**
          * @brief Compare if EEPROM data is equal without comparing the magic, version and sequence number
          *
          * @param other EEPROM data to compare with
@@ -123,13 +152,24 @@ struct EEPROM
                 return false;
             }
             // compare data directly, CRC is updated during read and write only
-            return memcmp(
-                &reinterpret_cast<const uint8_t *>(this)[offsetof(Data, tft_brightness)],
-                &reinterpret_cast<const uint8_t *>(&other)[offsetof(Data, tft_brightness)],
-                sizeof(Data) - offsetof(Data, tft_brightness)
-            ) == 0;
+            return memcmp(this->getDataPtr(), other.getDataPtr(), other.getDataSize()) == 0;
         }
 
+        /**
+         * @brief Calculate CRC for EEPROM data without header
+         *
+         * @return uint32_t CRC value
+         */
+        inline uint32_t calculateCRC() const
+        {
+            return HAL_CRC_Calculate(&hcrc, getDataPtr(), getDataSize() / sizeof(uint32_t));
+        }
+
+        /**
+         * @brief Validate CRC and mark data as invalid if it doesn't match
+         *
+         * @return uint32_t CRC value, or kInvalidCRC if invalid
+         */
         uint32_t validateCRC()
         {
             uint32_t newCrc = calculateCRC();
@@ -141,22 +181,14 @@ struct EEPROM
             return crc;
         }
 
-        uint32_t calculateCRC() const
-        {
-            return HAL_CRC_Calculate(&hcrc,
-                (uint32_t *)&reinterpret_cast<const uint8_t *>(this)[offsetof(Data, tft_brightness)],
-                (sizeof(Data) - offsetof(Data, tft_brightness)) / sizeof(uint32_t)
-            );
-        }
-
         /**
          * @brief Invalidate data
          *
          */
-        void invalidate()
+        inline void invalidate()
         {
-            magic = 0xcccccccc;
-            version = 0xcccccccc;
+            magic = kInvalidData;
+            version = kInvalidData;
             sequence = 0;
             crc = kInvalidCRC;
         }
@@ -482,8 +514,15 @@ protected:
 
 protected:
     Data data;
-    static constexpr uint16_t kDataSize = sizeof(Data);
 
+    // sanity checks
+    static constexpr uint16_t kDataSize = sizeof(Data);
+    static_assert(sizeof(Data) % sizeof(uint32_t) == 0, "EEPROM data size must be a multiple of 4 bytes");
+    static_assert(sizeof(Data) + kDefaultOffset <= kSize, "EEPROM data does not fit");
+    static_assert(!kBackupOffset || sizeof(Data) + kBackupOffset <= kSize, "EEPROM backup data does not fit");
+    static_assert(!kBackupOffset || sizeof(Data) + kDefaultOffset <= kBackupOffset, "EEPROM backup overlaps with data");
+
+    // precalculated ADC values
     uint16_t mosfet_temperature_limit_adc;
     uint16_t motor_temperature_limit_adc;
 };

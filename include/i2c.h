@@ -12,7 +12,7 @@
  */
 struct I2CHelper {
 
-    static const uint32_t kTimeoutMicros = 10000U;
+    static const uint32_t kTimeoutCount = 10000U;
 
     /**
      * @brief initialize I2C1 on PB8/PB9 (remapped)
@@ -99,7 +99,7 @@ struct I2CHelper {
         // START
         I2C1->CR1 |= I2C_CR1_START;
 
-        uint32_t timeout = kTimeoutMicros;
+        uint32_t timeout = kTimeoutCount;
         while (!(I2C1->SR1 & I2C_SR1_SB)) {
             if (isTimeout(timeout)) {
                 return I2CError();
@@ -109,7 +109,7 @@ struct I2CHelper {
         // Address
         I2C1->DR = address << 1;
 
-        timeout = kTimeoutMicros;
+        timeout = kTimeoutCount;
         while (!(I2C1->SR1 & I2C_SR1_ADDR)) {
             if (I2C1->SR1 & I2C_SR1_AF) {
                 return I2CError();
@@ -125,7 +125,7 @@ struct I2CHelper {
 
         if (length) {
             while (length--) {
-                timeout = kTimeoutMicros;
+                timeout = kTimeoutCount;
                 while (!(I2C1->SR1 & I2C_SR1_TXE)) {
                     if (I2C1->SR1 & I2C_SR1_AF) {
                         return I2CError();
@@ -137,7 +137,7 @@ struct I2CHelper {
                 I2C1->DR = *data++;
             }
 
-            timeout = kTimeoutMicros;
+            timeout = kTimeoutCount;
             while (!(I2C1->SR1 & I2C_SR1_BTF)) {
                 if (isTimeout(timeout)) {
                     return I2CError();
@@ -174,7 +174,7 @@ struct I2CHelper {
         // START
         I2C1->CR1 |= I2C_CR1_START;
 
-        uint32_t timeout = kTimeoutMicros;
+        uint32_t timeout = kTimeoutCount;
         while (!(I2C1->SR1 & I2C_SR1_SB)) {
             if (isTimeout(timeout)) {
                 return I2CError();
@@ -184,7 +184,7 @@ struct I2CHelper {
         // Address + read
         I2C1->DR = (address << 1) | 1;
 
-        timeout = kTimeoutMicros;
+        timeout = kTimeoutCount;
         while (!(I2C1->SR1 & I2C_SR1_ADDR)) {
             if (I2C1->SR1 & I2C_SR1_AF) {
                 return I2CError();
@@ -201,7 +201,7 @@ struct I2CHelper {
             (void)I2C1->SR2;
             I2C1->CR1 |= I2C_CR1_STOP;
 
-            timeout = kTimeoutMicros;
+            timeout = kTimeoutCount;
             while (!(I2C1->SR1 & I2C_SR1_RXNE)) {
                 if (isTimeout(timeout)) {
                     return I2CError();
@@ -215,7 +215,7 @@ struct I2CHelper {
             (void)I2C1->SR2;
 
             while (length > 0) {
-                timeout = kTimeoutMicros;
+                timeout = kTimeoutCount;
                 while (!(I2C1->SR1 & I2C_SR1_RXNE)) {
                     if (isTimeout(timeout)) {
                         return I2CError();
