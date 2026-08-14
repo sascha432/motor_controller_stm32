@@ -1,3 +1,7 @@
+/**
+  Author: sascha_lammers@gmx.de
+*/
+
 #ifndef LV_CONF_H
 #define LV_CONF_H
 
@@ -9,6 +13,7 @@
 #define LV_HOR_RES_MAX 240
 #define LV_VER_RES_MAX 135
 
+/* On screen monitoring */
 #ifndef LV_USE_PERF_MONITOR
 #define LV_USE_PERF_MONITOR 0
 #endif
@@ -36,6 +41,11 @@
 #define LV_BUFFER_LINES (64)
 #endif
 
+/* sprintf */
+#define LV_SPRINTF_CUSTOM 1
+#define LV_SPRINTF_INCLUDE <stdio.h>
+#define lv_snprintf  snprintf
+#define lv_vsnprintf vsnprintf
 
 /* Timing */
 #define LV_TICK_CUSTOM 1
@@ -47,7 +57,6 @@
 #define LV_DRAW_COMPLEX 1
 
 /* Logging and asserts */
-
 #ifndef LV_USE_LOG
 #define LV_USE_LOG 0
 #endif
@@ -127,8 +136,5 @@
 #define LV_FONT_MONTSERRAT_14 1
 #define LV_FONT_MONTSERRAT_18 1
 #define LV_FONT_MONTSERRAT_24 1
-#define LV_FONT_UNSCII_8 0
-
-#define LV_FONT_DEFAULT &lv_font_montserrat_12
 
 #endif
