@@ -1475,6 +1475,8 @@ class PIDTuningApp:
     def __init__(self, config: AppConfig) -> None:
         self.config = config
         self.log_file_path = self._configured_log_file_path()
+        self._log_write_error_reported = False
+        self._log_write_error_path: Optional[str] = None
         self.event_queue: queue.Queue[Tuple[str, object]] = queue.Queue()
         log_callback = lambda msg: self.event_queue.put(("log", msg))
         sample_callback = lambda sample: self.event_queue.put(("sample", sample))
@@ -2161,7 +2163,12 @@ class PIDTuningApp:
         self.config.connect_mode = str(values.get("connect_mode", self.config.connect_mode))
         self.config.raw_port = int(values.get("raw_port", self.config.raw_port))
         self.config.gdb_port = int(values.get("gdb_port", self.config.gdb_port))
-        self.log_file_path = self._configured_log_file_path()
+
+        new_log_path = self._configured_log_file_path()
+        if new_log_path != self.log_file_path:
+            self._log_write_error_reported = False
+            self._log_write_error_path = None
+        self.log_file_path = new_log_path
 
     def _close_config_dialog(self) -> None:
         if self._config_dialog is not None:
@@ -3244,18 +3251,26 @@ class PIDTuningApp:
         self._refresh_plot()
         self.canvas.draw_idle()
 
-    def _append_log(self, text: str) -> None:
-        try:
-            self.log_file_path.parent.mkdir(parents=True, exist_ok=True)
-            with self.log_file_path.open("a", encoding="utf-8") as handle:
-                handle.write(text + "\n")
-        except OSError:
-            pass
-
+    def _write_log_entry(self, text: str) -> None:
         self.log_text.configure(state=tk.NORMAL)
         self.log_text.insert(tk.END, text + "\n")
         self.log_text.see(tk.END)
         self.log_text.configure(state=tk.DISABLED)
+
+    def _append_log(self, text: str) -> None:
+        try:
+            with self.log_file_path.open("a", encoding="utf-8") as handle:
+                handle.write(text + "\n")
+            self._log_write_error_reported = False
+            self._log_write_error_path = None
+        except OSError as exc:
+            path = str(self.log_file_path)
+            if not self._log_write_error_reported or self._log_write_error_path != path:
+                self._log_write_error_reported = True
+                self._log_write_error_path = path
+                self._write_log_entry(f"ERROR: Failed to write log file {self.log_file_path}: {exc}")
+
+        self._write_log_entry(text)
 
     def _request_firmware_reset(self, reason: str, auto_restart: bool = False) -> None:
         if self.config.transport != "swo":
@@ -3577,7 +3592,7 @@ def parse_args() -> AppConfig:
         default=saved_string("transport", "serial").strip().lower(),
         help="PID data transport",
     )
-    parser.add_argument("--port", dest="serial_port", default=saved_string("serial_port", "COM10"), help="USB or serial port")
+    parser.add_argument("--port", dest="serial_port", default=saved_string("serial_port", "COM10"), help="Serial port")
     parser.add_argument("--baud", dest="serial_baud", type=int, default=saved_int("serial_baud", 115200), help="Serial baud rate")
     parser.add_argument("--uid", default=saved_string("uid", ""), help="Optional pyOCD probe unique ID")
     parser.add_argument("--target", default=saved_string("target", "cortex_m"), help="pyOCD target")

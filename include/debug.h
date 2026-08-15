@@ -11,15 +11,6 @@
 #include <string.h>
 #include <stm32f1xx.h>
 
-#if HAVE_USB_DEVICE
-#include <usb_device.h>
-#include <usbd_cdc_if.h>
-
-extern PCD_HandleTypeDef hpcd_USB_OTG_FS;
-extern USBD_HandleTypeDef hUsbDeviceFS;
-
-#endif
-
 // === data for SWD PID tuning ===
 
 #define SWO_DATA_FIXED_RAM_ADDRESS 0x2000F000UL
@@ -38,6 +29,11 @@ struct SWO
 
     template<typename T>
     static size_t write(uint8_t port, const T &value)
+    {
+        return write(port, &value, sizeof(value));
+    }
+
+    static size_t writeByte(uint8_t port, uint8_t value)
     {
         return write(port, &value, sizeof(value));
     }

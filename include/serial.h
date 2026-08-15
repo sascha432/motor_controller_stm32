@@ -9,10 +9,12 @@
 #if HAVE_USB_DEVICE
 
 #include <stm32f1xx.h>
+#include <usb_device.h>
 #include <usbd_cdc_if.h>
 #include "crc.h"
 #include "debug.h"
 
+extern PCD_HandleTypeDef hpcd_USB_OTG_FS;
 extern USBD_HandleTypeDef hUsbDeviceFS;
 
 #endif
@@ -109,26 +111,11 @@ struct Serial
 
 // === dummy class ===
 
-struct USBSerial
+struct Serial
 {
     static bool isConnected()
     {
         return false;
-    }
-
-    static int read()
-    {
-        return -1;
-    }
-
-    static int read(void *data, size_t size)
-    {
-        return 0;
-    }
-
-    static int write(const void *data, size_t size)
-    {
-        return 0;
     }
 };
 

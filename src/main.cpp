@@ -9,6 +9,7 @@
 #include "adc.h"
 #include "leds.h"
 #include "tft_driver.h"
+#include "tft_driver_screenshot.h"
 #include "ui.h"
 #include "menu.h"
 #include "eeprom.h"
@@ -148,7 +149,7 @@ static void loop()
         // check if a screenshot was requested
         if (SWO::data.sendScreenshot) {
             SWO::data.sendScreenshot = false;
-            screenshotRequested = tft_driver_screenshot_begin();
+            screenshotRequested = screenshot.begin();
             if (screenshotRequested) {
                 DEBUG_PRINT(DebugType::INFO, "Screenshot started");
                 lv_obj_invalidate(lv_scr_act());
@@ -197,7 +198,7 @@ static void loop()
         #if HAVE_SCREENSHOTS
             // finalize requested screenshot
             if (screenshotRequested) {
-                tft_driver_screenshot_end();
+                screenshot.end();
                 DEBUG_PRINT(DebugType::INFO, "Screenshot sent");
             }
         #endif
@@ -306,8 +307,7 @@ static void loop()
         PidController::PidLoopType item;
         while (pid.pidLoopBuffer.pop(item)) {
             if (SWO::data.enabled == SWO::EnableState::SWO) {
-                uint8_t size = sizeof(item);
-                if (!SWO::write(1, size) || !SWO::write(1, item)) {
+                if (!SWO::writeByte(1, sizeof(item)) || !SWO::write(1, item)) {
                     pid.pidLoopBuffer.clear();
                     break;
                 }
