@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <type_traits>
 #include <stm32f1xx.h>
+#include "crc.h"
 
 /**
  * @brief Float printf converters
@@ -676,14 +677,25 @@ static constexpr float kFloatToUint16Multiplier = 65535.0f;
 
 extern USBD_HandleTypeDef hUsbDeviceFS;
 
-struct USBSerial
+#endif
+
+#if HAVE_USB_DEVICE || HAVE_SERIAL
+
+struct Serial
 {
     static constexpr uint32_t kMagic = 0xDEADBEEF;
-    static constexpr uint32_t kTimeoutMs = 1000; // timeout in milliseconds before giving up on writing to USB
+    // timeout in milliseconds before giving up on writing to USB, about ~100-110kb/100ms including overhead at 12mbit/s. mostly relevant for sending screenshots
+    static constexpr uint32_t kTimeoutMs = 100;
 
     enum class BinaryType : uint16_t {
         PID,
+        TOGGLE_PID,
         SCREENSHOT,
+        REQUEST_SCREENSHOT,
+        PARAMETERS,
+        REQUEST_PARAMETERS,
+        EEPROM,
+        REQUEST_EEPROM,
     };
 
     struct BinaryHeader
@@ -712,21 +724,12 @@ struct USBSerial
         return false;
     }
 
-    static int read()
-    {
-        uint8_t buf;
-        if (read(&buf, sizeof(buf)) == sizeof(buf)) {
-            return buf;
-        }
-        return -1;
-    }
-
-    static size_t read(void *data, size_t size)
+    static size_t readBinary(void *data, size_t size, BinaryType &type, uint32_t &crc)
     {
         if (size == 0 || !isConnected()) {
             return 0;
         }
-        return CDC_Read_FS(reinterpret_cast<uint8_t *>(data), size);
+        return CDC_ReadBinary_FS(reinterpret_cast<uint8_t *>(data), size, reinterpret_cast<uint16_t *>(&type), &crc);
     }
 
     static size_t write(const void *data, size_t size)
@@ -745,7 +748,7 @@ struct USBSerial
         if (size == 0 || !isConnected() || !canWrite()) {
             return 0;
         }
-        BinaryHeader hdr(type, size);
+        BinaryHeader hdr(type, size, stm32_CRC(data, size));
         uint8_t result = CDC_Transmit_FS(reinterpret_cast<uint8_t *>(&hdr), sizeof(hdr));
         if (result != USBD_OK || !canWrite()) {
             return 0;
@@ -760,6 +763,8 @@ struct USBSerial
 
 
 #else
+
+// === dummy class ===
 
 struct USBSerial
 {

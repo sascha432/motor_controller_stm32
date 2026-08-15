@@ -226,23 +226,76 @@ static void loop()
 
     #if HAVE_USB_DEVICE
         // handle USB CDC data
-        if (USBSerial::isConnected()) {
-            // TODO binary protocol for updating PID values, EEPROM and requesting screenshots
-            switch(USBSerial::read()) {
-                case 's':
-                    SWO::data.sendScreenshot = true;
-                    DEBUG_PRINT(DebugType::INFO, "USB screenshot requested");
-                    break;
-                case 'p':
-                    if (SWO::data.enabled != SWO::EnableState::USB) {
-                        SWO::data.enabled = SWO::EnableState::USB;
-                        DEBUG_PRINT(DebugType::INFO, "USB PID tuning enabled");
+        if (Serial::isConnected()) {
+            char buf[128]; // EEPROM::Data is 60 byte
+            Serial::BinaryType type;
+            uint32_t crc;
+
+            size_t result = Serial::readBinary(buf, sizeof(buf), type, crc);
+            if (result) {
+                if (result % sizeof(uint32_t) != 0) {
+                    DEBUG_PRINT(DebugType::ERROR, "Serial: invalid binary size=%u type=%u", result, static_cast<uint32_t>(type));
+                }
+                else {
+                    uint32_t newCrc = stm32_CRC(buf, result);
+                    if (newCrc != crc) {
+                        DEBUG_PRINT(DebugType::ERROR, "Serial: CRC mismatch type=%u size=%u got=0x%08X expected=0x%08X", static_cast<uint32_t>(type), result, crc, newCrc);
+                        #if 0
+                        char buf2[16 * 4 + 1];
+                        for (size_t i = 0; i < result && i < 16; ++i) {
+                            snprintf(buf2 + i * 3, sizeof(buf2) - i * 3, "%02X ", static_cast<unsigned char>(buf[i]));
+                        }
+                        DEBUG_PRINT(DebugType::ERROR, "Serial: data=%s", buf2);
+                        #endif
                     }
                     else {
-                        SWO::data.enabled = SWO::EnableState::DISABLED;
-                        DEBUG_PRINT(DebugType::INFO, "USB PID tuning disabled");
+                        switch(type) {
+                            case Serial::BinaryType::REQUEST_SCREENSHOT: {
+                                    DEBUG_PRINT(DebugType::INFO, "Serial: screenshot requested");
+                                    SWO::data.sendScreenshot = true;
+                                }
+                                break;
+                            case Serial::BinaryType::TOGGLE_PID: {
+                                    uint32_t value = *reinterpret_cast<uint32_t *>(buf);
+                                    SWO::data.enabled = value ? SWO::EnableState::SERIAL : SWO::EnableState::DISABLED;
+                                    DEBUG_PRINT(DebugType::INFO, "Serial: PID tuning %s", value ? "enabled" : "disabled");
+                                    if (value) {
+                                        auto params = pid.getPidParameters();
+                                        Serial::writeBinary(Serial::BinaryType::PARAMETERS, &params, sizeof(params));
+                                    }
+                                }
+                                break;
+                            case Serial::BinaryType::REQUEST_PARAMETERS: {
+                                    DEBUG_PRINT(DebugType::INFO, "Serial: PID parameters requested");
+                                    auto params = pid.getPidParameters();
+                                    Serial::writeBinary(Serial::BinaryType::PARAMETERS, &params, sizeof(params));
+                                }
+                                break;
+                            case Serial::BinaryType::PARAMETERS: {
+                                    DEBUG_PRINT(DebugType::INFO, "Serial: PID parameters received");
+                                    pid.setPidParameters(*reinterpret_cast<PidController::PidParameters *>(buf));
+                                }
+                                break;
+                            case Serial::BinaryType::REQUEST_EEPROM: {
+                                    DEBUG_PRINT(DebugType::INFO, "Serial: EEPROM requested");
+                                    EEPROM::Data &data = eeprom.getData();
+                                    Serial::writeBinary(Serial::BinaryType::EEPROM, &data, sizeof(data));
+                                }
+                                break;
+                            case Serial::BinaryType::EEPROM: {
+                                    eeprom.getData() = *reinterpret_cast<EEPROM::Data *>(buf);
+                                    bool result = eeprom.write();
+                                    (void)result;
+                                    DEBUG_PRINT(DebugType::INFO, "Serial: EEPROM write=%u", result);
+                                    menu.applyEEPROMSettings();
+                                }
+                                break;
+                            default:
+                                DEBUG_PRINT(DebugType::ERROR, "Serial: binary type=%u size=%u", static_cast<uint32_t>(type), result);
+                                break;
+                        }
                     }
-                    break;
+                }
             }
         }
     #endif
@@ -258,17 +311,12 @@ static void loop()
                     break;
                 }
             }
-            #if HAVE_USB_DEVICE
-            else if (SWO::data.enabled == SWO::EnableState::USB) {
-                if (USBSerial::writeBinary(USBSerial::BinaryType::PID, &item, sizeof(item)) != sizeof(item)) {
+            #if HAVE_USB_DEVICE || HAVE_SERIAL
+            else if (SWO::data.enabled == SWO::EnableState::SERIAL) {
+                if (Serial::writeBinary(Serial::BinaryType::PID, &item, sizeof(item)) != sizeof(item)) {
                     pid.pidLoopBuffer.clear();
                     break;
                 }
-            }
-            #endif
-            #if HAVE_SERIAL
-            else if (SWO::data.enabled == SWO::EnableState::SERIAL) {
-                // not implemented yet
             }
             #endif
         }

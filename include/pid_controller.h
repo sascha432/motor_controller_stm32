@@ -469,6 +469,49 @@ struct PidController
      */
     void setPWMFrequency(uint32_t value);
 
+    // === PID parameters ===
+    struct PidParameters
+    {
+        float Kp;
+        float Ki;
+        float Kd;
+        uint16_t antiWindup;
+        uint16_t rpm;
+    };
+
+    /**
+     * @brief Get the Pid Parameters
+     *
+     * @return PidParameters
+     */
+    PidParameters getPidParameters() const
+    {
+        return {Kp, Ki, Kd, static_cast<uint16_t>(antiWindup), static_cast<uint16_t>(rpm)};
+    }
+
+    /**
+     * @brief Set the Pid Parameters and apply them to the controller
+     *
+     * @param params
+     */
+    void setPidParameters(const PidParameters& params)
+    {
+        // apply parameters to the controller and SWO data
+        setKp(params.Kp);
+        setKi(params.Ki);
+        setKd(params.Kd);
+        setAntiWindup(params.antiWindup);
+        setRPM(params.rpm);
+
+        DEBUG_PRINT(DebugType::PID, "Kp=%s Ki=%s Kd=%s RPM=%u windup=%s",
+            debugFloatToString(Kp, 6, true),
+            debugFloatToString(Ki, 6, true),
+            debugFloatToString(Kd, 6, true),
+            rpm,
+            debugFloatToString(antiWindup / static_cast<float>(UIConstants::kAntiWindupFactor), 2, true)
+        );
+    }
+
 public:
     // === Fault states data structure ===
     struct FaultStates

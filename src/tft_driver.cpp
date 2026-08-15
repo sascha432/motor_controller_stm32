@@ -53,7 +53,7 @@ struct TFTDriverScreenshot
 
         inline bool write(const void *data, size_t size)
         {
-            return USBSerial::writeBinary(USBSerial::BinaryType::SCREENSHOT, data, size) == size;
+            return Serial::writeBinary(Serial::BinaryType::SCREENSHOT, data, size) == size;
         }
 
     #else

@@ -46,11 +46,8 @@ struct SWO
     enum class EnableState : uint32_t {
         DISABLED = 0,
         SWO = 1,
-        #if HAVE_USB_DEVICE
-            USB = 2,
-        #endif
-        #if HAVE_SERIAL
-            SERIAL = 3,
+        #if HAVE_USB_DEVICE || HAVE_SERIAL
+            SERIAL = 2,
         #endif
     };
 

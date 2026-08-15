@@ -17,3 +17,5 @@ __pycache__
 docs/kicad/
 ss*.png
 menu_flow.md
+scripts/motor_config.json
+scripts/motor_config.log
