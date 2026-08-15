@@ -40,6 +40,7 @@ struct SerialProtocol
         REQUEST_PARAMETERS,
         EEPROM,
         REQUEST_EEPROM,
+        SYSTEM_RESET,
     };
 
     struct BinaryHeader
