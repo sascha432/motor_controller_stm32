@@ -141,6 +141,7 @@ BINARY_TYPE_PARAMETERS = 4
 BINARY_TYPE_REQUEST_PARAMETERS = 5
 BINARY_TYPE_EEPROM = 6
 BINARY_TYPE_REQUEST_EEPROM = 7
+BINARY_TYPE_SYSTEM_RESET = 8
 BINARY_MAX_PAYLOAD_SIZE = 65535
 PID_PARAMETERS_STRUCT = "<fffHH"
 PID_PARAMETERS_SIZE = struct.calcsize(PID_PARAMETERS_STRUCT)
@@ -1304,8 +1305,16 @@ class SerialBackend(SWOBackend):
         self.log("Requested EEPROM data")
 
     def reset_target(self) -> bool:
-        self.log("Firmware reset is unavailable in serial transport", "ERROR")
-        return False
+        if self.serial_port is None:
+            self.log("USB serial transport is not running", "ERROR")
+            return False
+        try:
+            self._send_binary_command(BINARY_TYPE_SYSTEM_RESET)
+            self.log("Sent system reset command")
+            return True
+        except Exception as exc:
+            self.log(f"Failed to send system reset command: {exc}", "ERROR")
+            return False
 
     def _read_serial(self) -> None:
         parser = BinaryPacketParser(
