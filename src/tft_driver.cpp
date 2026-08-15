@@ -9,7 +9,14 @@
 #include "tft_driver.h"
 #include "tft_driver_screenshot.h"
 
-static constexpr uint32_t kDMATimeout = 200000;
+static constexpr uint32_t calculateDMATimeoutMs(uint16_t bytes) {
+    // SPI @ 18 MHz: 8 bits/byte ÷ (18×10^6 bits/sec) = bytes/2250 ms
+    // Add 10ms overhead for DMA setup and completion
+    return (bytes / 2250) + 10;
+}
+
+static constexpr uint32_t kDMATransferTimeoutMillis = calculateDMATimeoutMs(LV_BUFFER_SIZE + 1024);
+static constexpr uint32_t kSPISyncTimeoutMillis  = 3;
 
 lv_disp_draw_buf_t s_lvgl_draw_buf;
 lv_color_t s_lvgl_buf_1[LV_BUFFER_SIZE];
@@ -205,32 +212,47 @@ void tft_driver_spi_send_buffer_dma_raw(const void *data, uint16_t len)
     TFT_DMA_CH->CCR &= ~DMA_CCR_EN;
     DMA1->IFCR = DMA_IFCR_CGIF5 | DMA_IFCR_CTCIF5 | DMA_IFCR_CHTIF5 | DMA_IFCR_CTEIF5;
 
-    TFT_DMA_CH->CMAR = reinterpret_cast<const uint32_t>(data);
-    TFT_DMA_CH->CNDTR = len;
+    // Configure DMA transfer source and parameters
+    TFT_DMA_CH->CMAR = reinterpret_cast<const uint32_t>(data);  // Source address (data buffer)
+    TFT_DMA_CH->CNDTR = len;                                    // Number of bytes to transfer
+    // Channel control: MINC=memory increment mode, DIR=memory-to-peripheral, PL_1=medium priority
     TFT_DMA_CH->CCR = DMA_CCR_MINC | DMA_CCR_DIR | DMA_CCR_PL_1;
 
+    // === DMA Transmission ===
+    // Enable SPI2 to accept DMA requests on TX and start the DMA transfer
     SPI2->CR2 |= SPI_CR2_TXDMAEN;
     TFT_DMA_CH->CCR |= DMA_CCR_EN;
 
-    volatile int timeout = kDMATimeout;
-    while (!(DMA1->ISR & DMA_ISR_TCIF5) && timeout--) {
+    // Wait for DMA transfer to complete with timeout protection
+    uint32_t start = HAL_GetTick();
+    while (!(DMA1->ISR & DMA_ISR_TCIF5) && (HAL_GetTick() - start < kDMATransferTimeoutMillis)) {
     }
 
+    // === Post-Transfer Cleanup ===
+    // Disable DMA channel after transfer
     TFT_DMA_CH->CCR &= ~DMA_CCR_EN;
+    // Disable SPI TX DMA requests
     SPI2->CR2 &= ~SPI_CR2_TXDMAEN;
+    // Clear all DMA flags again
     DMA1->IFCR = DMA_IFCR_CGIF5 | DMA_IFCR_CTCIF5 | DMA_IFCR_CHTIF5 | DMA_IFCR_CTEIF5;
 
-    timeout = kDMATimeout;
-    while (((SPI2->SR & SPI_SR_TXE) == 0U) && timeout--) {
+    // === SPI Synchronization ===
+    // Wait for TX FIFO to empty (TXE flag set) - all bytes shifted into shift register
+    start = HAL_GetTick();
+    while (((SPI2->SR & SPI_SR_TXE) == 0U) && (HAL_GetTick() - start < kSPISyncTimeoutMillis)) {
     }
 
-    timeout = kDMATimeout;
-    while ((SPI2->SR & SPI_SR_BSY) && timeout--) {
+    // Wait for SPI to finish transmitting (BSY flag clear) - shift register emptied on wire
+    start = HAL_GetTick();
+    while ((SPI2->SR & SPI_SR_BSY) && (HAL_GetTick() - start < kSPISyncTimeoutMillis)) {
     }
 
+    // === RX FIFO Cleanup ===
+    // Clear any data in RX FIFO (SPI receives during full-duplex transmission)
     while (SPI2->SR & SPI_SR_RXNE) {
-        (void)SPI2->DR;
+        (void)SPI2->DR;  // Read and discard RX data
     }
+    // Read SR register to clear any pending status flags
     (void)SPI2->SR;
 }
 
