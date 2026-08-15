@@ -88,12 +88,15 @@
   */
 /* Create buffer for reception and transmission           */
 /* It's up to user to redefine and/or remove those define */
+/** Received data over USB are stored in this buffer      */
+uint8_t UserRxBufferFS[APP_RX_DATA_SIZE];
+
+/** Data to send over USB CDC are stored in this buffer   */
+uint8_t UserTxBufferFS[APP_TX_DATA_SIZE];
 
 /* USER CODE BEGIN PRIVATE_VARIABLES */
 
 /** Received data over USB are stored in this buffer      */
-uint8_t UserRxBufferFS[APP_RX_DATA_SIZE];
-
 #define CDC_BINARY_BUFFER_SIZE (APP_RX_DATA_SIZE - 16)
 
 static uint8_t UserBinaryBufferFS[CDC_BINARY_BUFFER_SIZE];
@@ -309,10 +312,12 @@ static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
   */
 uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len)
 {
+  uint8_t result = USBD_OK;
   /* USER CODE BEGIN 7 */
   USBD_CDC_SetTxBuffer(&hUsbDeviceFS, Buf, Len);
   return USBD_CDC_TransmitPacket(&hUsbDeviceFS);
   /* USER CODE END 7 */
+  return result;
 }
 
 /* USER CODE BEGIN PRIVATE_FUNCTIONS_IMPLEMENTATION */
@@ -326,7 +331,7 @@ uint16_t CDC_ReadBinary_FS(uint8_t* Buf, uint16_t Len, uint16_t *Type, uint32_t 
     return 0U;
   }
 
-  while ((uint16_t)(magic_offset + 4U) <= available)
+  while ((uint16_t)(magic_offset + sizeof(uint32_t)) <= available)
   {
     if (*(const uint32_t *)&UserBinaryBufferFS[magic_offset] == CDC_BINARY_MAGIC)
     {
@@ -335,7 +340,7 @@ uint16_t CDC_ReadBinary_FS(uint8_t* Buf, uint16_t Len, uint16_t *Type, uint32_t 
     ++magic_offset;
   }
 
-  if ((uint16_t)(magic_offset + 4U) > available)
+  if ((uint16_t)(magic_offset + sizeof(uint32_t)) > available)
   {
     UserBinaryBufferLengthFS = 0U;
     return 0U;
