@@ -229,7 +229,7 @@ static void loop()
     #if HAVE_USB_DEVICE
         // handle USB CDC data
         if (Serial::isConnected()) {
-            char buf[128]; // EEPROM::Data is 60 byte
+            char buf[128]; // EEPROM::Data is 60 byte, the header is 12 byte + a lot extra space
             Serial::BinaryType type;
             uint32_t crc;
 
@@ -242,13 +242,6 @@ static void loop()
                     uint32_t newCrc = stm32_CRC(buf, result);
                     if (newCrc != crc) {
                         DEBUG_PRINT(DebugType::ERROR, "Serial: CRC mismatch type=%u size=%u got=0x%08X expected=0x%08X", static_cast<uint32_t>(type), result, crc, newCrc);
-                        #if 0
-                        char buf2[16 * 4 + 1];
-                        for (size_t i = 0; i < result && i < 16; ++i) {
-                            snprintf(buf2 + i * 3, sizeof(buf2) - i * 3, "%02X ", static_cast<unsigned char>(buf[i]));
-                        }
-                        DEBUG_PRINT(DebugType::ERROR, "Serial: data=%s", buf2);
-                        #endif
                     }
                     else {
                         switch(type) {
@@ -302,26 +295,28 @@ static void loop()
         }
     #endif
 
-    if (SWO::data.enabled != SWO::EnableState::DISABLED) {
+    if (SWO::data.enabled == SWO::EnableState::SWO) {
         // send PID tuning data
         PidController::PidLoopType item;
         while (pid.pidLoopBuffer.pop(item)) {
-            if (SWO::data.enabled == SWO::EnableState::SWO) {
-                if (!SWO::writeByte(1, sizeof(item)) || !SWO::write(1, item)) {
-                    pid.pidLoopBuffer.clear();
-                    break;
-                }
+            if (!SWO::writeByte(1, sizeof(item)) || !SWO::write(1, item)) {
+                pid.pidLoopBuffer.clear();
+                break;
             }
-            #if HAVE_USB_DEVICE || HAVE_SERIAL
-            else if (SWO::data.enabled == SWO::EnableState::SERIAL) {
-                if (Serial::writeBinary(Serial::BinaryType::PID, &item, sizeof(item)) != sizeof(item)) {
-                    pid.pidLoopBuffer.clear();
-                    break;
-                }
-            }
-            #endif
         }
     }
+    #if HAVE_USB_DEVICE || HAVE_SERIAL
+    else if (SWO::data.enabled == SWO::EnableState::SERIAL) {
+        // send PID tuning data
+        PidController::PidLoopType item;
+        while (pid.pidLoopBuffer.pop(item)) {
+            if (Serial::writeBinary(Serial::BinaryType::PID, &item, sizeof(item)) != sizeof(item)) {
+                pid.pidLoopBuffer.clear();
+                break;
+            }
+        }
+    }
+    #endif
 }
 
 // === interrupt handlers initialization ===

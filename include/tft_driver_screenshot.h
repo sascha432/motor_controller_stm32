@@ -4,10 +4,10 @@
 
 #pragma once
 
+#if HAVE_SCREENSHOTS
+
 #include "serial.h"
 #include "lvgl.h"
-
-#if HAVE_SCREENSHOTS
 
 // === Screenshot streaming support ===
 

@@ -19,18 +19,17 @@ extern USBD_HandleTypeDef hUsbDeviceFS;
 
 #endif
 
-#if HAVE_USB_DEVICE || HAVE_SERIAL
-
-struct Serial
+struct SerialProtocol
 {
-    static constexpr uint32_t kMagic = 0xDEADBEEF;
-    #if HAVE_SCREENSHOTS
-    // timeout in milliseconds before giving up on writing to USB
-    // tested about ~70-80kb/100ms (size is limited to 64kb per packet) mostly relevant for sending screenshots
-    static constexpr uint32_t kTimeoutMs = 100;
+   #if HAVE_SCREENSHOTS
+        // timeout in milliseconds before giving up on writing to USB
+        // tested about ~70-80kb/100ms (size is limited to 64kb per packet) mostly relevant for sending screenshots
+        static constexpr uint32_t kTimeoutMs = 100;
     #else
-    static constexpr uint32_t kTimeoutMs = 10;
+        static constexpr uint32_t kTimeoutMs = 10;
     #endif
+
+    static constexpr uint32_t kMagic = 0xDEADBEEF;
 
     enum class BinaryType : uint16_t {
         PID,
@@ -53,7 +52,13 @@ struct Serial
         BinaryHeader(BinaryType type, size_t size = 0, uint32_t crc = 0xffffffff) : magic(kMagic), size(size), type(type), crc(crc) {}
     };
 
-    inline static bool isConnected()
+};
+
+#if HAVE_USB_DEVICE
+
+struct Serial : public SerialProtocol
+{
+     inline static bool isConnected()
     {
         return hUsbDeviceFS.pClassData != nullptr && hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED;
     }
@@ -106,6 +111,13 @@ struct Serial
     }
 };
 
+#elif HAVE_SERIAL
+
+//TODO
+
+struct Serial : public SerialProtocol
+{
+};
 
 #else
 
