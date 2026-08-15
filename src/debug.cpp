@@ -35,7 +35,7 @@ static inline void debug_swd_init()
         ITM->TER |= (1UL << 1);
     #endif
 
-    #if HAVE_SWO_SCREENSHOTS
+    #if HAVE_SCREENSHOTS
         // Enable stimulus 2 for screenshot tiles.
         ITM->TER |= (1UL << 2);
     #endif
@@ -51,7 +51,7 @@ static inline void debug_swd_deinit()
         // Disable stimulus ports 0 and 1.
         ITM->TER &= ~((1UL << 0) | (1UL << 1));
 
-        #if HAVE_SWO_SCREENSHOTS
+        #if HAVE_SCREENSHOTS
             ITM->TER &= ~(1UL << 2);
         #endif
 

@@ -132,16 +132,42 @@ PID_PARAMETERS_STRUCT = "<fffHH"
 PID_PARAMETERS_SIZE = struct.calcsize(PID_PARAMETERS_STRUCT)
 
 
+def _build_stm32_crc_tables() -> tuple[tuple[int, ...], ...]:
+    byte_table = []
+    for byte in range(256):
+        crc = byte << 24
+        for _ in range(8):
+            crc = ((crc << 1) ^ 0x04C11DB7) & 0xFFFFFFFF if crc & 0x80000000 else (crc << 1) & 0xFFFFFFFF
+        byte_table.append(crc)
+
+    def advance_word(value: int) -> int:
+        for _ in range(4):
+            value = ((value << 8) & 0xFFFFFFFF) ^ byte_table[value >> 24]
+        return value
+
+    return tuple(
+        tuple(advance_word(byte << shift) for byte in range(256))
+        for shift in (24, 16, 8, 0)
+    )
+
+
+STM32_CRC_TABLES = _build_stm32_crc_tables()
+
+
 def binary_crc32(data: bytes) -> int:
     """Calculate the STM32 CRC result, zero-padding a partial final word."""
     data += b"\x00" * (-len(data) % 4)
 
     crc = 0xFFFFFFFF
-    for offset in range(0, len(data), 4):
-        word = int.from_bytes(data[offset:offset + 4], "little")
-        crc ^= word
-        for _ in range(32):
-            crc = ((crc << 1) ^ 0x04C11DB7) & 0xFFFFFFFF if crc & 0x80000000 else (crc << 1) & 0xFFFFFFFF
+    table_0, table_1, table_2, table_3 = STM32_CRC_TABLES
+    for (word,) in struct.iter_unpack("<I", data):
+        value = crc ^ word
+        crc = (
+            table_0[value >> 24]
+            ^ table_1[(value >> 16) & 0xFF]
+            ^ table_2[(value >> 8) & 0xFF]
+            ^ table_3[value & 0xFF]
+        )
     return crc
 
 # Screenshot stream uses the same length-prefix scheme: [len][payload] and the stream terminated by a single 0 byte [0][no payload]
@@ -152,6 +178,7 @@ SCREENSHOT_MAX_HEIGHT = 320
 SCREENSHOT_MAX_PIXELS = SCREENSHOT_MAX_WIDTH * SCREENSHOT_MAX_HEIGHT
 SCREENSHOT_BUFFER_SOFT_LIMIT = 65536
 SCREENSHOT_BUFFER_TAIL_KEEP = 256
+SCREENSHOT_TIMEOUT_SECONDS = 2.0
 SCREENSHOT_TILE_HEADER_STRUCT = "<HHHHI"
 SCREENSHOT_TILE_HEADER_SIZE = struct.calcsize(SCREENSHOT_TILE_HEADER_STRUCT)
 SCREENSHOT_FRAME_HEADER_STRUCT = "<HHI"
@@ -384,17 +411,21 @@ class BinaryPacketParser:
         sample_callback: Callable[[Sample], None],
         log_callback: Callable[[str], None],
         screenshot_callback: Optional[Callable[[bytes], None]] = None,
+        screenshot_error_callback: Optional[Callable[[str], None]] = None,
         parameters_callback: Optional[Callable[[bytes], None]] = None,
         eeprom_callback: Optional[Callable[[bytes], None]] = None,
     ) -> None:
         self.sample_callback = sample_callback
         self.log_callback = log_callback
         self.screenshot_callback = screenshot_callback
+        self.screenshot_error_callback = screenshot_error_callback
         self.parameters_callback = parameters_callback
         self.eeprom_callback = eeprom_callback
         self.buffer = bytearray()
         self.debug_text = bytearray()
         self.last_pid_payload: Optional[bytes] = None
+        self._screenshot_stream = bytearray()
+        self._screenshot_corrupt = False
 
     def feed(self, data: bytes) -> None:
         self.buffer.extend(data)
@@ -432,7 +463,18 @@ class BinaryPacketParser:
             payload = bytes(self.buffer[BINARY_HEADER_SIZE:packet_size])
             expected_crc = binary_crc32(payload)
             if _crc != expected_crc:
-                del self.buffer[:packet_size]
+                error = (
+                    f"Binary CRC mismatch: type={packet_type} size={payload_size} "
+                    f"received=0x{_crc:08x} calculated=0x{expected_crc:08x}"
+                )
+                self.log_callback(error)
+                if packet_type == BINARY_TYPE_SCREENSHOT:
+                    if not self._screenshot_corrupt:
+                        self._screenshot_corrupt = True
+                        self._screenshot_stream.clear()
+                        if self.screenshot_error_callback is not None:
+                            self.screenshot_error_callback(error)
+                del self.buffer[:len(magic_bytes)]
                 continue
             del self.buffer[:packet_size]
             self._dispatch(packet_type, payload)
@@ -441,6 +483,15 @@ class BinaryPacketParser:
         if self.buffer:
             self._consume_text(bytes(self.buffer))
             self.buffer.clear()
+        if self._screenshot_corrupt:
+            self._screenshot_stream.clear()
+            self._screenshot_corrupt = False
+        elif self._screenshot_stream:
+            self._screenshot_stream.clear()
+            if self.screenshot_error_callback is not None:
+                self.screenshot_error_callback(
+                    "Screenshot stream ended without zero-byte terminator"
+                )
         if self.debug_text:
             self.log_callback(self.debug_text.decode("utf-8", errors="replace"))
             self.debug_text.clear()
@@ -456,8 +507,21 @@ class BinaryPacketParser:
 
     def _dispatch(self, packet_type: int, payload: bytes) -> None:
         if packet_type == BINARY_TYPE_SCREENSHOT:
-            if self.screenshot_callback is not None:
-                self.screenshot_callback(payload)
+            if self.screenshot_callback is None:
+                return
+
+            if payload == b"\x00":
+                if self._screenshot_corrupt:
+                    self._screenshot_stream.clear()
+                    self._screenshot_corrupt = False
+                elif self._screenshot_stream:
+                    self.screenshot_callback(bytes(self._screenshot_stream) + payload)
+                    self._screenshot_stream.clear()
+                else:
+                    self.screenshot_callback(payload)
+                return
+
+            self._screenshot_stream.extend(payload)
             return
         if packet_type == BINARY_TYPE_PARAMETERS:
             if self.parameters_callback is not None:
@@ -576,16 +640,20 @@ class SWOBackend:
         with self._screenshot_lock:
             return self._screenshot_output_path is not None
 
-    def try_finalize_screenshot_if_idle(self, idle_seconds: float) -> bool:
+    def fail_screenshot_if_idle(self, idle_seconds: float) -> bool:
         with self._screenshot_lock:
-            if self._screenshot_output_path is None or self._screenshot_image is None:
+            if self._screenshot_output_path is None:
                 return False
             if self._screenshot_last_packet_time <= 0.0:
                 return False
             if (time.monotonic() - self._screenshot_last_packet_time) < idle_seconds:
                 return False
 
-        self._finalize_screenshot_stream()
+        self._screenshot_event_callback(
+            "screenshot-error",
+            "Screenshot incomplete: zero-byte terminator was not received",
+        )
+        self.cancel_screenshot()
         return True
 
     def build_pyocd_command(self, reset_run: bool) -> List[str]:
@@ -1127,6 +1195,10 @@ class SerialBackend(SWOBackend):
                 self.config.serial_baud,
                 timeout=0.2,
             )
+            try:
+                serial_port.set_buffer_size(rx_size=256 * 1024)
+            except (AttributeError, OSError):
+                pass
         except ImportError:
             self.log("pyserial not found. Install with: pip install pyserial")
             return False
@@ -1192,6 +1264,12 @@ class SerialBackend(SWOBackend):
             raise
         self.log(f"Requested screenshot -> {output_path.name}")
 
+    def _fail_corrupt_screenshot(self, error: str) -> None:
+        if not self.has_pending_screenshot():
+            return
+        self._screenshot_event_callback("screenshot-error", error)
+        self.cancel_screenshot()
+
     def request_eeprom(self) -> None:
         self._send_binary_command(BINARY_TYPE_REQUEST_EEPROM)
         self.log("Requested EEPROM data")
@@ -1205,6 +1283,7 @@ class SerialBackend(SWOBackend):
             self.sample_callback,
             self._log_serial_debug,
             screenshot_callback=self._consume_screenshot_payload,
+            screenshot_error_callback=self._fail_corrupt_screenshot,
             parameters_callback=self.parameters_callback,
             eeprom_callback=self.eeprom_callback,
         )
@@ -1214,7 +1293,9 @@ class SerialBackend(SWOBackend):
 
         try:
             while not self.stop_event.is_set():
-                chunk = serial_port.read(4096)  # type: ignore[attr-defined]
+                waiting = serial_port.in_waiting  # type: ignore[attr-defined]
+                read_size = max(4096, min(waiting, BINARY_MAX_PAYLOAD_SIZE))
+                chunk = serial_port.read(read_size)  # type: ignore[attr-defined]
                 if chunk:
                     try:
                         parser.feed(bytes(chunk))
@@ -1234,7 +1315,7 @@ class SerialBackend(SWOBackend):
                 self.log("Serial reader stopped")
 
     def _log_serial_debug(self, message: str) -> None:
-        if re.match(r"^\[\d+\] ", message):
+        if re.match(r"^\[\d+\] ", message) or message.startswith("Binary CRC mismatch:"):
             self.log(message)
 
 
@@ -1883,7 +1964,7 @@ class PIDTuningApp:
 
         output_path = self._next_screenshot_path()
         self.screenshot_in_progress = True
-        self._screenshot_deadline = time.monotonic() + 5.0
+        self._screenshot_deadline = time.monotonic() + SCREENSHOT_TIMEOUT_SECONDS
         self._update_control_button_states()
 
         def worker() -> None:
@@ -3421,7 +3502,7 @@ class PIDTuningApp:
                 filename = Path(str(payload)).name
                 # Unsolicited screenshots should follow the same timeout/finalize path as button-triggered captures.
                 self.screenshot_in_progress = True
-                self._screenshot_deadline = time.monotonic() + 10.0
+                self._screenshot_deadline = time.monotonic() + SCREENSHOT_TIMEOUT_SECONDS
                 self._append_log(f"Screenshot stream started -> {filename}")
                 self._update_control_button_states()
             elif kind == "screenshot-error":
@@ -3445,10 +3526,9 @@ class PIDTuningApp:
             self._append_log("ERROR: Screenshot request timed out")
             self._update_control_button_states()
 
-        if pending_capture and self.backend.try_finalize_screenshot_if_idle(0.75):
+        if pending_capture and self.backend.fail_screenshot_if_idle(SCREENSHOT_TIMEOUT_SECONDS):
             self.screenshot_in_progress = False
             self._screenshot_deadline = 0.0
-            self._append_log("ERROR: Saved screenshot from idle stream")
             self._update_control_button_states()
 
         if self._waiting_for_first_sample and self.backend.running and now >= self._first_sample_deadline:

@@ -7,6 +7,7 @@
 #include <stm32f1xx.h>
 #include "debug.h"
 #include "tft_driver.h"
+#include "serial.h"
 
 static constexpr uint32_t kDMATimeout = 200000;
 
@@ -15,9 +16,9 @@ lv_color_t s_lvgl_buf_1[LV_BUFFER_SIZE];
 lv_disp_drv_t s_lvgl_disp_drv;
 TIM_HandleTypeDef tim2;
 
-#if HAVE_SWO_SCREENSHOTS
+#if HAVE_SCREENSHOTS
 
-// === SWO screenshot streaming support ===
+// === Screenshot streaming support ===
 
 struct TFTDriverScreenshot
 {
@@ -49,11 +50,11 @@ struct TFTDriverScreenshot
     bool begin();
     void end();
 
-    #if HAVE_USB_DEVICE
+    #if HAVE_USB_DEVICE || HAVE_SERIAL
 
         inline bool write(const void *data, size_t size)
         {
-            return Serial::writeBinary(Serial::BinaryType::SCREENSHOT, data, size) == size;
+            return Serial::writeBinary(Serial::BinaryType::SCREENSHOT, data, size);
         }
 
     #else
@@ -360,7 +361,7 @@ void tft_driver_lvgl_flush_cb(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv
 
     tft_write_window_pixels(x0, y0, x1, y1, reinterpret_cast<const uint16_t *>(color_p), px);
 
-    #if HAVE_SWO_SCREENSHOTS
+    #if HAVE_SCREENSHOTS
     if (screenshot.isActive()) {
         screenshot.write_tile(x0, y0, x1, y1, color_p);
     }

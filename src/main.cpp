@@ -14,6 +14,7 @@
 #include "eeprom.h"
 #include "stats.h"
 #include "helpers.h"
+#include "serial.h"
 #include "debug.h"
 
 #if LV_USE_LOG
@@ -142,18 +143,18 @@ static void loop()
         menu.applyEEPROMSettings();
     }
 
-    #if HAVE_SWO_SCREENSHOTS
+    #if HAVE_SCREENSHOTS
         bool screenshotRequested = false;
         // check if a screenshot was requested
         if (SWO::data.sendScreenshot) {
             SWO::data.sendScreenshot = false;
             screenshotRequested = tft_driver_screenshot_begin();
             if (screenshotRequested) {
-                DEBUG_PRINT(DebugType::INFO, "SWO screenshot started");
+                DEBUG_PRINT(DebugType::INFO, "Screenshot started");
                 lv_obj_invalidate(lv_scr_act());
             }
             else {
-                DEBUG_PRINT(DebugType::INFO, "SWO screenshot failed to start");
+                DEBUG_PRINT(DebugType::INFO, "Screenshot failed to start");
             }
         }
     #else
@@ -193,11 +194,11 @@ static void loop()
         // update UI, this might take a couple 100ms
         screenFlow.refresh();
 
-        #if HAVE_SWO_SCREENSHOTS
+        #if HAVE_SCREENSHOTS
             // finalize requested screenshot
             if (screenshotRequested) {
                 tft_driver_screenshot_end();
-                DEBUG_PRINT(DebugType::INFO, "SWO screenshot sent");
+                DEBUG_PRINT(DebugType::INFO, "Screenshot sent");
             }
         #endif
         // DEBUG_PRINT_MSG(DebugType::UI, "lv_timer_handler=%ums\n", HAL_GetTick() - lastLvHandler);

@@ -798,7 +798,7 @@ void Menu::handleButtonPress(uint32_t duration)
             break;
         // === dashboard screen ===
         case Screen::Type::DASHBOARD:
-            #if HAVE_SWO_SCREENSHOTS
+            #if HAVE_SCREENSHOTS
             if (duration >= 1000) {
                 SWO::data.sendScreenshot = true;
             }
