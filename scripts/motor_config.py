@@ -21,6 +21,7 @@ import subprocess
 import threading
 import time
 import tkinter as tk
+from datetime import datetime
 from pathlib import Path
 from collections import deque
 from dataclasses import dataclass
@@ -47,7 +48,20 @@ NTC_NOMINAL_RESISTANCE = 10000
 NTC_BETA = 3950
 NTC_NOMINAL_TEMP_C = 25.0
 MAX_RPM = 55000
-
+FIRMWARE_LOG_PATTERN = re.compile(r"^\[(\d{6,})\]\s+([^\s]+)\s+(.*)$")
+PYOCD_LINE_PATTERN = re.compile(r"^\s*\d{6,}\s+[A-Za-z]\s+(.*?)(?:\s+\[[^\]]+\])?\s*$")
+LOG_ENTRY_TYPE_PATTERN = re.compile(r"^\d{2}:\d{2}:\d{2}\.\d{4}\s+([A-Z0-9_]+):\s")
+LOG_TYPE_NAMES = (
+    "ERROR",
+    "WARNING",
+    "NOTICE",
+    "INFO",
+    "MEM",
+    "UI",
+    "PID",
+    "GDB",
+    "SERIAL",
+)
 
 @dataclass
 class Sample:
@@ -693,7 +707,7 @@ class SWOBackend:
             return True
 
         cmd = self.build_pyocd_command(reset_run=reset_run)
-        self.log("Launching: " + " ".join(cmd))
+        self.log("Launching: " + " ".join(cmd), "GDB")
 
         try:
             # pyOCD's SWVEventSink writes decoded ITM port 0 text to its stdout, which would be a
@@ -706,10 +720,10 @@ class SWOBackend:
                 bufsize=0,
             )
         except FileNotFoundError:
-            self.log("pyOCD not found. Install with: pip install pyocd")
+            self.log("pyOCD not found. Install with: pip install pyocd", "ERROR")
             return False
         except Exception as exc:  # pragma: no cover - defensive path
-            self.log(f"Failed to launch pyOCD: {exc}")
+            self.log(f"Failed to launch pyOCD: {exc}", "ERROR")
             return False
 
         self.stop_event.clear()
@@ -749,7 +763,7 @@ class SWOBackend:
             cmd.extend(["--uid", self.config.uid])
         cmd.extend(["-c", "reset"])
 
-        self.log("Resetting firmware: " + " ".join(cmd))
+        self.log("Resetting firmware: " + " ".join(cmd), "GDB")
         try:
             result = subprocess.run(
                 cmd,
@@ -760,21 +774,21 @@ class SWOBackend:
                 timeout=8.0,
             )
         except FileNotFoundError:
-            self.log("pyOCD not found. Install with: pip install pyocd")
+            self.log("pyOCD not found. Install with: pip install pyocd", "ERROR")
             return False
         except subprocess.TimeoutExpired as exc:
-            self.log("Firmware reset timed out after 8s")
+            self.log("Firmware reset timed out after 8s", "ERROR")
             if exc.stdout:
-                self.log(str(exc.stdout).rstrip())
+                self.log(str(exc.stdout).rstrip(), "ERROR")
             return False
         except Exception as exc:  # pragma: no cover - defensive path
-            self.log(f"Failed to reset firmware: {exc}")
+            self.log(f"Failed to reset firmware: {exc}", "ERROR")
             return False
 
         if result.returncode != 0:
-            self.log(f"Firmware reset failed with exit code {result.returncode}")
+            self.log(f"Firmware reset failed with exit code {result.returncode}", "ERROR")
             if result.stdout:
-                self.log(result.stdout.rstrip())
+                self.log(result.stdout.rstrip(), "ERROR")
             return False
 
         if result.stdout:
@@ -790,12 +804,12 @@ class SWOBackend:
             chunk = self.proc.stderr.read(1)
             if not chunk:
                 if buffer:
-                    self.log(buffer.decode("utf-8", errors="replace"))
+                    self.log(self._clean_pyocd_line(buffer.decode("utf-8", errors="replace")), "GDB")
                 break
 
             buffer.extend(chunk)
             if chunk == b"\n":
-                self.log(buffer.decode("utf-8", errors="replace").rstrip("\r\n"))
+                self.log(self._clean_pyocd_line(buffer.decode("utf-8", errors="replace")), "GDB")
                 buffer.clear()
 
         self.running = False
@@ -805,7 +819,16 @@ class SWOBackend:
                 return_code = self.proc.poll()
         except Exception:
             return_code = None
-        self.log(f"pyOCD log loop ended (return code: {return_code})")
+        self.log(
+            f"pyOCD log loop ended (return code: {return_code})",
+            "ERROR" if return_code not in (None, 0) else "GDB",
+        )
+
+    @staticmethod
+    def _clean_pyocd_line(text: str) -> str:
+        line = text.rstrip("\r\n")
+        match = PYOCD_LINE_PATTERN.match(line)
+        return match.group(1) if match is not None else line
 
     def _read_raw_swv(self) -> None:
         last_connect_log = 0.0
@@ -814,7 +837,10 @@ class SWOBackend:
             try:
                 with socket.create_connection(("127.0.0.1", self.config.raw_port), timeout=1.0) as sock:
                     sock.settimeout(1.0)
-                    self.log(f"Connected to SWV raw stream on tcp://127.0.0.1:{self.config.raw_port}")
+                    self.log(
+                        f"Connected to SWV raw stream on tcp://127.0.0.1:{self.config.raw_port}",
+                        "GDB",
+                    )
 
                     accumulated = bytearray()
                     pid_bytes = bytearray()
@@ -886,7 +912,10 @@ class SWOBackend:
                 pid_bytes = bytearray()
                 now = time.monotonic()
                 if now - last_connect_log > 2.0:
-                    self.log(f"Waiting for SWV raw server on tcp://127.0.0.1:{self.config.raw_port}...")
+                    self.log(
+                        f"Waiting for SWV raw server on tcp://127.0.0.1:{self.config.raw_port}...",
+                        "GDB",
+                    )
                     last_connect_log = now
                 time.sleep(0.2)
 
@@ -1200,10 +1229,10 @@ class SerialBackend(SWOBackend):
             except (AttributeError, OSError):
                 pass
         except ImportError:
-            self.log("pyserial not found. Install with: pip install pyserial")
+            self.log("pyserial not found. Install with: pip install pyserial", "ERROR")
             return False
         except Exception as exc:
-            self.log(f"Failed to open serial port {self.config.serial_port}: {exc}")
+            self.log(f"Failed to open serial port {self.config.serial_port}: {exc}", "ERROR")
             try:
                 serial_port.close()  # type: ignore[union-attr]
             except Exception:
@@ -1214,7 +1243,7 @@ class SerialBackend(SWOBackend):
         try:
             self._send_binary_command(BINARY_TYPE_TOGGLE_PID, struct.pack("<I", 1))
         except Exception as exc:
-            self.log(f"Failed to send PID start command: {exc}")
+            self.log(f"Failed to send PID start command: {exc}", "ERROR")
             try:
                 serial_port.close()  # type: ignore[attr-defined]
             except Exception:
@@ -1239,11 +1268,11 @@ class SerialBackend(SWOBackend):
                 self._send_binary_command(BINARY_TYPE_TOGGLE_PID, struct.pack("<I", 0))
                 self.log("Sent PID stop command")
             except Exception as exc:
-                self.log(f"Failed to send PID stop command: {exc}")
+                self.log(f"Failed to send PID stop command: {exc}", "ERROR")
             try:
                 serial_port.close()  # type: ignore[attr-defined]
             except Exception as exc:
-                self.log(f"Failed to close serial port: {exc}")
+                self.log(f"Failed to close serial port: {exc}", "ERROR")
             finally:
                 self.serial_port = None
 
@@ -1275,7 +1304,7 @@ class SerialBackend(SWOBackend):
         self.log("Requested EEPROM data")
 
     def reset_target(self) -> bool:
-        self.log("Firmware reset is unavailable in serial transport")
+        self.log("Firmware reset is unavailable in serial transport", "ERROR")
         return False
 
     def _read_serial(self) -> None:
@@ -1307,7 +1336,7 @@ class SerialBackend(SWOBackend):
                         self._reset_screenshot_stream()
         except Exception as exc:
             if not self.stop_event.is_set():
-                self.log(f"Serial read failed: {exc}")
+                self.log(f"Serial read failed: {exc}", "ERROR")
         finally:
             parser.flush()
             if not self.stop_event.is_set():
@@ -1474,11 +1503,15 @@ class PIDTuningApp:
 
     def __init__(self, config: AppConfig) -> None:
         self.config = config
+        self._firmware_timestamp_offset: Optional[float] = None
+        self._log_timestamp_lock = threading.Lock()
         self.log_file_path = self._configured_log_file_path()
         self._log_write_error_reported = False
         self._log_write_error_path: Optional[str] = None
+        self._log_type_vars: dict[str, tk.BooleanVar] = {}
+        self._log_type_visibility: dict[str, bool] = {}
         self.event_queue: queue.Queue[Tuple[str, object]] = queue.Queue()
-        log_callback = lambda msg: self.event_queue.put(("log", msg))
+        log_callback = lambda msg, log_type="INFO": self.event_queue.put(("log", (msg, log_type)))
         sample_callback = lambda sample: self.event_queue.put(("sample", sample))
         screenshot_event_callback = lambda kind, payload: self.event_queue.put((kind, payload))
         parameters_callback = lambda payload: self.event_queue.put(("serial-parameters", payload))
@@ -1654,6 +1687,30 @@ class PIDTuningApp:
         self.log_text.grid(row=0, column=0, sticky="nsew")
         v_scrollbar.grid(row=0, column=1, sticky="ns")
         h_scrollbar.grid(row=1, column=0, sticky="ew")
+
+        settings = self._load_settings_data()
+        filter_frame = ttk.LabelFrame(wrap, text="Log Types")
+        filter_frame.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(6, 0))
+        for column in range(5):
+            filter_frame.columnconfigure(column, weight=1)
+
+        for index, log_type in enumerate(LOG_TYPE_NAMES):
+            enabled = bool(settings.get(f"log_type_{log_type}", True))
+            self._log_type_visibility[log_type] = enabled
+            variable = tk.BooleanVar(value=enabled)
+            self._log_type_vars[log_type] = variable
+            ttk.Checkbutton(
+                filter_frame,
+                text=log_type,
+                variable=variable,
+                command=lambda type_name=log_type: self._set_log_type_visibility(type_name),
+            ).grid(
+                row=index // 5,
+                column=index % 5,
+                sticky="w",
+                padx=6,
+                pady=2,
+            )
 
     def _set_fault_indicator(self, widget: tk.Label, active: bool) -> None:
         if active:
@@ -1888,15 +1945,15 @@ class PIDTuningApp:
     def _apply_serial_parameters(self, payload: bytes) -> None:
         parameters = decode_pid_parameters(payload)
         if parameters is None:
-            self._append_log(f"Invalid serial parameter packet size: {len(payload)}")
+            self._append_log(f"Invalid serial parameter packet size: {len(payload)}", "ERROR")
             return
 
         kp, ki, kd, anti_windup, rpm = parameters
         if not all(math.isfinite(value) for value in (kp, ki, kd)):
-            self._append_log("Invalid serial parameter packet: non-finite PID value")
+            self._append_log("Invalid serial parameter packet: non-finite PID value", "ERROR")
             return
         if anti_windup > anti_windup_percent_to_raw(100.0) or rpm > MAX_RPM:
-            self._append_log("Invalid serial parameter packet: value out of range")
+            self._append_log("Invalid serial parameter packet: value out of range", "ERROR")
             return
 
         self._pid_fields_updating = True
@@ -1912,7 +1969,8 @@ class PIDTuningApp:
 
         self._append_log(
             f"Received PID params: Kp={kp:.6f} Ki={ki:.6f} Kd={kd:.6f} "
-            f"AWR={anti_windup_raw_to_percent(anti_windup):.2f}% RPM={rpm}"
+            f"AWR={anti_windup_raw_to_percent(anti_windup):.2f}% RPM={rpm}",
+            "INFO",
         )
 
     def _set_sync_enabled(self, enabled: bool) -> None:
@@ -1955,13 +2013,13 @@ class PIDTuningApp:
 
     def _request_screenshot(self) -> None:
         if self.config.transport == "swo" and self.data_address is None:
-            self._append_log("Cannot take screenshot: no dataAddress received yet")
+            self._append_log("Cannot take screenshot: no dataAddress received yet", "WARNING")
             return
         if not self.backend.running or self.reset_in_progress:
-            self._append_log("Cannot take screenshot: monitor is not running")
+            self._append_log("Cannot take screenshot: monitor is not running", "WARNING")
             return
         if self.screenshot_in_progress:
-            self._append_log("Screenshot already in progress")
+            self._append_log("Screenshot already in progress", "WARNING")
             return
 
         output_path = self._next_screenshot_path()
@@ -2210,7 +2268,7 @@ class PIDTuningApp:
                 was_running = self.backend.running
                 if was_running:
                     self._stop_monitoring(None)
-                log_callback = lambda msg: self.event_queue.put(("log", msg))
+                log_callback = lambda msg, log_type="INFO": self.event_queue.put(("log", (msg, log_type)))
                 sample_callback = lambda sample: self.event_queue.put(("sample", sample))
                 screenshot_event_callback = lambda kind, payload: self.event_queue.put((kind, payload))
                 parameters_callback = lambda payload: self.event_queue.put(("serial-parameters", payload))
@@ -2233,7 +2291,7 @@ class PIDTuningApp:
                         screenshot_event_callback=screenshot_event_callback,
                         sample_callback=sample_callback,
                     )
-                self._append_log(f"Switched connection type to {self.config.transport}")
+                self._append_log(f"Switched connection type to {self.config.transport}", "INFO")
 
             if "graph_time_window" in values:
                 current_window_seconds = int(values["graph_time_window"])
@@ -2241,9 +2299,9 @@ class PIDTuningApp:
                     self.window_seconds_var.set(str(current_window_seconds))
                     self._apply_window()
             self._apply_graph_visibility()
-            self._append_log(f"Saved config to {self._settings_path().name}")
+            self._append_log(f"Saved config to {self._settings_path().name}", "INFO")
         except Exception as exc:
-            self._append_log(f"Failed to save config: {exc}")
+            self._append_log(f"Failed to save config: {exc}", "ERROR")
         finally:
             self._close_config_dialog()
 
@@ -2657,7 +2715,7 @@ class PIDTuningApp:
             return
 
         if not self.backend.running:
-            self._append_log("EEPROM editor is only available while monitoring is started")
+            self._append_log("EEPROM editor is only available while monitoring is started", "WARNING")
             return
 
         dialog = tk.Toplevel(self.root)
@@ -2870,7 +2928,7 @@ class PIDTuningApp:
         if self.config.transport != "swo":
             return
         if self.data_address is None:
-            self._append_log("Cannot read SWO::data yet: dataAddress not available")
+            self._append_log("Cannot read SWO::data yet: dataAddress not available", "WARNING")
             return
         if self.sync_in_progress:
             return
@@ -2893,13 +2951,13 @@ class PIDTuningApp:
 
     def _sync_to_target(self) -> None:
         if self.config.transport not in ("swo", "serial"):
-            self._append_log("PID parameter sync requires SWO or serial transport")
+            self._append_log("PID parameter sync requires SWO or serial transport", "ERROR")
             return
         if self.config.transport == "swo" and self.data_address is None:
-            self._append_log("Cannot sync: no dataAddress received yet")
+            self._append_log("Cannot sync: no dataAddress received yet", "WARNING")
             return
         if self.sync_in_progress:
-            self._append_log("Sync already in progress")
+            self._append_log("Sync already in progress", "WARNING")
             return
 
         # Read-only sync unless user edited fields. This prevents accidental
@@ -2909,13 +2967,13 @@ class PIDTuningApp:
                 self._request_read_swo_data("manual")
             else:
                 if not isinstance(self.backend, SerialBackend):
-                    self._append_log("Serial backend is not available")
+                    self._append_log("Serial backend is not available", "ERROR")
                     return
                 try:
                     self.backend._send_binary_command(BINARY_TYPE_REQUEST_PARAMETERS)
-                    self._append_log("Requested PID parameters from serial target")
+                    self._append_log("Requested PID parameters from serial target", "INFO")
                 except Exception as exc:
-                    self._append_log(f"Serial PID parameter request failed: {exc}")
+                    self._append_log(f"Serial PID parameter request failed: {exc}", "ERROR")
             return
 
         try:
@@ -2929,12 +2987,12 @@ class PIDTuningApp:
             if rpm < 0 or rpm > MAX_RPM:
                 raise ValueError("RPM out of range (0..%u)" % MAX_RPM)
         except Exception as exc:
-            self._append_log(f"Invalid PID input: {exc}")
+            self._append_log(f"Invalid PID input: {exc}", "ERROR")
             return
 
         if self.config.transport == "serial":
             if not isinstance(self.backend, SerialBackend):
-                self._append_log("Serial backend is not available")
+                self._append_log("Serial backend is not available", "ERROR")
                 return
 
             payload = struct.pack(
@@ -3252,15 +3310,48 @@ class PIDTuningApp:
         self.canvas.draw_idle()
 
     def _write_log_entry(self, text: str) -> None:
+        match = LOG_ENTRY_TYPE_PATTERN.match(text)
+        if match is not None and not self._log_type_visibility.get(match.group(1), True):
+            return
         self.log_text.configure(state=tk.NORMAL)
         self.log_text.insert(tk.END, text + "\n")
         self.log_text.see(tk.END)
         self.log_text.configure(state=tk.DISABLED)
 
-    def _append_log(self, text: str) -> None:
+    def _set_log_type_visibility(self, log_type: str) -> None:
+        enabled = bool(self._log_type_vars[log_type].get())
+        self._log_type_visibility[log_type] = enabled
+        settings = self._load_settings_data()
+        settings[f"log_type_{log_type}"] = enabled
+        self._save_settings_data(settings)
+
+    @staticmethod
+    def _format_timestamp(timestamp: float) -> str:
+        timestamp_date = datetime.fromtimestamp(timestamp)
+        return timestamp_date.strftime("%H:%M:%S") + f".{timestamp_date.microsecond // 100:04d}"
+
+    def _format_log_message(self, text: str, log_type: str = "INFO") -> str:
+        match = FIRMWARE_LOG_PATTERN.match(text)
+        if match is not None:
+            firmware_timestamp = int(match.group(1))
+            with self._log_timestamp_lock:
+                if self._firmware_timestamp_offset is None:
+                    self._firmware_timestamp_offset = time.time() - (firmware_timestamp / 1000.0)
+                timestamp = (firmware_timestamp / 1000.0) + self._firmware_timestamp_offset
+            log_type = match.group(2).upper()
+            message = match.group(3)
+        else:
+            timestamp = time.time()
+            log_type = str(log_type).strip().upper() or "INFO"
+            message = text
+
+        return f"{self._format_timestamp(timestamp)} {log_type}: {message}"
+
+    def _append_log(self, text: str, log_type: str = "INFO") -> None:
+        formatted_text = self._format_log_message(text, log_type)
         try:
             with self.log_file_path.open("a", encoding="utf-8") as handle:
-                handle.write(text + "\n")
+                handle.write(formatted_text + "\n")
             self._log_write_error_reported = False
             self._log_write_error_path = None
         except OSError as exc:
@@ -3268,21 +3359,23 @@ class PIDTuningApp:
             if not self._log_write_error_reported or self._log_write_error_path != path:
                 self._log_write_error_reported = True
                 self._log_write_error_path = path
-                self._write_log_entry(f"ERROR: Failed to write log file {self.log_file_path}: {exc}")
+                self._write_log_entry(
+                    self._format_log_message(f"Failed to write log file {self.log_file_path}: {exc}")
+                )
 
-        self._write_log_entry(text)
+        self._write_log_entry(formatted_text)
 
     def _request_firmware_reset(self, reason: str, auto_restart: bool = False) -> None:
         if self.config.transport != "swo":
-            self._append_log("Firmware reset requires SWO transport")
+            self._append_log("Firmware reset requires SWO transport", "ERROR")
             return
         if self.reset_in_progress:
-            self._append_log("Firmware reset already in progress")
+            self._append_log("Firmware reset already in progress", "WARNING")
             return
 
         self.reset_in_progress = True
         self._auto_restart_after_reset = auto_restart
-        self._append_log(reason)
+        self._append_log(reason, "WARNING")
         self.status_var.set("Resetting")
         self.backend.stop()
         self._cancel_startup_sync_job()
@@ -3309,7 +3402,7 @@ class PIDTuningApp:
         self.start_stop_button.configure(text="Start")
         self.status_var.set("Stopped")
         if log_message:
-            self._append_log(log_message)
+            self._append_log(log_message, "INFO")
         self.pending_initial_sync = False
         self.sync_in_progress = False
         self._set_sync_enabled(False)
@@ -3347,9 +3440,9 @@ class PIDTuningApp:
             self._update_control_button_states()
             if self.config.transport == "swo":
                 self._set_target_enabled(True)
-                self._append_log("Waiting for SWO::data read...")
+                self._append_log("Waiting for SWO::data read...", "INFO")
                 self._request_read_swo_data("startup")
-            self._append_log("Started")
+            self._append_log("Started", "INFO")
         else:
             self.status_var.set("Error")
             self._update_control_button_states()
@@ -3372,7 +3465,7 @@ class PIDTuningApp:
             if seconds <= 0:
                 raise ValueError
         except ValueError:
-            self._append_log(f"Invalid time window: {raw}")
+            self._append_log(f"Invalid time window: {raw}", "ERROR")
             return
 
         data = self._load_settings_data()
@@ -3380,7 +3473,7 @@ class PIDTuningApp:
         self._save_settings_data(data)
         self._init_buffers(seconds)
         self._refresh_plot()
-        self._append_log(f"Applied time window: {seconds}s")
+        self._append_log(f"Applied time window: {seconds}s", "INFO")
 
     def _process_events(self) -> None:
         got_sample = False
@@ -3391,8 +3484,11 @@ class PIDTuningApp:
                 break
 
             if kind == "log":
-                text = str(payload)
-                self._append_log(text)
+                if isinstance(payload, tuple) and len(payload) == 2:
+                    text, log_type = payload
+                    self._append_log(str(text), str(log_type))
+                else:
+                    self._append_log(str(payload))
             elif kind == "serial-parameters":
                 self._apply_serial_parameters(bytes(payload))
             elif kind == "serial-eeprom":
@@ -3410,7 +3506,8 @@ class PIDTuningApp:
                 self._append_log(
                     f"Loaded SWO::data ({reason}): "
                     f"Kp={data.kp:.6f} Ki={data.ki:.6f} Kd={data.kd:.6f} "
-                    f"AWR={anti_windup_raw_to_percent(data.anti_windup):.2f}% RPM={data.rpm} changed={int(data.changed)}"
+                    f"AWR={anti_windup_raw_to_percent(data.anti_windup):.2f}% RPM={data.rpm} changed={int(data.changed)}",
+                    "INFO",
                 )
                 self._set_sync_enabled(True)
                 if reason == "startup":
@@ -3435,14 +3532,14 @@ class PIDTuningApp:
                     self._set_fault_indicator(self.driver_ocp_indicator, False)
                     self._update_control_button_states()
                     if auto_restart:
-                        self._append_log("Firmware reset complete; restarting monitor")
+                        self._append_log("Firmware reset complete; restarting monitor", "INFO")
                         self._start_monitoring()
                     else:
-                        self._append_log('Firmware ready. Press "Start" to connect and run.')
+                        self._append_log('Firmware ready. Press "Start" to connect and run.', "INFO")
                 else:
                     self._auto_restart_after_reset = False
                     self.status_var.set("Error")
-                    self._append_log("Firmware reset failed; check pyOCD/probe connection")
+                    self._append_log("Firmware reset failed; check pyOCD/probe connection", "ERROR")
             elif kind == "sync-done":
                 self.sync_in_progress = False
             elif kind == "startup-sync-retry":
@@ -3455,7 +3552,7 @@ class PIDTuningApp:
                 message = str(payload)
                 if self._eeprom_dialog_status_var is not None:
                     self._eeprom_dialog_status_var.set(f"Failed to load EEPROM data: {message}")
-                self._append_log(f"EEPROM dialog load failed: {message}")
+                self._append_log(f"EEPROM dialog load failed: {message}", "ERROR")
                 self._set_eeprom_dialog_editable(False)
             elif kind == "eeprom-commit-complete":
                 committed_eeprom_data = payload if isinstance(payload, EEPROMData) else None
@@ -3463,7 +3560,8 @@ class PIDTuningApp:
                     self._eeprom_dialog_status_var.set("EEPROM committed")
                 self._append_log(
                     "EEPROM data committed"
-                    + (" and SWO::data.EEPROM.commit set" if self.config.transport == "swo" else " via serial")
+                    + (" and SWO::data.EEPROM.commit set" if self.config.transport == "swo" else " via serial"),
+                    "INFO",
                 )
                 if committed_eeprom_data is not None:
                     # Keep UI input fields in sync with committed EEPROM values without re-reading SWO memory.
@@ -3497,7 +3595,8 @@ class PIDTuningApp:
                         f"Kp={committed_eeprom_data.kp:.6f} Ki={committed_eeprom_data.ki:.6f} "
                         f"Kd={committed_eeprom_data.kd:.6f} "
                         f"AWR={anti_windup_raw_to_percent(committed_eeprom_data.anti_windup):.2f}% "
-                        f"RPM={committed_eeprom_data.motor_rpm}"
+                        f"RPM={committed_eeprom_data.motor_rpm}",
+                        "INFO",
                     )
                     self._set_sync_enabled(True)
                 self._close_eeprom_dialog()
@@ -3505,27 +3604,27 @@ class PIDTuningApp:
                 message = str(payload)
                 if self._eeprom_dialog_status_var is not None:
                     self._eeprom_dialog_status_var.set(f"EEPROM commit failed: {message}")
-                self._append_log(f"EEPROM commit failed: {message}")
+                self._append_log(f"EEPROM commit failed: {message}", "ERROR")
                 self._set_eeprom_dialog_editable(True)
             elif kind == "screenshot-complete":
                 filename = Path(str(payload)).name
                 self.screenshot_in_progress = False
                 self._screenshot_deadline = 0.0
-                self._append_log(f"Saved screenshot to {filename}")
+                self._append_log(f"Saved screenshot to {filename}", "INFO")
                 self._update_control_button_states()
             elif kind == "screenshot-started":
                 filename = Path(str(payload)).name
                 # Unsolicited screenshots should follow the same timeout/finalize path as button-triggered captures.
                 self.screenshot_in_progress = True
                 self._screenshot_deadline = time.monotonic() + SCREENSHOT_TIMEOUT_SECONDS
-                self._append_log(f"Screenshot stream started -> {filename}")
+                self._append_log(f"Screenshot stream started -> {filename}", "INFO")
                 self._update_control_button_states()
             elif kind == "screenshot-error":
                 message = str(payload)
                 self.screenshot_in_progress = False
                 self._screenshot_deadline = 0.0
                 self.backend.cancel_screenshot()
-                self._append_log(message)
+                self._append_log(message, "ERROR")
                 self._update_control_button_states()
 
         now = time.monotonic()
@@ -3538,7 +3637,7 @@ class PIDTuningApp:
         if pending_capture and self._screenshot_deadline > 0.0 and now >= self._screenshot_deadline:
             self.screenshot_in_progress = False
             self.backend.cancel_screenshot()
-            self._append_log("ERROR: Screenshot request timed out")
+            self._append_log("Screenshot request timed out", "ERROR")
             self._update_control_button_states()
 
         if pending_capture and self.backend.fail_screenshot_if_idle(SCREENSHOT_TIMEOUT_SECONDS):

@@ -102,11 +102,9 @@ enum class DebugType : uint32_t
     WARNING = 0x02,
     NOTICE = 0x04,
     INFO = 0x08,
-    CORE = 0x10,
-    MEM = 0x20,
-    USB = 0x40,
-    UI = 0x80,
-    PID = 0x100,
+    MEM = 0x10,
+    UI = 0x20,
+    PID = 0x40,
     ALL = 0xFFFFFFFF
 };
 
@@ -128,12 +126,9 @@ inline const char *debugLevelToString(DebugType level)
         case DebugType::WARNING: return "WARNING";
         case DebugType::NOTICE: return "NOTICE";
         case DebugType::INFO: return "INFO";
-        case DebugType::CORE: return "CORE";
         case DebugType::MEM: return "MEM";
-        case DebugType::USB: return "USB";
         case DebugType::UI: return "UI";
         case DebugType::PID: return "PID";
-
         case DebugType::ERROR:
         default:
             return "ERROR";
