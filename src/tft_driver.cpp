@@ -9,97 +9,25 @@
 #include "tft_driver.h"
 #include "tft_driver_screenshot.h"
 
-static constexpr uint32_t calculateDMATimeoutMs(uint16_t bytes) {
-    // SPI @ 18 MHz: 8 bits/byte ÷ (18×10^6 bits/sec) = bytes/2250 ms
-    // Add 10ms overhead for DMA setup and completion
-    return (bytes / 2250) + 10;
+static constexpr uint32_t kSPISyncTimeoutMillis = 3;                                                // SPI synchronization timeout in milliseconds
+
+/**
+ * @brief Calculate the DMA transfer timeout based on the max. number of bytes to transfer and the SPI clock speed
+ *
+ * @param bytes Number of bytes to transfer
+ * @param spiClockHz SPI clock speed in Hz (default: 18 MHz)
+ * @return constexpr uint32_t Calculated timeout in milliseconds
+ */
+static constexpr uint32_t kCalculateDMATimeoutMs(uint16_t bytes, uint32_t spiClockHz = 18000000) {
+    return (bytes / (spiClockHz / 8000)) + (kSPISyncTimeoutMillis * 2);
 }
 
-static constexpr uint32_t kDMATransferTimeoutMillis = calculateDMATimeoutMs(LV_BUFFER_SIZE + 1024);
-static constexpr uint32_t kSPISyncTimeoutMillis  = 3;
+static constexpr uint32_t kDMATransferTimeoutMillis = kCalculateDMATimeoutMs(LV_BUFFER_SIZE);       // DMA transfer timeout in milliseconds
 
 lv_disp_draw_buf_t s_lvgl_draw_buf;
 lv_color_t s_lvgl_buf_1[LV_BUFFER_SIZE];
 lv_disp_drv_t s_lvgl_disp_drv;
 TIM_HandleTypeDef tim2;
-
-#if HAVE_SCREENSHOTS
-
-// === Screenshot streaming support ===
-
-TFTDriverScreenshot screenshot;
-
-bool TFTDriverScreenshot::write_tile(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, const lv_color_t *color_p)
-{
-    if (!active) {
-        return false;
-    }
-    if (!isPortWritable()) {
-        active = false;
-        return false;
-    }
-    const uint32_t pixel_count = (static_cast<uint32_t>(x1 - x0 + 1U) * static_cast<uint32_t>(y1 - y0 + 1U));
-    const uint32_t byte_count = pixel_count * sizeof(uint16_t);
-    TileHeader header = {
-        x0,
-        y0,
-        static_cast<uint16_t>(x1 - x0 + 1U),
-        static_cast<uint16_t>(y1 - y0 + 1U),
-        byte_count,
-    };
-
-    if (!writeByte(sizeof(header))) {
-        active = false;
-        return false;
-    }
-    if (!write(header)) {
-        active = false;
-        return false;
-    }
-    if (!write(color_p, byte_count)) {
-        active = false;
-        return false;
-    }
-    return true;
-}
-
-bool TFTDriverScreenshot::begin()
-{
-    if (active) {
-        return true;
-    }
-    if (!isPortWritable()) {
-        return false;
-    }
-    FrameHeader header = {
-        static_cast<uint16_t>(LV_HOR_RES_MAX),
-        static_cast<uint16_t>(LV_VER_RES_MAX),
-        TFTDriverScreenshot::kPixelFormatRgb565,
-        0U,
-    };
-    if (!writeByte(sizeof(header))) {
-        return false;
-    }
-    if (!write(header)) {
-        return false;
-    }
-    active = true;
-    return true;
-}
-
-void TFTDriverScreenshot::end()
-{
-    if (!active) {
-        return;
-    }
-    if (!isPortWritable()) {
-        return;
-    }
-    writeByte(0);
-    active = false;
-}
-
-#endif
 
 /**
  * @brief init GPIO pins and timers for the SPI display and backlight PWM
@@ -340,3 +268,82 @@ void tft_driver_lvgl_init(void)
     s_lvgl_disp_drv.draw_buf = &s_lvgl_draw_buf;
     lv_disp_drv_register(&s_lvgl_disp_drv);
 }
+
+
+#if HAVE_SCREENSHOTS
+
+// === Screenshot streaming support ===
+
+TFTDriverScreenshot screenshot;
+
+bool TFTDriverScreenshot::write_tile(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, const lv_color_t *color_p)
+{
+    if (!active) {
+        return false;
+    }
+    if (!isPortWritable()) {
+        active = false;
+        return false;
+    }
+    const uint32_t pixel_count = (static_cast<uint32_t>(x1 - x0 + 1U) * static_cast<uint32_t>(y1 - y0 + 1U));
+    const uint32_t byte_count = pixel_count * sizeof(uint16_t);
+    TileHeader header = {
+        x0,
+        y0,
+        static_cast<uint16_t>(x1 - x0 + 1U),
+        static_cast<uint16_t>(y1 - y0 + 1U),
+        byte_count,
+    };
+
+    if (!writeByte(sizeof(header))) {
+        active = false;
+        return false;
+    }
+    if (!write(header)) {
+        active = false;
+        return false;
+    }
+    if (!write(color_p, byte_count)) {
+        active = false;
+        return false;
+    }
+    return true;
+}
+
+bool TFTDriverScreenshot::begin()
+{
+    if (active) {
+        return true;
+    }
+    if (!isPortWritable()) {
+        return false;
+    }
+    FrameHeader header = {
+        static_cast<uint16_t>(LV_HOR_RES_MAX),
+        static_cast<uint16_t>(LV_VER_RES_MAX),
+        TFTDriverScreenshot::kPixelFormatRgb565,
+        0U,
+    };
+    if (!writeByte(sizeof(header))) {
+        return false;
+    }
+    if (!write(header)) {
+        return false;
+    }
+    active = true;
+    return true;
+}
+
+void TFTDriverScreenshot::end()
+{
+    if (!active) {
+        return;
+    }
+    if (!isPortWritable()) {
+        return;
+    }
+    writeByte(0);
+    active = false;
+}
+
+#endif
