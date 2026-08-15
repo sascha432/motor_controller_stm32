@@ -1,7 +1,5 @@
 /**
   Author: sascha_lammers@gmx.de
-
-  Handle debug output to serial/swo/usb etc...
 */
 
 #pragma once
@@ -10,6 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stm32f1xx.h>
+#include "tick_profiler.h"
 
 // === data for SWD PID tuning ===
 
@@ -263,7 +262,19 @@ inline const char *debugLevelToString(DebugType level)
     #define DEBUG_FUNCTION_SIG __func__
 #endif
 
-const char *debug_function_name(const char *signature, char *out, size_t outSize);
+constexpr const char *debug_source_filename(const char *file)
+{
+    const char *filename = file;
+    for (const char *cursor = file; *cursor != '\0'; ++cursor) {
+        if (*cursor == '/' || *cursor == '\\') {
+            filename = cursor + 1;
+        }
+    }
+    return filename;
+}
+
+#define DEBUG_SOURCE_FILENAME debug_source_filename(__FILE__)
+
 void debug_init(void);
 
 #if DEBUG_OUTPUT == DEBUG_OUTPUT_NONE
@@ -273,113 +284,45 @@ void debug_init(void);
 
 #elif DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL
 
-    #define DEBUG_PRINT_MSG(level, msg, ...) \
-        do { \
-            if ((uint32_t)(DEBUG_LEVEL) & (uint32_t)(level)) { \
-                Serial.printf(msg, ##__VA_ARGS__); \
-            } \
-        } while(0)
-
-    #define DEBUG_PRINT(level, msg, ...) \
-        do { \
-            if ((uint32_t)(DEBUG_LEVEL) & (uint32_t)(level)) { \
-                char _debug_function[96]; \
-                Serial.printf("[%06lu] %s %s " msg "\n", HAL_GetTick(), debugLevelToString(level), debug_function_name(DEBUG_FUNCTION_SIG, _debug_function, sizeof(_debug_function)), ##__VA_ARGS__); \
-            } \
-        } while(0)
+    #define DEBUG_PRINTF_FUNC Serial.printf
 
 #elif DEBUG_OUTPUT == DEBUG_OUTPUT_SWO
 
     void debug_swd_printf(const char *fmt, ...);
 
-    #define DEBUG_PRINT_MSG(level, msg, ...) \
-        do { \
-            if ((uint32_t)(DEBUG_LEVEL) & (uint32_t)(level)) { \
-                debug_swd_printf(msg, ##__VA_ARGS__); \
-            } \
-        } while(0)
-
-    #define DEBUG_PRINT(level, msg, ...) \
-        do { \
-            if ((uint32_t)(DEBUG_LEVEL) & (uint32_t)(level)) { \
-                char _debug_function[96]; \
-                debug_swd_printf("[%06lu] %s %s " msg "\n", HAL_GetTick(), debugLevelToString(level), debug_function_name(DEBUG_FUNCTION_SIG, _debug_function, sizeof(_debug_function)), ##__VA_ARGS__); \
-            } \
-        } while(0)
-
+    #define DEBUG_PRINTF_FUNC debug_swd_printf
 
 #elif DEBUG_OUTPUT == DEBUG_OUTPUT_USB
 
     void debug_usb_printf(const char *fmt, ...);
 
+    #define DEBUG_PRINTF_FUNC debug_usb_printf
+
+#else
+
+    #error invalid DEBUG_OUTPUT value
+
+#endif
+
+#if DEBUG_OUTPUT == DEBUG_OUTPUT_NONE
+
+    #define DEBUG_PRINT_MSG(level, msg, ...) do {} while(0)
+    #define DEBUG_PRINT(level, msg, ...) do {} while(0)
+
+#else
+
     #define DEBUG_PRINT_MSG(level, msg, ...) \
         do { \
             if ((uint32_t)(DEBUG_LEVEL) & (uint32_t)(level)) { \
-                debug_usb_printf(msg, ##__VA_ARGS__); \
+                DEBUG_PRINTF_FUNC(msg, ##__VA_ARGS__); \
             } \
         } while(0)
 
     #define DEBUG_PRINT(level, msg, ...) \
         do { \
             if ((uint32_t)(DEBUG_LEVEL) & (uint32_t)(level)) { \
-                char _debug_function[96]; \
-                debug_usb_printf("[%06lu] %s %s " msg "\n", HAL_GetTick(), debugLevelToString(level), debug_function_name(DEBUG_FUNCTION_SIG, _debug_function, sizeof(_debug_function)), ##__VA_ARGS__); \
+                DEBUG_PRINTF_FUNC("[%06lu] %s %s:%d " msg "\n", HAL_GetTick(), debugLevelToString(level), DEBUG_SOURCE_FILENAME, __LINE__, ##__VA_ARGS__); \
             } \
         } while(0)
-
-#else
-    #error invalid DEBUG_OUTPUT value
-#endif
-
-
-// === profiler ===
-
-#if HAVE_DWT_TICK_PROFILER
-
-struct TickProfiler {
-
-    struct AverageSumType
-    {
-        volatile uint32_t sum;
-        volatile uint32_t count;
-        volatile uint32_t started;
-        volatile uint32_t numberOfSamples;
-        AverageSumType() : sum(0), count(0), started(0), numberOfSamples(0) {}
-    };
-
-    static inline void start(uint32_t numberOfSamples = 128, uint32_t slot = 0)
-    {
-        slots[slot].numberOfSamples = numberOfSamples;
-        slots[slot].started = DWT->CYCCNT;
-    }
-
-    static inline void stop(uint32_t slot = 0)
-    {
-        volatile const uint32_t now = DWT->CYCCNT;
-        if (slots[slot].numberOfSamples < 2) {
-            slots[slot].sum = (now - slots[slot].started);
-            slots[slot].count = 1;
-        }
-        else {
-            slots[slot].sum += (now - slots[slot].started);
-            if (++slots[slot].count >= slots[slot].numberOfSamples) {
-                slots[slot].sum -= slots[slot].sum / 16;
-                slots[slot].count -= slots[slot].count / 16;
-            }
-        }
-    }
-
-    static inline uint32_t getTicks(uint32_t slot = 0)
-    {
-        return (slots[slot].count ? (slots[slot].sum / slots[slot].count) : 0);
-    }
-
-    static void snprintf(char *buf, size_t size, uint32_t slot = 0)
-    {
-        ::snprintf(buf, size, "%u\n", (unsigned)getTicks(slot));
-    }
-
-    static AverageSumType slots[16];
-};
 
 #endif

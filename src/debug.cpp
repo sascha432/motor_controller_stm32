@@ -90,34 +90,6 @@ size_t SWO::write(uint8_t port, const void *data, size_t size)
     return writeFast(port, data, size);
 }
 
-const char *debug_function_name(const char *signature, char *out, size_t outSize)
-{
-    if (!signature || !out || outSize == 0) {
-        return "<?>";
-    }
-
-    // Strip trailing template substitution details like " [with ...]".
-    const char *end = signature;
-    while (*end && *end != '[') {
-        ++end;
-    }
-
-    // Keep only the last token after return type, e.g. "Class::method()".
-    const char *start = end;
-    while (start > signature && *(start - 1) != ' ') {
-        --start;
-    }
-
-    size_t len = static_cast<size_t>(end - start);
-    if (len >= outSize) {
-        len = outSize - 1;
-    }
-
-    memcpy(out, start, len);
-    out[len] = '\0';
-    return out;
-}
-
 #if DEBUG_OUTPUT == DEBUG_OUTPUT_SWO
 
 static void debug_swd_write(const char *msg)
@@ -172,10 +144,16 @@ void debug_usb_printf(const char *fmt, ...)
 
 #endif
 
+#if DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL
+
+#error no serial support yet
+
+#endif
+
 void debug_init(void)
 {
     #if DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL
-        //TODO replace old arduino code
+        //TODO replace old arduino code and implement UART/use HAL uart code
         Serial.begin(115200);
     #endif
 }
