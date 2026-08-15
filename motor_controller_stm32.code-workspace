@@ -5,6 +5,8 @@
 		}
 	],
 	"settings": {
+		"cmake.configureOnOpen": false,
+		"cmake.ignoreCMakeListsMissing": true,
 		"workbench.colorCustomizations": {
 			"activityBar.background": "#580D3B",
 			"titleBar.activeBackground": "#7B1252",
@@ -99,6 +101,7 @@
 			"MAPR",
 			"milliamps",
 			"MILLIOHM",
+			"MINC",
 			"MOHM",
 			"mosfet",
 			"MOSI",
@@ -134,6 +137,7 @@
 			"VREF",
 			"WWDG"
 		],
-		"files.trimTrailingWhitespace": true
+		"files.trimTrailingWhitespace": true,
+		"C_Cpp.default.configurationProvider": "platformio.platformio-ide"
 	}
 }
