@@ -231,6 +231,7 @@ enum class DebugType : uint32_t
 #define DEBUG_NOTICE            DebugType::NOTICE
 #define DEBUG_DEBUG             DebugType::INFO
 #define DEBUG_ALL               DebugType::ALL
+#define DEBUG_LEVEL_RESULT(result)    ((result) ? DebugType::INFO : DebugType::ERROR)
 
 // debug level to output
 // #define DEBUG_LEVEL             static_cast<DebugType>((uint32_t)DebugType::ERROR|(uint32_t)DebugType::WARNING|(uint32_t)DebugType::NOTICE)
@@ -282,21 +283,17 @@ void debug_init(void);
     #define DEBUG_PRINT_MSG(level, msg, ...) do {} while(0)
     #define DEBUG_PRINT(level, msg, ...) do {} while(0)
 
-#elif DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL
-
-    #define DEBUG_PRINTF_FUNC Serial.printf
-
 #elif DEBUG_OUTPUT == DEBUG_OUTPUT_SWO
 
     void debug_swd_printf(const char *fmt, ...);
 
     #define DEBUG_PRINTF_FUNC debug_swd_printf
 
-#elif DEBUG_OUTPUT == DEBUG_OUTPUT_USB
+#elif DEBUG_OUTPUT == DEBUG_OUTPUT_USB || DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL
 
-    void debug_usb_printf(const char *fmt, ...);
+    void debug_serial_printf(const char *fmt, ...);
 
-    #define DEBUG_PRINTF_FUNC debug_usb_printf
+    #define DEBUG_PRINTF_FUNC debug_serial_printf
 
 #else
 

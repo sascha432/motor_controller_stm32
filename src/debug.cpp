@@ -122,12 +122,11 @@ void debug_swd_printf(const char *fmt, ...)
 
 #endif
 
-#if DEBUG_OUTPUT == DEBUG_OUTPUT_USB
+#if DEBUG_OUTPUT == DEBUG_OUTPUT_USB || DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL
 
-void debug_usb_printf(const char *fmt, ...)
+void debug_serial_printf(const char *fmt, ...)
 {
-    // Avoid calling CDC_Transmit_FS before the USB stack is fully configured.
-    if (hUsbDeviceFS.pClassData == nullptr || hUsbDeviceFS.dev_state != USBD_STATE_CONFIGURED) {
+    if (!Serial::isConnected()) {
         return;
     }
 
@@ -141,12 +140,6 @@ void debug_usb_printf(const char *fmt, ...)
         Serial::write(buf, strlen(buf));
     }
 }
-
-#endif
-
-#if DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL
-
-#error no serial support yet
 
 #endif
 
