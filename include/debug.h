@@ -210,7 +210,13 @@ struct SWO
         #define __DEBUG__BUILD__ "DEBUG"
     #endif
 #else
-    #define __DEBUG__BUILD__ ""
+    #if HAVE_USB_DEVICE
+        #define __DEBUG__BUILD__ "USB"
+    #elif HAVE_SERIAL
+        #define __DEBUG__BUILD__ "UART"
+    #else
+        #define __DEBUG__BUILD__ "SWO"
+    #endif
 #endif
 
 enum class DebugType : uint32_t
@@ -226,12 +232,12 @@ enum class DebugType : uint32_t
 };
 
 // old macros
-#define DEBUG_ERROR             DebugType::ERROR
-#define DEBUG_WARNING           DebugType::WARNING
-#define DEBUG_NOTICE            DebugType::NOTICE
-#define DEBUG_DEBUG             DebugType::INFO
-#define DEBUG_ALL               DebugType::ALL
-#define DEBUG_LEVEL_RESULT(result)    ((result) ? DebugType::INFO : DebugType::ERROR)
+#define DEBUG_ERROR                     DebugType::ERROR
+#define DEBUG_WARNING                   DebugType::WARNING
+#define DEBUG_NOTICE                    DebugType::NOTICE
+#define DEBUG_DEBUG                     DebugType::INFO
+#define DEBUG_ALL                       DebugType::ALL
+#define DEBUG_LEVEL_RESULT(result)      ((result) ? DebugType::INFO : DebugType::ERROR)
 
 // debug level to output
 // #define DEBUG_LEVEL             static_cast<DebugType>((uint32_t)DebugType::ERROR|(uint32_t)DebugType::WARNING|(uint32_t)DebugType::NOTICE)
@@ -254,14 +260,6 @@ inline const char *debugLevelToString(DebugType level)
 }
 
 // === debug helpers ===
-
-#if defined(__GNUC__) || defined(__clang__)
-    #define DEBUG_FUNCTION_SIG __PRETTY_FUNCTION__
-#elif defined(_MSC_VER)
-    #define DEBUG_FUNCTION_SIG __FUNCSIG__
-#else
-    #define DEBUG_FUNCTION_SIG __func__
-#endif
 
 constexpr const char *debug_source_filename(const char *file)
 {
