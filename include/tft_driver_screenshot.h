@@ -43,6 +43,11 @@ struct TFTDriverScreenshot
 
     #if HAVE_USB_DEVICE || HAVE_SERIAL
 
+        inline bool isPortWritable() const
+        {
+            return true;
+        }
+
         inline size_t write(const void *data, size_t size)
         {
             return Serial::writeBinary(Serial::BinaryType::SCREENSHOT, data, size);
@@ -50,9 +55,14 @@ struct TFTDriverScreenshot
 
     #else
 
+        inline bool isPortWritable() const
+        {
+            return SWO::isPortWritable(kPort);
+        }
+
         inline size_t write(const void *data, size_t size)
         {
-            return SWO::write(kPort, data, size);
+            return SWO::writeFast(kPort, data, size);
         }
 
     #endif

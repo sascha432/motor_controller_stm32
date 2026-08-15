@@ -285,6 +285,11 @@ static void loop()
                                     menu.applyEEPROMSettings();
                                 }
                                 break;
+                            case Serial::BinaryType::SYSTEM_RESET: {
+                                    DEBUG_PRINT(DebugType::INFO, "Serial: system reset requested");
+                                    NVIC_SystemReset();
+                                }
+                                break;
                             default:
                                 DEBUG_PRINT(DebugType::ERROR, "Serial: binary type=%u size=%u", static_cast<uint32_t>(type), result);
                                 break;
@@ -296,12 +301,14 @@ static void loop()
     #endif
 
     if (SWO::data.enabled == SWO::EnableState::SWO) {
-        // send PID tuning data
-        PidController::PidLoopType item;
-        while (pid.pidLoopBuffer.pop(item)) {
-            if (!SWO::writeByte(1, sizeof(item)) || !SWO::write(1, item)) {
-                pid.pidLoopBuffer.clear();
-                break;
+        if (SWO::isPortWritable(1)) {
+            // send PID tuning data
+            PidController::PidLoopType item;
+            while (pid.pidLoopBuffer.pop(item)) {
+                if (!SWO::writeByteFast(1, sizeof(item)) || !SWO::writeFast(1, item)) {
+                    pid.pidLoopBuffer.clear();
+                    break;
+                }
             }
         }
     }

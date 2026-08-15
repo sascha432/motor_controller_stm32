@@ -82,59 +82,12 @@ void SWO::deinit()
     SWO::state = false;
 }
 
-bool SWO::waitReadyPort(uint32_t port)
-{
-    constexpr uint32_t kMaxReadyPolls = 50000U;
-    volatile uint32_t polls = 0;
-    while (ITM->PORT[port].u32 == 0U) {
-        if (++polls >= kMaxReadyPolls) {
-            return false;
-        }
-    }
-    return true;
-}
-
 size_t SWO::write(uint8_t port, const void *data, size_t size)
 {
-    if (!state) { // SWO not enabled
+    if (!isPortWritable(port)) {
         return 0;
     }
-    if ((ITM->TCR & ITM_TCR_ITMENA_Msk) == 0U || (ITM->TER & (1UL << port)) == 0U) { // ITM Port not enabled
-        return 0;
-    }
-
-    const uint8_t *bytes = static_cast<const uint8_t *>(data);
-    size_t sent = 0;
-
-    while (sent < size) {
-        if (!waitReadyPort(port)) {
-            break;
-        }
-
-        size_t remaining = size - sent;
-        if (remaining >= 4U) {
-            uint32_t word =
-                (static_cast<uint32_t>(bytes[sent + 0]) << 0) |
-                (static_cast<uint32_t>(bytes[sent + 1]) << 8) |
-                (static_cast<uint32_t>(bytes[sent + 2]) << 16) |
-                (static_cast<uint32_t>(bytes[sent + 3]) << 24);
-            ITM->PORT[port].u32 = word;
-            sent += 4U;
-        }
-        else if (remaining >= 2U) {
-            uint16_t half =
-                static_cast<uint16_t>(
-                    (static_cast<uint16_t>(bytes[sent + 0]) << 0) |
-                    (static_cast<uint16_t>(bytes[sent + 1]) << 8)
-                );
-            ITM->PORT[port].u16 = half;
-            sent += 2U;
-        }
-        else {
-            ITM->PORT[port].u8 = bytes[sent++];
-        }
-    }
-    return sent;
+    return writeFast(port, data, size);
 }
 
 const char *debug_function_name(const char *signature, char *out, size_t outSize)
@@ -167,32 +120,19 @@ const char *debug_function_name(const char *signature, char *out, size_t outSize
 
 #if DEBUG_OUTPUT == DEBUG_OUTPUT_SWO
 
-static inline bool debug_swd_write_ITM_SendChar(uint32_t ch)
-{
-    if (((ITM->TCR & ITM_TCR_ITMENA_Msk) != 0UL) && /* ITM enabled */
-        ((ITM->TER & 1UL) != 0UL))                  /* ITM Port #0 enabled */
-    {
-        if (!SWO::waitReadyPort(0)) {
-            return false;
-        }
-        ITM->PORT[0U].u8 = (uint8_t)ch;
-        return true;
-    }
-    return false;
-}
-
 static void debug_swd_write(const char *msg)
 {
     if (!msg) {
         return;
     }
-    if (!SWO::state) { // SWO not enabled
+    if (!SWO::isPortWritable(0)) {
         return;
     }
     while (*msg) {
-        if (!debug_swd_write_ITM_SendChar(static_cast<uint32_t>(*msg++))) {
+        if (!SWO::waitReadyPort(0)) {
             break;
         }
+        ITM->PORT[0U].u8 = (uint8_t)*msg++;
     }
 }
 

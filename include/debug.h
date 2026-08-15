@@ -21,24 +21,8 @@
  */
 struct SWO
 {
-    static void init();
-    static void deinit();
-    static size_t write(uint8_t port, const void *data, size_t size);
+    static constexpr uint32_t kSwoTimeoutMillis = 5U;
 
-    static bool waitReadyPort(uint32_t port);
-
-    template<typename T>
-    static size_t write(uint8_t port, const T &value)
-    {
-        return write(port, &value, sizeof(value));
-    }
-
-    static size_t writeByte(uint8_t port, uint8_t value)
-    {
-        return write(port, &value, sizeof(value));
-    }
-
-    static bool state;
     enum class EnableState : uint32_t {
         DISABLED = 0,
         SWO = 1,
@@ -63,6 +47,140 @@ struct SWO
         DataType() : Kp(0), Ki(0), Kd(0), antiWindup(0), rpm(0), enabled(EnableState::DISABLED), changed(false), EEPROM{0, false}, sendScreenshot(false) {}
     };
     static constexpr size_t kDataTypeSize = sizeof(DataType);
+    static_assert(sizeof(DataType) % 4 == 0, "DataType size must be a multiple of 4");
+
+    static void init();
+    static void deinit();
+
+    /**
+     * @brief Write data to the specified SWO port
+     *
+     * @param port The SWO port number to write to
+     * @param data Pointer to the data to write
+     * @param size Number of bytes to write
+     * @return size_t Number of bytes actually written
+     */
+    static size_t write(uint8_t port, const void *data, size_t size);
+
+    /**
+     * @brief Check global states and if the port is enabled
+     *
+     * @param port The SWO port number to check
+     * @return true if the port is enabled
+     * @return false if the port is not enabled
+     */
+    inline static bool isPortWritable(uint8_t port)
+    {
+        return (state) && (ITM->TCR & ITM_TCR_ITMENA_Msk) && (ITM->TER & (1UL << port));
+    }
+
+    /**
+     * @brief Wait until the port is ready to write or timeout occurs
+     *
+     * @param port The SWO port number to check
+     * @return true if the port is ready to write
+     * @return false if the port is not ready to write within the timeout
+     */
+    inline static bool waitReadyPort(uint8_t port)
+    {
+        const uint32_t start = HAL_GetTick();
+        while (ITM->PORT[port].u32 == 0) {
+            if ((HAL_GetTick() - start) >= kSwoTimeoutMillis) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * @brief Write a value of any type to the specified SWO port
+     *
+     * @tparam T The type of the value to write
+     * @param port The SWO port number to write to
+     * @param value The value to write
+     * @return size_t Number of bytes actually written
+     */
+    template<typename T>
+    inline static size_t write(uint8_t port, const T &value)
+    {
+        return write(port, &value, sizeof(value));
+    }
+
+    /**
+     * @brief Write a single byte to the specified SWO port
+     *
+     * @param port The SWO port number to write to
+     * @param value The byte value to write
+     * @return size_t Number of bytes actually written
+     */
+    inline static size_t writeByte(uint8_t port, uint8_t value)
+    {
+        return write(port, &value, sizeof(value));
+    }
+
+    /**
+     * @brief Write data to the specified SWO port without checking if the port is enabled
+     *
+     * @param port The SWO port number to write to
+     * @param data Pointer to the data to write
+     * @param size Number of bytes to write
+     * @return size_t Number of bytes actually written
+     */
+    inline static size_t writeFast(uint8_t port, const void *data, size_t size)
+    {
+        const uint8_t *bytes = static_cast<const uint8_t *>(data);
+        size_t sent = 0;
+        while (sent < size) {
+            if (!waitReadyPort(port)) {
+                break;
+            }
+            const size_t remaining = size - sent;
+            if (remaining >= 4U) {
+                ITM->PORT[port].u32 = *reinterpret_cast<const uint32_t *>(&bytes[sent]);
+                sent += 4U;
+            }
+            else if (remaining >= 2U) {
+                ITM->PORT[port].u16 = *reinterpret_cast<const uint16_t *>(&bytes[sent]);
+                sent += 2U;
+            }
+            else {
+                ITM->PORT[port].u8 = bytes[sent++];
+            }
+        }
+        return sent;
+    }
+
+    /**
+     * @brief Write a value of any type to the specified SWO port without checking if the port is enabled
+     *
+     * @tparam T The type of the value to write
+     * @param port The SWO port number to write to
+     * @param value The value to write
+     * @return size_t Number of bytes actually written
+     */
+    template<typename T>
+    inline static size_t writeFast(uint8_t port, const T &value)
+    {
+        return writeFast(port, &value, sizeof(value));
+    }
+
+    /**
+     * @brief Write a single byte to the specified SWO port without checking if the port is enabled
+     *
+     * @param port The SWO port number to write to
+     * @param value The byte value to write
+     * @return size_t Number of bytes actually written
+     */
+    inline static size_t writeByteFast(uint8_t port, uint8_t value)
+    {
+        if (!waitReadyPort(port)) {
+            return 0;
+        }
+        ITM->PORT[port].u8 = value;
+        return 1;
+    }
+
+    static bool state;
     static DataType data;
 };
 
