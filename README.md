@@ -11,7 +11,7 @@
 - Diagnostics screen with firmware/PCB info and live min/max telemetry (VCC, current, temperatures, RPM/PWM)
 - EEPROM-backed settings with save/restore-defaults from the menu
 - LVGL TFT UI with rotary encoder plus dedicated start/back/knob buttons
-- Python script for PID parameter tuning over SWD connection
+- Python Tool for configuration and parameter tuning over SWD or USB serial connection
 
 ## Hardware Features
 
