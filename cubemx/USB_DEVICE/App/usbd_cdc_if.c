@@ -22,6 +22,7 @@
 #include "usbd_cdc_if.h"
 
 /* USER CODE BEGIN INCLUDE */
+#include <string.h>
 
 /* USER CODE END INCLUDE */
 
@@ -87,15 +88,22 @@
   */
 /* Create buffer for reception and transmission           */
 /* It's up to user to redefine and/or remove those define */
+
+/* USER CODE BEGIN PRIVATE_VARIABLES */
+
 /** Received data over USB are stored in this buffer      */
 uint8_t UserRxBufferFS[APP_RX_DATA_SIZE];
 
-/** Data to send over USB CDC are stored in this buffer   */
-uint8_t UserTxBufferFS[APP_TX_DATA_SIZE];
+#define CDC_BINARY_BUFFER_SIZE (APP_RX_DATA_SIZE - 16)
 
-/* USER CODE BEGIN PRIVATE_VARIABLES */
-static volatile uint16_t UserRxBufferLengthFS;
-static volatile uint16_t UserRxBufferOffsetFS;
+static uint8_t UserBinaryBufferFS[CDC_BINARY_BUFFER_SIZE];
+static volatile uint16_t UserBinaryBufferLengthFS;
+
+enum
+{
+  CDC_BINARY_HEADER_SIZE = 12,
+  CDC_BINARY_MAGIC = 0xDEADBEEF,
+};
 
 /* USER CODE END PRIVATE_VARIABLES */
 
@@ -153,7 +161,7 @@ static int8_t CDC_Init_FS(void)
 {
   /* USER CODE BEGIN 3 */
   /* Set Application Buffers */
-  USBD_CDC_SetTxBuffer(&hUsbDeviceFS, UserTxBufferFS, 0);
+  USBD_CDC_SetTxBuffer(&hUsbDeviceFS, NULL, 0);
   USBD_CDC_SetRxBuffer(&hUsbDeviceFS, UserRxBufferFS);
   return (USBD_OK);
   /* USER CODE END 3 */
@@ -261,8 +269,29 @@ static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
 static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
 {
   /* USER CODE BEGIN 6 */
-  UserRxBufferLengthFS = (uint16_t)*Len;
-  UserRxBufferOffsetFS = 0;
+  uint16_t received = (uint16_t)*Len;
+
+  if (received > 0U)
+  {
+    uint16_t binary_space = (uint16_t)(sizeof(UserBinaryBufferFS) - UserBinaryBufferLengthFS);
+    if (received <= binary_space)
+    {
+      memcpy(&UserBinaryBufferFS[UserBinaryBufferLengthFS], Buf, received);
+      UserBinaryBufferLengthFS = (uint16_t)(UserBinaryBufferLengthFS + received);
+    }
+    else if (received <= sizeof(UserBinaryBufferFS))
+    {
+      memcpy(UserBinaryBufferFS, Buf, received);
+      UserBinaryBufferLengthFS = received;
+    }
+    else
+    {
+      UserBinaryBufferLengthFS = 0;
+    }
+  }
+
+  USBD_CDC_SetRxBuffer(&hUsbDeviceFS, UserRxBufferFS);
+  USBD_CDC_ReceivePacket(&hUsbDeviceFS);
   return (USBD_OK);
   /* USER CODE END 6 */
 }
@@ -280,37 +309,92 @@ static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
   */
 uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len)
 {
-  uint8_t result = USBD_OK;
   /* USER CODE BEGIN 7 */
-  USBD_CDC_HandleTypeDef *hcdc = (USBD_CDC_HandleTypeDef*)hUsbDeviceFS.pClassData;
-  if (hcdc->TxState != 0){
-    return USBD_BUSY;
-  }
   USBD_CDC_SetTxBuffer(&hUsbDeviceFS, Buf, Len);
-  result = USBD_CDC_TransmitPacket(&hUsbDeviceFS);
+  return USBD_CDC_TransmitPacket(&hUsbDeviceFS);
   /* USER CODE END 7 */
-  return result;
 }
 
 /* USER CODE BEGIN PRIVATE_FUNCTIONS_IMPLEMENTATION */
-uint16_t CDC_Read_FS(uint8_t* Buf, uint16_t Len)
+uint16_t CDC_ReadBinary_FS(uint8_t* Buf, uint16_t Len, uint16_t *Type, uint32_t *Crc)
 {
-  uint16_t count = 0;
+  uint16_t available = UserBinaryBufferLengthFS;
+  uint16_t magic_offset = 0;
 
-  while (count < Len && UserRxBufferOffsetFS < UserRxBufferLengthFS)
+  if (available == 0U)
   {
-    Buf[count++] = UserRxBufferFS[UserRxBufferOffsetFS++];
+    return 0U;
   }
 
-  if (UserRxBufferOffsetFS == UserRxBufferLengthFS)
+  while ((uint16_t)(magic_offset + 4U) <= available)
   {
-    UserRxBufferLengthFS = 0;
-    UserRxBufferOffsetFS = 0;
-    USBD_CDC_SetRxBuffer(&hUsbDeviceFS, UserRxBufferFS);
-    USBD_CDC_ReceivePacket(&hUsbDeviceFS);
+    if (*(const uint32_t *)&UserBinaryBufferFS[magic_offset] == CDC_BINARY_MAGIC)
+    {
+      break;
+    }
+    ++magic_offset;
   }
 
-  return count;
+  if ((uint16_t)(magic_offset + 4U) > available)
+  {
+    UserBinaryBufferLengthFS = 0U;
+    return 0U;
+  }
+
+  if (magic_offset > 0U)
+  {
+    uint16_t remaining = (uint16_t)(available - magic_offset);
+    memmove(UserBinaryBufferFS, &UserBinaryBufferFS[magic_offset], remaining);
+    UserBinaryBufferLengthFS = remaining;
+    available = remaining;
+  }
+
+  if (available < CDC_BINARY_HEADER_SIZE)
+  {
+    return 0U;
+  }
+
+  const uint16_t payload_size = *(const uint16_t *)&UserBinaryBufferFS[4];
+  const uint16_t binary_type = *(const uint16_t *)&UserBinaryBufferFS[6];
+  const uint32_t crc = *(const uint32_t *)&UserBinaryBufferFS[8];
+  const uint16_t frame_size = (uint16_t)(CDC_BINARY_HEADER_SIZE + payload_size);
+
+  if (payload_size > (sizeof(UserBinaryBufferFS) - CDC_BINARY_HEADER_SIZE))
+  {
+    UserBinaryBufferLengthFS = 0U;
+    return 0U;
+  }
+
+  if (available < frame_size)
+  {
+    return 0U;
+  }
+
+  if (Len < payload_size)
+  {
+    return 0U;
+  }
+
+  memcpy(Buf, &UserBinaryBufferFS[CDC_BINARY_HEADER_SIZE], payload_size);
+
+  uint16_t remaining = (uint16_t)(available - frame_size);
+  if (remaining > 0U)
+  {
+    memmove(UserBinaryBufferFS, &UserBinaryBufferFS[frame_size], remaining);
+  }
+  UserBinaryBufferLengthFS = remaining;
+
+  if (Type != NULL)
+  {
+    *Type = binary_type;
+  }
+
+  if (Crc != NULL)
+  {
+    *Crc = crc;
+  }
+
+  return payload_size;
 }
 
 /* USER CODE END PRIVATE_FUNCTIONS_IMPLEMENTATION */
