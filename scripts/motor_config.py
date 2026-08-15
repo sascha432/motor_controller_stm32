@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
-"""Graphical PID monitor for STM32 SWO or USB CDC serial.
+"""
+Motor configuration and parameter tuning tool for SWO or USB/serial.
 
 Author: sascha_lammers@gmx.de
 
 *** Mostly AI generated code be aware of utter garbage that i might have missed ***
-
-The backend connects to pyOCD gdbserver and decodes raw SWV ITM packets.
-Port 1 is interpreted as PidController::PidLoopType binary frames.
 """
 
 from __future__ import annotations
 
 import argparse
 import importlib
+import json
 import math
 import queue
 import re
@@ -93,6 +92,20 @@ class AppConfig:
     gdb_port: int
 
 
+def _load_saved_settings_defaults() -> dict[str, object]:
+    config_path = Path(__file__).resolve().with_suffix(".json")
+    if not config_path.exists():
+        return {}
+
+    try:
+        with config_path.open("r", encoding="utf-8") as handle:
+            data = json.load(handle)
+    except Exception:
+        return {}
+
+    return data if isinstance(data, dict) else {}
+
+
 # Firmware protocol on SWO port 1: first byte is the payload length, followed by the raw PID item bytes.
 PID_FRAME_LENGTH_PREFIX = 1
 PID_ITEM_STRUCT = "<H10HBB"
@@ -107,8 +120,29 @@ BINARY_HEADER_STRUCT = "<IHHI"
 BINARY_HEADER_SIZE = struct.calcsize(BINARY_HEADER_STRUCT)
 BINARY_MAGIC = 0xDEADBEEF
 BINARY_TYPE_PID = 0
-BINARY_TYPE_SCREENSHOT = 1
+BINARY_TYPE_TOGGLE_PID = 1
+BINARY_TYPE_SCREENSHOT = 2
+BINARY_TYPE_REQUEST_SCREENSHOT = 3
+BINARY_TYPE_PARAMETERS = 4
+BINARY_TYPE_REQUEST_PARAMETERS = 5
+BINARY_TYPE_EEPROM = 6
+BINARY_TYPE_REQUEST_EEPROM = 7
 BINARY_MAX_PAYLOAD_SIZE = 65535
+PID_PARAMETERS_STRUCT = "<fffHH"
+PID_PARAMETERS_SIZE = struct.calcsize(PID_PARAMETERS_STRUCT)
+
+
+def binary_crc32(data: bytes) -> int:
+    """Calculate the STM32 CRC result, zero-padding a partial final word."""
+    data += b"\x00" * (-len(data) % 4)
+
+    crc = 0xFFFFFFFF
+    for offset in range(0, len(data), 4):
+        word = int.from_bytes(data[offset:offset + 4], "little")
+        crc ^= word
+        for _ in range(32):
+            crc = ((crc << 1) ^ 0x04C11DB7) & 0xFFFFFFFF if crc & 0x80000000 else (crc << 1) & 0xFFFFFFFF
+    return crc
 
 # Screenshot stream uses the same length-prefix scheme: [len][payload] and the stream terminated by a single 0 byte [0][no payload]
 SCREENSHOT_END_MARKER = 0
@@ -300,6 +334,18 @@ def decode_pid_item(payload: bytes) -> Optional[Sample]:
     )
 
 
+def decode_pid_parameters(payload: bytes) -> Optional[tuple[float, float, float, int, int]]:
+    if len(payload) != PID_PARAMETERS_SIZE:
+        return None
+    return struct.unpack(PID_PARAMETERS_STRUCT, payload)
+
+
+def decode_eeprom_data(payload: bytes) -> Optional[EEPROMData]:
+    if len(payload) != EEPROM_DATA_SIZE:
+        return None
+    return EEPROMData(*struct.unpack(EEPROM_DATA_STRUCT, payload))
+
+
 def is_plausible_sample(sample: Sample) -> bool:
     return not sample_validation_errors(sample)
 
@@ -338,10 +384,14 @@ class BinaryPacketParser:
         sample_callback: Callable[[Sample], None],
         log_callback: Callable[[str], None],
         screenshot_callback: Optional[Callable[[bytes], None]] = None,
+        parameters_callback: Optional[Callable[[bytes], None]] = None,
+        eeprom_callback: Optional[Callable[[bytes], None]] = None,
     ) -> None:
         self.sample_callback = sample_callback
         self.log_callback = log_callback
         self.screenshot_callback = screenshot_callback
+        self.parameters_callback = parameters_callback
+        self.eeprom_callback = eeprom_callback
         self.buffer = bytearray()
         self.debug_text = bytearray()
         self.last_pid_payload: Optional[bytes] = None
@@ -380,6 +430,10 @@ class BinaryPacketParser:
                 return
 
             payload = bytes(self.buffer[BINARY_HEADER_SIZE:packet_size])
+            expected_crc = binary_crc32(payload)
+            if _crc != expected_crc:
+                del self.buffer[:packet_size]
+                continue
             del self.buffer[:packet_size]
             self._dispatch(packet_type, payload)
 
@@ -404,6 +458,14 @@ class BinaryPacketParser:
         if packet_type == BINARY_TYPE_SCREENSHOT:
             if self.screenshot_callback is not None:
                 self.screenshot_callback(payload)
+            return
+        if packet_type == BINARY_TYPE_PARAMETERS:
+            if self.parameters_callback is not None:
+                self.parameters_callback(payload)
+            return
+        if packet_type == BINARY_TYPE_EEPROM:
+            if self.eeprom_callback is not None:
+                self.eeprom_callback(payload)
             return
         if packet_type != BINARY_TYPE_PID:
             return
@@ -1021,6 +1083,8 @@ class SerialBackend(SWOBackend):
         screenshot_path_factory: Callable[[], Path],
         screenshot_event_callback: Callable[[str, object], None],
         sample_callback: Callable[[Sample], None],
+        parameters_callback: Callable[[bytes], None],
+        eeprom_callback: Callable[[bytes], None],
     ) -> None:
         super().__init__(
             config,
@@ -1033,6 +1097,22 @@ class SerialBackend(SWOBackend):
         self.reader_thread: Optional[threading.Thread] = None
         self.serial_port: Optional[object] = None
         self.running = False
+        self.parameters_callback = parameters_callback
+        self.eeprom_callback = eeprom_callback
+
+    def _send_binary_command(self, command_type: int, payload: bytes = b"\x00\x00\x00\x00") -> None:
+        self._send_binary_payload(command_type, payload)
+
+    def _send_binary_payload(self, packet_type: int, payload: bytes) -> None:
+        serial_port = self.serial_port
+        if serial_port is None:
+            raise RuntimeError("USB serial transport is not running")
+
+        crc = binary_crc32(payload)
+        header = struct.pack(BINARY_HEADER_STRUCT, BINARY_MAGIC, len(payload), packet_type, crc)
+        serial_port.write(header)  # type: ignore[attr-defined]
+        serial_port.write(payload)  # type: ignore[attr-defined]
+        serial_port.flush()  # type: ignore[attr-defined]
 
     def start(self, reset_run: bool = False) -> bool:
         del reset_run
@@ -1047,8 +1127,6 @@ class SerialBackend(SWOBackend):
                 self.config.serial_baud,
                 timeout=0.2,
             )
-            serial_port.write(b"p")
-            serial_port.flush()
         except ImportError:
             self.log("pyserial not found. Install with: pip install pyserial")
             return False
@@ -1061,6 +1139,17 @@ class SerialBackend(SWOBackend):
             return False
 
         self.serial_port = serial_port
+        try:
+            self._send_binary_command(BINARY_TYPE_TOGGLE_PID, struct.pack("<I", 1))
+        except Exception as exc:
+            self.log(f"Failed to send PID start command: {exc}")
+            try:
+                serial_port.close()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            self.serial_port = None
+            return False
+
         self.stop_event.clear()
         self.running = True
         self.reader_thread = threading.Thread(target=self._read_serial, daemon=True)
@@ -1072,12 +1161,10 @@ class SerialBackend(SWOBackend):
     def stop(self) -> None:
         self.stop_event.set()
         serial_port = self.serial_port
-        self.serial_port = None
 
         if serial_port is not None:
             try:
-                serial_port.write(b"p")  # type: ignore[attr-defined]
-                serial_port.flush()  # type: ignore[attr-defined]
+                self._send_binary_command(BINARY_TYPE_TOGGLE_PID, struct.pack("<I", 0))
                 self.log("Sent PID stop command")
             except Exception as exc:
                 self.log(f"Failed to send PID stop command: {exc}")
@@ -1085,6 +1172,8 @@ class SerialBackend(SWOBackend):
                 serial_port.close()  # type: ignore[attr-defined]
             except Exception as exc:
                 self.log(f"Failed to close serial port: {exc}")
+            finally:
+                self.serial_port = None
 
         if self.reader_thread is not None:
             self.reader_thread.join(timeout=1.0)
@@ -1093,17 +1182,19 @@ class SerialBackend(SWOBackend):
 
     def request_screenshot(self, output_path: Path) -> None:
         super().request_screenshot(output_path)
-        serial_port = self.serial_port
-        if serial_port is None:
+        if self.serial_port is None:
             self.cancel_screenshot()
             raise RuntimeError("USB serial transport is not running")
         try:
-            serial_port.write(b"s")  # type: ignore[attr-defined]
-            serial_port.flush()  # type: ignore[attr-defined]
+            self._send_binary_command(BINARY_TYPE_REQUEST_SCREENSHOT)
         except Exception:
             self.cancel_screenshot()
             raise
         self.log(f"Requested screenshot -> {output_path.name}")
+
+    def request_eeprom(self) -> None:
+        self._send_binary_command(BINARY_TYPE_REQUEST_EEPROM)
+        self.log("Requested EEPROM data")
 
     def reset_target(self) -> bool:
         self.log("Firmware reset is unavailable in serial transport")
@@ -1112,8 +1203,10 @@ class SerialBackend(SWOBackend):
     def _read_serial(self) -> None:
         parser = BinaryPacketParser(
             self.sample_callback,
-            self.log,
+            self._log_serial_debug,
             screenshot_callback=self._consume_screenshot_payload,
+            parameters_callback=self.parameters_callback,
+            eeprom_callback=self.eeprom_callback,
         )
         serial_port = self.serial_port
         if serial_port is None:
@@ -1139,6 +1232,10 @@ class SerialBackend(SWOBackend):
             if not self.stop_event.is_set():
                 self.running = False
                 self.log("Serial reader stopped")
+
+    def _log_serial_debug(self, message: str) -> None:
+        if re.match(r"^\[\d+\] ", message):
+            self.log(message)
 
 
 class GDBMemoryClient:
@@ -1288,6 +1385,7 @@ class GDBMemoryClient:
 class PIDTuningApp:
     PRESETS = (5, 10, 20, 30)
     STARTUP_PACKET_TIMEOUT_SECONDS = 5.0
+    EEPROM_CONFIG_SLOT_COUNT = 10
 
     @staticmethod
     def _make_series(length: int) -> deque[float]:
@@ -1295,10 +1393,13 @@ class PIDTuningApp:
 
     def __init__(self, config: AppConfig) -> None:
         self.config = config
+        self.log_file_path = self._configured_log_file_path()
         self.event_queue: queue.Queue[Tuple[str, object]] = queue.Queue()
         log_callback = lambda msg: self.event_queue.put(("log", msg))
         sample_callback = lambda sample: self.event_queue.put(("sample", sample))
         screenshot_event_callback = lambda kind, payload: self.event_queue.put((kind, payload))
+        parameters_callback = lambda payload: self.event_queue.put(("serial-parameters", payload))
+        eeprom_callback = lambda payload: self.event_queue.put(("serial-eeprom", payload))
         if config.transport == "serial":
             self.backend = SerialBackend(
                 config,
@@ -1306,6 +1407,8 @@ class PIDTuningApp:
                 screenshot_path_factory=self._next_screenshot_path,
                 screenshot_event_callback=screenshot_event_callback,
                 sample_callback=sample_callback,
+                parameters_callback=parameters_callback,
+                eeprom_callback=eeprom_callback,
             )
         else:
             self.backend = SWOBackend(
@@ -1317,7 +1420,7 @@ class PIDTuningApp:
             )
 
         self.root = tk.Tk()
-        self.root.title("PID Tuning SWO Monitor")
+        self.root.title("Motor Controller Config")
         self.root.geometry("1920x1200")
         self.root.minsize(1000, 640)
 
@@ -1331,6 +1434,8 @@ class PIDTuningApp:
         self._pid_fields_updating = False
         self._pid_fields_dirty = False
         self._last_loaded_swo_data: Optional[SWOData] = None
+        self._config_dialog: Optional[tk.Toplevel] = None
+        self._config_dialog_vars: dict[str, tk.StringVar] = {}
         self._eeprom_dialog: Optional[tk.Toplevel] = None
         self._eeprom_dialog_status_var: Optional[tk.StringVar] = None
         self._eeprom_dialog_vars: dict[str, tk.StringVar] = {}
@@ -1339,6 +1444,7 @@ class PIDTuningApp:
         self._eeprom_dialog_commit_button: Optional[ttk.Button] = None
         self._eeprom_dialog_source: Optional[EEPROMData] = None
         self._eeprom_dialog_address: Optional[int] = None
+        self._restore_ui_state()
         self.screenshot_in_progress = False
         self._screenshot_deadline = 0.0
         self._install_pid_field_traces()
@@ -1357,7 +1463,9 @@ class PIDTuningApp:
         self._build_layout()
         self._update_control_button_states()
         self.root.after_idle(self._update_control_button_states)
-        self._init_buffers(window_seconds=10)
+        self.window_seconds_var.set(str(self._load_graph_time_window()))
+        self._init_buffers(window_seconds=int(self.window_seconds_var.get()))
+        self._apply_graph_visibility()
         self._build_plot_lines()
         self._refresh_plot()
 
@@ -1527,7 +1635,7 @@ class PIDTuningApp:
         ttk.Label(status_frame, text="Status:").pack(side=tk.LEFT)
         ttk.Label(status_frame, textvariable=self.status_var).pack(side=tk.LEFT, padx=(6, 0))
 
-        pid_group = ttk.LabelFrame(outer, text="PID Parameters (SWO::DataType)")
+        pid_group = ttk.LabelFrame(outer, text="PID Parameters")
         pid_group.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(8, 6))
         pid_group.columnconfigure(1, weight=1)
 
@@ -1565,11 +1673,14 @@ class PIDTuningApp:
         )
         self.reset_firmware_button.grid(row=8, column=0, columnspan=2, padx=6, pady=(0, 6), sticky="ew")
 
+        self.config_button = ttk.Button(pid_group, text="Config...", command=self._open_config_dialog)
+        self.config_button.grid(row=9, column=0, columnspan=2, padx=6, pady=(0, 6), sticky="ew")
+
         ttk.Label(
             outer,
             text="Panels are resizable; drag separators to adjust Graph / Logs / Faults / Controls.",
             justify=tk.LEFT,
-        ).grid(row=3, column=0, columnspan=2, sticky="w", pady=(6, 0))
+        ).grid(row=4, column=0, columnspan=2, sticky="w", pady=(6, 0))
 
     def _pack_swo_data(
         self,
@@ -1691,6 +1802,36 @@ class PIDTuningApp:
         finally:
             self._pid_fields_updating = False
 
+    def _apply_serial_parameters(self, payload: bytes) -> None:
+        parameters = decode_pid_parameters(payload)
+        if parameters is None:
+            self._append_log(f"Invalid serial parameter packet size: {len(payload)}")
+            return
+
+        kp, ki, kd, anti_windup, rpm = parameters
+        if not all(math.isfinite(value) for value in (kp, ki, kd)):
+            self._append_log("Invalid serial parameter packet: non-finite PID value")
+            return
+        if anti_windup > anti_windup_percent_to_raw(100.0) or rpm > MAX_RPM:
+            self._append_log("Invalid serial parameter packet: value out of range")
+            return
+
+        self._pid_fields_updating = True
+        try:
+            self.kp_var.set(f"{kp:.6f}")
+            self.ki_var.set(f"{ki:.6f}")
+            self.kd_var.set(f"{kd:.6f}")
+            self.anti_windup_var.set(f"{anti_windup_raw_to_percent(anti_windup):.2f}")
+            self.rpm_var.set(str(rpm))
+            self._pid_fields_dirty = False
+        finally:
+            self._pid_fields_updating = False
+
+        self._append_log(
+            f"Received PID params: Kp={kp:.6f} Ki={ki:.6f} Kd={kd:.6f} "
+            f"AWR={anti_windup_raw_to_percent(anti_windup):.2f}% RPM={rpm}"
+        )
+
     def _set_sync_enabled(self, enabled: bool) -> None:
         self.sync_button.configure(state=(tk.NORMAL if enabled else tk.DISABLED))
 
@@ -1705,13 +1846,19 @@ class PIDTuningApp:
 
     def _update_control_button_states(self) -> None:
         swo_transport = self.config.transport == "swo"
-        eeprom_enabled = swo_transport and self.backend.running and not self.reset_in_progress and self._eeprom_dialog is None
+        config_enabled = not self.backend.running and not self.reset_in_progress
+        eeprom_enabled = (swo_transport or self.config.transport == "serial") and self.backend.running and not self.reset_in_progress and self._eeprom_dialog is None
         screenshot_enabled = self.backend.running and not self.reset_in_progress and not self.screenshot_in_progress
         reset_enabled = swo_transport and not self.reset_in_progress and self._eeprom_dialog is None
-        self._set_sync_enabled(swo_transport and self.backend.running and not self.reset_in_progress)
+        self._set_sync_enabled(
+            (swo_transport or self.config.transport == "serial")
+            and self.backend.running
+            and not self.reset_in_progress
+        )
         self._set_eeprom_button_enabled(eeprom_enabled)
         self._set_screenshot_button_enabled(screenshot_enabled)
         self._set_reset_firmware_button_enabled(reset_enabled)
+        self.config_button.configure(state=(tk.NORMAL if config_enabled else tk.DISABLED))
 
     def _next_screenshot_path(self) -> Path:
         script_dir = Path(__file__).resolve().parent
@@ -1816,6 +1963,11 @@ class PIDTuningApp:
             except Exception:
                 pass
             try:
+                self._eeprom_dialog.geometry()
+                self._save_ui_state()
+            except Exception:
+                pass
+            try:
                 self._eeprom_dialog.destroy()
             except Exception:
                 pass
@@ -1826,24 +1978,517 @@ class PIDTuningApp:
         self._eeprom_dialog_widgets = []
         self._eeprom_dialog_summary_vars = {}
         self._eeprom_dialog_commit_button = None
+        self._eeprom_dialog_save_button = None
+        self._eeprom_dialog_load_button = None
+        self._eeprom_dialog_slot_var = None
+        self._eeprom_dialog_slot_combo = None
         self._eeprom_dialog_source = None
         self._eeprom_dialog_address = None
         self._update_control_button_states()
 
-    def _populate_eeprom_dialog(self, swo_data: SWOData, data: EEPROMData) -> None:
+    def _default_eeprom_slot_names(self) -> list[str]:
+        return [f"slot_{index + 1}" for index in range(self.EEPROM_CONFIG_SLOT_COUNT)]
+
+    def _settings_path(self) -> Path:
+        return Path(__file__).resolve().with_suffix(".json")
+
+    def _default_log_file_path(self) -> Path:
+        return Path(__file__).resolve().with_suffix(".log")
+
+    def _configured_log_file_path(self) -> Path:
+        value = self._load_settings_data().get("log_file")
+        if isinstance(value, str) and value.strip():
+            return Path(value.strip()).expanduser()
+        return self._default_log_file_path()
+
+    def _load_config_fields(self) -> dict[str, object]:
+        data = self._load_settings_data()
+        fields = {
+            "transport": data.get("transport", self.config.transport),
+            "serial_port": data.get("serial_port", self.config.serial_port),
+            "serial_baud": data.get("serial_baud", self.config.serial_baud),
+            "uid": data.get("uid", self.config.uid),
+            "target": data.get("target", self.config.target),
+            "system_clock": data.get("system_clock", self.config.system_clock),
+            "swo_clock": data.get("swo_clock", self.config.swo_clock),
+            "swd_frequency": data.get("swd_frequency", self.config.swd_frequency),
+            "connect_mode": data.get("connect_mode", self.config.connect_mode),
+            "raw_port": data.get("raw_port", self.config.raw_port),
+            "gdb_port": data.get("gdb_port", self.config.gdb_port),
+            "log_file": data.get("log_file", str(self._default_log_file_path())),
+            "graph_rpm": data.get("graph_rpm", True),
+            "graph_pwm": data.get("graph_pwm", True),
+            "graph_current": data.get("graph_current", True),
+            "graph_voltage": data.get("graph_voltage", True),
+            "graph_temperature": data.get("graph_temperature", True),
+            "graph_integral": data.get("graph_integral", True),
+            "graph_time_window": data.get("graph_time_window", 60),
+        }
+        return fields
+
+    def _load_graph_time_window(self) -> int:
+        data = self._load_settings_data()
+        raw_value = data.get("graph_time_window", 60)
+        try:
+            return max(1, int(raw_value))
+        except Exception:
+            return 60
+
+    def _save_config_fields(self, values: dict[str, object]) -> None:
+        data = self._load_settings_data()
+        for key in (
+            "transport",
+            "serial_port",
+            "serial_baud",
+            "uid",
+            "target",
+            "system_clock",
+            "swo_clock",
+            "swd_frequency",
+            "connect_mode",
+            "raw_port",
+            "gdb_port",
+            "log_file",
+            "graph_rpm",
+            "graph_pwm",
+            "graph_current",
+            "graph_voltage",
+            "graph_temperature",
+            "graph_integral",
+            "graph_time_window",
+        ):
+            if key in values:
+                if key == "graph_time_window":
+                    data[key] = max(1, int(values[key]))
+                elif key == "transport":
+                    data[key] = str(values[key]).strip().lower()
+                elif key == "log_file":
+                    log_file = str(values[key]).strip()
+                    data[key] = log_file or str(self._default_log_file_path())
+                else:
+                    data[key] = values[key]
+        self._save_settings_data(data)
+
+        self.config.transport = str(values.get("transport", self.config.transport)).strip().lower()
+        self.config.serial_port = str(values.get("serial_port", self.config.serial_port))
+        self.config.serial_baud = int(values.get("serial_baud", self.config.serial_baud))
+        self.config.uid = str(values.get("uid", self.config.uid))
+        self.config.target = str(values.get("target", self.config.target))
+        self.config.system_clock = int(values.get("system_clock", self.config.system_clock))
+        self.config.swo_clock = int(values.get("swo_clock", self.config.swo_clock))
+        self.config.swd_frequency = int(values.get("swd_frequency", self.config.swd_frequency))
+        self.config.connect_mode = str(values.get("connect_mode", self.config.connect_mode))
+        self.config.raw_port = int(values.get("raw_port", self.config.raw_port))
+        self.config.gdb_port = int(values.get("gdb_port", self.config.gdb_port))
+        self.log_file_path = self._configured_log_file_path()
+
+    def _close_config_dialog(self) -> None:
+        if self._config_dialog is not None:
+            try:
+                self._save_ui_state()
+            except Exception:
+                pass
+            try:
+                self._config_dialog.grab_release()
+            except Exception:
+                pass
+            try:
+                self._config_dialog.destroy()
+            except Exception:
+                pass
+        self._config_dialog = None
+        self._config_dialog_vars = {}
+
+    def _save_config_dialog(self) -> None:
+        if self._config_dialog is None:
+            return
+
+        try:
+            previous_transport = str(self.config.transport).strip().lower()
+            previous_window_seconds = self._load_graph_time_window()
+            values = {}
+            for key, var in self._config_dialog_vars.items():
+                raw_value = var.get()
+                if isinstance(raw_value, bool):
+                    values[key] = raw_value
+                elif isinstance(raw_value, str):
+                    values[key] = raw_value.strip()
+                else:
+                    values[key] = raw_value
+            self._save_config_fields(values)
+
+            current_transport = str(self.config.transport).strip().lower()
+            if current_transport != previous_transport:
+                was_running = self.backend.running
+                if was_running:
+                    self._stop_monitoring(None)
+                log_callback = lambda msg: self.event_queue.put(("log", msg))
+                sample_callback = lambda sample: self.event_queue.put(("sample", sample))
+                screenshot_event_callback = lambda kind, payload: self.event_queue.put((kind, payload))
+                parameters_callback = lambda payload: self.event_queue.put(("serial-parameters", payload))
+                eeprom_callback = lambda payload: self.event_queue.put(("serial-eeprom", payload))
+                if current_transport == "serial":
+                    self.backend = SerialBackend(
+                        self.config,
+                        log_callback=log_callback,
+                        screenshot_path_factory=self._next_screenshot_path,
+                        screenshot_event_callback=screenshot_event_callback,
+                        sample_callback=sample_callback,
+                        parameters_callback=parameters_callback,
+                        eeprom_callback=eeprom_callback,
+                    )
+                else:
+                    self.backend = SWOBackend(
+                        self.config,
+                        log_callback=log_callback,
+                        screenshot_path_factory=self._next_screenshot_path,
+                        screenshot_event_callback=screenshot_event_callback,
+                        sample_callback=sample_callback,
+                    )
+                self._append_log(f"Switched connection type to {self.config.transport}")
+
+            if "graph_time_window" in values:
+                current_window_seconds = int(values["graph_time_window"])
+                if current_window_seconds != previous_window_seconds:
+                    self.window_seconds_var.set(str(current_window_seconds))
+                    self._apply_window()
+            self._apply_graph_visibility()
+            self._append_log(f"Saved config to {self._settings_path().name}")
+        except Exception as exc:
+            self._append_log(f"Failed to save config: {exc}")
+        finally:
+            self._close_config_dialog()
+
+    def _open_config_dialog(self) -> None:
+        if self._config_dialog is not None:
+            self._config_dialog.lift()
+            self._config_dialog.focus_force()
+            return
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Config")
+        dialog.transient(self.root)
+        dialog.grab_set()
+        dialog.minsize(520, 420)
+        dialog.protocol("WM_DELETE_WINDOW", self._close_config_dialog)
+        self._config_dialog = dialog
+
+        ui_state = self._load_ui_state()
+        config_geometry = ui_state.get("config_geometry") if isinstance(ui_state, dict) else None
+        if isinstance(config_geometry, str) and config_geometry:
+            try:
+                dialog.geometry(config_geometry)
+            except Exception:
+                self._position_dialog_centered(dialog, width=620, height=460)
+        else:
+            self._position_dialog_centered(dialog, width=620, height=460)
+
+        values = self._load_config_fields()
+        self._config_dialog_vars = {}
+
+        outer = ttk.Frame(dialog, padding=12)
+        outer.pack(fill=tk.BOTH, expand=True)
+        outer.columnconfigure(0, weight=1)
+
+        transport_frame = ttk.LabelFrame(outer, text="Connection Type")
+        transport_frame.grid(row=0, column=0, sticky="ew", pady=(0, 12))
+        transport_frame.columnconfigure(1, weight=1)
+        ttk.Label(transport_frame, text="Transport:").grid(row=0, column=0, padx=(8, 6), pady=4, sticky="w")
+        transport_value = str(values.get("transport", "")).strip().lower()
+        transport_display = {"serial": "Serial", "swo": "SWO"}.get(transport_value, transport_value)
+        var = tk.StringVar(value=transport_display)
+        self._config_dialog_vars["transport"] = var
+        widget = ttk.Combobox(transport_frame, textvariable=var, values=["Serial", "SWO"], state="readonly", width=24)
+        widget.grid(row=0, column=1, padx=(0, 8), pady=4, sticky="ew")
+
+        inner = ttk.Frame(outer)
+        inner.grid(row=1, column=0, sticky="nsew")
+        inner.columnconfigure(0, weight=1)
+        inner.columnconfigure(1, weight=1)
+
+        serial_frame = ttk.LabelFrame(inner, text="Serial")
+        serial_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 8), pady=(0, 8))
+        serial_frame.columnconfigure(1, weight=1)
+
+        swo_frame = ttk.LabelFrame(inner, text="SWO")
+        swo_frame.grid(row=0, column=1, sticky="nsew", padx=(8, 0), pady=(0, 8))
+        swo_frame.columnconfigure(1, weight=1)
+
+        serial_fields = (
+            ("serial_port", "Serial port", "entry", None),
+            ("serial_baud", "Serial baud", "entry", None),
+        )
+        swo_fields = (
+            ("connect_mode", "Connect mode", "choice", ["halt", "pre-reset", "under-reset", "attach"]),
+            ("swo_clock", "SWO clock", "entry", None),
+            ("swd_frequency", "SWD freq", "entry", None),
+            ("raw_port", "SWV raw port", "entry", None),
+            ("gdb_port", "GDB port", "entry", None),
+        )
+
+        for row_index, (key, label_text, kind, options) in enumerate(serial_fields):
+            ttk.Label(serial_frame, text=f"{label_text}:").grid(row=row_index, column=0, padx=(8, 6), pady=4, sticky="w")
+            var = tk.StringVar(value=str(values.get(key, "")))
+            self._config_dialog_vars[key] = var
+            if kind == "choice" and options is not None:
+                widget = ttk.Combobox(serial_frame, textvariable=var, values=options, state="readonly", width=22)
+            else:
+                widget = ttk.Entry(serial_frame, textvariable=var, width=24)
+            widget.grid(row=row_index, column=1, padx=(0, 8), pady=4, sticky="ew")
+
+        for row_index, (key, label_text, kind, options) in enumerate(swo_fields):
+            ttk.Label(swo_frame, text=f"{label_text}:").grid(row=row_index, column=0, padx=(8, 6), pady=4, sticky="w")
+            var = tk.StringVar(value=str(values.get(key, "")))
+            self._config_dialog_vars[key] = var
+            if kind == "choice" and options is not None:
+                widget = ttk.Combobox(swo_frame, textvariable=var, values=options, state="readonly", width=22)
+            else:
+                widget = ttk.Entry(swo_frame, textvariable=var, width=24)
+            widget.grid(row=row_index, column=1, padx=(0, 8), pady=4, sticky="ew")
+
+        log_frame = ttk.LabelFrame(outer, text="Log file")
+        log_frame.grid(row=2, column=0, sticky="ew", pady=(12, 0))
+        log_frame.columnconfigure(1, weight=1)
+        ttk.Label(log_frame, text="Filename:").grid(row=0, column=0, padx=(8, 6), pady=6, sticky="w")
+        log_file_var = tk.StringVar(value=str(values.get("log_file", self._default_log_file_path())))
+        self._config_dialog_vars["log_file"] = log_file_var
+        ttk.Entry(log_frame, textvariable=log_file_var).grid(
+            row=0, column=1, padx=(0, 8), pady=6, sticky="ew"
+        )
+
+        graph_frame = ttk.LabelFrame(outer, text="Graphs")
+        graph_frame.grid(row=3, column=0, sticky="ew", pady=(12, 0))
+        graph_frame.columnconfigure(0, weight=1)
+        graph_frame.columnconfigure(1, weight=1)
+
+        graph_specs = (
+            ("graph_rpm", "RPM", 0, 0),
+            ("graph_pwm", "PWM", 0, 1),
+            ("graph_current", "Current", 1, 0),
+            ("graph_voltage", "Voltage", 1, 1),
+            ("graph_temperature", "Temperature", 2, 0),
+            ("graph_integral", "Integral", 2, 1),
+        )
+
+        for key, label_text, row, col in graph_specs:
+            var = tk.BooleanVar(value=bool(values.get(key, True)))
+            self._config_dialog_vars[key] = var
+            widget = ttk.Checkbutton(graph_frame, text=label_text, variable=var)
+            widget.grid(row=row, column=col, padx=8, pady=4, sticky="w")
+
+        ttk.Label(graph_frame, text="Time window (s):").grid(row=3, column=0, padx=8, pady=(12, 4), sticky="w")
+        time_window_var = tk.StringVar(value=str(values.get("graph_time_window", 60)))
+        self._config_dialog_vars["graph_time_window"] = time_window_var
+        ttk.Entry(graph_frame, textvariable=time_window_var, width=12).grid(row=3, column=1, padx=(0, 8), pady=(12, 4), sticky="w")
+
+        buttons = ttk.Frame(dialog)
+        buttons.pack(fill=tk.X, padx=12, pady=(0, 12))
+        ttk.Button(buttons, text="Save", command=self._save_config_dialog).pack(side=tk.RIGHT, padx=(0, 6))
+        ttk.Button(buttons, text="Cancel", command=self._close_config_dialog).pack(side=tk.RIGHT)
+
+        dialog.bind("<Configure>", lambda event: self._save_ui_state())
+
+    def _load_settings_data(self) -> dict[str, object]:
+        config_path = self._settings_path()
+        if not config_path.exists():
+            return {}
+
+        try:
+            with config_path.open("r", encoding="utf-8") as handle:
+                data = json.load(handle)
+        except Exception:
+            return {}
+
+        return data if isinstance(data, dict) else {}
+
+    def _save_settings_data(self, data: dict[str, object]) -> None:
+        config_path = self._settings_path()
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        with config_path.open("w", encoding="utf-8") as handle:
+            json.dump(data, handle, indent=2)
+            handle.write("\n")
+
+    def _load_ui_state(self) -> dict[str, object]:
+        data = self._load_settings_data()
+        ui = data.get("ui", {}) if isinstance(data.get("ui", {}), dict) else {}
+        return ui
+
+    def _save_ui_state(self) -> None:
+        data = self._load_settings_data()
+        ui = data.get("ui", {}) if isinstance(data.get("ui", {}), dict) else {}
+        if self.root is not None:
+            try:
+                ui["main_geometry"] = self.root.winfo_geometry()
+            except Exception:
+                pass
+        if self._config_dialog is not None:
+            try:
+                ui["config_geometry"] = self._config_dialog.winfo_geometry()
+            except Exception:
+                pass
+        if self._eeprom_dialog is not None:
+            try:
+                ui["eeprom_geometry"] = self._eeprom_dialog.winfo_geometry()
+            except Exception:
+                pass
+        if self.panes is not None:
+            try:
+                ui["main_panes"] = [self.panes.sashpos(0)]
+            except Exception:
+                pass
+        if self.right_panes is not None:
+            try:
+                ui["right_panes"] = [self.right_panes.sashpos(0), self.right_panes.sashpos(1)]
+            except Exception:
+                pass
+        data["ui"] = ui
+        self._save_settings_data(data)
+
+    def _restore_ui_state(self) -> None:
+        ui_state = self._load_ui_state()
+        geometry = ui_state.get("main_geometry")
+        if isinstance(geometry, str) and geometry:
+            try:
+                self.root.geometry(geometry)
+            except Exception:
+                pass
+
+        main_panes = ui_state.get("main_panes")
+        if isinstance(main_panes, list) and len(main_panes) >= 1:
+            try:
+                self.panes.sashpos(0, int(main_panes[0]))
+            except Exception:
+                pass
+
+        right_panes = ui_state.get("right_panes")
+        if isinstance(right_panes, list) and len(right_panes) >= 2:
+            try:
+                self.right_panes.sashpos(0, int(right_panes[0]))
+                self.right_panes.sashpos(1, int(right_panes[1]))
+            except Exception:
+                pass
+
+        eeprom_geometry = ui_state.get("eeprom_geometry")
+        if isinstance(eeprom_geometry, str) and eeprom_geometry and self._eeprom_dialog is not None:
+            try:
+                self._eeprom_dialog.geometry(eeprom_geometry)
+            except Exception:
+                pass
+
+    def _snapshot_eeprom_dialog_as_slot_dict(self, slot_name: str) -> dict[str, object]:
+        if self._eeprom_dialog_source is None:
+            raise RuntimeError("EEPROM data is not loaded yet")
+
+        values = self._read_eeprom_dialog_values()
+        return {
+            "name": slot_name,
+            "values": {
+                field_name: getattr(values, field_name)
+                for _, field_name, _, _, _, _ in EEPROM_FIELD_SPECS
+            },
+        }
+
+    def _save_eeprom_config_file(self) -> None:
+        if self._eeprom_dialog is None:
+            return
+
+        slot_name = (self._eeprom_dialog_slot_var.get() if self._eeprom_dialog_slot_var is not None else "slot_1").strip()
+        if not slot_name:
+            slot_name = "slot_1"
+
+        data = self._load_settings_data()
+        slots = data.get("eeprom_slots", []) if isinstance(data.get("eeprom_slots", []), list) else []
+
+        slot_map = {str(item.get("name", "")): item for item in slots if isinstance(item, dict)}
+        slot_map[slot_name] = self._snapshot_eeprom_dialog_as_slot_dict(slot_name)
+
+        ordered_slots = []
+        for existing_name in self._default_eeprom_slot_names():
+            if existing_name in slot_map:
+                ordered_slots.append(slot_map[existing_name])
+        for name, item in slot_map.items():
+            if name not in {slot["name"] for slot in ordered_slots}:
+                ordered_slots.append(item)
+
+        data["eeprom_slots"] = ordered_slots[: self.EEPROM_CONFIG_SLOT_COUNT]
+        self._save_settings_data(data)
+
+        if self._eeprom_dialog_status_var is not None:
+            self._eeprom_dialog_status_var.set(f"Saved EEPROM config to {self._settings_path().name}")
+
+    def _load_eeprom_config_file(self) -> None:
+        if self._eeprom_dialog is None:
+            return
+
+        data = self._load_settings_data()
+        slots = data.get("eeprom_slots", []) if isinstance(data.get("eeprom_slots", []), list) else []
+        if not slots:
+            if self._eeprom_dialog_status_var is not None:
+                self._eeprom_dialog_status_var.set(f"No EEPROM config file found at {self._settings_path().name}")
+            return
+
+        slot_name = (self._eeprom_dialog_slot_var.get() if self._eeprom_dialog_slot_var is not None else "slot_1").strip()
+        if not slot_name:
+            slot_name = "slot_1"
+
+        selected = None
+        for item in slots:
+            if not isinstance(item, dict):
+                continue
+            if str(item.get("name", "")) == slot_name:
+                selected = item
+                break
+
+        if selected is None:
+            if self._eeprom_dialog_status_var is not None:
+                self._eeprom_dialog_status_var.set(f"No EEPROM preset named '{slot_name}' found")
+            return
+
+        values = selected.get("values", {})
+        if not isinstance(values, dict):
+            if self._eeprom_dialog_status_var is not None:
+                self._eeprom_dialog_status_var.set("EEPROM preset values are invalid")
+            return
+
+        for spec in EEPROM_FIELD_SPECS:
+            _, field_name, field_kind, _, _, _ = spec
+            if field_name not in values:
+                continue
+            value = values[field_name]
+            if field_kind == "choice":
+                choices = spec[5] or ()
+                label = next((label for label, candidate in choices if candidate == value), str(value))
+                self._eeprom_dialog_vars[field_name].set(label)
+            elif field_kind == "percent":
+                self._eeprom_dialog_vars[field_name].set(f"{anti_windup_raw_to_percent(int(value)):.2f}")
+            else:
+                self._eeprom_dialog_vars[field_name].set(str(value))
+
+        if self._eeprom_dialog_status_var is not None:
+            self._eeprom_dialog_status_var.set(f"Loaded EEPROM preset '{slot_name}'")
+
+    def _populate_eeprom_dialog(
+        self,
+        data: EEPROMData,
+        swo_data: Optional[SWOData] = None,
+    ) -> None:
         if self._eeprom_dialog is None:
             return
 
         self._eeprom_dialog_source = data
-        self._eeprom_dialog_address = swo_data.eeprom_address
+        self._eeprom_dialog_address = swo_data.eeprom_address if swo_data is not None else None
 
         summary_vars = self._eeprom_dialog_summary_vars
         summary_vars["magic"].set(f"0x{data.magic:08X}")
         summary_vars["version"].set(str(data.version))
         summary_vars["sequence"].set(str(data.sequence))
         summary_vars["crc"].set(f"0x{data.crc:08X}")
-        summary_vars["address"].set(f"0x{self._eeprom_dialog_address:08X}")
-        summary_vars["commit"].set("set" if swo_data.eeprom_commit else "clear")
+        summary_vars["address"].set(
+            f"0x{self._eeprom_dialog_address:08X}" if self._eeprom_dialog_address is not None else "serial"
+        )
+        summary_vars["commit"].set(
+            ("set" if swo_data.eeprom_commit else "clear") if swo_data is not None else "n/a"
+        )
 
         for spec in EEPROM_FIELD_SPECS:
             _, field_name, _, _, _, _ = spec
@@ -1936,7 +2581,15 @@ class PIDTuningApp:
         dialog.protocol("WM_DELETE_WINDOW", self._close_eeprom_dialog)
         self._eeprom_dialog = dialog
 
-        self._position_dialog_centered(dialog, width=1080, height=640)
+        ui_state = self._load_ui_state()
+        eeprom_geometry = ui_state.get("eeprom_geometry") if isinstance(ui_state, dict) else None
+        if isinstance(eeprom_geometry, str) and eeprom_geometry:
+            try:
+                dialog.geometry(eeprom_geometry)
+            except Exception:
+                self._position_dialog_centered(dialog, width=1080, height=640)
+        else:
+            self._position_dialog_centered(dialog, width=1080, height=640)
 
         dialog.columnconfigure(0, weight=1)
         dialog.rowconfigure(1, weight=1)
@@ -2014,13 +2667,40 @@ class PIDTuningApp:
         self._eeprom_dialog_status_var = tk.StringVar(value="Loading EEPROM data...")
         ttk.Label(button_frame, textvariable=self._eeprom_dialog_status_var).grid(row=0, column=0, sticky="w")
 
+        slot_row = ttk.Frame(button_frame)
+        slot_row.grid(row=1, column=1, sticky="e")
+        ttk.Label(slot_row, text="Slot:").pack(side=tk.LEFT, padx=(0, 6))
+        self._eeprom_dialog_slot_var = tk.StringVar(value=self._default_eeprom_slot_names()[0])
+        self._eeprom_dialog_slot_combo = ttk.Combobox(
+            slot_row,
+            textvariable=self._eeprom_dialog_slot_var,
+            values=self._default_eeprom_slot_names(),
+            state="readonly",
+            width=18,
+        )
+        self._eeprom_dialog_slot_combo.pack(side=tk.LEFT, padx=(0, 8))
+        self._eeprom_dialog_save_button = ttk.Button(slot_row, text="Store", command=self._save_eeprom_config_file)
+        self._eeprom_dialog_save_button.pack(side=tk.LEFT, padx=(0, 6))
+        self._eeprom_dialog_load_button = ttk.Button(slot_row, text="Load", command=self._load_eeprom_config_file)
+        self._eeprom_dialog_load_button.pack(side=tk.LEFT)
+
         button_row = ttk.Frame(button_frame)
-        button_row.grid(row=0, column=1, sticky="e")
+        button_row.grid(row=2, column=1, sticky="e", pady=(8, 0))
         self._eeprom_dialog_commit_button = ttk.Button(button_row, text="Commit", command=self._commit_eeprom_dialog, state=tk.DISABLED)
         self._eeprom_dialog_commit_button.pack(side=tk.LEFT, padx=(0, 6))
         ttk.Button(button_row, text="Cancel", command=self._close_eeprom_dialog).pack(side=tk.LEFT)
 
+        dialog.bind("<Configure>", lambda event: self._save_ui_state())
         self._set_eeprom_dialog_editable(False)
+
+        if self.config.transport == "serial":
+            try:
+                if not isinstance(self.backend, SerialBackend):
+                    raise RuntimeError("Serial backend is not available")
+                self.backend.request_eeprom()
+            except Exception as exc:
+                self.event_queue.put(("eeprom-load-error", str(exc)))
+            return
 
         def worker() -> None:
             try:
@@ -2035,7 +2715,7 @@ class PIDTuningApp:
         threading.Thread(target=worker, daemon=True).start()
 
     def _commit_eeprom_dialog(self) -> None:
-        if self._eeprom_dialog_source is None or self._eeprom_dialog_address is None:
+        if self._eeprom_dialog_source is None:
             if self._eeprom_dialog_status_var is not None:
                 self._eeprom_dialog_status_var.set("EEPROM data is not loaded yet")
             return
@@ -2050,6 +2730,29 @@ class PIDTuningApp:
         self._set_eeprom_dialog_editable(False)
         if self._eeprom_dialog_status_var is not None:
             self._eeprom_dialog_status_var.set("Committing EEPROM data...")
+
+        if self.config.transport == "serial":
+            if not isinstance(self.backend, SerialBackend):
+                if self._eeprom_dialog_status_var is not None:
+                    self._eeprom_dialog_status_var.set("Serial backend is not available")
+                self._set_eeprom_dialog_editable(True)
+                return
+
+            def serial_worker() -> None:
+                try:
+                    self.backend._send_binary_payload(BINARY_TYPE_EEPROM, self._pack_eeprom_data(eeprom_data))
+                    self.event_queue.put(("eeprom-commit-complete", eeprom_data))
+                except Exception as exc:
+                    self.event_queue.put(("eeprom-commit-error", str(exc)))
+
+            threading.Thread(target=serial_worker, daemon=True).start()
+            return
+
+        if self._eeprom_dialog_address is None:
+            if self._eeprom_dialog_status_var is not None:
+                self._eeprom_dialog_status_var.set("EEPROM data address is not available")
+            self._set_eeprom_dialog_editable(True)
+            return
 
         def worker() -> None:
             try:
@@ -2101,10 +2804,10 @@ class PIDTuningApp:
         threading.Thread(target=worker, daemon=True).start()
 
     def _sync_to_target(self) -> None:
-        if self.config.transport != "swo":
-            self._append_log("PID parameter sync requires SWO transport")
+        if self.config.transport not in ("swo", "serial"):
+            self._append_log("PID parameter sync requires SWO or serial transport")
             return
-        if self.data_address is None:
+        if self.config.transport == "swo" and self.data_address is None:
             self._append_log("Cannot sync: no dataAddress received yet")
             return
         if self.sync_in_progress:
@@ -2114,7 +2817,17 @@ class PIDTuningApp:
         # Read-only sync unless user edited fields. This prevents accidental
         # writes of defaults and keeps Sync useful for refresh.
         if not self._pid_fields_dirty:
-            self._request_read_swo_data("manual")
+            if self.config.transport == "swo":
+                self._request_read_swo_data("manual")
+            else:
+                if not isinstance(self.backend, SerialBackend):
+                    self._append_log("Serial backend is not available")
+                    return
+                try:
+                    self.backend._send_binary_command(BINARY_TYPE_REQUEST_PARAMETERS)
+                    self._append_log("Requested PID parameters from serial target")
+                except Exception as exc:
+                    self._append_log(f"Serial PID parameter request failed: {exc}")
             return
 
         try:
@@ -2129,6 +2842,33 @@ class PIDTuningApp:
                 raise ValueError("RPM out of range (0..%u)" % MAX_RPM)
         except Exception as exc:
             self._append_log(f"Invalid PID input: {exc}")
+            return
+
+        if self.config.transport == "serial":
+            if not isinstance(self.backend, SerialBackend):
+                self._append_log("Serial backend is not available")
+                return
+
+            payload = struct.pack(
+                PID_PARAMETERS_STRUCT,
+                kp,
+                ki,
+                kd,
+                anti_windup_percent_to_raw(anti_windup),
+                rpm,
+            )
+            self.sync_in_progress = True
+
+            def serial_worker() -> None:
+                try:
+                    self.backend._send_binary_payload(BINARY_TYPE_PARAMETERS, payload)
+                    self.event_queue.put(("log", "Sent PID parameters to serial target"))
+                except Exception as exc:
+                    self.event_queue.put(("log", f"Serial PID parameter sync failed: {exc}"))
+                finally:
+                    self.event_queue.put(("sync-done", None))
+
+            threading.Thread(target=serial_worker, daemon=True).start()
             return
 
         self.sync_in_progress = True
@@ -2199,59 +2939,81 @@ class PIDTuningApp:
         self.derivative = self._make_series(self.samples_per_window)
 
     def _build_plot_lines(self) -> None:
-        ax0, ax1, ax2, ax3, ax4, ax5 = self.axes
+        visibility = getattr(self, 'graph_visibility', {
+            'rpm': True, 'pwm': True, 'current': True,
+            'voltage': True, 'temperature': True, 'integral': True
+        })
 
-        (self.line_rpm,) = ax0.plot(self.x_values, self.rpm, label="RPM", color="#0077B6")
-        (self.line_rpm_avg,) = ax0.plot(self.x_values, self.rpm_avg, label="Avg RPM", color="#E85D04", linestyle="--")
-        ax0.legend(loc="upper left")
+        ax_map = {}
+        axis_idx = 0
+        for graph_type in ['rpm', 'pwm', 'current', 'voltage', 'temperature', 'integral']:
+            if visibility.get(graph_type, True):
+                ax_map[graph_type] = self.axes[axis_idx]
+                axis_idx += 1
 
-        (self.line_pwm,) = ax1.plot(self.x_values, self.pwm, label="PWM %", color="#2A9D8F")
-        (self.line_pwm_avg,) = ax1.plot(self.x_values, self.pwm_avg, label="Avg PWM %", color="#9A031E", linestyle="--")
-        ax1.legend(loc="upper left")
+        if 'rpm' in ax_map:
+            ax0 = ax_map['rpm']
+            (self.line_rpm,) = ax0.plot(self.x_values, self.rpm, label="RPM", color="#0077B6")
+            (self.line_rpm_avg,) = ax0.plot(self.x_values, self.rpm_avg, label="Avg RPM", color="#E85D04", linestyle="--")
+            ax0.legend(loc="upper left")
 
-        (self.line_i_ocp,) = ax2.plot(
-            self.x_values,
-            self.current_ocp_ma,
-            label="Current OCP",
-            color="#F72585",
-            zorder=2,
-        )
-        (self.line_i_avg,) = ax2.plot(
-            self.x_values,
-            self.current_avg_ma,
-            label="Current Avg",
-            color="#4361EE",
-            zorder=3,
-        )
-        (self.line_i_motor_limit,) = ax2.plot(
-            self.x_values,
-            self.dac_motor_current_ma,
-            label="Motor Limit (DAC)",
-            color="#2A9D8F",
-            linestyle=":",
-            linewidth=1.2,
-        )
-        (self.line_i_input_limit,) = ax2.plot(
-            self.x_values,
-            self.dac_input_current_ma,
-            label="Input Limit (DAC)",
-            color="#FF9F1C",
-            linestyle=":",
-            linewidth=1.2,
-        )
-        ax2.legend(loc="upper left")
+        if 'pwm' in ax_map:
+            ax1 = ax_map['pwm']
+            (self.line_pwm,) = ax1.plot(self.x_values, self.pwm, label="PWM %", color="#2A9D8F")
+            (self.line_pwm_avg,) = ax1.plot(self.x_values, self.pwm_avg, label="Avg PWM %", color="#9A031E", linestyle="--")
+            ax1.legend(loc="upper left")
 
-        (self.line_u_mv,) = ax3.plot(self.x_values, self.voltage_mv, label="Voltage", color="#FF9F1C")
-        ax3.legend(loc="upper left")
+        if 'current' in ax_map:
+            ax2 = ax_map['current']
+            (self.line_i_ocp,) = ax2.plot(
+                self.x_values,
+                self.current_ocp_ma,
+                label="Current OCP",
+                color="#F72585",
+                zorder=2,
+            )
+            (self.line_i_avg,) = ax2.plot(
+                self.x_values,
+                self.current_avg_ma,
+                label="Current Avg",
+                color="#4361EE",
+                zorder=3,
+            )
+            (self.line_i_motor_limit,) = ax2.plot(
+                self.x_values,
+                self.dac_motor_current_ma,
+                label="Motor Limit (DAC)",
+                color="#2A9D8F",
+                linestyle=":",
+                linewidth=1.2,
+            )
+            (self.line_i_input_limit,) = ax2.plot(
+                self.x_values,
+                self.dac_input_current_ma,
+                label="Input Limit (DAC)",
+                color="#FF9F1C",
+                linestyle=":",
+                linewidth=1.2,
+            )
+            ax2.legend(loc="upper left")
 
-        (self.line_motor_t,) = ax4.plot(self.x_values, self.motor_temp_c, label="Motor", color="#3A86FF")
-        (self.line_mosfet_t,) = ax4.plot(self.x_values, self.mosfet_temp_c, label="MOSFET", color="#FB5607")
-        ax4.legend(loc="upper left")
+        if 'voltage' in ax_map:
+            ax3 = ax_map['voltage']
+            (self.line_u_mv,) = ax3.plot(self.x_values, self.voltage_mv, label="Voltage", color="#FF9F1C")
+            ax3.legend(loc="upper left")
 
-        (self.line_error,) = ax5.plot(self.x_values, self.error, label="Error", color="#E76F51")
-        (self.line_integral,) = ax5.plot(self.x_values, self.integral, label="Integral", color="#6A4C93")
-        (self.line_derivative,) = ax5.plot(self.x_values, self.derivative, label="Derivative", color="#2A9D8F")
-        ax5.legend(loc="upper left")
+        if 'temperature' in ax_map:
+            ax4 = ax_map['temperature']
+            (self.line_motor_t,) = ax4.plot(self.x_values, self.motor_temp_c, label="Motor", color="#3A86FF")
+            (self.line_mosfet_t,) = ax4.plot(self.x_values, self.mosfet_temp_c, label="MOSFET", color="#FB5607")
+            ax4.legend(loc="upper left")
+
+        if 'integral' in ax_map:
+            ax5 = ax_map['integral']
+            (self.line_error,) = ax5.plot(self.x_values, self.error, label="Error", color="#E76F51")
+            (self.line_integral,) = ax5.plot(self.x_values, self.integral, label="Integral", color="#6A4C93")
+            (self.line_derivative,) = ax5.plot(self.x_values, self.derivative, label="Derivative", color="#2A9D8F")
+            ax5.legend(loc="upper left")
 
     def _append_value(self, series: List[float], value: float) -> None:
         series.append(value)
@@ -2309,34 +3071,106 @@ class PIDTuningApp:
         if not self._plot_dirty:
             return
 
-        self.line_rpm.set_data(self.x_values, self.rpm)
-        self.line_rpm_avg.set_data(self.x_values, self.rpm_avg)
-        self.line_pwm.set_data(self.x_values, self.pwm)
-        self.line_pwm_avg.set_data(self.x_values, self.pwm_avg)
-        self.line_i_avg.set_data(self.x_values, self.current_avg_ma)
-
-        self.line_i_ocp.set_data(self.x_values, self.current_ocp_ma)
-        self.line_i_motor_limit.set_data(self.x_values, self.dac_motor_current_ma)
-        self.line_i_input_limit.set_data(self.x_values, self.dac_input_current_ma)
-        self.line_u_mv.set_data(self.x_values, self.voltage_mv)
-        self.line_motor_t.set_data(self.x_values, self.motor_temp_c)
-        self.line_mosfet_t.set_data(self.x_values, self.mosfet_temp_c)
-        self.line_error.set_data(self.x_values, self.error)
-        self.line_integral.set_data(self.x_values, self.integral)
-        self.line_derivative.set_data(self.x_values, self.derivative)
+        if hasattr(self, 'line_rpm'):
+            self.line_rpm.set_data(self.x_values, self.rpm)
+            self.line_rpm_avg.set_data(self.x_values, self.rpm_avg)
+        if hasattr(self, 'line_pwm'):
+            self.line_pwm.set_data(self.x_values, self.pwm)
+            self.line_pwm_avg.set_data(self.x_values, self.pwm_avg)
+        if hasattr(self, 'line_i_avg'):
+            self.line_i_avg.set_data(self.x_values, self.current_avg_ma)
+            self.line_i_ocp.set_data(self.x_values, self.current_ocp_ma)
+            self.line_i_motor_limit.set_data(self.x_values, self.dac_motor_current_ma)
+            self.line_i_input_limit.set_data(self.x_values, self.dac_input_current_ma)
+        if hasattr(self, 'line_u_mv'):
+            self.line_u_mv.set_data(self.x_values, self.voltage_mv)
+        if hasattr(self, 'line_motor_t'):
+            self.line_motor_t.set_data(self.x_values, self.motor_temp_c)
+            self.line_mosfet_t.set_data(self.x_values, self.mosfet_temp_c)
+        if hasattr(self, 'line_error'):
+            self.line_error.set_data(self.x_values, self.error)
+            self.line_integral.set_data(self.x_values, self.integral)
+            self.line_derivative.set_data(self.x_values, self.derivative)
 
         for axis in self.axes:
             axis.set_xlim(self.x_values[0], self.x_values[-1])
             axis.relim()
             axis.autoscale_view(scalex=False, scaley=True)
 
-        # Keep PWM plot in percentage range.
-        self.axes[1].set_ylim(0.0, 100.0)
+        pwm_graph_visible = getattr(self, 'graph_visibility', {}).get('pwm', True)
+        if pwm_graph_visible and len(self.axes) > 1:
+            self.axes[1].set_ylim(0.0, 100.0)
+        elif hasattr(self, 'line_pwm'):
+            for ax in self.axes:
+                for line in ax.get_lines():
+                    if line == self.line_pwm:
+                        ax.set_ylim(0.0, 100.0)
+                        break
 
         self.canvas.draw_idle()
         self._plot_dirty = False
 
+    def _apply_graph_visibility(self) -> None:
+        if not hasattr(self, 'canvas'):
+            return
+
+        data = self._load_settings_data()
+        self.graph_visibility = {
+            'rpm': bool(data.get("graph_rpm", True)),
+            'pwm': bool(data.get("graph_pwm", True)),
+            'current': bool(data.get("graph_current", True)),
+            'voltage': bool(data.get("graph_voltage", True)),
+            'temperature': bool(data.get("graph_temperature", True)),
+            'integral': bool(data.get("graph_integral", True)),
+        }
+
+        self.figure.clear()
+        num_enabled = sum(1 for v in self.graph_visibility.values() if v)
+        if num_enabled == 0:
+            num_enabled = 1
+            self.graph_visibility['rpm'] = True
+
+        self.axes = self.figure.subplots(num_enabled, 1, sharex=True)
+        if num_enabled == 1:
+            self.axes = [self.axes]
+        else:
+            self.axes = list(self.axes)
+        hspace = max(0.08, 0.30 * (num_enabled / 6.0))
+        self.figure.subplots_adjust(left=0.055, right=0.995, top=0.963, bottom=0.065, hspace=hspace)
+
+        graph_info = [
+            ('rpm', "RPM / Avg RPM", "RPM"),
+            ('pwm', "PWM (%) / Avg PWM (%)", "%"),
+            ('current', "Current Avg/OCP + DAC Limits (mA)", "mA"),
+            ('voltage', "Voltage (mV)", "mV"),
+            ('temperature', "Temperatures (C)", "C"),
+            ('integral', "Integral", "I"),
+        ]
+
+        axis_idx = 0
+        for graph_type, title, ylabel in graph_info:
+            if self.graph_visibility.get(graph_type, True):
+                ax = self.axes[axis_idx]
+                ax.set_title(title, loc="left", fontsize=10)
+                ax.set_ylabel(ylabel)
+                ax.grid(True, linestyle="--", linewidth=0.5, alpha=0.5)
+                axis_idx += 1
+
+        if len(self.axes) > 0:
+            self.axes[-1].set_xlabel("Time (s)")
+
+        self._build_plot_lines()
+        self._refresh_plot()
+        self.canvas.draw_idle()
+
     def _append_log(self, text: str) -> None:
+        try:
+            self.log_file_path.parent.mkdir(parents=True, exist_ok=True)
+            with self.log_file_path.open("a", encoding="utf-8") as handle:
+                handle.write(text + "\n")
+        except OSError:
+            pass
+
         self.log_text.configure(state=tk.NORMAL)
         self.log_text.insert(tk.END, text + "\n")
         self.log_text.see(tk.END)
@@ -2445,6 +3279,9 @@ class PIDTuningApp:
             self._append_log(f"Invalid time window: {raw}")
             return
 
+        data = self._load_settings_data()
+        data["graph_time_window"] = seconds
+        self._save_settings_data(data)
         self._init_buffers(seconds)
         self._refresh_plot()
         self._append_log(f"Applied time window: {seconds}s")
@@ -2460,6 +3297,14 @@ class PIDTuningApp:
             if kind == "log":
                 text = str(payload)
                 self._append_log(text)
+            elif kind == "serial-parameters":
+                self._apply_serial_parameters(bytes(payload))
+            elif kind == "serial-eeprom":
+                data = decode_eeprom_data(bytes(payload))
+                if data is None:
+                    self.event_queue.put(("eeprom-load-error", f"Invalid serial EEPROM packet size: {len(bytes(payload))}"))
+                else:
+                    self._populate_eeprom_dialog(data)
             elif kind == "sample":
                 self._handle_sample(payload)  # type: ignore[arg-type]
                 got_sample = True
@@ -2509,7 +3354,7 @@ class PIDTuningApp:
                 self.pending_initial_sync = True
             elif kind == "eeprom-load":
                 swo_data, eeprom_data = payload  # type: ignore[misc]
-                self._populate_eeprom_dialog(swo_data, eeprom_data)
+                self._populate_eeprom_dialog(eeprom_data, swo_data)
             elif kind == "eeprom-load-error":
                 message = str(payload)
                 if self._eeprom_dialog_status_var is not None:
@@ -2520,7 +3365,10 @@ class PIDTuningApp:
                 committed_eeprom_data = payload if isinstance(payload, EEPROMData) else None
                 if self._eeprom_dialog_status_var is not None:
                     self._eeprom_dialog_status_var.set("EEPROM committed")
-                self._append_log("EEPROM data committed and SWO::data.EEPROM.commit set")
+                self._append_log(
+                    "EEPROM data committed"
+                    + (" and SWO::data.EEPROM.commit set" if self.config.transport == "swo" else " via serial")
+                )
                 if committed_eeprom_data is not None:
                     # Keep UI input fields in sync with committed EEPROM values without re-reading SWO memory.
                     self._pid_fields_updating = True
@@ -2619,6 +3467,7 @@ class PIDTuningApp:
         self.root.after(40, self._process_events)
 
     def _on_close(self) -> None:
+        self._save_ui_state()
         self.backend.stop()
         self.gdb_mem.close()
         self.root.destroy()
@@ -2628,29 +3477,42 @@ class PIDTuningApp:
 
 
 def parse_args() -> AppConfig:
-    parser = argparse.ArgumentParser(description="PID graphical monitor for USB serial or SWO")
+    defaults = _load_saved_settings_defaults()
+
+    def saved_string(key: str, fallback: str) -> str:
+        value = defaults.get(key, fallback)
+        return str(value)
+
+    def saved_int(key: str, fallback: int) -> int:
+        value = defaults.get(key, fallback)
+        try:
+            return int(value)
+        except Exception:
+            return fallback
+
+    parser = argparse.ArgumentParser(description="Motor configuration and parameter tuning tool for SWO or USB/serial")
     parser.add_argument(
         "--transport",
         choices=["serial", "swo"],
-        default="serial",
+        default=saved_string("transport", "serial").strip().lower(),
         help="PID data transport",
     )
-    parser.add_argument("--port", dest="serial_port", default="COM10", help="USB CDC serial port")
-    parser.add_argument("--baud", dest="serial_baud", type=int, default=115200, help="USB CDC baud rate")
-    parser.add_argument("--uid", default="", help="Optional pyOCD probe unique ID")
-    parser.add_argument("--target", default="cortex_m", help="pyOCD target")
-    parser.add_argument("--system-clock", type=int, default=72_000_000, help="System clock in Hz")
-    parser.add_argument("--swo-clock", type=int, default=2_000_000, help="SWO clock in Hz")
-    parser.add_argument("--swd-frequency", type=int, default=4_000_000, help="SWD frequency in Hz")
+    parser.add_argument("--port", dest="serial_port", default=saved_string("serial_port", "COM10"), help="USB or serial port")
+    parser.add_argument("--baud", dest="serial_baud", type=int, default=saved_int("serial_baud", 115200), help="Serial baud rate")
+    parser.add_argument("--uid", default=saved_string("uid", ""), help="Optional pyOCD probe unique ID")
+    parser.add_argument("--target", default=saved_string("target", "cortex_m"), help="pyOCD target")
+    parser.add_argument("--system-clock", type=int, default=saved_int("system_clock", 72_000_000), help="System clock in Hz")
+    parser.add_argument("--swo-clock", type=int, default=saved_int("swo_clock", 2_000_000), help="SWO clock in Hz")
+    parser.add_argument("--swd-frequency", type=int, default=saved_int("swd_frequency", 4_000_000), help="SWD frequency in Hz")
     parser.add_argument(
         "--connect-mode",
         choices=["halt", "pre-reset", "under-reset", "attach"],
-        default="attach",
+        default=saved_string("connect_mode", "attach"),
         help="pyOCD connect mode",
     )
-    parser.add_argument("--raw-port", type=int, default=3443, help="SWV raw TCP port")
+    parser.add_argument("--raw-port", type=int, default=saved_int("raw_port", 3443), help="SWV raw TCP port")
     parser.add_argument("--pid-port", type=int, default=1, help="ITM port for PidLoopType")
-    parser.add_argument("--gdb-port", type=int, default=3333, help="pyOCD gdbserver port for memory sync")
+    parser.add_argument("--gdb-port", type=int, default=saved_int("gdb_port", 3333), help="pyOCD gdbserver port for memory sync")
 
     args = parser.parse_args()
     return AppConfig(
