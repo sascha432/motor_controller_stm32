@@ -157,7 +157,7 @@ void PidController::reset()
     ocp.reset();
     resetFaults();
 
-    DEBUG_PRINT(DebugType::PID, "Kp=%s Ki=%s Kd=%s RPM=%u windup=%s OCP=%u/%u OVP=%u",
+    DEBUG_PRINT(DebugType::PID, "reset() Kp=%s Ki=%s Kd=%s RPM=%u windup=%s OCP=%u/%u OVP=%u",
         debugFloatToString(Kp, 6, true),
         debugFloatToString(Ki, 6, true),
         debugFloatToString(Kd, 6, true),
@@ -181,7 +181,7 @@ void PidController::motorOn()
     }
     else {
         __enable_irq();
-        DEBUG_PRINT(DebugType::ERROR, "MOTOR RUNNING");
+        DEBUG_PRINT(DebugType::ERROR, "motorOn() MOTOR RUNNING");
     }
 }
 
@@ -198,7 +198,7 @@ void PidController::motorOff()
     }
     else {
         __enable_irq();
-        DEBUG_PRINT(DebugType::ERROR, "MOTOR NOT RUNNING");
+        DEBUG_PRINT(DebugType::ERROR, "motorOff() MOTOR NOT RUNNING");
     }
 }
 

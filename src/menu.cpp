@@ -333,7 +333,7 @@ void Menu::loadAdvancedMenu()
 
 void Menu::exitAdvancedMenu()
 {
-    DEBUG_PRINT(DebugType::UI, "prev. screen=%p", screenFlow.getScreen()->getPrevScreen());
+    DEBUG_PRINT(DebugType::UI, "exitAdvancedMenu() prev. screen=%p", screenFlow.getScreen()->getPrevScreen());
     if (screenFlow.getScreen()->getPrevScreen()) {
         // accessed through main menu
         restorePreviousMenu();
@@ -362,7 +362,7 @@ void Menu::loadDashboardScreen()
 
 void Menu::restorePreviousMenu()
 {
-    DEBUG_PRINT(DebugType::UI, "value=%d", getValue());
+    DEBUG_PRINT(DebugType::UI, "restorePreviousMenu() value=%d", getValue());
     // restore previous screen
     screenFlow.back();
     clearUserInput();
@@ -421,7 +421,7 @@ void Menu::clearUserInput()
 void Menu::saveEEPROMChanges()
 {
     bool success = eeprom.write();
-    DEBUG_PRINT(DebugType::UI, "eeprom.write=%d", success);
+    DEBUG_PRINT(DebugType::UI, "saveEEPROMChanges() write=%d", success);
     if (success) {
         screenFlow.setScreen(new InfoScreen(Screen::Type::EEPROM_SAVED, "Saved", InfoScreen::InfoScreenThemeType::INFO));
         screenFlow.refresh();
@@ -433,7 +433,7 @@ void Menu::writePendingEEPROMChanges()
 {
     bool success = eeprom.write();
     (void)success;
-    DEBUG_PRINT(DebugType::UI, "eeprom.write=%d", success);
+    DEBUG_PRINT(DebugType::UI, "writePendingEEPROMChanges() write=%d", success);
 }
 
 void Menu::applyEEPROMSettings()
@@ -445,7 +445,7 @@ void Menu::applyEEPROMSettings()
 
 void Menu::handleButtonPress(uint32_t duration)
 {
-    DEBUG_PRINT(DebugType::UI, "enter screen=%p prev=%p id=%d value=%d duration=%d", screenFlow.getScreen(), screenFlow->getPrevScreen(), static_cast<int>(screenFlow->getId()), getValue(), duration);
+    DEBUG_PRINT(DebugType::UI, "handleButtonPress(uint32_t duration = %u) screen=%p prev=%p id=%d value=%d", duration, screenFlow.getScreen(), screenFlow->getPrevScreen(), static_cast<int>(screenFlow->getId()), getValue());
     Screen *screen;
     // Handle button press based on the current screen
     switch(screenFlow->getId()) {
@@ -880,12 +880,11 @@ void Menu::handleButtonPress(uint32_t duration)
             // no button action
             break;
     }
-    DEBUG_PRINT(DebugType::UI, "leave screen=%p prev=%p id=%d value=%d", screenFlow.getScreen(), screenFlow->getPrevScreen(), static_cast<int>(screenFlow->getId()), getValue());
 }
 
 void Menu::handleBackButtonPress()
 {
-    DEBUG_PRINT(DebugType::UI, "enter screen=%p id=%d value=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), getValue());
+    DEBUG_PRINT(DebugType::UI, "handleBackButtonPress() screen=%p id=%d value=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), getValue());
     switch(screenFlow->getId()) {
         case Screen::Type::DASHBOARD:
             pid.motorOff();
@@ -909,12 +908,11 @@ void Menu::handleBackButtonPress()
             restorePreviousMenu();
             break;
     }
-    DEBUG_PRINT(DebugType::UI, "leave screen=%p id=%d value=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), getValue());
 }
 
 void Menu::handleStartButtonPress()
 {
-    DEBUG_PRINT(DebugType::UI, "enter screen=%p id=%d value=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), getValue());
+    DEBUG_PRINT(DebugType::UI, "handleStartButtonPress() screen=%p id=%d value=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), getValue());
     switch(screenFlow->getId()) {
         case Screen::Type::START:
             if (pid.motorToggle()) {
@@ -930,7 +928,6 @@ void Menu::handleStartButtonPress()
             // no default action
             break;
     }
-    DEBUG_PRINT(DebugType::UI, "leave screen=%p id=%d value=%d", screenFlow.getScreen(), static_cast<int>(screenFlow->getId()), getValue());
 }
 
 int32_t Menu::updateRotaryValue(int32_t value)

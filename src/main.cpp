@@ -21,7 +21,7 @@
 #if LV_USE_LOG
 static void lvgl_log_cb(const char *buf)
 {
-    DEBUG_PRINT_MSG(DebugType::UI, "LVGL: %s", buf ? buf : "<null>");
+    DEBUG_PRINT_MSG(DebugType::LVGL, "%s", buf ? buf : "<null>");
 }
 #endif
 
@@ -171,7 +171,7 @@ static void loop()
         if (delta) {
             int32_t newPosition = menu.updateRotaryValue(delta);
             (void)newPosition;
-            DEBUG_PRINT(DebugType::UI, "menu=%d delta=%d", newPosition, delta);
+            DEBUG_PRINT(DebugType::UI, "main() menu=%d rotary_delta=%d", newPosition, delta);
         }
         // handle LVGL updates
         ScreenFlow &screenFlow = menu.getScreenFlow();

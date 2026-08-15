@@ -227,7 +227,6 @@ void *operator new(std::size_t size) noexcept
     #if LV_MEM_DEBUG
     if (!ptr) {
         DEBUG_PRINT(DebugType::MEM, "operator new failed size=%u", static_cast<unsigned>(size));
-        throw std::bad_alloc();
     }
     #endif
     return ptr;
@@ -249,7 +248,6 @@ void *operator new[](std::size_t size) noexcept
     #if LV_MEM_DEBUG
     if (!ptr) {
         DEBUG_PRINT(DebugType::MEM, "operator new[] failed size=%u", static_cast<unsigned>(size));
-        throw std::bad_alloc();
     }
     #endif
     return ptr;

@@ -5,7 +5,6 @@
 */
 
 #include <stm32f1xx.h>
-#include "debug.h"
 #include "tft_driver.h"
 #include "tft_driver_screenshot.h"
 

@@ -122,15 +122,14 @@ Screen::Screen(Type id) :
     steps(1),
     value(0)
 {
-    DEBUG_PRINT(DebugType::UI, "ctor");
 }
 
 Screen::~Screen()
 {
-    DEBUG_PRINT(DebugType::UI, "screen=%p", screen);
+    DEBUG_PRINT(DebugType::UI, "~Screen() screen=%p", screen);
     #if DEBUG
     if (prevScreen) {
-        DEBUG_PRINT(DebugType::ERROR, "prev. screen=%p not null", prevScreen);
+        DEBUG_PRINT(DebugType::ERROR, "~Screen() prev. screen=%p not null", prevScreen);
     }
     #endif
     if (screen) {
@@ -141,7 +140,7 @@ Screen::~Screen()
 
 void Screen::load()
 {
-    DEBUG_PRINT(DebugType::UI, "screen=%p", screen);
+    DEBUG_PRINT(DebugType::UI, "Screen::load() screen=%p", screen);
     if (screen) {
         auto tmp = screen;
         screen = lv_obj_create(nullptr);
@@ -158,7 +157,7 @@ void Screen::load()
 
 void Screen::update()
 {
-    DEBUG_PRINT(DebugType::UI, "screen=%p", screen);
+    DEBUG_PRINT(DebugType::UI, "Screen::update() screen=%p", screen);
 }
 
 void Screen::setValue(uint32_t value)
@@ -187,7 +186,7 @@ void WelcomeScreen::load()
 
 void InfoScreen::load()
 {
-    DEBUG_PRINT(DebugType::UI, "message=%s", message ? message : "<NULL>");
+    DEBUG_PRINT(DebugType::UI, "InfoScreen::load() message=%s", message ? message : "<NULL>");
     Screen::load();
     label = lv_label_create(screen);
     lv_label_set_text_static(label, message);
@@ -226,7 +225,7 @@ MenuScreen::MenuScreen(Type id, const char **itemLabels, size_t itemCount) :
 
 void MenuScreen::load()
 {
-    DEBUG_PRINT(DebugType::UI, "items=%u selected=%u", count, selected);
+    DEBUG_PRINT(DebugType::UI, "MenuScreen::load() items=%u selected=%u", count, selected);
     Screen::load();
     lv_obj_t *menu = lv_obj_create(screen);
 
@@ -290,7 +289,7 @@ uint32_t MenuScreen::getValue() const
 
 void SliderScreen::load()
 {
-    DEBUG_PRINT(DebugType::UI, "range=%u-%u value=%u label=%s unit=%s", minValue, maxValue, value, label, unit ? unit : "<NULL>");
+    DEBUG_PRINT(DebugType::UI, "SliderScreen::load() range=%u-%u value=%u label=%s unit=%s", minValue, maxValue, value, label, unit ? unit : "<NULL>");
     Screen::load();
 
     lv_obj_t *container = lv_obj_create(screen);

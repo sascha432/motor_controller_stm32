@@ -18,7 +18,7 @@ void ScreenFlow::init()
 
 void ScreenFlow::destroy()
 {
-    DEBUG_PRINT(DebugType::UI, "screen=%p", screen);
+    DEBUG_PRINT(DebugType::UI, "ScreenFlow::destroy() screen=%p", screen);
     if (screen) {
         lv_scr_load(Screen::emptyScreen);
         delete screen;
@@ -28,7 +28,7 @@ void ScreenFlow::destroy()
 
 void ScreenFlow::setScreen(Screen *newScreen)
 {
-    DEBUG_PRINT(DebugType::UI, "new=%p old=%p", newScreen, screen);
+    DEBUG_PRINT(DebugType::UI, "ScreenFlow::setScreen(Screen *newScreen = %p) old=%p", newScreen, screen);
     destroy();
     screen = newScreen;
     screen->load();
@@ -36,7 +36,7 @@ void ScreenFlow::setScreen(Screen *newScreen)
 
 void ScreenFlow::back()
 {
-    DEBUG_PRINT(DebugType::UI, "prev=%p current=%p", screen->prevScreen, screen);
+    DEBUG_PRINT(DebugType::UI, "ScreenFlow::back() prev=%p current=%p", screen->prevScreen, screen);
     if (screen->prevScreen) {
         lv_scr_load(Screen::emptyScreen);
         auto tmp = screen->removePrevScreen();
@@ -48,7 +48,7 @@ void ScreenFlow::back()
 
 void ScreenFlow::next(Screen *nextScreen)
 {
-    DEBUG_PRINT(DebugType::UI, "next=%p current=%p", nextScreen, screen);
+    DEBUG_PRINT(DebugType::UI, "ScreenFlow::next(nextScreen = %p)  current=%p", nextScreen, screen);
     if (screen) {
         lv_obj_clean(screen->screen);
     }

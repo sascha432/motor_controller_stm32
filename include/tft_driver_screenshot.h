@@ -7,6 +7,7 @@
 #if HAVE_SCREENSHOTS
 
 #include "serial.h"
+#include "debug.h"
 #include "lvgl.h"
 
 // === Screenshot streaming support ===

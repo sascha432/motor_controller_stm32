@@ -228,6 +228,9 @@ enum class DebugType : uint32_t
     MEM = 0x10,
     UI = 0x20,
     PID = 0x40,
+    #if LV_USE_LOG
+    LVGL = 0x80,
+    #endif
     ALL = 0xFFFFFFFF
 };
 
@@ -253,6 +256,9 @@ inline const char *debugLevelToString(DebugType level)
         case DebugType::MEM: return "MEM";
         case DebugType::UI: return "UI";
         case DebugType::PID: return "PID";
+        #if LV_USE_LOG
+        case DebugType::LVGL: return "LVGL";
+        #endif
         case DebugType::ERROR:
         default:
             return "ERROR";
@@ -303,6 +309,7 @@ void debug_init(void);
 
     #define DEBUG_PRINT_MSG(level, msg, ...) do {} while(0)
     #define DEBUG_PRINT(level, msg, ...) do {} while(0)
+    #define DEBUG_PRINT_SRC(level, msg, ...) do {} while(0)
 
 #else
 
@@ -316,7 +323,14 @@ void debug_init(void);
     #define DEBUG_PRINT(level, msg, ...) \
         do { \
             if ((uint32_t)(DEBUG_LEVEL) & (uint32_t)(level)) { \
-                DEBUG_PRINTF_FUNC("[%06lu] %s %s:%d " msg "\n", HAL_GetTick(), debugLevelToString(level), DEBUG_SOURCE_FILENAME, __LINE__, ##__VA_ARGS__); \
+                DEBUG_PRINTF_FUNC("[%06lu] %s " msg "\n", HAL_GetTick(), debugLevelToString(level), ##__VA_ARGS__); \
+            } \
+        } while(0)
+
+    #define DEBUG_PRINT_SRC(level, msg, ...) \
+        do { \
+            if ((uint32_t)(DEBUG_LEVEL) & (uint32_t)(level)) { \
+                DEBUG_PRINTF_FUNC("[%06lu] %s %s:%u " msg "\n", HAL_GetTick(), debugLevelToString(level), DEBUG_SOURCE_FILENAME, __LINE__, ##__VA_ARGS__); \
             } \
         } while(0)
 
