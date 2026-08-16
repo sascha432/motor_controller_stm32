@@ -489,10 +489,10 @@ private:
     lv_obj_t *scrollbarThumb;
     int32_t scrollOffset;
     int32_t scrollMax;
-    char vccLabelBuf[32];
-    char currentLabelBuf[32];
-    char motorTempLabelBuf[32];
-    char mosfetTempLabelBuf[32];
+    char vccLabelBuf[40];
+    char currentLabelBuf[48];
+    char motorTempLabelBuf[40];
+    char mosfetTempLabelBuf[40];
     char rpmLabelBuf[24];
     char lastErrorLabelBuf[48];
 };
@@ -597,8 +597,8 @@ protected:
     SelectedValueType lastSelectedValue;
     lv_point_t graphRpmPoints[kDashboardScreenGraphPointCount];
     lv_point_t graphSetRpmPoints[kDashboardScreenGraphPointCount];
-    char voltageLabelBuf[14];
-    char currentLabelBuf[14];
+    char voltageLabelBuf[16];
+    char currentLabelBuf[16];
     char motorTempLabelBuf[8];
     char mosfetTempLabelBuf[8];
     char rpmLabelBuf[16];
@@ -635,8 +635,8 @@ private:
     lv_obj_t *mosfetTempLabel;
     lv_obj_t *directionLabel;
     lv_obj_t *speedLabel;
-    char voltageLabelBuf[14];
-    char currentLabelBuf[14];
+    char voltageLabelBuf[16];
+    char currentLabelBuf[16];
     char motorTempLabelBuf[8];
     char mosfetTempLabelBuf[8];
     char directionLabelBuf[16];

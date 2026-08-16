@@ -16,13 +16,13 @@ static constexpr float kADCClockMHz = 12.0f;    // ADC clock in MHz
 static constexpr float kAdcSampleTimeUs(uint32_t sampleBits)
 {
     switch (sampleBits & 0x07) {
-        case ADC_SAMPLETIME_1CYCLE_5: return (1.5f   + 12.5f) / kADCClockMHz;
-        case ADC_SAMPLETIME_7CYCLES_5: return (7.5f   + 12.5f) / kADCClockMHz;
-        case ADC_SAMPLETIME_13CYCLES_5: return (13.5f  + 12.5f) / kADCClockMHz;
-        case ADC_SAMPLETIME_28CYCLES_5: return (28.5f  + 12.5f) / kADCClockMHz;
-        case ADC_SAMPLETIME_41CYCLES_5: return (41.5f  + 12.5f) / kADCClockMHz;
-        case ADC_SAMPLETIME_55CYCLES_5: return (55.5f  + 12.5f) / kADCClockMHz;
-        case ADC_SAMPLETIME_71CYCLES_5: return (71.5f  + 12.5f) / kADCClockMHz;
+        case ADC_SAMPLETIME_1CYCLE_5: return (1.5f + 12.5f) / kADCClockMHz;
+        case ADC_SAMPLETIME_7CYCLES_5: return (7.5f + 12.5f) / kADCClockMHz;
+        case ADC_SAMPLETIME_13CYCLES_5: return (13.5f + 12.5f) / kADCClockMHz;
+        case ADC_SAMPLETIME_28CYCLES_5: return (28.5f + 12.5f) / kADCClockMHz;
+        case ADC_SAMPLETIME_41CYCLES_5: return (41.5f + 12.5f) / kADCClockMHz;
+        case ADC_SAMPLETIME_55CYCLES_5: return (55.5f + 12.5f) / kADCClockMHz;
+        case ADC_SAMPLETIME_71CYCLES_5: return (71.5f + 12.5f) / kADCClockMHz;
         case ADC_SAMPLETIME_239CYCLES_5: return (239.5f + 12.5f) / kADCClockMHz;
     }
     return 0.0f;

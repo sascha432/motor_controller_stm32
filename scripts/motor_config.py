@@ -1198,6 +1198,61 @@ class SerialBackend(SWOBackend):
         self.parameters_callback = parameters_callback
         self.eeprom_callback = eeprom_callback
 
+    @staticmethod
+    def _is_com_port(port_name: str) -> bool:
+        return bool(re.fullmatch(r"COM\d+", port_name.strip(), re.IGNORECASE))
+
+    def _resolve_serial_port_name(self, port_name: str) -> str:
+        requested_port = str(port_name).strip()
+        if self._is_com_port(requested_port):
+            return requested_port
+
+        try:
+            list_ports = importlib.import_module("serial.tools.list_ports")
+        except ImportError:
+            return requested_port
+
+        def normalize(value: Optional[str]) -> str:
+            return str(value or "").strip().lower()
+
+        windows_device_id = re.fullmatch(
+            r"USB\\VID_([0-9A-F]{4})&PID_([0-9A-F]{4})\\(.+)",
+            requested_port,
+            re.IGNORECASE,
+        )
+        parts = [part.strip() for part in requested_port.split(":") if part.strip()]
+        vid = pid = serial_number = None
+        if windows_device_id is not None:
+            vid = int(windows_device_id.group(1), 16)
+            pid = int(windows_device_id.group(2), 16)
+            serial_number = windows_device_id.group(3)
+        elif len(parts) >= 2:
+            try:
+                vid = int(parts[0], 16)
+                pid = int(parts[1], 16)
+            except ValueError:
+                vid = pid = None
+            if len(parts) >= 3:
+                serial_number = parts[2]
+
+        for port in list_ports.comports():
+            if normalize(port.device) == normalize(requested_port):
+                return port.device
+            if vid is not None and pid is not None and port.vid == vid and port.pid == pid:
+                if serial_number is not None:
+                    if normalize(port.serial_number) == normalize(serial_number):
+                        return port.device
+                    continue
+                return port.device
+            if normalize(port.serial_number) == normalize(requested_port):
+                return port.device
+            if normalize(port.hwid).startswith(normalize(requested_port)):
+                return port.device
+            if normalize(port.description) == normalize(requested_port):
+                return port.device
+
+        return requested_port
+
     def _send_binary_command(self, command_type: int, payload: bytes = b"\x00\x00\x00\x00") -> None:
         self._send_binary_payload(command_type, payload)
 
@@ -1217,11 +1272,14 @@ class SerialBackend(SWOBackend):
         if self.running:
             return True
 
+        port_name = self.config.serial_port
         try:
             serial = importlib.import_module("serial")
 
+            port_name = self._resolve_serial_port_name(self.config.serial_port)
+            is_usb_device = port_name.casefold() != self.config.serial_port.casefold()
             serial_port = serial.Serial(
-                self.config.serial_port,
+                port_name,
                 self.config.serial_baud,
                 timeout=0.2,
             )
@@ -1233,7 +1291,13 @@ class SerialBackend(SWOBackend):
             self.log("pyserial not found. Install with: pip install pyserial", "ERROR")
             return False
         except Exception as exc:
-            self.log(f"Failed to open serial port {self.config.serial_port}: {exc}", "ERROR")
+            port_description = f"COM port {port_name}"
+            if is_usb_device:
+                port_description += f" (USB device ID {self.config.serial_port})"
+            self.log(
+                f"Failed to open {port_description}: {exc}",
+                "ERROR",
+            )
             try:
                 serial_port.close()  # type: ignore[union-attr]
             except Exception:
@@ -1256,7 +1320,7 @@ class SerialBackend(SWOBackend):
         self.running = True
         self.reader_thread = threading.Thread(target=self._read_serial, daemon=True)
         self.reader_thread.start()
-        self.log(f"Connected to serial port {self.config.serial_port} at {self.config.serial_baud} baud")
+        self.log(f"Connected to {port_name}%s at {self.config.serial_baud} baud" % (is_usb_device and f" ({self.config.serial_port})" or ""))
         self.log("Sent PID start command")
         return True
 
@@ -1591,7 +1655,6 @@ class PIDTuningApp:
         self.window_seconds_var.set(str(self._load_graph_time_window()))
         self._init_buffers(window_seconds=int(self.window_seconds_var.get()))
         self._apply_graph_visibility()
-        self._build_plot_lines()
         self._refresh_plot()
 
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -2370,7 +2433,7 @@ class PIDTuningApp:
         swo_frame.columnconfigure(1, weight=1)
 
         serial_fields = (
-            ("serial_port", "Serial port", "entry", None),
+            ("serial_port", "COM port / USB device ID", "entry", None),
             ("serial_baud", "Serial baud", "entry", None),
         )
         swo_fields = (
@@ -3700,7 +3763,7 @@ def parse_args() -> AppConfig:
         default=saved_string("transport", "serial").strip().lower(),
         help="PID data transport",
     )
-    parser.add_argument("--port", dest="serial_port", default=saved_string("serial_port", "COM10"), help="Serial port")
+    parser.add_argument("--port", dest="serial_port", default=saved_string("serial_port", "COM10"), help="COM port or USB device id")
     parser.add_argument("--baud", dest="serial_baud", type=int, default=saved_int("serial_baud", 115200), help="Serial baud rate")
     parser.add_argument("--uid", default=saved_string("uid", ""), help="Optional pyOCD probe unique ID")
     parser.add_argument("--target", default=saved_string("target", "cortex_m"), help="pyOCD target")
