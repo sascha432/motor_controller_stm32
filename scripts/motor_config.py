@@ -25,7 +25,7 @@ from datetime import datetime
 from pathlib import Path
 from collections import deque
 from dataclasses import dataclass
-from tkinter import ttk
+from tkinter import messagebox, simpledialog, ttk
 from typing import Callable, Iterable, List, Optional, Tuple
 
 from PIL import Image
@@ -194,6 +194,8 @@ SCREENSHOT_MAX_PIXELS = SCREENSHOT_MAX_WIDTH * SCREENSHOT_MAX_HEIGHT
 SCREENSHOT_BUFFER_SOFT_LIMIT = 65536
 SCREENSHOT_BUFFER_TAIL_KEEP = 256
 SCREENSHOT_TIMEOUT_SECONDS = 2.0
+GRAPH_REFRESH_INTERVAL_SECONDS = 0.10
+EEPROM_DIALOG_GRAPH_REFRESH_INTERVAL_SECONDS = 1.0
 SCREENSHOT_TILE_HEADER_STRUCT = "<HHHHI"
 SCREENSHOT_TILE_HEADER_SIZE = struct.calcsize(SCREENSHOT_TILE_HEADER_STRUCT)
 SCREENSHOT_FRAME_HEADER_STRUCT = "<HHI"
@@ -213,6 +215,7 @@ SWO_DATA_SEND_SCREENSHOT_OFFSET = struct.calcsize("<fffHHI?3xI?3x")
 # EEPROM::DataType layout in firmware with dynamic EEPROM address from SWO::DataType
 EEPROM_DATA_STRUCT = "<IIIIBBHHHHHBBBBBBBBHxxfffHHH?x"
 EEPROM_DATA_SIZE = struct.calcsize(EEPROM_DATA_STRUCT)
+NEW_EEPROM_SLOT = "New EEPROM Config..."
 
 @dataclass
 class SWOData:
@@ -2202,6 +2205,16 @@ class PIDTuningApp:
     def _default_eeprom_slot_names(self) -> list[str]:
         return [f"slot_{index + 1}" for index in range(self.EEPROM_CONFIG_SLOT_COUNT)]
 
+    def _eeprom_slot_names(self) -> list[str]:
+        data = self._load_settings_data()
+        slots = data.get("eeprom_slots", []) if isinstance(data.get("eeprom_slots", []), list) else []
+        names = [
+            str(item.get("name", "")).strip()
+            for item in slots
+            if isinstance(item, dict) and str(item.get("name", "")).strip()
+        ]
+        return (names[: self.EEPROM_CONFIG_SLOT_COUNT] or self._default_eeprom_slot_names()) + [NEW_EEPROM_SLOT]
+
     def _settings_path(self) -> Path:
         return Path(__file__).resolve().with_suffix(".json")
 
@@ -2501,8 +2514,8 @@ class PIDTuningApp:
 
         buttons = ttk.Frame(dialog)
         buttons.pack(fill=tk.X, padx=12, pady=(0, 12))
-        ttk.Button(buttons, text="Save", command=self._save_config_dialog).pack(side=tk.RIGHT, padx=(0, 6))
         ttk.Button(buttons, text="Cancel", command=self._close_config_dialog).pack(side=tk.RIGHT)
+        ttk.Button(buttons, text="Save", command=self._save_config_dialog).pack(side=tk.RIGHT, padx=(0, 6))
 
         dialog.bind("<Configure>", lambda event: self._save_ui_state())
 
@@ -2610,14 +2623,32 @@ class PIDTuningApp:
         if self._eeprom_dialog is None:
             return
 
-        slot_name = (self._eeprom_dialog_slot_var.get() if self._eeprom_dialog_slot_var is not None else "slot_1").strip()
-        if not slot_name:
-            slot_name = "slot_1"
+        current_slot_name = (
+            self._eeprom_dialog_slot_var.get()
+            if self._eeprom_dialog_slot_var is not None
+            else "slot_1"
+        ).strip() or "slot_1"
+        is_new_slot = current_slot_name == NEW_EEPROM_SLOT
+        slot_name = simpledialog.askstring(
+            "Store EEPROM Config",
+            "Name for the new slot:" if is_new_slot else "Name of the slot to replace:",
+            initialvalue="" if is_new_slot else current_slot_name,
+            parent=self._eeprom_dialog,
+        )
+        if slot_name is None:
+            return
+        slot_name = slot_name.strip()
+        if not slot_name or slot_name == NEW_EEPROM_SLOT:
+            if self._eeprom_dialog_status_var is not None:
+                self._eeprom_dialog_status_var.set("EEPROM slot name is invalid")
+            return
 
         data = self._load_settings_data()
         slots = data.get("eeprom_slots", []) if isinstance(data.get("eeprom_slots", []), list) else []
 
         slot_map = {str(item.get("name", "")): item for item in slots if isinstance(item, dict)}
+        if not is_new_slot and slot_name != current_slot_name:
+            slot_map.pop(current_slot_name, None)
         slot_map[slot_name] = self._snapshot_eeprom_dialog_as_slot_dict(slot_name)
 
         ordered_slots = []
@@ -2630,6 +2661,12 @@ class PIDTuningApp:
 
         data["eeprom_slots"] = ordered_slots[: self.EEPROM_CONFIG_SLOT_COUNT]
         self._save_settings_data(data)
+
+        if self._eeprom_dialog_slot_combo is not None:
+            slot_names = [str(slot["name"]) for slot in data["eeprom_slots"]] + [NEW_EEPROM_SLOT]
+            self._eeprom_dialog_slot_combo.configure(values=slot_names)
+        if self._eeprom_dialog_slot_var is not None:
+            self._eeprom_dialog_slot_var.set(slot_name)
 
         if self._eeprom_dialog_status_var is not None:
             self._eeprom_dialog_status_var.set(f"Saved EEPROM config to {self._settings_path().name}")
@@ -2684,6 +2721,51 @@ class PIDTuningApp:
 
         if self._eeprom_dialog_status_var is not None:
             self._eeprom_dialog_status_var.set(f"Loaded EEPROM preset '{slot_name}'")
+
+    def _delete_eeprom_config_file(self) -> None:
+        if self._eeprom_dialog is None:
+            return
+
+        slot_name = (
+            self._eeprom_dialog_slot_var.get()
+            if self._eeprom_dialog_slot_var is not None
+            else ""
+        ).strip()
+        if not slot_name or slot_name == NEW_EEPROM_SLOT:
+            if self._eeprom_dialog_status_var is not None:
+                self._eeprom_dialog_status_var.set("Select a saved EEPROM config to delete")
+            return
+
+        if not messagebox.askyesno(
+            "Delete EEPROM Config",
+            f"Delete the EEPROM config '{slot_name}'?",
+            parent=self._eeprom_dialog,
+        ):
+            return
+
+        data = self._load_settings_data()
+        slots = data.get("eeprom_slots", []) if isinstance(data.get("eeprom_slots", []), list) else []
+        remaining_slots = [
+            item
+            for item in slots
+            if not (isinstance(item, dict) and str(item.get("name", "")) == slot_name)
+        ]
+        if len(remaining_slots) == len(slots):
+            if self._eeprom_dialog_status_var is not None:
+                self._eeprom_dialog_status_var.set(f"EEPROM preset '{slot_name}' was not found")
+            return
+
+        data["eeprom_slots"] = remaining_slots[: self.EEPROM_CONFIG_SLOT_COUNT]
+        self._save_settings_data(data)
+
+        saved_names = [str(item["name"]) for item in data["eeprom_slots"]]
+        slot_names = saved_names + [NEW_EEPROM_SLOT]
+        if self._eeprom_dialog_slot_combo is not None:
+            self._eeprom_dialog_slot_combo.configure(values=slot_names)
+        if self._eeprom_dialog_slot_var is not None:
+            self._eeprom_dialog_slot_var.set(saved_names[0] if saved_names else NEW_EEPROM_SLOT)
+        if self._eeprom_dialog_status_var is not None:
+            self._eeprom_dialog_status_var.set(f"Deleted EEPROM preset '{slot_name}'")
 
     def _populate_eeprom_dialog(
         self,
@@ -2888,11 +2970,12 @@ class PIDTuningApp:
         slot_row = ttk.Frame(button_frame)
         slot_row.grid(row=1, column=1, sticky="e")
         ttk.Label(slot_row, text="Slot:").pack(side=tk.LEFT, padx=(0, 6))
-        self._eeprom_dialog_slot_var = tk.StringVar(value=self._default_eeprom_slot_names()[0])
+        slot_names = self._eeprom_slot_names()
+        self._eeprom_dialog_slot_var = tk.StringVar(value=slot_names[0])
         self._eeprom_dialog_slot_combo = ttk.Combobox(
             slot_row,
             textvariable=self._eeprom_dialog_slot_var,
-            values=self._default_eeprom_slot_names(),
+            values=slot_names,
             state="readonly",
             width=18,
         )
@@ -2900,7 +2983,13 @@ class PIDTuningApp:
         self._eeprom_dialog_save_button = ttk.Button(slot_row, text="Store", command=self._save_eeprom_config_file)
         self._eeprom_dialog_save_button.pack(side=tk.LEFT, padx=(0, 6))
         self._eeprom_dialog_load_button = ttk.Button(slot_row, text="Load", command=self._load_eeprom_config_file)
-        self._eeprom_dialog_load_button.pack(side=tk.LEFT)
+        self._eeprom_dialog_load_button.pack(side=tk.LEFT, padx=(0, 6))
+        self._eeprom_dialog_delete_button = ttk.Button(
+            slot_row,
+            text="Delete",
+            command=self._delete_eeprom_config_file,
+        )
+        self._eeprom_dialog_delete_button.pack(side=tk.LEFT)
 
         button_row = ttk.Frame(button_frame)
         button_row.grid(row=2, column=1, sticky="e", pady=(8, 0))
@@ -3700,7 +3789,12 @@ class PIDTuningApp:
                 self._update_control_button_states()
 
         now = time.monotonic()
-        if got_sample and (now - self._last_plot_refresh) >= 0.10:
+        graph_refresh_interval = (
+            EEPROM_DIALOG_GRAPH_REFRESH_INTERVAL_SECONDS
+            if self._eeprom_dialog is not None
+            else GRAPH_REFRESH_INTERVAL_SECONDS
+        )
+        if got_sample and (now - self._last_plot_refresh) >= graph_refresh_interval:
             self._refresh_plot()
             self._last_plot_refresh = now
 
