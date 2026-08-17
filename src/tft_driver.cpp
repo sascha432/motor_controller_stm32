@@ -10,6 +10,11 @@
 
 static constexpr uint32_t kSPISyncTimeoutMillis = 3;                                                // SPI synchronization timeout in milliseconds
 
+lv_disp_draw_buf_t s_lvgl_draw_buf;
+lv_color_t s_lvgl_buf_1[LV_BUFFER_SIZE];
+lv_disp_drv_t s_lvgl_disp_drv;
+TIM_HandleTypeDef tim2;
+
 /**
  * @brief Calculate the DMA transfer timeout based on the max. number of bytes to transfer and the SPI clock speed
  *
@@ -18,15 +23,11 @@ static constexpr uint32_t kSPISyncTimeoutMillis = 3;                            
  * @return constexpr uint32_t Calculated timeout in milliseconds
  */
 static constexpr uint32_t kCalculateDMATimeoutMs(uint16_t bytes, uint32_t spiClockHz = 18000000) {
-    return (bytes / (spiClockHz / 8000)) + (kSPISyncTimeoutMillis * 2);
+    return (((bytes * 8000) + (spiClockHz - 1)) / spiClockHz);
 }
 
-static constexpr uint32_t kDMATransferTimeoutMillis = kCalculateDMATimeoutMs(LV_BUFFER_SIZE);       // DMA transfer timeout in milliseconds
+static constexpr uint32_t kDMATransferTimeoutMillis = kCalculateDMATimeoutMs(sizeof(s_lvgl_buf_1));       // DMA transfer timeout in milliseconds
 
-lv_disp_draw_buf_t s_lvgl_draw_buf;
-lv_color_t s_lvgl_buf_1[LV_BUFFER_SIZE];
-lv_disp_drv_t s_lvgl_disp_drv;
-TIM_HandleTypeDef tim2;
 
 /**
  * @brief init GPIO pins and timers for the SPI display and backlight PWM
@@ -152,7 +153,7 @@ void tft_driver_spi_send_buffer_dma_raw(const void *data, uint16_t len)
 
     // Wait for DMA transfer to complete with timeout protection
     uint32_t start = HAL_GetTick();
-    while (!(DMA1->ISR & DMA_ISR_TCIF5) && (HAL_GetTick() - start < kDMATransferTimeoutMillis)) {
+    while (!(DMA1->ISR & DMA_ISR_TCIF5) && (HAL_GetTick() - start <= kDMATransferTimeoutMillis)) {
     }
 
     // === Post-Transfer Cleanup ===
@@ -166,12 +167,12 @@ void tft_driver_spi_send_buffer_dma_raw(const void *data, uint16_t len)
     // === SPI Synchronization ===
     // Wait for TX FIFO to empty (TXE flag set) - all bytes shifted into shift register
     start = HAL_GetTick();
-    while (((SPI2->SR & SPI_SR_TXE) == 0U) && (HAL_GetTick() - start < kSPISyncTimeoutMillis)) {
+    while (((SPI2->SR & SPI_SR_TXE) == 0U) && (HAL_GetTick() - start <= kSPISyncTimeoutMillis)) {
     }
 
     // Wait for SPI to finish transmitting (BSY flag clear) - shift register emptied on wire
     start = HAL_GetTick();
-    while ((SPI2->SR & SPI_SR_BSY) && (HAL_GetTick() - start < kSPISyncTimeoutMillis)) {
+    while ((SPI2->SR & SPI_SR_BSY) && (HAL_GetTick() - start <= kSPISyncTimeoutMillis)) {
     }
 
     // === RX FIFO Cleanup ===

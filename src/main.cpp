@@ -193,7 +193,14 @@ static void loop()
         }
 
         // update UI, this might take a couple 100ms
-        screenFlow.refresh();
+        #if HAVE_DWT_TICK_PROFILER && false
+            TickProfiler::start(8);
+            screenFlow.refresh();
+            TickProfiler::stop();
+            DEBUG_PRINT_MSG(DebugType::UI, "%u\n", TickProfiler::getTicks());
+        #else
+            screenFlow.refresh();
+        #endif
 
         #if HAVE_SCREENSHOTS
             // finalize requested screenshot

@@ -22,7 +22,7 @@
 #define LV_BUFFER_SIZE              (LV_HOR_RES_MAX * LV_BUFFER_LINES)
 
 #define TFT_DMA_CH                  DMA1_Channel5
-#define TFT_DMA_TX_CHUNK_PIXELS     256
+// #define TFT_DMA_TX_CHUNK_PIXELS     64
 
 // Function prototypes
 extern lv_disp_draw_buf_t s_lvgl_draw_buf;
@@ -71,10 +71,5 @@ void tft_driver_init(void);
 void tft_driver_lvgl_init(void);
 void tft_clear_display(uint16_t color = 0x0000);
 void tft_write_window_pixels(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, const uint16_t *pixels, uint32_t pixel_count);
-
-#if HAVE_SCREENSHOTS
-bool tft_driver_screenshot_begin(void);
-void tft_driver_screenshot_end(void);
-#endif
 
 // EOF

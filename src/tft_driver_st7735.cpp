@@ -40,14 +40,16 @@
 #define ST7735_GMCTRP1 0xE0
 #define ST7735_GMCTRN1 0xE1
 
-static uint8_t dma_transfer_buffer[TFT_DMA_TX_CHUNK_PIXELS * 2];
-
 /**
  * Write repeated RGB565 color pixels using chunked DMA transfers.
  */
 static inline void write_color_pixels(uint16_t color, uint32_t pixels)
 {
-    const uint32_t pixel_pattern = __REV16((static_cast<uint32_t>(color) << 16U) | color);
+    constexpr size_t kChunkPixelBufferSize = 128 / sizeof(uint16_t); // chunk buffer in half words
+    uint32_t dma_transfer_buffer[kChunkPixelBufferSize / sizeof(uint16_t)];
+
+    // const uint32_t pixel_pattern = __REV16(static_cast<uint32_t>(color) << 16U) | color; // big endian
+    const uint32_t pixel_pattern = (static_cast<uint32_t>(color) << 16U) | color;
     std::fill(std::begin(dma_transfer_buffer), std::end(dma_transfer_buffer), pixel_pattern);
 
     TFT_PIN_RS_HIGH();
@@ -55,8 +57,8 @@ static inline void write_color_pixels(uint16_t color, uint32_t pixels)
     tft_driver_delay();
 
     while (pixels > 0) {
-        const uint16_t chunk_pixels = (pixels > TFT_DMA_TX_CHUNK_PIXELS) ? TFT_DMA_TX_CHUNK_PIXELS : pixels;
-        tft_driver_spi_send_buffer_dma_raw(dma_transfer_buffer, chunk_pixels * 2U);
+        const uint16_t chunk_pixels = (pixels > kChunkPixelBufferSize) ? kChunkPixelBufferSize : pixels;
+        tft_driver_spi_send_buffer_dma_raw(dma_transfer_buffer, chunk_pixels * sizeof(uint16_t));
         pixels -= chunk_pixels;
     }
 
@@ -73,20 +75,20 @@ static inline void write_pixel_buffer_rgb565(const uint16_t *pixels, uint32_t pi
     TFT_PIN_CS_LOW();
     tft_driver_delay();
 
-    uint32_t offset = 0;
-    while (offset < pixel_count) {
-        const uint32_t pixels_left = pixel_count - offset;
-        const uint32_t chunk_pixels = (pixels_left > TFT_DMA_TX_CHUNK_PIXELS) ? TFT_DMA_TX_CHUNK_PIXELS : pixels_left;
-        const uint32_t copy_words = (chunk_pixels + 1) / 2; // always copy 32bit words, out of bounds is safe because we only copy to the dma_transfer_buffer which is large enough
-
-        // 32bit transfer
-        uint32_t *dma_buffer = reinterpret_cast<uint32_t *>(dma_transfer_buffer);
-        const uint32_t *pixel_buffer = reinterpret_cast<const uint32_t *>(pixels + offset);
-        for (uint32_t i = 0; i < copy_words; i++) {
-            *dma_buffer++ = __REV16(*pixel_buffer++);
+    if constexpr (sizeof(s_lvgl_buf_1) > UINT16_MAX) {
+        constexpr size_t kMaxDMATransferSize = UINT16_MAX / sizeof(uint16_t); // max transfer in half words
+        while(pixel_count > 0) {
+            uint32_t transfer = pixel_count;
+            if (pixel_count > kMaxDMATransferSize) {
+                transfer = kMaxDMATransferSize;
+            }
+            tft_driver_spi_send_buffer_dma_raw(pixels, transfer * sizeof(uint16_t));
+            pixels += transfer;
+            pixel_count -= transfer;
         }
-        tft_driver_spi_send_buffer_dma_raw(dma_transfer_buffer, chunk_pixels * 2U);
-        offset += chunk_pixels;
+    }
+    else {
+        tft_driver_spi_send_buffer_dma_raw(pixels, pixel_count * sizeof(uint16_t));
     }
 
     tft_driver_delay();
