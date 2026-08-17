@@ -44,6 +44,37 @@
             }
         },
         {
+            "name": "OpenOCD Debug (skip Pre-Debug)",
+            "type": "cortex-debug",
+            "request": "launch",
+            "servertype": "openocd",
+            "interface": "swd",
+            "executable": "${workspaceFolder}/.pio/build/stm32f107custom/firmware.elf",
+            "device": "stm32f107custom",
+            "runToEntryPoint": "",
+            "configFiles": [
+                "interface/stlink.cfg",
+                "target/stm32f1x.cfg"
+            ],
+            "swoConfig": {
+                "enabled": true,
+                "cpuFrequency": 72000000,
+                "swoFrequency": 2000000,
+                "decoders": [
+                    {
+                        "type": "console",
+                        "port": 0,
+                        "encoding": "ascii"
+                    },
+                    {
+                        "type": "binary",
+                        "port": 1,
+                        "encoding": "unsigned"
+                    }
+                ]
+            }
+        },
+        {
             "type": "platformio-debug",
             "request": "launch",
             "name": "PIO Debug",
