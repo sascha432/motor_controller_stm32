@@ -99,7 +99,7 @@ struct Serial : public SerialProtocol
         if (size == 0 || !isConnected() || !canWrite()) {
             return 0;
         }
-        BinaryHeader hdr(type, size, stm32_CRC(data, size));
+        BinaryHeader hdr(type, size, stm32_CRC(reinterpret_cast<const uint32_t *>(data), size));
         uint8_t result = CDC_Transmit_FS(reinterpret_cast<uint8_t *>(&hdr), sizeof(hdr));
         if (result != USBD_OK || !canWrite()) {
             return 0;

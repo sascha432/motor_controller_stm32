@@ -9,8 +9,7 @@
 #include "adc.h"
 #include "i2c.h"
 #include "adc_converters.h"
-
-extern CRC_HandleTypeDef hcrc;
+#include "crc.h"
 
 struct EEPROM
 {
@@ -121,11 +120,12 @@ struct EEPROM
         /**
          * @brief Get the data pointer without header
          *
-         * @return uint32_t*
+         * @return const uint32_t*
          */
-        inline uint32_t *getDataPtr() const
+        inline const uint32_t *getDataPtr() const
         {
-            return reinterpret_cast<uint32_t *>(const_cast<uint8_t *>(reinterpret_cast<const uint8_t *>(this)) + offsetof(Data, tft_brightness));
+            static_assert(offsetof(Data, tft_brightness) % sizeof(uint32_t) == 0, "Data structure is not 32bit aligned");
+            return reinterpret_cast<const uint32_t *>(&(this->tft_brightness));
         }
 
         /**
@@ -162,7 +162,7 @@ struct EEPROM
          */
         inline uint32_t calculateCRC() const
         {
-            return HAL_CRC_Calculate(&hcrc, getDataPtr(), getDataSize() / sizeof(uint32_t));
+            return stm32_CRC(getDataPtr(), getDataSize());
         }
 
         /**

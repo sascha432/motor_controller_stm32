@@ -27,7 +27,7 @@ static void lvgl_log_cb(const char *buf)
 
 // === core setup ===
 
-static void setup()
+static inline void setup()
 {
     // Initialize and read EEPROM on I2C1 on PB8/PB9
     eeprom.init();
@@ -65,7 +65,7 @@ static void setup()
 
 // === user setup runs after core setup ===
 
-static void user_setup()
+static inline void user_setup()
 {
     // Initialize display driver
     tft_driver_init();
@@ -96,7 +96,7 @@ static void user_setup()
 
 // === main loop ===
 
-static void loop()
+static inline void loop()
 {
     // feed the dog
     WatchDog::feed();
@@ -335,7 +335,7 @@ static void loop()
 
 // === interrupt handlers initialization ===
 
-static void EXTI_Init()
+static inline void EXTI_Init()
 {
     // EXTI8-11 -> Port D
     AFIO->EXTICR[2] =
@@ -392,7 +392,7 @@ static void EXTI_Init()
 TIM_HandleTypeDef tim6;
 TIM_HandleTypeDef tim7;
 
-static void TIM7_TIM6_Init()
+static inline void TIM7_TIM6_Init()
 {
     // TIM7 for microsecond delay
     tim7.Instance = TIM7;
@@ -419,7 +419,7 @@ static void TIM7_TIM6_Init()
 
 CRC_HandleTypeDef hcrc;
 
-void MX_CRC_Init(void)
+static inline void MX_CRC_Init(void)
 {
     __HAL_RCC_CRC_CLK_ENABLE();
 
@@ -446,9 +446,8 @@ static inline void DWT_Init(void)
 
 /**
   * @brief System Clock Configuration
-  * @retval None
   */
-extern "C" void SystemClock_Config(void)
+static inline void SystemClock_Config()
 {
     RCC_OscInitTypeDef RCC_OscInitStruct = {};
     RCC_ClkInitTypeDef RCC_ClkInitStruct = {};
