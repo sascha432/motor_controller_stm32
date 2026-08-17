@@ -14,7 +14,7 @@
 
 struct TFTDriverScreenshot
 {
-    static constexpr uint8_t kPort = 2;
+    static constexpr uint8_t kPort = SWO::kScreenshotPort;
 
     TFTDriverScreenshot() : active(false)
     {}

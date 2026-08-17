@@ -30,15 +30,15 @@ static inline void debug_swd_init()
 
     #if DEBUG_OUTPUT == DEBUG_OUTPUT_SWO
         // Enable stimulus ports 0 (text logs) and 1 (pid tuning).
-        ITM->TER |= (1UL << 0) | (1UL << 1);
+        ITM->TER |= (1UL << SWO::kITMPort) | (1UL << SWO::kPidPort);
     #else
         // Enable stimulus 1 (pid tuning).
-        ITM->TER |= (1UL << 1);
+        ITM->TER |= (1UL << SWO::kPidPort);
     #endif
 
     #if HAVE_SCREENSHOTS
         // Enable stimulus 2 for screenshot tiles.
-        ITM->TER |= (1UL << 2);
+        ITM->TER |= (1UL << SWO::kScreenshotPort);
     #endif
 }
 
@@ -50,10 +50,10 @@ static inline void debug_swd_deinit()
         ITM->TCR = 0;
 
         // Disable stimulus ports 0 and 1.
-        ITM->TER &= ~((1UL << 0) | (1UL << 1));
+        ITM->TER &= ~((1UL << SWO::kITMPort) | (1UL << SWO::kPidPort));
 
         #if HAVE_SCREENSHOTS
-            ITM->TER &= ~(1UL << 2);
+            ITM->TER &= ~(1UL << SWO::kScreenshotPort);
         #endif
 
         // Lock ITM
@@ -97,14 +97,14 @@ static void debug_swd_write(const char *msg)
     if (!msg) {
         return;
     }
-    if (!SWO::isPortWritable(0)) {
+    if (!SWO::isPortWritable(SWO::kITMPort)) {
         return;
     }
     while (*msg) {
-        if (!SWO::waitReadyPort(0)) {
+        if (!SWO::waitReadyPort(SWO::kITMPort)) {
             break;
         }
-        ITM->PORT[0U].u8 = (uint8_t)*msg++;
+        ITM->PORT[SWO::kITMPort].u8 = (uint8_t)*msg++;
     }
 }
 

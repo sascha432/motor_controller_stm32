@@ -308,11 +308,11 @@ static void loop()
     #endif
 
     if (SWO::data.enabled == SWO::EnableState::SWO) {
-        if (SWO::isPortWritable(1)) {
+        if (SWO::isPortWritable(SWO::kPidPort)) {
             // send PID tuning data
             PidController::PidLoopType item;
             while (pid.pidLoopBuffer.pop(item)) {
-                if (!SWO::writeByteFast(1, sizeof(item)) || !SWO::writeFast(1, item)) {
+                if (!SWO::writeByteFast(SWO::kPidPort, sizeof(item)) || !SWO::writeFast(SWO::kPidPort, item)) {
                     pid.pidLoopBuffer.clear();
                     break;
                 }

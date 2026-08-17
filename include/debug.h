@@ -21,6 +21,9 @@
 struct SWO
 {
     static constexpr uint32_t kSwoTimeoutMillis = 5U;
+    static constexpr uint8_t kITMPort = 0U;
+    static constexpr uint8_t kPidPort = 1U;
+    static constexpr uint8_t kScreenshotPort = 2U;
 
     enum class EnableState : uint32_t {
         DISABLED = 0,
