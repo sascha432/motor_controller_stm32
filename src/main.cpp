@@ -246,7 +246,7 @@ static inline void loop()
                     DEBUG_PRINT(DebugType::ERROR, "Serial: invalid binary size=%u type=%u", result, static_cast<uint32_t>(type));
                 }
                 else {
-                    uint32_t newCrc = stm32_CRC(buf, result);
+                    uint32_t newCrc = stm32_CRC(reinterpret_cast<uint32_t *>(buf), result);
                     if (newCrc != crc) {
                         DEBUG_PRINT(DebugType::ERROR, "Serial: CRC mismatch type=%u size=%u got=0x%08X expected=0x%08X", static_cast<uint32_t>(type), result, crc, newCrc);
                     }
