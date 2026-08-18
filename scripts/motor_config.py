@@ -931,7 +931,7 @@ class SWOBackend:
         rgb = bytearray((len(payload) // 2) * 3)
         dst = 0
         for src in range(0, len(payload), 2):
-            value = payload[src] | (payload[src + 1] << 8)
+            value = (payload[src] << 8) | payload[src + 1]
             red = ((value >> 11) & 0x1F) * 255 // 31
             green = ((value >> 5) & 0x3F) * 255 // 63
             blue = (value & 0x1F) * 255 // 31
