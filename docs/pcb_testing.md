@@ -27,6 +27,7 @@
 - USB not detecting any device - CC1/CC2 resistors working, D+/- connected to MCU DP DN, tvs diode right direction
 - MT6701 analog sensor working as counter to check if the motor turns
 - SMCJ33A clamping to 38.7V when braking from high RPM
+- fixed issue with high LED string voltage by increasing the OVP to 57V, tested 8-40V input with 26-27V output and pwm dimming, stops around 30V input reaching the 57V OVP
 
 ### Rev 1.1
 
