@@ -31,6 +31,8 @@ struct TFTDriverScreenshot
         uint16_t height;
         PixelFormat format;
         uint32_t reserved: 24;
+
+        FrameHeader(uint16_t width, uint16_t height, PixelFormat format) : width(width), height(height), format(format), reserved(0) {}
     };
     static_assert(sizeof(FrameHeader) % 4 == 0, "FrameHeader must be 4-byte aligned");
 
@@ -40,6 +42,8 @@ struct TFTDriverScreenshot
         uint16_t width;
         uint16_t height;
         uint32_t byteCount;
+
+        TileHeader(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint32_t byteCount) : x(x), y(y), width(width), height(height), byteCount(byteCount) {}
     };
     static_assert(sizeof(TileHeader) % 4 == 0, "TileHeader must be 4-byte aligned");
 

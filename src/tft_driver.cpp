@@ -287,9 +287,7 @@ bool TFTDriverScreenshot::write_tile(uint16_t x0, uint16_t y0, uint16_t x1, uint
     const uint32_t width = static_cast<uint32_t>(x1 - x0 + 1U);
     const uint32_t height = static_cast<uint32_t>(y1 - y0 + 1U);
     const uint32_t byte_count = width * height * sizeof(uint16_t);
-    TileHeader header = {
-        x0, y0, static_cast<uint16_t>(width), static_cast<uint16_t>(height), byte_count
-    };
+    TileHeader header = TileHeader(x0, y0, width, height, byte_count);
 
     if (!writeByte(sizeof(header))) {
         active = false;
@@ -314,9 +312,7 @@ bool TFTDriverScreenshot::begin()
     if (!isPortWritable()) {
         return false;
     }
-    FrameHeader header = {
-        static_cast<uint16_t>(LV_HOR_RES_MAX), static_cast<uint16_t>(LV_VER_RES_MAX), kPixelFormat, 0U
-    };
+    FrameHeader header = FrameHeader(LV_HOR_RES_MAX, LV_VER_RES_MAX, kPixelFormat);
     if (!writeByte(sizeof(header))) {
         return false;
     }
