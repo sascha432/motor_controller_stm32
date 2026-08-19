@@ -43,7 +43,7 @@ static inline void setup()
         if (duration >= 5000) {
             pid.running = false;
             PID_WRITE_MOTOR_PWM_OFF();
-            NVIC_SystemReset();
+            HAL_NVIC_SystemReset();
         }
     });
     startButton.init();
@@ -164,8 +164,7 @@ static inline void loop()
 
     // handle ui updates and rotary encoder
     static uint32_t lastLvHandler = 0;
-    if ((HAL_GetTick() - lastLvHandler) >= 5 || screenshotRequested)
-    {
+    if ((HAL_GetTick() - lastLvHandler) >= 5 || screenshotRequested) {
         // handle rotary encoder
         int32_t delta = knob.getPositionDelta();
         if (delta) {
@@ -294,7 +293,7 @@ static inline void loop()
                                 break;
                             case Serial::BinaryType::SYSTEM_RESET: {
                                     DEBUG_PRINT(DebugType::INFO, "Serial: system reset requested");
-                                    NVIC_SystemReset();
+                                    HAL_NVIC_SystemReset();
                                 }
                                 break;
                             default:
@@ -385,8 +384,8 @@ static inline void EXTI_Init()
         (1U<<14);    // PB14 DRV_FAULT
 
     // Enable NVIC
-    NVIC_EnableIRQ(EXTI9_5_IRQn);
-    NVIC_EnableIRQ(EXTI15_10_IRQn);
+    HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+    HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 }
 
 TIM_HandleTypeDef tim6;
@@ -507,33 +506,6 @@ int main(void)
     TIM7_TIM6_Init();
     #if HAVE_USB_DEVICE
         MX_USB_DEVICE_Init();
-        #if 0
-        // test USB stack
-        __HAL_RCC_GPIOx_CLK_ENABLE<PC13>();
-        // PC13: MODE=10 (2MHz), CNF=00 (push-pull output)
-        GPIO_CRx_REG<PC13>() &= ~(0xF << digitalPinShift<PC13>());
-        GPIO_CRx_REG<PC13>() |= (0x2 << digitalPinShift<PC13>());
-        digitalWriteLow<PC13>();
-        bool pc13State = false;
-        for(;;) {
-            int ch = USBSerial::read();
-            if (ch != -1) {
-                DEBUG_PRINT(DebugType::INFO, "USB read=%d ('%c')", ch, ch);
-            }
-            DEBUG_PRINT(DebugType::INFO, "USB time=%u connected=%u", (unsigned)HAL_GetTick(), (unsigned)USBSerial::isConnected());
-            char buf[32];
-            snprintf(buf, sizeof(buf), "time=%u\r\n", (unsigned)HAL_GetTick());
-            USBSerial::write(buf, strlen(buf));
-            pc13State = !pc13State;
-            if (pc13State) {
-                digitalWriteHigh<PC13>();
-            }
-            else {
-                digitalWriteLow<PC13>();
-            }
-            WatchDog::delay(500);
-        }
-        #endif
     #endif
     setup();
     EXTI_Init();

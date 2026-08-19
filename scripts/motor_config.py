@@ -187,7 +187,8 @@ def binary_crc32(data: bytes) -> int:
 
 # Screenshot stream uses the same length-prefix scheme: [len][payload] and the stream terminated by a single 0 byte [0][no payload]
 SCREENSHOT_END_MARKER = 0
-SCREENSHOT_PIXEL_FORMAT_RGB565 = 1
+SCREENSHOT_PIXEL_FORMAT_RGB565_LITTLE_ENDIAN = 0
+SCREENSHOT_PIXEL_FORMAT_RGB565_BIG_ENDIAN = 1
 SCREENSHOT_MAX_WIDTH = 320
 SCREENSHOT_MAX_HEIGHT = 320
 SCREENSHOT_MAX_PIXELS = SCREENSHOT_MAX_WIDTH * SCREENSHOT_MAX_HEIGHT
@@ -198,7 +199,7 @@ GRAPH_REFRESH_INTERVAL_SECONDS = 0.10
 EEPROM_DIALOG_GRAPH_REFRESH_INTERVAL_SECONDS = 1.0
 SCREENSHOT_TILE_HEADER_STRUCT = "<HHHHI"
 SCREENSHOT_TILE_HEADER_SIZE = struct.calcsize(SCREENSHOT_TILE_HEADER_STRUCT)
-SCREENSHOT_FRAME_HEADER_STRUCT = "<HHI"
+SCREENSHOT_FRAME_HEADER_STRUCT = "<HHB3x"
 SCREENSHOT_FRAME_HEADER_SIZE = struct.calcsize(SCREENSHOT_FRAME_HEADER_STRUCT)
 SCREENSHOT_PORT = 2
 
@@ -626,7 +627,7 @@ class SWOBackend:
         self._screenshot_tiles: list[tuple[int, int, int, int, bytes]] = []
         self._screenshot_width = 0
         self._screenshot_height = 0
-        self._screenshot_format = 0
+        self._screenshot_format = -1
         self._screenshot_has_explicit_frame = False
         self._screenshot_last_packet_time = 0.0
 
@@ -638,7 +639,7 @@ class SWOBackend:
             self._screenshot_tiles = []
             self._screenshot_width = 0
             self._screenshot_height = 0
-            self._screenshot_format = 0
+            self._screenshot_format = -1
             self._screenshot_has_explicit_frame = False
             self._screenshot_last_packet_time = time.monotonic()
 
@@ -650,7 +651,7 @@ class SWOBackend:
             self._screenshot_tiles = []
             self._screenshot_width = 0
             self._screenshot_height = 0
-            self._screenshot_format = 0
+            self._screenshot_format = -1
             self._screenshot_has_explicit_frame = False
             self._screenshot_last_packet_time = 0.0
 
@@ -924,14 +925,17 @@ class SWOBackend:
                 time.sleep(0.2)
 
     @staticmethod
-    def _rgb565_to_rgb_bytes(payload: bytes) -> bytes:
+    def _rgb565_to_rgb_bytes(payload: bytes, pixel_format: int) -> bytes:
         if len(payload) % 2 != 0:
             raise ValueError("RGB565 payload length must be even")
 
         rgb = bytearray((len(payload) // 2) * 3)
         dst = 0
         for src in range(0, len(payload), 2):
-            value = (payload[src] << 8) | payload[src + 1]
+            if pixel_format == SCREENSHOT_PIXEL_FORMAT_RGB565_LITTLE_ENDIAN:
+                value = payload[src] | (payload[src + 1] << 8)
+            else:
+                value = (payload[src] << 8) | payload[src + 1]
             red = ((value >> 11) & 0x1F) * 255 // 31
             green = ((value >> 5) & 0x3F) * 255 // 63
             blue = (value & 0x1F) * 255 // 31
@@ -948,7 +952,7 @@ class SWOBackend:
             self._screenshot_tiles = []
             self._screenshot_width = 0
             self._screenshot_height = 0
-            self._screenshot_format = 0
+            self._screenshot_format = -1
             self._screenshot_has_explicit_frame = False
 
     def _finalize_screenshot_stream(self) -> None:
@@ -962,7 +966,7 @@ class SWOBackend:
             self._screenshot_tiles = []
             self._screenshot_width = 0
             self._screenshot_height = 0
-            self._screenshot_format = 0
+            self._screenshot_format = -1
             self._screenshot_has_explicit_frame = False
 
         if image is None or output_path is None:
@@ -970,7 +974,7 @@ class SWOBackend:
 
         try:
             for x, y, width, height, tile_bytes in tiles:
-                rgb_bytes = self._rgb565_to_rgb_bytes(tile_bytes)
+                rgb_bytes = self._rgb565_to_rgb_bytes(tile_bytes, self._screenshot_format)
                 tile_image = Image.frombytes("RGB", (width, height), rgb_bytes)
                 image.paste(tile_image, (x, y))
             output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1059,7 +1063,7 @@ class SWOBackend:
 
         self._screenshot_width = required_width
         self._screenshot_height = required_height
-        self._screenshot_format = SCREENSHOT_PIXEL_FORMAT_RGB565
+        self._screenshot_format = -1
         self._screenshot_has_explicit_frame = False
         self._screenshot_image = Image.new("RGB", (required_width, required_height))
         self._screenshot_tiles = []
@@ -1108,13 +1112,12 @@ class SWOBackend:
 
                 # Parse frame header
                 if len(record) == SCREENSHOT_FRAME_HEADER_SIZE:
-                    width, height, format_word = struct.unpack(SCREENSHOT_FRAME_HEADER_STRUCT, record)
-                    pixel_format = format_word & 0x1
+                    width, height, pixel_format, = struct.unpack(SCREENSHOT_FRAME_HEADER_STRUCT, record)
 
                     if not self._begin_screenshot_capture_locked("frame-header"):
                         return
 
-                    if pixel_format != SCREENSHOT_PIXEL_FORMAT_RGB565:
+                    if pixel_format not in (SCREENSHOT_PIXEL_FORMAT_RGB565_LITTLE_ENDIAN, SCREENSHOT_PIXEL_FORMAT_RGB565_BIG_ENDIAN):
                         self._fail_screenshot_stream_locked(
                             f"Unsupported screenshot format: {pixel_format}"
                         )

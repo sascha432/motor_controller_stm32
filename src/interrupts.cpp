@@ -22,7 +22,9 @@ InterruptErrorType interruptErrorType;
  */
 static inline void TIM6_Handler(void)
 {
+    // keep value a power of 2 that it uses bit shifts instead of division for the modulo operation
     constexpr uint32_t kTicksPerPidIsr = (PidController::kPIDInterval * 1000.0f) / PidController::kOcpTickInterval;
+    // needs to be multiple of kTicksPerPidIsr, about 20-30ms is a good interval for the knob ISR
     constexpr uint32_t kTicksPerKnobIsr = kTicksPerPidIsr * (uint32_t)(25.0f / PidController::kPIDInterval);
     static uint32_t timer6Counter = 0;
     pid.ocp_isr();
@@ -210,7 +212,11 @@ extern "C" void OTG_FS_IRQHandler(void)
 
 #endif
 
-// for disabled interrupts
+/**
+ * @brief Delay with interrupt disabled
+ *
+ * @param ms Time in milliseconds
+ */
 static void delay_ms(uint32_t ms)
 {
     constexpr uint32_t kTicksPerMs = F_CPU / 1000;
@@ -284,7 +290,7 @@ extern "C" void Error_Handler(void)
         delay_ms(500);
         // check if the back button is pressed and reset MCU
         if (backButton.readGPIOState()) {
-            NVIC_SystemReset();
+            HAL_NVIC_SystemReset();
         }
     }
 }

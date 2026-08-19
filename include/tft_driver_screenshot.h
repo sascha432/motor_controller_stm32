@@ -15,17 +15,22 @@
 struct TFTDriverScreenshot
 {
     static constexpr uint8_t kPort = SWO::kScreenshotPort;
-
-    TFTDriverScreenshot() : active(false)
-    {}
-
-    static constexpr uint32_t kPixelFormatRgb565 = 1U;
+    enum class PixelFormat : uint8_t {
+        RGB565_LITTLE_ENDIAN = 0,
+        RGB565_BIG_ENDIAN = 1,
+    };
+    static constexpr auto kPixelFormat =
+    #if LV_COLOR_16_SWAP
+        PixelFormat::RGB565_BIG_ENDIAN;
+    #else
+        PixelFormat::RGB565_LITTLE_ENDIAN;
+    #endif
 
     struct FrameHeader {
         uint16_t width;
         uint16_t height;
-        uint32_t format: 1;
-        uint32_t reserved: 31;
+        PixelFormat format;
+        uint32_t reserved: 24;
     };
     static_assert(sizeof(FrameHeader) % 4 == 0, "FrameHeader must be 4-byte aligned");
 
@@ -37,6 +42,9 @@ struct TFTDriverScreenshot
         uint32_t byteCount;
     };
     static_assert(sizeof(TileHeader) % 4 == 0, "TileHeader must be 4-byte aligned");
+
+    TFTDriverScreenshot() : active(false)
+    {}
 
     bool write_tile(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, const lv_color_t *color_p);
     bool begin();

@@ -8,8 +8,6 @@
 #include "tft_driver.h"
 #include "tft_driver_screenshot.h"
 
-static constexpr uint32_t kSPISyncTimeoutMillis = 3;                                                // SPI synchronization timeout in milliseconds
-
 lv_disp_draw_buf_t s_lvgl_draw_buf;
 lv_color_t s_lvgl_buf_1[LV_BUFFER_SIZE];
 lv_disp_drv_t s_lvgl_disp_drv;
@@ -26,7 +24,8 @@ static constexpr uint32_t kCalculateDMATimeoutMs(uint16_t bytes, uint32_t spiClo
     return (((bytes * 8000) + (spiClockHz - 1)) / spiClockHz);
 }
 
-static constexpr uint32_t kDMATransferTimeoutMillis = kCalculateDMATimeoutMs(sizeof(s_lvgl_buf_1));       // DMA transfer timeout in milliseconds
+static constexpr uint32_t kDMATransferTimeoutMillis = kCalculateDMATimeoutMs(sizeof(s_lvgl_buf_1));         // DMA transfer timeout in milliseconds
+static constexpr uint32_t kSPISyncTimeoutMillis = 3;                                                        // SPI synchronization timeout in milliseconds
 
 
 /**
@@ -285,14 +284,11 @@ bool TFTDriverScreenshot::write_tile(uint16_t x0, uint16_t y0, uint16_t x1, uint
         active = false;
         return false;
     }
-    const uint32_t pixel_count = (static_cast<uint32_t>(x1 - x0 + 1U) * static_cast<uint32_t>(y1 - y0 + 1U));
-    const uint32_t byte_count = pixel_count * sizeof(uint16_t);
+    const uint32_t width = static_cast<uint32_t>(x1 - x0 + 1U);
+    const uint32_t height = static_cast<uint32_t>(y1 - y0 + 1U);
+    const uint32_t byte_count = width * height * sizeof(uint16_t);
     TileHeader header = {
-        x0,
-        y0,
-        static_cast<uint16_t>(x1 - x0 + 1U),
-        static_cast<uint16_t>(y1 - y0 + 1U),
-        byte_count,
+        x0, y0, static_cast<uint16_t>(width), static_cast<uint16_t>(height), byte_count
     };
 
     if (!writeByte(sizeof(header))) {
@@ -319,10 +315,7 @@ bool TFTDriverScreenshot::begin()
         return false;
     }
     FrameHeader header = {
-        static_cast<uint16_t>(LV_HOR_RES_MAX),
-        static_cast<uint16_t>(LV_VER_RES_MAX),
-        TFTDriverScreenshot::kPixelFormatRgb565,
-        0U,
+        static_cast<uint16_t>(LV_HOR_RES_MAX), static_cast<uint16_t>(LV_VER_RES_MAX), kPixelFormat, 0U
     };
     if (!writeByte(sizeof(header))) {
         return false;
