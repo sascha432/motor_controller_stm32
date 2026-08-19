@@ -23,8 +23,9 @@ void EEPROM::init()
 {
     SWO::data.EEPROM.address = reinterpret_cast<uint32_t>(&this->data);
     i2c.initI2C1Remapped();
-    bool res = i2c.sendBytes(kAddress, nullptr, 0);
-    DEBUG_PRINT(DebugType::INFO, "EEPROM detected=%u", (int)res);
+    bool result = i2c.sendBytes(kAddress, nullptr, 0);
+    (void)result;
+    DEBUG_PRINT(DebugType::INFO, "EEPROM detected=%u", (int)result);
 }
 
 void EEPROM::read()
