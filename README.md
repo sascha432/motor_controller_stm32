@@ -62,7 +62,7 @@
 
 Demonstration of the DC motor controller running a drill press motor
 
-[![DC motor controller demonstration](https://img.youtube.com/vi/RS3WaWhKhmE/maxresdefault.jpg)](https://www.youtube.com/watch?v=RS3WaWhKhmE)
+[![DC motor controller demonstration](stl/maxresdefault.jpg)](https://www.youtube.com/watch?v=RS3WaWhKhmE)
 
 Screenshots
 
