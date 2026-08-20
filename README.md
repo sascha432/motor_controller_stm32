@@ -48,7 +48,9 @@
 
 [Schematics PDF](docs/schematic_dc-motor-controller_rev11.pdf)
 
-<a href="docs/schematic_dc-motor-controller_rev11.pdf">
+[Schematics SVG](docs/schematic_dc-motor-controller_rev11.svg)
+
+<a href="docs/schematic_dc-motor-controller_rev11.svg">
 	<img src="docs/schematics_rev11.png" alt="Schematic thumbnail" width="640" />
 </a>
 
@@ -68,6 +70,10 @@
 
 ![kp_parameter](docs/images/kp_parameter.png)
 ![diagnostic_screen](docs/images/diagnostic_screen.png)
+
+![Drill press](stl/drill_press_1.jpg)
+
+![Drill press](stl/drill_press_2.jpg)
 
 ![Enclosure and motor](stl/enclosure_and_motor.jpg)
 
