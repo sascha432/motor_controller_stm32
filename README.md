@@ -60,6 +60,12 @@
 
 ## Some pictures
 
+Demonstration of the DC motor controller running a drill press motor
+
+[![DC motor controller demonstration](https://img.youtube.com/vi/RS3WaWhKhmE/maxresdefault.jpg)](https://www.youtube.com/watch?v=RS3WaWhKhmE)
+
+Screenshots
+
 ![start_screen](docs/images/start_screen.png)
 ![main_menu](docs/images/main_menu.png)
 ![led_brightness_55](docs/images/led_brightness_55.png)
@@ -70,6 +76,8 @@
 
 ![kp_parameter](docs/images/kp_parameter.png)
 ![diagnostic_screen](docs/images/diagnostic_screen.png)
+
+Drill press, controller enclosure and PCB
 
 ![Drill press](stl/drill_press_1.jpg)
 
@@ -84,5 +92,7 @@
 ![PCB back](stl/pcb_back.jpg)
 
 ![STL files and MT6701](stl/stl_files.png)
+
+PID tuning software
 
 ![PID tuning](stl/pid_tuning.png)
