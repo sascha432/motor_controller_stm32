@@ -32,3 +32,9 @@
 ### Rev 1.1
 
 Untested
+
+### Rev 1.2
+
+- USB link detection/vbus sensing instead of PA9 vbus sensing
+
+
