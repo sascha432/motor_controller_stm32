@@ -1645,7 +1645,6 @@ class PIDTuningApp:
         self._install_pid_field_traces()
 
         self.data_address: Optional[int] = SWO_DATA_FIXED_RAM_ADDRESS
-        self.pending_initial_sync = False
         self.sync_in_progress = False
         self.reset_in_progress = False
         self._auto_restart_after_reset = False
@@ -2520,7 +2519,7 @@ class PIDTuningApp:
         ttk.Button(buttons, text="Cancel", command=self._close_config_dialog).pack(side=tk.RIGHT)
         ttk.Button(buttons, text="Save", command=self._save_config_dialog).pack(side=tk.RIGHT, padx=(0, 6))
 
-        dialog.bind("<Configure>", lambda event: self._save_ui_state())
+        dialog.bind("<Configure>", lambda _: self._save_ui_state())
 
     def _load_settings_data(self) -> dict[str, object]:
         config_path = self._settings_path()
@@ -3000,7 +2999,7 @@ class PIDTuningApp:
         self._eeprom_dialog_commit_button.pack(side=tk.LEFT, padx=(0, 6))
         ttk.Button(button_row, text="Cancel", command=self._close_eeprom_dialog).pack(side=tk.LEFT)
 
-        dialog.bind("<Configure>", lambda event: self._save_ui_state())
+        dialog.bind("<Configure>", lambda _: self._save_ui_state())
         self._set_eeprom_dialog_editable(False)
 
         if self.config.transport == "serial":
@@ -3567,7 +3566,6 @@ class PIDTuningApp:
         self.status_var.set("Stopped")
         if log_message:
             self._append_log(log_message, "INFO")
-        self.pending_initial_sync = False
         self.sync_in_progress = False
         self._set_sync_enabled(False)
         self.screenshot_in_progress = False
@@ -3593,7 +3591,6 @@ class PIDTuningApp:
         if started:
             self.start_stop_button.configure(text="Stop")
             self.status_var.set("Running")
-            self.pending_initial_sync = self.config.transport == "swo"
             self.sync_in_progress = False
             self._waiting_for_first_sample = self.config.transport == "swo"
             self._first_sample_deadline = (
@@ -3674,8 +3671,6 @@ class PIDTuningApp:
                     "INFO",
                 )
                 self._set_sync_enabled(True)
-                if reason == "startup":
-                    self.pending_initial_sync = False
                 self.sync_in_progress = False
             elif kind == "swo-read-invalid":
                 reason = str(payload)
@@ -3689,7 +3684,6 @@ class PIDTuningApp:
                 if reset_ok:
                     self.start_stop_button.configure(text="Start")
                     self.status_var.set("Stopped")
-                    self.pending_initial_sync = False
                     self.sync_in_progress = False
                     self._set_fault_indicator(self.ocp_indicator, False)
                     self._set_fault_indicator(self.driver_fault_indicator, False)
@@ -3708,7 +3702,6 @@ class PIDTuningApp:
                 self.sync_in_progress = False
             elif kind == "startup-sync-retry":
                 self._startup_sync_job = None
-                self.pending_initial_sync = True
             elif kind == "eeprom-load":
                 swo_data, eeprom_data = payload  # type: ignore[misc]
                 self._populate_eeprom_dialog(eeprom_data, swo_data)
@@ -3816,7 +3809,8 @@ class PIDTuningApp:
 
         if self._waiting_for_first_sample and self.backend.running and now >= self._first_sample_deadline:
             self._request_firmware_reset(
-                "No PID packets received within 1s after Start. Resetting firmware and retrying automatically.",
+                f"No PID packets received within {self.STARTUP_PACKET_TIMEOUT_SECONDS:.0f}s after Start. "
+                "Resetting firmware and retrying automatically.",
                 auto_restart=True,
             )
 

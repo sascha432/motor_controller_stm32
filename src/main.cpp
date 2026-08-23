@@ -57,6 +57,8 @@ static inline void setup()
     adc.initDAC();
     // PID controller
     pid.init();
+    // apply parameters
+    pid.applyPIDParams();
 
     // Initialize display GPIO, PWM timer and SPI
     tft_driver_gpio_tim_init();
