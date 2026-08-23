@@ -22,8 +22,25 @@
 - Adjustable current limit with signal LED (0.5-40A)
 - 1.14" 135x240 TFT display, rotary encoder and 3 buttons for easy navigation
 - Support for magnetic encoder MT6701 in A/B mode up to 1024PPR (55000 RPM)
-- Dimmable LED with CC driver 3-26V/350mA/5W
+- Dimmable LED with CC driver 3-32V/350mA/5W
 - Current, voltage and temperature monitoring
+
+## Error Codes
+
+The red LED blinks once to indicate an error. The yellow LED then identifies
+the error by blinking the corresponding number of times:
+
+| Yellow LED flashes | Description |
+|---:|---|
+| 1 | A general error was reported |
+| 2 | The watchdog interrupt did not respond in time (57ms) |
+| 3 | The watchdog timer was not reset in time (1000ms) |
+| 4 | The processor encountered a severe, unrecoverable error |
+| 5 | The processor accessed memory incorrectly |
+| 6 | A critical interrupt occurred that could not be ignored |
+| 7 | The processor accessed an invalid or unavailable bus address |
+| 8 | The processor detected an invalid instruction or arithmetic operation |
+
 
 ## Navigation
 
