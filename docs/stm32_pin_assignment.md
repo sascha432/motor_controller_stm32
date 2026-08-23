@@ -124,4 +124,6 @@ th:nth-child(4), td:nth-child(4) { width: 56%; }
 
 ## Revision: PCB Rev1.2
 
-No pin changes
+| Signal | STM32 pin | Type | Notes |
+|---|---|---|---|
+| USB_PU_EN | PE1 | DOUT | USB pull-up enable in conjunction with VBUS detection |

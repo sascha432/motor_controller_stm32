@@ -2,7 +2,7 @@
 
 ## [Unreleased 1.0.2]
 
-- Current Master
+- Device controlled USB D+ pull-up
 
 ## 1.0.1
 
