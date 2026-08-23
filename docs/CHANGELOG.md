@@ -1,6 +1,10 @@
 # Changelog
 
-## [Unreleased 1.0.1]
+## [Unreleased 1.0.2]
+
+- N/A
+
+## 1.0.1
 
 - USB debug output disabled inside ISRs
 - Improved display performance by removing the big endian conversion before transferring data via DMA
