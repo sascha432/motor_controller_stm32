@@ -41,6 +41,7 @@
 			"\\bAFIO_\\w*",
 		],
 		"cSpell.words": [
+			"__get_IPSR",
 			"ACPR",
 			"ADC1",
 			"ADC1_2_IRQHandler",
@@ -66,6 +67,7 @@
 			"CYCCNT",
 			"DASHBOARDSCREEN",
 			"DBGMCU",
+			"DBGMCU_CR_TRACE_IOEN",
 			"dejavu",
 			"DEMCR",
 			"DIAGNOSTICSCREEN",
@@ -127,6 +129,7 @@
 			"SWDIO",
 			"SWSTART",
 			"SYSCLKSource",
+			"TPIU",
 			"TRCENA",
 			"USBD",
 			"usbd_ctlreq",

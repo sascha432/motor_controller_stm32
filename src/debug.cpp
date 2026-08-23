@@ -126,6 +126,10 @@ void debug_swd_printf(const char *fmt, ...)
 
 void debug_serial_printf(const char *fmt, ...)
 {
+    if (__get_PRIMASK() || __get_IPSR()) {
+        // do not send any debug messages over USB with interrupts disabled or inside ISRs
+        return;
+    }
     if (!Serial::isConnected()) {
         return;
     }
