@@ -464,7 +464,9 @@ struct DiagnosticsScreen :  public Screen
         mosfetTempLabel(nullptr),
         rpmPwmLabel(nullptr),
         lastErrorLabel(nullptr),
-        usbConnectionLabel(nullptr),
+        #if HAVE_USB_DEVICE
+            usbConnectionLabel(nullptr),
+        #endif
         scrollbarTrack(nullptr),
         scrollbarThumb(nullptr),
         scrollOffset(0),
@@ -490,7 +492,9 @@ private:
     lv_obj_t *mosfetTempLabel;
     lv_obj_t *rpmPwmLabel;
     lv_obj_t *lastErrorLabel;
-    lv_obj_t *usbConnectionLabel;
+    #if HAVE_USB_DEVICE
+        lv_obj_t *usbConnectionLabel;
+    #endif
     lv_obj_t *scrollbarTrack;
     lv_obj_t *scrollbarThumb;
     int32_t scrollOffset;
