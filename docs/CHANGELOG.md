@@ -2,7 +2,7 @@
 
 ## [Unreleased 1.0.2]
 
-- N/A
+- Current Master
 
 ## 1.0.1
 
