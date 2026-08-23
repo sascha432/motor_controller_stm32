@@ -169,7 +169,11 @@ struct Screen
     static constexpr lv_coord_t kDiagnosticScreenScrollbarWidth = 4;
     static constexpr lv_coord_t kDiagnosticScreenScrollbarThumbHeight = 16;
     static constexpr lv_coord_t kDiagnosticScreenRowHeight = 16;
+    #if HAVE_USB_DEVICE
+    static constexpr int32_t kDiagnosticScreenRowCount = 8;
+    #else
     static constexpr int32_t kDiagnosticScreenRowCount = 7;
+    #endif
     static constexpr lv_coord_t kDiagnosticViewportWidth = kScreenWidth - kDiagnosticScreenMargin;
     static constexpr lv_coord_t kDiagnosticViewportHeight = kScreenHeight - kDiagnosticScreenMargin;
     static constexpr lv_coord_t kDiagnosticTextWidth = kDiagnosticViewportWidth - kDiagnosticScreenScrollbarWidth - 4;
@@ -460,6 +464,7 @@ struct DiagnosticsScreen :  public Screen
         mosfetTempLabel(nullptr),
         rpmPwmLabel(nullptr),
         lastErrorLabel(nullptr),
+        usbConnectionLabel(nullptr),
         scrollbarTrack(nullptr),
         scrollbarThumb(nullptr),
         scrollOffset(0),
@@ -485,6 +490,7 @@ private:
     lv_obj_t *mosfetTempLabel;
     lv_obj_t *rpmPwmLabel;
     lv_obj_t *lastErrorLabel;
+    lv_obj_t *usbConnectionLabel;
     lv_obj_t *scrollbarTrack;
     lv_obj_t *scrollbarThumb;
     int32_t scrollOffset;

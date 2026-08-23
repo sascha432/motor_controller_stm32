@@ -10,6 +10,7 @@
 #include "stats.h"
 #include "controls.h"
 #include "menu.h"
+#include "serial.h"
 
 // === Helpers ===
 
@@ -466,6 +467,9 @@ void DiagnosticsScreen::load()
     mosfetTempLabel = diagnostic_screen_create_label(viewport, kDiagnosticTextWidth, 4);
     rpmPwmLabel = diagnostic_screen_create_label(viewport, kDiagnosticTextWidth, 5);
     lastErrorLabel = diagnostic_screen_create_label(viewport, kDiagnosticTextWidth, 6);
+    #if HAVE_USB_DEVICE
+        usbConnectionLabel = diagnostic_screen_create_label(viewport, kDiagnosticTextWidth, 7);
+    #endif
 
     scrollMax = diagnostic_screen_scroll_max_lines(kDiagnosticViewportHeight);
     scrollOffset = 0;
@@ -488,7 +492,7 @@ void DiagnosticsScreen::update()
     const int32_t scrollLine = std::clamp<int32_t>(value, 0, scrollMax);
     scrollOffset = scrollLine * Screen::kDiagnosticScreenRowHeight;
 
-    // Keep labels in one container and scroll in full line-height steps.
+    // Keep labels in one container and scroll in full line-height steps
     diagnostic_screen_set_label_row(firmwareLabel, 0, scrollOffset);
     diagnostic_screen_set_label_row(vccLabel, 1, scrollOffset);
     diagnostic_screen_set_label_row(currentLabel, 2, scrollOffset);
@@ -496,6 +500,9 @@ void DiagnosticsScreen::update()
     diagnostic_screen_set_label_row(mosfetTempLabel, 4, scrollOffset);
     diagnostic_screen_set_label_row(rpmPwmLabel, 5, scrollOffset);
     diagnostic_screen_set_label_row(lastErrorLabel, 6, scrollOffset);
+    #if HAVE_USB_DEVICE
+        diagnostic_screen_set_label_row(usbConnectionLabel, 7, scrollOffset);
+    #endif
 
     const int32_t trackHeightRaw = lv_obj_get_height(scrollbarTrack);
     const int32_t trackHeight = std::max<int32_t>(trackHeightRaw, 10);
@@ -552,6 +559,10 @@ void DiagnosticsScreen::_refreshVisuals()
     memcpy(lastErrorLabelBuf, "Last Error ", 11);
     pid.errorPrintf(lastErrorLabelBuf + 11, sizeof(lastErrorLabelBuf) - 11);
     lv_label_set_text_static(lastErrorLabel, lastErrorLabelBuf);
+
+    #if HAVE_USB_DEVICE
+        lv_label_set_text_static(usbConnectionLabel, Serial::isConnected() ? "USB Connected" : "USB Disconnected");
+    #endif
 }
 
 // === Dashboard Screen ===
