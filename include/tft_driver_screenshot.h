@@ -54,7 +54,7 @@ struct TFTDriverScreenshot
     bool begin();
     void end();
 
-    #if HAVE_USB_DEVICE || HAVE_SERIAL
+    #if HAVE_USB_DEVICE
 
         inline bool isPortWritable() const
         {

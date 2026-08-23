@@ -122,9 +122,9 @@ void debug_swd_printf(const char *fmt, ...)
 
 #endif
 
-#if DEBUG_OUTPUT == DEBUG_OUTPUT_USB || DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL
+#if DEBUG_OUTPUT == DEBUG_OUTPUT_USB
 
-void debug_serial_printf(const char *fmt, ...)
+void debug_usb_printf(const char *fmt, ...)
 {
     if (__get_PRIMASK() || __get_IPSR()) {
         // do not send any debug messages over USB with interrupts disabled or inside ISRs
@@ -146,14 +146,6 @@ void debug_serial_printf(const char *fmt, ...)
 }
 
 #endif
-
-void debug_init(void)
-{
-    #if DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL
-        //TODO replace old arduino code and implement UART/use HAL uart code
-        Serial.begin(115200);
-    #endif
-}
 
 // === profiler ===
 

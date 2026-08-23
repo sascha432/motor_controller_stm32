@@ -320,7 +320,7 @@ static inline void loop()
             }
         }
     }
-    #if HAVE_USB_DEVICE || HAVE_SERIAL
+    #if HAVE_USB_DEVICE
     else if (SWO::data.enabled == SWO::EnableState::SERIAL) {
         // send PID tuning data
         PidController::PidLoopType item;
@@ -503,7 +503,6 @@ int main(void)
     DWT_Init();
     SystemClock_Config();
     SWO::init();
-    debug_init();
     MX_CRC_Init();
     TIM7_TIM6_Init();
     #if HAVE_USB_DEVICE

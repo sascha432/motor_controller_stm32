@@ -28,7 +28,7 @@ struct SWO
     enum class EnableState : uint32_t {
         DISABLED = 0,
         SWO = 1,
-        #if HAVE_USB_DEVICE || HAVE_SERIAL
+        #if HAVE_USB_DEVICE
             SERIAL = 2,
         #endif
     };
@@ -189,12 +189,11 @@ struct SWO
 // === debug settings ===
 
 #define DEBUG_OUTPUT_NONE       0
-#define DEBUG_OUTPUT_SERIAL     1
 #define DEBUG_OUTPUT_SWO        2
 #define DEBUG_OUTPUT_USB        3
 
 #ifndef DEBUG_OUTPUT
-    #define DEBUG_OUTPUT        DEBUG_OUTPUT_SERIAL
+    #define DEBUG_OUTPUT        DEBUG_OUTPUT_NONE
 #endif
 
 #if defined(DEBUG) && !DEBUG
@@ -207,16 +206,12 @@ struct SWO
         #define __DEBUG__BUILD__ "DEBUG SWO"
     #elif DEBUG_OUTPUT == DEBUG_OUTPUT_USB
         #define __DEBUG__BUILD__ "DEBUG USB"
-    #elif DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL
-        #define __DEBUG__BUILD__ "DEBUG UART"
     #else
         #define __DEBUG__BUILD__ "DEBUG"
     #endif
 #else
     #if HAVE_USB_DEVICE
         #define __DEBUG__BUILD__ "USB"
-    #elif HAVE_SERIAL
-        #define __DEBUG__BUILD__ "UART"
     #else
         #define __DEBUG__BUILD__ "SWO"
     #endif
@@ -283,8 +278,6 @@ constexpr const char *debug_source_filename(const char *file)
 
 #define DEBUG_SOURCE_FILENAME debug_source_filename(__FILE__)
 
-void debug_init(void);
-
 #if DEBUG_OUTPUT == DEBUG_OUTPUT_NONE
 
     #define DEBUG_PRINT_MSG(level, msg, ...) do {} while(0)
@@ -296,11 +289,11 @@ void debug_init(void);
 
     #define DEBUG_PRINTF_FUNC debug_swd_printf
 
-#elif DEBUG_OUTPUT == DEBUG_OUTPUT_USB || DEBUG_OUTPUT == DEBUG_OUTPUT_SERIAL
+#elif DEBUG_OUTPUT == DEBUG_OUTPUT_USB
 
-    void debug_serial_printf(const char *fmt, ...);
+    void debug_usb_printf(const char *fmt, ...);
 
-    #define DEBUG_PRINTF_FUNC debug_serial_printf
+    #define DEBUG_PRINTF_FUNC debug_usb_printf
 
 #else
 

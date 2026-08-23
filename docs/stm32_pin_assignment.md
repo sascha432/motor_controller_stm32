@@ -121,3 +121,7 @@ th:nth-child(4), td:nth-child(4) { width: 56%; }
 |---|---|---|---|
 | TX4 | PC10 | SERIAL | UART4 TX |
 | RX4 | PC11 | SERIAL | UART4 RX |
+
+## Revision: PCB Rev1.2
+
+No pin changes

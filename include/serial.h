@@ -112,24 +112,4 @@ struct Serial : public SerialProtocol
     }
 };
 
-#elif HAVE_SERIAL
-
-//TODO
-
-struct Serial : public SerialProtocol
-{
-};
-
-#else
-
-// === dummy class ===
-
-struct Serial
-{
-    static bool isConnected()
-    {
-        return false;
-    }
-};
-
 #endif

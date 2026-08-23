@@ -14,7 +14,7 @@
 #define VERSION_PATCH           1
 
 #define PCB_REV_MAJOR           1
-#define PCB_REV_MINOR           0
+#define PCB_REV_MINOR           2
 
 // === UI constants ===
 struct UIConstants

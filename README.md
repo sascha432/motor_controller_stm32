@@ -13,6 +13,8 @@
 - LVGL TFT UI with rotary encoder plus dedicated start/back/knob buttons
 - Python Tool for configuration and parameter tuning over SWD or USB serial connection
 
+## [Change Log](docs/CHANGELOG.md)
+
 ## Hardware Features
 
 - 8-36V, 20A continuous, 40A peak
