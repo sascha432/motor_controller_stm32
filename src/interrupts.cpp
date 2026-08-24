@@ -22,20 +22,20 @@ InterruptErrorType interruptErrorType;
  */
 static inline void TIM6_Handler(void)
 {
-    // keep value a power of 2 that it uses bit shifts instead of division for the modulo operation
-    constexpr uint32_t kTicksPerPidIsr = (PidController::kPIDInterval * 1000.0f) / PidController::kOcpTickInterval;
-    // needs to be multiple of kTicksPerPidIsr, about 20-30ms is a good interval for the knob ISR
-    constexpr uint32_t kTicksPerKnobIsr = kTicksPerPidIsr * (uint32_t)(25.0f / PidController::kPIDInterval);
+    // call PID isr
+    pid.isr();
+
+    // call knob and button ISRs
+    constexpr uint32_t kTicksPerKnobIsr = (uint32_t)(25.0f / PidController::kPIDInterval);
+    constexpr float kKnobTimingMillis = kTicksPerKnobIsr * PidController::kPIDInterval;
+    (void)kKnobTimingMillis;
+
     static uint32_t timer6Counter = 0;
-    pid.ocp_isr();
-    if (kIsDivisible<kTicksPerPidIsr>(timer6Counter)) {
-        pid.isr();
-        if (kIsDivisible<kTicksPerKnobIsr>(timer6Counter)) {
-            knob.isr();
-            backButton.isDownIsr();
-        }
+    if (++timer6Counter > kTicksPerKnobIsr) {
+        timer6Counter = 0;
+        knob.isr();
+        backButton.isDownIsr();
     }
-    timer6Counter++;
 }
 
 /**
@@ -108,11 +108,6 @@ extern "C" void EXTI15_10_IRQHandler(void)
             LEDs::onLEDError(); // turn fault LED on, main loop resets it after the fault has cleared
         }
     }
-    if (pending & (1 << 12)) {
-        // OCP_INT_PIN/PB12 falling edge
-        pid.faults.ocpFault = true;
-        pid.trigger_ocp();
-    }
 }
 
 /**
@@ -124,6 +119,19 @@ extern "C" void DMA1_Channel1_IRQHandler()
     if (DMA1->ISR & DMA_ISR_TCIF1) {
         DMA1->IFCR = DMA_IFCR_CGIF1;
         adc.isr();
+    }
+}
+
+/**
+ * @brief ADC1_2_IRQHandler is the interrupt handler for the injected ADC group. It is called
+ *        when an injected conversion sequence (JEOC) completes, once per PWM period
+ *
+ */
+extern "C" void ADC1_2_IRQHandler()
+{
+    if (ADC1->SR & ADC_SR_JEOC) {
+        ADC1->SR = ~ADC_SR_JEOC;    // clear injected end of sequence flag
+        adc.isrInjected();
     }
 }
 
