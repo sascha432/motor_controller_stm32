@@ -38,6 +38,12 @@ struct LEDs_T {
         GPIO_CRx_REG<GPIO_LEDS_PIN>() |= (0x4 << digitalPinShift<GPIO_LEDS_PIN>());
     }
 
+    static bool isAnyLEDOn()
+    {
+        const uint32_t odr = digitalPinToGPIO<GPIO_LEDS_PIN>()->ODR;
+        return (odr & (1U << digitalPinToBit<GPIO_LEDS_PIN>())) || !(odr & (1U << digitalPinToBit<GPIO_LEDS_PIN>()));
+    }
+
     static bool isErrorLEDOn()
     {
         return digitalPinToGPIO<GPIO_LEDS_PIN>()->ODR & (1U << digitalPinToBit<GPIO_LEDS_PIN>());
