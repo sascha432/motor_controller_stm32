@@ -12,9 +12,11 @@
 #define VERSION_MAJOR           1
 #define VERSION_MINOR           0
 #define VERSION_PATCH           2
+#define VERSION_FULL            ((VERSION_MAJOR << 16) | (VERSION_MINOR << 8) | (VERSION_PATCH))
 
 #define PCB_REV_MAJOR           1
 #define PCB_REV_MINOR           2
+#define PCB_REV_FULL            (PCB_REV_MAJOR << 8) | (PCB_REV_MINOR)
 
 // === UI constants ===
 struct UIConstants

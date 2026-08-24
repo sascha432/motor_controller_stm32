@@ -40,8 +40,6 @@ struct ADC
     static constexpr uint32_t kSampleTimeCH14 = ADC_SAMPLETIME_71CYCLES_5;          // motor ntc
     static constexpr uint32_t kSampleTimeCH15 = ADC_SAMPLETIME_71CYCLES_5;          // mosfet ntc
 
-    static constexpr uint32_t kInjectedTriggerOffsetTicks = 0;                      // offset added to the active PWM compare to delay the injected sample (72MHz timer ticks, ~14ns each)
-
     static constexpr uint32_t kISenseCountDecayDivider = 16;                        // reduce by 1/16 to avoid overflow in rolling average
     static constexpr float kISenseRollingAverageTime = 1.0f;                        // rolling average over 1000ms
     static constexpr uint16_t kISenseCountMax = ((1000.0 / PID_INTERVAL) * kISenseRollingAverageTime * (1.0f + (0.5f / kISenseCountDecayDivider))); // calculate number of samples

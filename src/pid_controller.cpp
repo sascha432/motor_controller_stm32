@@ -205,7 +205,7 @@ void PidController::motorOff()
         running = false;
         releaseBrakeCounter = (kReleaseBrakeTimeMillis / kPIDInterval) + 1;
         if (releaseBrakeCounter == 0) {
-            // stop if not braking
+            // stop if not braking, we need to injection to monitor OVP
             adc.stopInjectedTrigger();
         }
         else {
@@ -304,7 +304,7 @@ void PidController::isr()
         // countdown once set
         if (--releaseBrakeCounter == 0) {
             PID_WRITE_MOTOR_PWM_OFF();
-            adc.stopInjectedTrigger(); // stop after braking
+            adc.stopInjectedTrigger(); // stop after braking to keep ovp alive
             #if PID_ISR_DEBUG_PRINT
                 DEBUG_PRINT(DebugType::PID, "Brake released");
             #endif
