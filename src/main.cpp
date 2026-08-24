@@ -115,12 +115,14 @@ static inline void loop()
         menu.handleStartButtonPress();
     }
 
-    // LED 1 signals fault or error
-    if (LEDs::isErrorLEDOn()) {
+    if (LEDs::isAnyLEDOn()) {
         // check if fault/errors have cleared
         if (
+            // check for DRV fault
             !pid.faults.drv8701Fault &&
-            (pid.getErrorCode() == PidController::ErrorCodeType::NONE)
+            (pid.getErrorCode() == PidController::ErrorCodeType::NONE) &&
+            // check OCP condition
+            (pid.ocp.counter == 0)
         ) {
             // turn LEDs off
             LEDs::off();
@@ -213,6 +215,15 @@ static inline void loop()
         // DEBUG_PRINT_MSG(DebugType::UI, "lv_timer_handler=%ums\n", HAL_GetTick() - lastLvHandler);
         lastLvHandler = HAL_GetTick();
     }
+
+    #if 1
+        static uint32_t lastDebugPrint = 0;
+        if ((HAL_GetTick() - lastDebugPrint) >= 100U) {
+            DEBUG_PRINT(DebugType::INFO, "c=%u U=%u I=%u I2=%u", adc.counter1, adc.vsense, adc.isense, adc.isense2);
+            // DEBUG_PRINT(DebugType::INFO, "c=%u I=%u F=%u", (unsigned)pid.ocp.counter, (unsigned)adc.getAndClearISenseMaxValue(), (unsigned)adc.getISenseFilteredValue());
+            lastDebugPrint = HAL_GetTick();
+        }
+    #endif
 
     #if LV_MEM_DEBUG
         static uint32_t lastMemStats = 0;
@@ -345,9 +356,8 @@ static inline void EXTI_Init()
         (0x3 << 8) |    // EXTI10 PD10
         (0x3 << 12);    // EXTI11 PD11
 
-    // EXTI12, EXTI14 -> Port B
+    // EXTI14 -> Port B
     AFIO->EXTICR[3] =
-        (0x1 << 0) |    // EXTI12 PB12
         (0x1 << 8);     // EXTI14 PB14
 
     // Clear pending flags
@@ -356,7 +366,6 @@ static inline void EXTI_Init()
         (1U<<9)  |   // PD9  BTN_2
         (1U<<10) |   // PD10 BTN_3
         (1U<<11) |   // PD11 DRV_SNSOUT
-        (1U<<12) |   // PB12 OCP_INT
         (1U<<14);    // PB14 DRV_FAULT
 
     // Enable interrupt lines
@@ -365,7 +374,6 @@ static inline void EXTI_Init()
         (1U<<9)  |   // PD9  BTN_2
         (1U<<10) |   // PD10 BTN_3
         (1U<<11) |   // PD11 DRV_SNSOUT
-        (1U<<12) |   // PB12 OCP_INT
         (1U<<14);    // PB14 DRV_FAULT
 
     // Rising edge: button change interrupt
@@ -382,7 +390,6 @@ static inline void EXTI_Init()
         (1U<<9)  |   // PD9  BTN_2
         (1U<<10) |   // PD10 BTN_3
         (1U<<11) |   // PD11 DRV_SNSOUT
-        (1U<<12) |   // PB12 OCP_INT
         (1U<<14);    // PB14 DRV_FAULT
 
     // Enable NVIC
@@ -409,7 +416,8 @@ static inline void TIM7_TIM6_Init()
     tim6.Instance = TIM6;
     tim6.Init.Prescaler = 71; // 72 MHz / 72 = 1 MHz (1 us tick)
     tim6.Init.CounterMode = TIM_COUNTERMODE_UP;
-    tim6.Init.Period = PidController::kOcpTickInterval - 1; // 20 counts = 20us
+    tim6.Init.Period = static_cast<uint32_t>(PidController::kPIDInterval * 1000 - 1);
+
     tim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
     __HAL_RCC_TIM6_CLK_ENABLE();
     HAL_TIM_Base_Init(&tim6);
