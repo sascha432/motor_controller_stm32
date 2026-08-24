@@ -2,6 +2,7 @@
 
 ## [Unreleased 1.0.2]
 
+- Using ADC injection group and interrupt to handle over current and voltage
 - Device controlled USB D+ pull-up
 
 ## 1.0.1

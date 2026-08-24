@@ -284,7 +284,7 @@ struct Stats
     volatile size_t graphWriteIndex;
     volatile bool graphDirty;
 
-protected:
+// protected:
     // stats
     struct {
         Helpers::MinMax<30000> vcc;

@@ -70,6 +70,15 @@ void ADC::init()
 
     NVIC_EnableIRQ(DMA1_Channel1_IRQn); // enable DMA1 channel 1 interrupt
 
+    // Injected group: PA2 (IN2) current + PA3 (IN3) voltage, triggered by TIM1_CH4
+    // compare event (fires at the PWM falling edge / end of duty cycle)
+    ADC1->CR2 |= ADC_CR2_JEXTTRIG | ADC_CR2_JEXTSEL_0;              // TIM1_CH4 trigger, rising edge
+    ADC1->JSQR = (2U << ADC_JSQR_JSQ3_Pos) |                        // rank 1: IN2 (PA2) current
+                 (3U << ADC_JSQR_JSQ4_Pos) |                        // rank 2: IN3 (PA3) voltage
+                 ADC_JSQR_JL_0;                                     // JL = 1 -> 2 injected ranks
+    ADC1->CR1 |= ADC_CR1_JEOCIE;                                    // enable injected end of sequence interrupt
+    NVIC_EnableIRQ(ADC1_2_IRQn);                                    // enable ADC1/2 interrupt
+
     // Enable ADC for calibration
     ADC1->CR2 |= ADC_CR2_ADON;
     delay_us(ADC_CALIBRATION_TIMEOUT);
@@ -92,8 +101,7 @@ void ADC::init()
     ADC1->CR2 |= ADC_CR2_EXTSEL | ADC_CR2_EXTTRIG;      // enable external trigger (software start)
     ADC1->CR2 |= ADC_CR2_DMA;                           // Enable DMA
 
-    // bare metal is 26-63% faster then HAL
-    // 146/182 (motor stopped/running) clock cycles vs 290/472
+    // start first transfer, the injected group will be triggered by the PWM timer while the motor is running
     dmaTransferComplete = false;
     startDMA();
 }
@@ -115,30 +123,53 @@ void ADC::initDAC()
 
 void ADC::isr()
 {
-    // hard fault if we have an OVP condition, mostly likely due to reverse currents while braking
-    if (getVSenseValue() > pid.faults.vsenseMax) {
-        if (pid.errorCode != PidController::ErrorCodeType::OVP) {
-            pid.setErrorCode(PidController::ErrorCodeType::OVP);
-        }
-    }
-
-    const uint16_t value = getISenseValue();
-    // store average for display
-    isenseSum += value;
-    if (++isenseCount >= kISenseCountMax) {
-        // reduce by 1/16th to avoid overflow in rolling average
-        isenseSum -= isenseSum / kISenseCountDecayDivider;
-        isenseCount -= isenseCount / kISenseCountDecayDivider;
-    }
-    // update filtered value for fast OCP detection
-    isenseOcpFiltered = filterValue<uint32_t, 2>(isenseOcpFiltered, value);
+    // check ovp condition
+    pid.ovp_check(getVSenseValue());
 
     // update filtered temperature values
     motorTemperatureFiltered = filterValue<uint16_t, 16>(motorTemperatureFiltered, getMotorNTCValue());
     mosfetTemperatureFiltered = filterValue<uint16_t, 16>(mosfetTemperatureFiltered, getMosfetNTCValue());
 
     dmaTransferComplete = true;
-    if (pid.running || pid.releaseBreakCounter) { // update as fast as possible while running (OCP/OVP) or braking (OVP)
-        startDMA();
+}
+
+void ADC::isrInjected()
+{
+    // rank 1: PA2/IN2 current, rank 2: PA3/IN3 voltage (JDR1 is the first injected conversion)
+    const uint16_t iSense = ADC1->JDR1;
+    const uint16_t vSense = ADC1->JDR2;
+
+    isenseFiltered = filterValue<uint16_t, 4>(isenseFiltered, iSense);
+
+    // max. value
+    if (isenseFiltered > isenseMax) {
+        isenseMax = isenseFiltered;
     }
+
+    // average
+    isenseSum += isenseFiltered;
+    if (++isenseCount >= isenseSmoothing) {
+        isenseSum -= isenseSum / kISenseCountDecayDivider;
+        isenseCount -= isenseCount / kISenseCountDecayDivider;
+    }
+
+    // check ovp condition
+    pid.ovp_check(vSense);
+
+    // update max voltage
+    stats.minMax.vcc.update(vSense);
+
+    // handle OCP detection
+    if (isenseFiltered > pid.faults.isenseMax) {
+        pid.ocp_start();
+    }
+    else {
+        pid.ocp_stop();
+    }
+}
+
+void ADC::initInjection()
+{
+    // 100ms smoothing
+    isenseSmoothing = eeprom.getPWMFrequency() / 10;
 }

@@ -8,6 +8,8 @@
 #include "menu.h"
 #include "stats.h"
 
+#define PID_ISR_DEBUG_PRINT 0
+
 PidController pid;
 MotorEncoder motorEncoder;
 TIM_HandleTypeDef tim4;
@@ -53,6 +55,15 @@ void PidController::init()
     // Start PWM
     HAL_TIM_PWM_Start(&tim1, TIM_CHANNEL_1);
     HAL_TIM_PWM_Start(&tim1, TIM_CHANNEL_2);
+
+    // TIM1 CH4 compare event used as injected ADC trigger (PA2 current + PA3 voltage sample)
+    // starts disabled (Pulse = 0 keeps OC4REF flat -> no trigger); it is enabled/disabled via
+    // ADC::updateInjectedTriggerPoint() from motorOn()/motorOff() so the injected group only
+    // samples while the motor is running. The output is internal only, NOT routed to PA11.
+    sConfigOC.OCMode = TIM_OCMODE_PWM1;
+    sConfigOC.Pulse = 0;
+    HAL_TIM_PWM_ConfigChannel(&tim1, &sConfigOC, TIM_CHANNEL_4);
+    HAL_TIM_PWM_Start(&tim1, TIM_CHANNEL_4);
 
     // TIM4 setup MT6701 encoder on PB6 PB7
     __HAL_RCC_AFIO_CLK_ENABLE();
@@ -148,7 +159,7 @@ void PidController::reset()
     stats.reset();
     ::stats.reset();
     errorCode = ErrorCodeType::NONE;
-    releaseBreakCounter = 0;
+    releaseBrakeCounter = 0;
     faults.reset();
     faults.vsenseMax = ADCConverter::Voltage::reverse(eeprom.getOvpProtection());
     lastRpmCounter = PID_READ_RPM_COUNTER();
@@ -156,17 +167,20 @@ void PidController::reset()
     applyPIDParams();
     ocp.reset();
     resetFaults();
+    adc.initInjection();
 
-    DEBUG_PRINT(DebugType::PID, "reset() Kp=%s Ki=%s Kd=%s RPM=%u windup=%s OCP=%u/%u OVP=%u",
-        debugFloatToString(Kp, 6, true),
-        debugFloatToString(Ki, 6, true),
-        debugFloatToString(Kd, 6, true),
-        rpm,
-        debugFloatToString(antiWindup / static_cast<float>(UIConstants::kAntiWindupFactor), 2, true),
-        eeprom.getInputCurrentLimit(),
-        eeprom.getMotorCurrentLimit(),
-        eeprom.getOvpProtection()
-    );
+    #if PID_ISR_DEBUG_PRINT
+        DEBUG_PRINT(DebugType::PID, "reset() Kp=%s Ki=%s Kd=%s RPM=%u windup=%s OCP=%u/%u OVP=%u",
+            debugFloatToString(Kp, 6, true),
+            debugFloatToString(Ki, 6, true),
+            debugFloatToString(Kd, 6, true),
+            rpm,
+            debugFloatToString(antiWindup / static_cast<float>(UIConstants::kAntiWindupFactor), 2, true),
+            eeprom.getInputCurrentLimit(),
+            eeprom.getMotorCurrentLimit(),
+            eeprom.getOvpProtection()
+        );
+    #endif
 }
 
 void PidController::motorOn()
@@ -175,8 +189,6 @@ void PidController::motorOn()
     if (!running) {
         reset();
         running = true;
-        // start DMA transfer after setting running to true, the ADC will self restart while running
-        adc.startDMAIfReady();
         __enable_irq();
     }
     else {
@@ -191,9 +203,16 @@ void PidController::motorOff()
     PID_WRITE_MOTOR_PWM_OFF();
     if (running) {
         running = false;
-        const uint32_t level = clampPWMLevel(eeprom.getMotorBrake() * pwmLevel.getMax() / 100);
-        PID_WRITE_MOTOR_PWM_BREAK(level);
-        releaseBreakCounter = (kReleaseBreakTimeMillis / kPIDInterval) + 1;
+        releaseBrakeCounter = (kReleaseBrakeTimeMillis / kPIDInterval) + 1;
+        if (releaseBrakeCounter == 0) {
+            // stop if not braking
+            adc.stopInjectedTrigger();
+        }
+        else {
+            // enable brake
+            const uint32_t level = clampPWMLevel(eeprom.getMotorBrake() * pwmLevel.getMax() / 100);
+            PID_WRITE_MOTOR_PWM_BRAKE(level);
+        }
         __enable_irq();
     }
     else {
@@ -279,20 +298,21 @@ void PidController::isr()
     // apply new PWM level if motor is running
     if (running) {
         PID_WRITE_MOTOR_PWM_ON(clampedPwmLevel, motorDirection);
+        adc.updateInjectedTriggerPoint();
     }
-    else if (releaseBreakCounter) {
+    else if (releaseBrakeCounter) {
         // countdown once set
-        if (--releaseBreakCounter == 0) {
+        if (--releaseBrakeCounter == 0) {
             PID_WRITE_MOTOR_PWM_OFF();
-            // make sure the ADC is running after releasing the brake
-            adc.startDMAIfReady();
-            DEBUG_PRINT(DebugType::PID, "Brake released");
+            adc.stopInjectedTrigger(); // stop after braking
+            #if PID_ISR_DEBUG_PRINT
+                DEBUG_PRINT(DebugType::PID, "Brake released");
+            #endif
         }
     }
-    else {
-        // start new ADC DMA transfer manually while not running or braking, helps to reduce MCU load
-        adc.startDMAIfReady();
-    }
+
+    // start new ADC DMA transfer
+    adc.startDMAIfReady();
 
     // update pwm stats
     stats.pwm.update(clampedPwmLevel);
@@ -336,7 +356,7 @@ void PidController::isr()
         PidLoopType item;
         item.rpm = static_cast<uint16_t>(deltaRPM);
         item.voltage = adc.getVSenseValue();
-        item.currentOcp = adc.getISenseOcpFilteredValue();
+        item.currentOcp = adc.getAndClearISenseMaxValue();
         item.currentAverage = adc.getISenseAverageValue();
         item.motorTemperature = adc.getMotorTemperatureFiltered();
         item.mosfetTemperature = adc.getMosfetTemperatureFiltered();
@@ -355,7 +375,7 @@ void PidController::isr()
         item.pwmLevel = static_cast<uint8_t>((clampedPwmLevel * 100) / pwmLevel.getARR());
         item.running = running ? 1U : 0U;
         item.drv8701Fault = faults.drv8701Fault ? 1U : 0U;
-        item.ocpFault = (ocp.state != OcpStateType::NONE) ? 1U : 0U;
+        item.ocpFault = (ocp.state == OcpStateType::TRIGGERED) ? 1U : 0U;
         item.snsoutFault = faults.snsoutFault ? 1U : 0U;
         pidLoopBuffer.push(item);
 
@@ -375,74 +395,62 @@ void PidController::isr()
             pid.setRPM(eeprom.getMotorRPM());
             pid.setAntiWindup(eeprom.getAntiWindup());
 
-            DEBUG_PRINT(DebugType::PID, "SWO PID tuning: Kp=%s Ki=%s Kd=%s RPM=%u windup=%s",
-                debugFloatToString(SWO::data.Kp, 6, true),
-                debugFloatToString(SWO::data.Ki, 6, true),
-                debugFloatToString(SWO::data.Kd, 6, true),
-                SWO::data.rpm,
-                debugFloatToString(SWO::data.antiWindup / static_cast<float>(UIConstants::kAntiWindupFactor), 2, true)
-            );
+            #if PID_ISR_DEBUG_PRINT
+                DEBUG_PRINT(DebugType::PID, "SWO PID tuning: Kp=%s Ki=%s Kd=%s RPM=%u windup=%s",
+                    debugFloatToString(SWO::data.Kp, 6, true),
+                    debugFloatToString(SWO::data.Ki, 6, true),
+                    debugFloatToString(SWO::data.Kd, 6, true),
+                    SWO::data.rpm,
+                    debugFloatToString(SWO::data.antiWindup / static_cast<float>(UIConstants::kAntiWindupFactor), 2, true)
+                );
+            #endif
         }
     }
 }
 
-void PidController::ocp_isr()
+void PidController::ocp_start()
 {
-    ocp.counter++;
-    if (ocp.state == OcpStateType::TRIGGERED) {
-        if (adc.getISenseOcpFilteredValue() < ((faults.isenseMax * (kOcpISenseThreshold * 1024 / 100)) / 1024)) {
-            // start recovery after the current dropped to kOcpISenseThreshold % of the limit
-            ocp.state = OcpStateType::RECOVERY;
-            ocp.counter = 0;
-        }
-    }
-    if (ocp.state == OcpStateType::RECOVERY) {
-        if (kIsDivisible<kOcpRecoveryInterval>(ocp.counter)) {
-            // use 32bit to avoid overflow
-            uint32_t value = DAC_GET_MOTOR_CURRENT();
-            value = value + (value / kOcpCurrentRampUp);
-            if (value > ocp.dacMotorCurrent) {
-                // once the motor current limit is back to the original value, we can reset the OCP condition
-                value = ocp.dacMotorCurrent;
-                ocp.state = OcpStateType::NONE;
-                ocp.counter = 0;
-                ocp.lastCounter = 0;
-                LEDs::off();
-            }
-            DAC_SET_MOTOR_CURRENT(value);
-        }
-    }
-}
+    ocp.state = OcpStateType::TRIGGERED;
 
-void PidController::trigger_ocp()
-{
-    if (ocp.state == OcpStateType::TRIGGERED) {
-        if (ocp.counter >= ocp.lastCounter + kOcpRetriggerTimeout) {
-            ocp.lastCounter = ocp.counter;
-            // reduce motor current every time we trigger input OCP
-            uint16_t value = DAC_GET_MOTOR_CURRENT();
-            value = value - (value / kOcpCurrentRampDown);
-            if (value < ocp.dacInputCurrent) {
-                value = ocp.dacInputCurrent;
-            }
-            DAC_SET_MOTOR_CURRENT(value);
-        }
+    // ramp motor current down to stay within input current limit
+    int32_t motorCurrent = DAC_GET_MOTOR_CURRENT();
+    motorCurrent -= std::max<int32_t>(1, static_cast<uint32_t>(motorCurrent) / kOcpCurrentRampDown);
+    if (motorCurrent < 0) {
+        motorCurrent = 0;
     }
-    else { // ocp.state != OcpStateType::TRIGGERED, we can use else here
-    // else if (ocp.state == OcpStateType::NONE || ocp.state == OcpStateType::RECOVERY) {
-        if (adc.getISenseOcpFilteredValue() > faults.isenseMax) {
-            ocp.state = OcpStateType::TRIGGERED;
-            ocp.counter = 0;
-            ocp.lastCounter = 0;
-            uint16_t value = ocp.dacMotorCurrent;
-            if (value > ocp.dacInputCurrent * kOcpInputToMotorCurrentRatio) {
-                value = ocp.dacInputCurrent * kOcpInputToMotorCurrentRatio;
-            }
-            else {
-                value = value - (value / kOcpCurrentRampDown);
-            }
-            DAC_SET_MOTOR_CURRENT(value);
+    DAC_SET_MOTOR_CURRENT(motorCurrent);
+
+    // counter handles the warning LED and keeps it on the longer the OCP condition lasts
+    if (ocp.counter < 1024) {
+        if (ocp.counter++ == 0) {
             LEDs::onLEDWarning();
+        }
+    }
+}
+
+void PidController::ocp_stop()
+{
+    if (ocp.counter) {
+        ocp.counter--;
+    }
+
+    uint32_t motorCurrent = DAC_GET_MOTOR_CURRENT();
+    if (motorCurrent < ocp.dacMotorCurrent) {
+        motorCurrent += std::max<uint32_t>(1, motorCurrent / kOcpCurrentRampUp);
+        if (motorCurrent > ocp.dacMotorCurrent) {
+            motorCurrent = ocp.dacMotorCurrent;
+            ocp.state = OcpStateType::NONE;
+        }
+        DAC_SET_MOTOR_CURRENT(motorCurrent);
+    }
+}
+
+void PidController::ovp_check(uint16_t vSense)
+{
+    if (vSense > faults.vsenseMax) {
+        if (errorCode != ErrorCodeType::OVP) {
+            // hard fault if we have an OVP condition, mostly likely due to reverse currents while braking
+            setErrorCode(ErrorCodeType::OVP);
         }
     }
 }

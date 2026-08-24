@@ -25,14 +25,12 @@ struct PidController
     using PidValueType = int32_t;
     #endif
 
-    static constexpr uint32_t kReleaseBreakTimeMillis = 5000;                           // time to release the brake after motor is turned off
+    static constexpr uint32_t kReleaseBrakeTimeMillis = 5000;                           // time to release the brake after motor is turned off
     static constexpr uint32_t kInitialSensorCheckTimeMillis = 750;                      // time to initially check for motor stall and sensor errors
 
     static constexpr uint16_t kPPR = 1024;                                              // MT6701 PPR
     static constexpr uint16_t kCPR = kPPR * 4;                                          // 4x Mode PPR to CPR
-    // tested with 1.28, 2.56, 5.12 and 10.24...
-    // lower values make the PID controller more responsive, but the graph update rate is reduced due to the higher CPU load
-    static constexpr float kPIDInterval = 2.56f;                                        // PID update rate in millis used for precise RPM calculation
+    static constexpr float kPIDInterval = PID_INTERVAL;                                 // PID update rate in millis used for precise RPM calculation
     static constexpr uint16_t kAntiWindup = 97 * UIConstants::kAntiWindupFactor;        // reduce integral if error is out of range (97%)
     static constexpr bool kProgramPPR = false;                                          // set to true to program the MT6701 encoder during boot over i2c
     static constexpr uint32_t kMaxRPM = 55000;                                          // max. supported RPM by the encoder
@@ -84,7 +82,7 @@ struct PidController
         antiWindup(kAntiWindup),
         errorCode(ErrorCodeType::NONE),
         running(false),
-        releaseBreakCounter(0)
+        releaseBrakeCounter(0)
     {
         setKp(UIConstants::kDefaultKp);
         setKi(UIConstants::kDefaultKi);
@@ -305,7 +303,6 @@ struct PidController
     void resetFaults()
     {
         faults.drv8701Fault = !digitalRead<DRV8701_FAULT_PIN>();
-        faults.ocpFault = !digitalRead<OCP_INT_PIN>();
         faults.snsoutFault = !digitalRead<DRV_SNSOUT_PIN>();
     }
 
@@ -421,15 +418,23 @@ struct PidController
     void isr();
 
     /**
-     * @brief OCP interrupt service routine for the PID controller
+     * @brief Handle OCP start event
      *
      */
-    void ocp_isr();
+    void ocp_start();
 
     /**
-     * @brief Trigger OCP event
+     * @brief Handle OCP stop event
+     *
      */
-    void trigger_ocp();
+    void ocp_stop();
+
+    /**
+     * @brief Check if OVP condition is met and stop motor or braking with hard fault
+     *
+     * @param vSense
+     */
+    void ovp_check(uint16_t vSense);
 
     /**
      * @brief Turn motor on in the specified direction
@@ -519,14 +524,12 @@ public:
         uint32_t isenseMax;             // maximum current as ADC value
         uint32_t vsenseMax;             // maximum voltage as ADC value
         volatile bool drv8701Fault;     // DRV8701 fault pin state
-        volatile bool ocpFault;         // OCP(INA381) fault pin state
         volatile bool snsoutFault;      // SNSOUT(motor current limit) fault pin state
 
         FaultStates() :
             isenseMax(INT32_MAX),
             vsenseMax(INT32_MAX),
             drv8701Fault(false),
-            ocpFault(false),
             snsoutFault(false)
         {
         }
@@ -534,7 +537,6 @@ public:
         inline void reset()
         {
             drv8701Fault = false;
-            ocpFault = false;
             snsoutFault = false;
         }
     };
@@ -583,35 +585,27 @@ public:
     static_assert(kPidLoopTypeSize % 4 == 0, "PidLoopType must be 4-byte aligned");
 
     // === OCP state machine and constants ===
-    static constexpr float kMinADCTimeMicros = 1000000 / ADC::kTotalSamplesPerSecond;   // sample time for current measurement in microseconds, limits retrigger timeout and recovery interval
 
-    static constexpr uint32_t kOcpTickInterval = 20;                                    // 20us tick interval
-    static constexpr uint32_t kOcpISenseThreshold = 80;                                 // lower threshold in percent before the OCP condition is cleared
-    static constexpr uint32_t kOcpRecoveryInterval = 20 / kOcpTickInterval;             // 20us interval
-    static constexpr uint32_t kOcpRetriggerTimeout = 20 / kOcpTickInterval;             // 20us timeout
-    static constexpr uint32_t kOcpCurrentRampUp = 16;                                   // increase current by 1/16 every tick
-    static constexpr uint32_t kOcpCurrentRampDown = 16;                                 // reduce current by 1/16 every tick
-    static constexpr uint32_t kOcpInputToMotorCurrentRatio = 8;                         // if the motor current limit is higher than x the input current limit, it will be reduced to x the input current limit, before ramping it down further
+    static constexpr uint32_t kOcpCurrentRampUp = 32;
+    static constexpr uint32_t kOcpCurrentRampDown = 32;
     static constexpr float kOcpAntiWindUpFloat = 0.8f;                                  // strong anti windup during OCP condition
 
     enum class OcpStateType : uint32_t {
         NONE = 0,           // no OCP condition
         TRIGGERED = 1,      // OCP detected, decreasing motor current limit
-        RECOVERY = 2        // OCP recovery, increasing motor current limit
+        // RECOVERY = 2        // OCP recovery, increasing motor current limit
     };
 
     struct OcpState
     {
         OcpStateType state;                 // state of the over current protection
-        uint32_t counter;                   // 5us tick counter
-        uint32_t lastCounter;
+        uint32_t counter;                   // event counter
         uint16_t dacMotorCurrent;
         uint16_t dacInputCurrent;
 
         OcpState() :
             state(OcpStateType::NONE),
             counter(0),
-            lastCounter(0),
             dacMotorCurrent(0),
             dacInputCurrent(0)
         {
@@ -621,7 +615,6 @@ public:
         {
             state = OcpStateType::NONE;
             counter = 0;
-            lastCounter = 0;
             dacMotorCurrent = DAC_GET_MOTOR_CURRENT();
             dacInputCurrent = DAC_GET_INPUT_CURRENT();
         }
@@ -707,7 +700,7 @@ public:
     static constexpr size_t kPidLoopBufferSize = sizeof(pidLoopBuffer);
 
     volatile bool running;                          // true if the PID controller is running
-    volatile uint32_t releaseBreakCounter;          // counter for releasing the brake after motor off
+    volatile uint32_t releaseBrakeCounter;          // counter for releasing the brake after motor off
 };
 
 extern PidController pid;

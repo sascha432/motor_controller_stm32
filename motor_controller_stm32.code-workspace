@@ -95,6 +95,7 @@
 			"ICSELECTION",
 			"itface",
 			"IWDG",
+			"JEOC",
 			"kOCPISenseThreshold",
 			"lvgl",
 			"madctl",

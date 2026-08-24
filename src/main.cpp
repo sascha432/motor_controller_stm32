@@ -216,10 +216,10 @@ static inline void loop()
         lastLvHandler = HAL_GetTick();
     }
 
-    #if 1
+    #if 0
         static uint32_t lastDebugPrint = 0;
         if ((HAL_GetTick() - lastDebugPrint) >= 100U) {
-            DEBUG_PRINT(DebugType::INFO, "c=%u U=%u I=%u I2=%u", adc.counter1, adc.vsense, adc.isense, adc.isense2);
+            DEBUG_PRINT(DebugType::INFO, "I=%u", ADCConverter::Current::convert(adc.getISenseAverageValue()));
             // DEBUG_PRINT(DebugType::INFO, "c=%u I=%u F=%u", (unsigned)pid.ocp.counter, (unsigned)adc.getAndClearISenseMaxValue(), (unsigned)adc.getISenseFilteredValue());
             lastDebugPrint = HAL_GetTick();
         }

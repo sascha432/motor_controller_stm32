@@ -35,17 +35,16 @@ static constexpr float kAdcSampleTimeUs(uint32_t sampleBits)
 struct ADC
 {
     static constexpr uint32_t kNumConversions = 4;                                  // number of channels
-    static constexpr uint32_t kSampleTimeCH2 = ADC_SAMPLETIME_13CYCLES_5;           // isense
-    static constexpr uint32_t kSampleTimeCH3 = ADC_SAMPLETIME_28CYCLES_5;           // vsense
+    static constexpr uint32_t kSampleTimeCH2 = ADC_SAMPLETIME_239CYCLES_5;          // isense
+    static constexpr uint32_t kSampleTimeCH3 = ADC_SAMPLETIME_13CYCLES_5;           // vsense
     static constexpr uint32_t kSampleTimeCH14 = ADC_SAMPLETIME_71CYCLES_5;          // motor ntc
     static constexpr uint32_t kSampleTimeCH15 = ADC_SAMPLETIME_71CYCLES_5;          // mosfet ntc
 
-    static constexpr float kTotalSampleTime = kAdcSampleTimeUs(kSampleTimeCH2) + kAdcSampleTimeUs(kSampleTimeCH3) + kAdcSampleTimeUs(kSampleTimeCH14) + kAdcSampleTimeUs(kSampleTimeCH15); // sum of sample time per channel
-    static constexpr float kTotalSamplesPerSecond = 1000000.0f / kTotalSampleTime;  // samples per second for all channels
+    static constexpr uint32_t kInjectedTriggerOffsetTicks = 0;                      // offset added to the active PWM compare to delay the injected sample (72MHz timer ticks, ~14ns each)
 
     static constexpr uint32_t kISenseCountDecayDivider = 16;                        // reduce by 1/16 to avoid overflow in rolling average
-    static constexpr float kISenseRollingAverageTime = 0.25f;                       // rolling average over 250ms
-    static constexpr uint16_t kISenseCountMax = (kTotalSamplesPerSecond * kISenseRollingAverageTime * (1.0f + (0.5f / kISenseCountDecayDivider))) / kNumConversions; // calculate number of samples
+    static constexpr float kISenseRollingAverageTime = 1.0f;                        // rolling average over 1000ms
+    static constexpr uint16_t kISenseCountMax = ((1000.0 / PID_INTERVAL) * kISenseRollingAverageTime * (1.0f + (0.5f / kISenseCountDecayDivider))); // calculate number of samples
 
     /**
      * @brief Construct ADC object
@@ -54,10 +53,12 @@ struct ADC
     ADC() :
         isenseSum(0),
         isenseCount(0),
-        isenseOcpFiltered(0),
+        isenseFiltered(0),
+        isenseMax(0),
         motorTemperatureFiltered(0),
         mosfetTemperatureFiltered(0),
-        dmaTransferComplete(false)
+        dmaTransferComplete(false),
+        isenseSmoothing(0)
     {
     }
 
@@ -78,6 +79,12 @@ struct ADC
      *
      */
     void isr();
+
+    /**
+     * @brief Interrupt Service Routine for the injected ADC group
+     *
+     */
+    void isrInjected();
 
 protected:
     friend PidController;
@@ -114,16 +121,6 @@ public:
     }
 
     /**
-     * @brief Get the Input Current average value for OCP
-     *
-     * @return uint16_t Filtered current in ADC units
-     */
-    inline uint16_t getISenseOcpFilteredValue() const
-    {
-        return isenseOcpFiltered;
-    }
-
-    /**
      * @brief Get the Input Voltage value
      *
      * @return uint16_t Voltage in ADC units
@@ -131,6 +128,18 @@ public:
     inline uint16_t getVSenseValue() const
     {
         return adc_buffer[1];
+    }
+
+    /**
+     * @brief Get the and clear max. current value
+     *
+     * @return uint16_t
+     */
+    inline uint16_t getAndClearISenseMaxValue()
+    {
+        const uint16_t value = isenseMax;
+        isenseMax = 0;
+        return value;
     }
 
     /**
@@ -165,6 +174,42 @@ public:
     }
 
 protected:
+    // /**
+    //  * @brief Update the TIM1_CH4 compare value so the next injected sample starts at the
+    //  *        falling edge (end of duty) of the active PWM channel
+    //  */
+    // inline void updateInjectedTriggerPoint()
+    // {
+    //     // sample at the end of the active duty cycle (PWM goes low) plus an optional offset.
+    //     // clamp to [1, ARR]: CCR4 == 0 would keep OC4REF flat (PWM mode 2 -> always high) and
+    //     // never generate a trigger edge, which would stall the injected ISR
+    //     const uint16_t ccr1 = PID_READ_MOTOR_PWM_DRV_IN1();
+    //     const uint16_t ccr2 = PID_READ_MOTOR_PWM_DRV_IN2();
+    //     updateInjectedTriggerPoint(std::max<uint16_t>(ccr1, ccr2));
+    // }
+
+    /**
+     * @brief Update the TIM1_CH4 compare value to enable the injection
+     *
+     */
+    inline void updateInjectedTriggerPoint()
+    {
+        PID_MOTOR_PWM_TIMER->CCR4 = 4 * 72; // start 4us delayed
+    }
+
+    /**
+     * @brief Disable the injected ADC trigger by flattening OC4REF (CCR4 = 0)
+     *
+     */
+    inline void stopInjectedTrigger()
+    {
+        PID_MOTOR_PWM_TIMER->CCR4 = 0;
+        isenseSum = 0;
+        isenseCount = 0;
+    }
+
+    void initInjection();
+
     /**
      * @brief Check if the DMA is ready for a new transfer
      *
@@ -225,10 +270,12 @@ protected:
     volatile uint16_t adc_buffer[kNumConversions];
     volatile uint32_t isenseSum;
     volatile uint16_t isenseCount;
-    volatile uint32_t isenseOcpFiltered;
+    volatile uint16_t isenseFiltered;
+    volatile uint16_t isenseMax;
     volatile uint16_t motorTemperatureFiltered;
     volatile uint16_t mosfetTemperatureFiltered;
     volatile bool dmaTransferComplete;
+    uint16_t isenseSmoothing;
 };
 
 extern ADC adc;
