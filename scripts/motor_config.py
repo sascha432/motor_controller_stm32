@@ -3265,12 +3265,42 @@ class PIDTuningApp:
             (self.line_rpm,) = ax0.plot(self.x_values, self.rpm, label="RPM", color="#0077B6")
             (self.line_rpm_avg,) = ax0.plot(self.x_values, self.rpm_avg, label="Avg RPM", color="#E85D04", linestyle="--")
             ax0.legend(loc="upper left")
+            # Live Avg RPM readout shown at the bottom of the graph.
+            self.rpm_text = ax0.text(
+                0.02,
+                0.07,
+                "Avg RPM: --",
+                transform=ax0.transAxes,
+                ha="left",
+                va="bottom",
+                fontsize=11,
+                fontweight="bold",
+                color="#0077B6",
+                bbox=dict(boxstyle="round,pad=0.35", fc="white", ec="#0077B6", alpha=0.85),
+            )
+        else:
+            self.rpm_text = None
 
         if 'pwm' in ax_map:
             ax1 = ax_map['pwm']
             (self.line_pwm,) = ax1.plot(self.x_values, self.pwm, label="PWM %", color="#2A9D8F")
             (self.line_pwm_avg,) = ax1.plot(self.x_values, self.pwm_avg, label="Avg PWM %", color="#9A031E", linestyle="--")
             ax1.legend(loc="upper left")
+            # Live Avg PWM % readout shown below the avg line at the bottom of the graph.
+            self.pwm_text = ax1.text(
+                0.02,
+                0.07,
+                "Avg PWM: --",
+                transform=ax1.transAxes,
+                ha="left",
+                va="bottom",
+                fontsize=11,
+                fontweight="bold",
+                color="#2A9D8F",
+                bbox=dict(boxstyle="round,pad=0.35", fc="white", ec="#2A9D8F", alpha=0.85),
+            )
+        else:
+            self.pwm_text = None
 
         if 'current' in ax_map:
             ax2 = ax_map['current']
@@ -3383,9 +3413,21 @@ class PIDTuningApp:
         if hasattr(self, 'line_rpm'):
             self.line_rpm.set_data(self.x_values, self.rpm)
             self.line_rpm_avg.set_data(self.x_values, self.rpm_avg)
+            if getattr(self, 'rpm_text', None) is not None:
+                current_rpm = self.rpm_avg[-1] if len(self.rpm_avg) else math.nan
+                if math.isnan(current_rpm):
+                    self.rpm_text.set_text("Avg RPM: --")
+                else:
+                    self.rpm_text.set_text(f"Avg RPM: {int(current_rpm)}")
         if hasattr(self, 'line_pwm'):
             self.line_pwm.set_data(self.x_values, self.pwm)
             self.line_pwm_avg.set_data(self.x_values, self.pwm_avg)
+            if getattr(self, 'pwm_text', None) is not None:
+                current_pwm = self.pwm_avg[-1] if len(self.pwm_avg) else math.nan
+                if math.isnan(current_pwm):
+                    self.pwm_text.set_text("Avg PWM: --")
+                else:
+                    self.pwm_text.set_text(f"Avg PWM: {current_pwm:.1f}%")
         if hasattr(self, 'line_i_avg'):
             self.line_i_avg.set_data(self.x_values, self.current_avg_ma)
             self.line_i_ocp.set_data(self.x_values, self.current_ocp_ma)
