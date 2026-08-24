@@ -87,6 +87,11 @@ Timer configurations:
 #define TFT_PIN_RST_LOW()           digitalWriteLow<TFT_PIN_RST>()
 #endif
 
+// default PID interval in milliseconds
+#ifndef PID_INTERVAL
+#define PID_INTERVAL                                2.0f
+#endif
+
 // motor driver pins are connected to channels 1 and 2 of TIM1 (PA8 and PA9)
 #define PID_MOTOR_PWM_TIMER                         TIM1
 #define PID_WRITE_MOTOR_PWM_DRV_IN1(level)          (PID_MOTOR_PWM_TIMER->CCR1 = (level))
@@ -97,7 +102,7 @@ Timer configurations:
 #define PID_WRITE_MOTOR_PWM_REVERSE(level)          (PID_MOTOR_PWM_TIMER->CCR1 = 0, PID_MOTOR_PWM_TIMER->CCR2 = (level))
 #define PID_WRITE_MOTOR_PWM_ON(level, dir)          ((dir == EEPROM::MotorDirection::Reverse) ? PID_WRITE_MOTOR_PWM_REVERSE(level) : PID_WRITE_MOTOR_PWM_FORWARD(level))
 #define PID_WRITE_MOTOR_PWM_OFF()                   (PID_MOTOR_PWM_TIMER->CCR1 = 0, PID_MOTOR_PWM_TIMER->CCR2 = 0)
-#define PID_WRITE_MOTOR_PWM_BREAK(level)            (PID_MOTOR_PWM_TIMER->CCR1 = (level), PID_MOTOR_PWM_TIMER->CCR2 = (level))
+#define PID_WRITE_MOTOR_PWM_BRAKE(level)            (PID_MOTOR_PWM_TIMER->CCR1 = (level), PID_MOTOR_PWM_TIMER->CCR2 = (level))
 
 // DAC macros for DRV8701 and INA381 overcurrent protection
 #define DAC_SET_MOTOR_CURRENT(value)                (DAC->DHR12R1 = (value) & 0xfff)
