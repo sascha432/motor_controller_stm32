@@ -406,9 +406,9 @@ void PidController::ocp_start()
 
     // ramp motor current down to stay within input current limit
     int32_t motorCurrent = DAC_GET_MOTOR_CURRENT();
-    motorCurrent -= std::max<int32_t>(1, static_cast<uint32_t>(motorCurrent) / kOcpCurrentRampDown);
-    if (motorCurrent < 0) {
-        motorCurrent = 0;
+    motorCurrent -= static_cast<uint32_t>(motorCurrent) / kOcpCurrentRampDown;
+    if (motorCurrent < kOcpCurrentRampUp) {
+        motorCurrent = kOcpCurrentRampUp; // keep at kOcpCurrentRampUp
     }
     DAC_SET_MOTOR_CURRENT(motorCurrent);
 
@@ -428,7 +428,7 @@ void PidController::ocp_stop()
 
     uint32_t motorCurrent = DAC_GET_MOTOR_CURRENT();
     if (motorCurrent < ocp.dacMotorCurrent) {
-        motorCurrent += std::max<uint32_t>(1, motorCurrent / kOcpCurrentRampUp);
+        motorCurrent += motorCurrent / kOcpCurrentRampUp;
         if (motorCurrent >= ocp.dacMotorCurrent) {
             motorCurrent = ocp.dacMotorCurrent;
             ocp.state = OcpStateType::NONE;
