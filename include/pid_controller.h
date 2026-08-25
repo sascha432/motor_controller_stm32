@@ -31,7 +31,7 @@ struct PidController
     static constexpr uint16_t kPPR = 1024;                                              // MT6701 PPR
     static constexpr uint16_t kCPR = kPPR * 4;                                          // 4x Mode PPR to CPR
     static constexpr float kPIDInterval = PID_INTERVAL;                                 // PID update rate in millis used for precise RPM calculation
-    static constexpr uint16_t kAntiWindup = 97 * UIConstants::kAntiWindupFactor;        // reduce integral if error is out of range (97%)
+    static constexpr uint16_t kAntiWindup = 90 * UIConstants::kAntiWindupFactor;        // reduce integral if error is out of range (90%)
     static constexpr bool kProgramPPR = false;                                          // set to true to program the MT6701 encoder during boot over i2c
     static constexpr uint32_t kMaxRPM = 55000;                                          // max. supported RPM by the encoder
     static constexpr float kMaxError = kCPR / (60000 / kPIDInterval) * kMaxRPM;         // factor to reduce error to a value between -1.0 and 1.0 for the PID loop

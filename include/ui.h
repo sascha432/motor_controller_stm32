@@ -170,9 +170,9 @@ struct Screen
     static constexpr lv_coord_t kDiagnosticScreenScrollbarThumbHeight = 16;
     static constexpr lv_coord_t kDiagnosticScreenRowHeight = 16;
     #if HAVE_USB_DEVICE
-    static constexpr int32_t kDiagnosticScreenRowCount = 8;
+    static constexpr int32_t kDiagnosticScreenRowCount = 9;
     #else
-    static constexpr int32_t kDiagnosticScreenRowCount = 7;
+    static constexpr int32_t kDiagnosticScreenRowCount = 8;
     #endif
     static constexpr lv_coord_t kDiagnosticViewportWidth = kScreenWidth - kDiagnosticScreenMargin;
     static constexpr lv_coord_t kDiagnosticViewportHeight = kScreenHeight - kDiagnosticScreenMargin;

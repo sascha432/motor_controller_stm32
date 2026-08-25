@@ -21,7 +21,7 @@ inline constexpr lv_coord_t diagnostic_screen_get_ypos_for_row(int32_t row)
         default:
             break;
     }
-    return Screen::kDiagnosticScreenRowHeight * row + (Screen::kDiagnosticScreenRowHeight * 3);
+    return Screen::kDiagnosticScreenRowHeight * row + (Screen::kDiagnosticScreenRowHeight * 4);
 }
 
 inline constexpr int32_t diagnostic_screen_content_height()
@@ -458,7 +458,10 @@ void DiagnosticsScreen::load()
         "Firmware " STR(VERSION_MAJOR) "." STR(VERSION_MINOR) "." STR(VERSION_PATCH) " " __DEBUG__BUILD__ "\n"
         "PCB Rev " STR(PCB_REV_MAJOR) "." STR(PCB_REV_MINOR) "\n"
         "Build " __DATE__ " " __TIME__ "\n"
-        "EEPROM cycle #%u", (unsigned)eeprom.getData().sequence
+        "EEPROM cycle #%u\n"
+        "PID Interval " SPRINTF_FP2_FMT "ms",
+            (unsigned)eeprom.getData().sequence,
+            CONVERT_TO_FP2(static_cast<uint32_t>(PidController::kPIDInterval * 1000))
     );
 
     vccLabel = diagnostic_screen_create_label(viewport, kDiagnosticTextWidth, 1);
@@ -561,7 +564,7 @@ void DiagnosticsScreen::_refreshVisuals()
     lv_label_set_text_static(lastErrorLabel, lastErrorLabelBuf);
 
     #if HAVE_USB_DEVICE
-        lv_label_set_text_static(usbConnectionLabel, Serial::isConnected() ? "USB Connected" : "USB Disconnected");
+        lv_label_set_text_static(usbConnectionLabel, Serial::isConfigured() ? (Serial::isConnected() ? "USB connected" : "USB disconnected") : "USB cable not detected");
     #endif
 }
 
