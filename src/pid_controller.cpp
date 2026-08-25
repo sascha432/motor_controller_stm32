@@ -270,15 +270,7 @@ void PidController::isr()
         clampedPwmLevel = clampPWMLevel(newPwmLevel);
 
         // apply anti-windup
-        if (ocp.state != OcpStateType::NONE) {
-            #if PID_USE_FLOATING_POINT_MATH
-                setIntegral(getIntegral() * kOcpAntiWindUpFloat);
-            #else
-                // use fixed point
-                setIntegral((getIntegral() * static_cast<PidValueType>(kOcpAntiWindUpFloat * 1024)) / 1024);
-            #endif
-        }
-        else if (antiWindup) {
+        if (antiWindup) {
             if ((newPwmLevel < pwmLevel.getLower()) || (newPwmLevel > pwmLevel.getUpper())) {
                 #if PID_USE_FLOATING_POINT_MATH
                     setIntegral(getIntegral() * antiWindup * (0.01f / UIConstants::kAntiWindupFactor));
@@ -437,7 +429,7 @@ void PidController::ocp_stop()
     uint32_t motorCurrent = DAC_GET_MOTOR_CURRENT();
     if (motorCurrent < ocp.dacMotorCurrent) {
         motorCurrent += std::max<uint32_t>(1, motorCurrent / kOcpCurrentRampUp);
-        if (motorCurrent > ocp.dacMotorCurrent) {
+        if (motorCurrent >= ocp.dacMotorCurrent) {
             motorCurrent = ocp.dacMotorCurrent;
             ocp.state = OcpStateType::NONE;
         }

@@ -287,8 +287,8 @@ struct Stats
 // protected:
     // stats
     struct {
-        Helpers::MinMax<30000> vcc;
-        Helpers::MinMax<30000> current;
+        Helpers::MinMax<10000> vcc;
+        Helpers::MinMax<10000> current;
         Helpers::MinMax<60000> motorTemp;
         Helpers::MinMax<60000> mosfetTemp;
     } minMax;

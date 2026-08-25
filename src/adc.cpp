@@ -139,14 +139,15 @@ void ADC::isrInjected()
     const uint16_t iSense = ADC1->JDR1;
     const uint16_t vSense = ADC1->JDR2;
 
+    // Rev1.0 lacks the proper RC filter for the current, so we do it in software (4 and 8 seems to work well, 2 is not enough)
     isenseFiltered = filterValue<uint16_t, 4>(isenseFiltered, iSense);
 
     // max. value
-    if (isenseFiltered > isenseMax) {
-        isenseMax = isenseFiltered;
+    if (isenseFiltered > isenseMaxFiltered) {
+        isenseMaxFiltered = isenseFiltered;
     }
 
-    // average
+    // average current for display purposes
     isenseSum += isenseFiltered;
     if (++isenseCount >= isenseSmoothing) {
         isenseSum -= isenseSum / kISenseCountDecayDivider;
@@ -156,7 +157,7 @@ void ADC::isrInjected()
     // check ovp condition
     pid.ovp_check(vSense);
 
-    // update max voltage
+    // update max. voltage
     stats.minMax.vcc.update(vSense);
 
     // handle OCP detection

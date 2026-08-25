@@ -23,10 +23,10 @@ struct UIConstants
 {
     // ui slider min/max values
     static constexpr uint32_t kStepInputCurrent = 100;                      // input current step in mA
-    static constexpr uint32_t kMinInputCurrent = kStepInputCurrent * 5;     // min. input current in mA
+    static constexpr uint32_t kMinInputCurrent = kStepInputCurrent * 10;    // min. input current in mA
     static constexpr uint32_t kMaxInputCurrent = 40000;                     // max. input current in mA
     static constexpr uint32_t kStepMotorCurrent = 100;                      // motor current step in mA
-    static constexpr uint32_t kMinMotorCurrent = kStepMotorCurrent * 5;     // min. peak motor current in mA
+    static constexpr uint32_t kMinMotorCurrent = kStepMotorCurrent * 20;    // min. peak motor current in mA
     static constexpr uint32_t kMaxMotorCurrent = 40000;                     // max. peak motor current in mA
     static constexpr uint16_t kMinRPM = 10;                                 // Min. Motor RPM
     static constexpr uint16_t kMaxRPM = 55000;                              // Max. Motor RPM

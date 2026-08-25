@@ -588,7 +588,6 @@ public:
 
     static constexpr uint32_t kOcpCurrentRampUp = 32;
     static constexpr uint32_t kOcpCurrentRampDown = 32;
-    static constexpr float kOcpAntiWindUpFloat = 0.8f;                                  // strong anti windup during OCP condition
 
     enum class OcpStateType : uint32_t {
         NONE = 0,           // no OCP condition

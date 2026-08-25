@@ -34,7 +34,15 @@ static constexpr float kAdcSampleTimeUs(uint32_t sampleBits)
  */
 struct ADC
 {
-    static constexpr uint32_t kNumConversions = 4;                                  // number of channels
+
+    enum DMABufferType {
+        ISENSE,
+        VSENSE,
+        MOTOR_NTC,
+        MOSFET_NTC,
+        MAX
+    };
+    static constexpr uint32_t kNumConversions = DMABufferType::MAX;                 // number of channels
     static constexpr uint32_t kSampleTimeCH2 = ADC_SAMPLETIME_239CYCLES_5;          // isense
     static constexpr uint32_t kSampleTimeCH3 = ADC_SAMPLETIME_13CYCLES_5;           // vsense
     static constexpr uint32_t kSampleTimeCH14 = ADC_SAMPLETIME_71CYCLES_5;          // motor ntc
@@ -44,6 +52,8 @@ struct ADC
     static constexpr float kISenseRollingAverageTime = 1.0f;                        // rolling average over 1000ms
     static constexpr uint16_t kISenseCountMax = ((1000.0 / PID_INTERVAL) * kISenseRollingAverageTime * (1.0f + (0.5f / kISenseCountDecayDivider))); // calculate number of samples
 
+    static constexpr uint32_t kInjectionStartDelayMicros = 4;                       // synchronize delayed start with PWM timer
+
     /**
      * @brief Construct ADC object
      *
@@ -52,7 +62,7 @@ struct ADC
         isenseSum(0),
         isenseCount(0),
         isenseFiltered(0),
-        isenseMax(0),
+        isenseMaxFiltered(0),
         motorTemperatureFiltered(0),
         mosfetTemperatureFiltered(0),
         dmaTransferComplete(false),
@@ -125,7 +135,7 @@ public:
      */
     inline uint16_t getVSenseValue() const
     {
-        return adc_buffer[1];
+        return adc_buffer[DMABufferType::VSENSE];
     }
 
     /**
@@ -135,8 +145,8 @@ public:
      */
     inline uint16_t getAndClearISenseMaxValue()
     {
-        const uint16_t value = isenseMax;
-        isenseMax = 0;
+        const uint16_t value = isenseMaxFiltered;
+        isenseMaxFiltered = 0;
         return value;
     }
 
@@ -192,7 +202,7 @@ protected:
      */
     inline void updateInjectedTriggerPoint()
     {
-        PID_MOTOR_PWM_TIMER->CCR4 = 4 * 72; // start 4us delayed
+        PID_MOTOR_PWM_TIMER->CCR4 = kInjectionStartDelayMicros * 72;
     }
 
     /**
@@ -241,7 +251,7 @@ protected:
      */
     inline uint16_t getISenseValue() const
     {
-        return adc_buffer[0];
+        return adc_buffer[DMABufferType::ISENSE];
     }
 
     /**
@@ -251,7 +261,7 @@ protected:
      */
     inline uint16_t getMotorNTCValue() const
     {
-        return adc_buffer[2];
+        return adc_buffer[DMABufferType::MOTOR_NTC];
     }
 
         /**
@@ -261,7 +271,7 @@ protected:
      */
     inline uint16_t getMosfetNTCValue() const
     {
-        return adc_buffer[3];
+        return adc_buffer[DMABufferType::MOSFET_NTC];
     }
 
 protected:
@@ -269,7 +279,7 @@ protected:
     volatile uint32_t isenseSum;
     volatile uint16_t isenseCount;
     volatile uint16_t isenseFiltered;
-    volatile uint16_t isenseMax;
+    volatile uint16_t isenseMaxFiltered;
     volatile uint16_t motorTemperatureFiltered;
     volatile uint16_t mosfetTemperatureFiltered;
     volatile bool dmaTransferComplete;
