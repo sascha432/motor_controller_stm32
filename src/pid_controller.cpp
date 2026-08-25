@@ -290,7 +290,7 @@ void PidController::isr()
     // apply new PWM level if motor is running
     if (running) {
         PID_WRITE_MOTOR_PWM_ON(clampedPwmLevel, motorDirection);
-        adc.updateInjectedTriggerPoint();
+        adc.updateInjectedTriggerPoint(clampedPwmLevel);
     }
     else if (releaseBrakeCounter) {
         // countdown once set

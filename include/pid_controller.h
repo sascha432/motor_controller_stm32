@@ -591,8 +591,7 @@ public:
 
     enum class OcpStateType : uint32_t {
         NONE = 0,           // no OCP condition
-        TRIGGERED = 1,      // OCP detected, decreasing motor current limit
-        // RECOVERY = 2        // OCP recovery, increasing motor current limit
+        TRIGGERED = 1,      // OCP detected
     };
 
     struct OcpState

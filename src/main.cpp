@@ -122,6 +122,7 @@ static inline void loop()
             !pid.faults.drv8701Fault &&
             (pid.getErrorCode() == PidController::ErrorCodeType::NONE) &&
             // check OCP condition
+            (pid.ocp.state == PidController::OcpStateType::NONE) &&
             (pid.ocp.counter == 0)
         ) {
             // turn LEDs off

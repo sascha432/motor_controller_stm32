@@ -182,26 +182,17 @@ public:
     }
 
 protected:
-    // /**
-    //  * @brief Update the TIM1_CH4 compare value so the next injected sample starts at the
-    //  *        falling edge (end of duty) of the active PWM channel
-    //  */
-    // inline void updateInjectedTriggerPoint()
-    // {
-    //     // sample at the end of the active duty cycle (PWM goes low) plus an optional offset.
-    //     // clamp to [1, ARR]: CCR4 == 0 would keep OC4REF flat (PWM mode 2 -> always high) and
-    //     // never generate a trigger edge, which would stall the injected ISR
-    //     const uint16_t ccr1 = PID_READ_MOTOR_PWM_DRV_IN1();
-    //     const uint16_t ccr2 = PID_READ_MOTOR_PWM_DRV_IN2();
-    //     updateInjectedTriggerPoint(std::max<uint16_t>(ccr1, ccr2));
-    // }
-
     /**
      * @brief Update the TIM1_CH4 compare value to enable the injection
      *
+     * @param pwmLevel unused
+     *
      */
-    inline void updateInjectedTriggerPoint()
+    inline void updateInjectedTriggerPoint(uint16_t pwmLevel)
     {
+        // the trigger point can be adjusted to get the best measurement
+        (void)pwmLevel;
+        // used fixed trigger point
         PID_MOTOR_PWM_TIMER->CCR4 = kInjectionStartDelayMicros * 72;
     }
 
