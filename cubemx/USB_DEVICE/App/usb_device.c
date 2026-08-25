@@ -78,6 +78,21 @@ void MX_USB_DEVICE_Init(void)
   // disable USB pull-up power source
   GPIOE->BRR = GPIO_PIN_1;
 
+  #if 0
+  #if DEBUG
+  #warning FORCING D+ LOW CAN BE DANGEROUS! TESTING ONLY AND IT IS HIGHLY RECOMMENDED TO USE 50-100R IN SERIES WITH THE HOST D+ LINE
+  #else
+  #error NOT ALLOWED
+  #endif
+  // configure PA12 (USB D+) as push-pull output and pull it low
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+  GPIOA->CRH = (GPIOA->CRH & ~(0xFUL << 16)) | (0x2UL << 16); // CNF=00 push-pull output, MODE=10 2 MHz
+  GPIOA->BRR = GPIO_PIN_12; // drive D+ low -> host sees a disconnect/bus reset
+  HAL_Delay(1);
+  // configure PA12 back as floating input, release D+ for the USB transceiver
+  GPIOA->CRH = (GPIOA->CRH & ~(0xFUL << 16)) | (0x4UL << 16); // MODE=00 input, CNF=01 floating
+  #endif
+
   /* USER CODE END USB_DEVICE_Init_PreTreatment */
 
   /* Init Device Library, add supported class and start the library. */
