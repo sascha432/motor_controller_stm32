@@ -2,6 +2,7 @@
 
 ## [Unreleased 1.0.2]
 
+- Terminal connected detection to avoid USB timeouts and lag
 - Using ADC injection group and interrupt to handle over current and voltage
 - Device controlled USB D+ pull-up
 
