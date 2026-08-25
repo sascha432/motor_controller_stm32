@@ -501,12 +501,14 @@ struct PidController
      */
     void setPidParameters(const PidParameters& params)
     {
-        // apply parameters to the controller and SWO data
-        setKp(params.Kp);
-        setKi(params.Ki);
-        setKd(params.Kd);
-        setAntiWindup(params.antiWindup);
-        setRPM(params.rpm);
+        // update eeprom
+        eeprom.setKp(params.Kp);
+        eeprom.setKi(params.Ki);
+        eeprom.setKd(params.Kd);
+        eeprom.setAntiWindup(params.antiWindup);
+        eeprom.setMotorRPM(params.rpm);
+        // apply to pid controller
+        applyPIDParams();
 
         DEBUG_PRINT(DebugType::PID, "Kp=%s Ki=%s Kd=%s RPM=%u windup=%s",
             debugFloatToString(Kp, 6, true),
