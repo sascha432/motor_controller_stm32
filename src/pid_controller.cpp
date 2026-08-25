@@ -403,16 +403,16 @@ void PidController::ocp_start()
 {
     ocp.state = OcpStateType::TRIGGERED;
 
-    // ramp motor current down to stay within input current limit
+    // ramp motor current limit down to stay within input current limit
     uint32_t motorCurrent = DAC_GET_MOTOR_CURRENT();
     motorCurrent -= motorCurrent / kOcpCurrentRampDown;
     if (motorCurrent < kOcpCurrentRampUp) {
-        motorCurrent = kOcpCurrentRampUp; // keep at kOcpCurrentRampUp
+        motorCurrent = kOcpCurrentRampUp; // keep at kOcpCurrentRampUp to get a non zero increment for the ramp up
     }
     DAC_SET_MOTOR_CURRENT(motorCurrent);
 
     // counter handles the warning LED and keeps it on the longer the OCP condition lasts
-    if (ocp.counter < 1024) {
+    if (ocp.counter < adc.isenseSmoothing) { // adc.isenseSmoothing = PWM frequency / 10 = limits the max. time to about 100ms before the LED turns off after the condition has been cleared
         if (ocp.counter++ == 0) {
             LEDs::onLEDWarning();
         }
@@ -425,10 +425,12 @@ void PidController::ocp_stop()
         ocp.counter--;
     }
 
+    // ramp motor current limit up
     uint32_t motorCurrent = DAC_GET_MOTOR_CURRENT();
     if (motorCurrent < ocp.dacMotorCurrent) {
         motorCurrent += motorCurrent / kOcpCurrentRampUp;
         if (motorCurrent >= ocp.dacMotorCurrent) {
+            // previous level reached, disabled OCP condition
             motorCurrent = ocp.dacMotorCurrent;
             ocp.state = OcpStateType::NONE;
         }

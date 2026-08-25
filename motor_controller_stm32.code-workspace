@@ -97,6 +97,7 @@
 			"IWDG",
 			"JEOC",
 			"JSQR",
+			"kADCCFGRClockDiv",
 			"kOCPISenseThreshold",
 			"lvgl",
 			"madctl",

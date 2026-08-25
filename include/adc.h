@@ -11,7 +11,9 @@
 extern ADC_HandleTypeDef hadc1;
 struct PidController;
 
-static constexpr float kADCClockMHz = 12.0f;    // ADC clock in MHz
+static constexpr uint32_t kADCCFGRClockDiv = RCC_CFGR_ADCPRE_DIV6;
+static constexpr float kADCClockMHz = F_CPU / (kADCCFGRClockDiv == RCC_CFGR_ADCPRE_DIV2 ? 2000000 : (kADCCFGRClockDiv == RCC_CFGR_ADCPRE_DIV4 ? 4000000 : (kADCCFGRClockDiv == RCC_CFGR_ADCPRE_DIV6 ? 6000000 : (kADCCFGRClockDiv == RCC_CFGR_ADCPRE_DIV8 ? 8000000 : (0)))));
+static_assert(kADCClockMHz <= 14.0f, "ADC clock speed is limited to 14MHz");
 
 static constexpr float kAdcSampleTimeUs(uint32_t sampleBits)
 {

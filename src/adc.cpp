@@ -43,7 +43,7 @@ void ADC::init()
 
     // Clear and set ADC clock divider
     RCC->CFGR &= ~RCC_CFGR_ADCPRE;
-    RCC->CFGR |= RCC_CFGR_ADCPRE_DIV6;   // 72MHz / 6 = 12MHz ADC clock
+    RCC->CFGR |= kADCCFGRClockDiv;          // F_CPU / kADCCFGRClockDiv = kADCClockMHz ADC clock
 
     // Sample times for PA2, PA3 in SMPR2
     ADC1->SMPR2 &= ~(ADC_SMPR2_SMP2_Msk|ADC_SMPR2_SMP3_Msk);
