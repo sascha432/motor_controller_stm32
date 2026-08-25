@@ -25,6 +25,36 @@
 - Dimmable LED with CC driver 3-32V/350mA/5W
 - Current, voltage and temperature monitoring
 
+## Current and voltage protection
+
+### Undervoltage Lockout
+
+The controller has an undervoltage lockout (UVLO) threshold of 5.9V. When the supply voltage drops below this threshold, the motor is disabled briefly to allow the supply voltage to recover.
+
+The red LED indicates an undervoltage condition and turns off after the voltage recovers.
+
+### Overvoltage Protection
+
+Overvoltage protection (OVP) is most likely to be triggered while the motor is braking. Back EMF can cause a substantial increase in the supply voltage, potentially blowing the fuse. Adjust the braking strength and OVP threshold carefully; a limit of 32V is generally safe.
+
+At approximately 38V and above, the OVP is disabled, causing all of the energy to be dissipated through the clamping diode and fuse. When OVP is triggered, braking is disengaged, the red LED turns on, and the display shows a motor OVP error.
+
+### Overcurrent Protection
+
+The controller has two configurable current-protection mechanisms.
+
+#### Motor Current Limit
+
+> The maximum current through the motor winding is regulated by a fixed off-time PWM current regulation, or current chopping. When an H-bridge is enabled in forward or reverse drive, current rises through the winding at a rate dependent on the DC voltage and inductance of the winding. After the current hits the current chopping threshold, the bridge enters a brake (low-side slow decay) mode until tOFF has expired.<br>(TI DRV8701 SLVSCX5B –MARCH 2015–REVISED JULY 2015)
+
+This protection operates silently and does not generate a user-facing error.
+
+#### Input Current Limit
+
+When the maximum input current is reached, the motor current limit is gradually reduced until the condition clears. It is then gradually increased again to prevent immediate retriggering. If the motor current limit is set too low, the input current limit may not function correctly.
+
+The yellow LED indicates that the input current limit has been reached and turns off after recovery.
+
 ## Error Codes
 
 The red LED blinks once to indicate an error. The yellow LED then identifies
