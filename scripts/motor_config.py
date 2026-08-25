@@ -31,6 +31,7 @@ from typing import Callable, Iterable, List, Optional, Tuple
 from PIL import Image
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
+from matplotlib.ticker import MultipleLocator
 
 
 # Mirrors include/adc_converters.h aliases:
@@ -1738,6 +1739,7 @@ class PIDTuningApp:
             axis.set_ylabel(ylabel)
             axis.grid(True, linestyle="--", linewidth=0.5, alpha=0.5)
 
+        self._apply_x_grid()
         self.axes[-1].set_xlabel("Time (s)")
 
         self.canvas = FigureCanvasTkAgg(self.figure, master=self.graph_frame)
@@ -3247,6 +3249,9 @@ class PIDTuningApp:
         self.integral = self._make_series(self.samples_per_window)
         self.derivative = self._make_series(self.samples_per_window)
 
+        if hasattr(self, "axes"):
+            self._apply_x_grid()
+
     def _build_plot_lines(self) -> None:
         visibility = getattr(self, 'graph_visibility', {
             'rpm': True, 'pwm': True, 'current': True,
@@ -3406,6 +3411,14 @@ class PIDTuningApp:
         )
         self._plot_dirty = True
 
+    def _apply_x_grid(self) -> None:
+        # X-axis major grid: 1s spacing for windows above 1s, 100ms at/below 1s.
+        window_seconds = getattr(self, "window_seconds", 1)
+        step = 1.0 if window_seconds > 1 else 0.1
+        locator = MultipleLocator(step)
+        for axis in self.axes:
+            axis.xaxis.set_major_locator(locator)
+
     def _refresh_plot(self) -> None:
         if not self._plot_dirty:
             return
@@ -3507,6 +3520,7 @@ class PIDTuningApp:
                 ax.grid(True, linestyle="--", linewidth=0.5, alpha=0.5)
                 axis_idx += 1
 
+        self._apply_x_grid()
         if len(self.axes) > 0:
             self.axes[-1].set_xlabel("Time (s)")
 
