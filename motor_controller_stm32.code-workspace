@@ -96,6 +96,7 @@
 			"itface",
 			"IWDG",
 			"JEOC",
+			"JSQR",
 			"kOCPISenseThreshold",
 			"lvgl",
 			"madctl",

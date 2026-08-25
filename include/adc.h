@@ -192,7 +192,7 @@ protected:
     {
         // the trigger point can be adjusted to get the best measurement
         (void)pwmLevel;
-        // used fixed trigger point
+        // use fixed trigger point
         PID_MOTOR_PWM_TIMER->CCR4 = kInjectionStartDelayMicros * 72;
     }
 
@@ -207,7 +207,16 @@ protected:
         isenseCount = 0;
     }
 
-    void initInjection();
+    /**
+     * @brief Set PWM frequency for ADC injection
+     *
+     * @param frequency
+     */
+    inline void initInjection(uint32_t frequency)
+    {
+        // 100ms smoothing
+        isenseSmoothing = frequency / 10;
+    }
 
     /**
      * @brief Check if the DMA is ready for a new transfer

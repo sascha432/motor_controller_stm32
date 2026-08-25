@@ -34,23 +34,25 @@ void ADC::init()
     ADC1->CR1 |= ADC_CR1_SCAN;
 
     // set the number of conversions in the regular ADC sequence.
-    ADC1->SQR1 = ((kNumConversions - 1) << 20);
+    ADC1->SQR1 = ((kNumConversions - 1) << ADC_SQR1_L_Pos);
     ADC1->SQR3 =
-        (2  << 0)  |        // rank 1: PA2
-        (3  << 5)  |        // rank 2: PA3
-        (14 << 10) |        // rank 3: PC4
-        (15 << 15);         // rank 4: PC5
+        (2U  << ADC_SQR3_SQ1_Pos) |         // rank 1: PA2
+        (3U  << ADC_SQR3_SQ2_Pos) |         // rank 2: PA3
+        (14U << ADC_SQR3_SQ3_Pos) |         // rank 3: PC4
+        (15U << ADC_SQR3_SQ4_Pos);          // rank 4: PC5
 
     // Clear and set ADC clock divider
     RCC->CFGR &= ~RCC_CFGR_ADCPRE;
     RCC->CFGR |= RCC_CFGR_ADCPRE_DIV6;   // 72MHz / 6 = 12MHz ADC clock
 
     // Sample times for PA2, PA3 in SMPR2
-    ADC1->SMPR2 |= (kSampleTimeCH2 << (2 * 3));   // CH2
-    ADC1->SMPR2 |= (kSampleTimeCH3 << (3 * 3));   // CH3
+    ADC1->SMPR2 &= ~(ADC_SMPR2_SMP2_Msk|ADC_SMPR2_SMP3_Msk);
+    ADC1->SMPR2 |= (kSampleTimeCH2 << ADC_SMPR2_SMP2_Pos)       // CH2
+                |  (kSampleTimeCH3 << ADC_SMPR2_SMP3_Pos);      // CH3
     // Sample times for PC4, PC5 in SMPR1
-    ADC1->SMPR1 |= (kSampleTimeCH14 << ((14 - 10) * 3)); // CH14
-    ADC1->SMPR1 |= (kSampleTimeCH15 << ((15 - 10) * 3)); // CH15
+    ADC1->SMPR1 &= ~(ADC_SMPR1_SMP14_Msk|ADC_SMPR1_SMP15_Msk);
+    ADC1->SMPR1 |= (kSampleTimeCH14 << ADC_SMPR1_SMP14_Pos)     // CH14
+                |  (kSampleTimeCH15 << ADC_SMPR1_SMP15_Pos);    // CH15
 
     // Enable DMA
     __HAL_RCC_DMA1_CLK_ENABLE();
@@ -167,10 +169,4 @@ void ADC::isrInjected()
     else {
         pid.ocp_stop();
     }
-}
-
-void ADC::initInjection()
-{
-    // 100ms smoothing
-    isenseSmoothing = eeprom.getPWMFrequency() / 10;
 }

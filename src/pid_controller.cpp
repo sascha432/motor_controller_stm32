@@ -167,7 +167,6 @@ void PidController::reset()
     ocp.reset();
     applyPIDParams();
     resetFaults();
-    adc.initInjection();
 
     #if PID_ISR_DEBUG_PRINT
         DEBUG_PRINT(DebugType::PID, "reset() Kp=%s Ki=%s Kd=%s RPM=%u windup=%s OCP=%u/%u OVP=%u",
@@ -499,6 +498,9 @@ void PidController::setPWMFrequency(uint32_t frequency)
     setKp(Kp);
     setKi(Ki);
     setKd(Kd);
+
+    // update frequency for injection group
+    adc.initInjection(frequency);
 
     // start timer
     __HAL_TIM_SET_COUNTER(&tim1, 0);
