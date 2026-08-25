@@ -72,13 +72,13 @@ extern "C" void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
  */
 extern "C" void EXTI9_5_IRQHandler(void)
 {
-    uint32_t pending = EXTI->PR & ((1 << 8) | (1 << 9));
+    uint32_t pending = EXTI->PR & (GPIO_PIN_8 | GPIO_PIN_9);
     EXTI->PR = pending; // clear flags
-    if (pending & (1 << 8)) {
+    if (pending & GPIO_PIN_8) {
         // KNOB_BUTTON_PIN/PD8 changed
         knobButton.isr(GPIOD->IDR);
     }
-    if (pending & (1 << 9)) {
+    if (pending & GPIO_PIN_9) {
         // BACK_BUTTON_PIN/PD9 changed
         backButton.isr(GPIOD->IDR);
     }
@@ -90,17 +90,17 @@ extern "C" void EXTI9_5_IRQHandler(void)
  */
 extern "C" void EXTI15_10_IRQHandler(void)
 {
-    uint32_t pending = EXTI->PR & ((1 << 10) | (1 << 11) | (1 << 12) | (1 << 14));
+    uint32_t pending = EXTI->PR & (GPIO_PIN_10 | GPIO_PIN_11 | GPIO_PIN_12 | GPIO_PIN_14);
     EXTI->PR = pending; // clear flags
-    if (pending & (1 << 10)) {
+    if (pending & GPIO_PIN_10) {
         // START_BUTTON_PIN/PD10 changed
         startButton.isr(GPIOD->IDR);
     }
-    if (pending & (1 << 11)) {
+    if (pending & GPIO_PIN_11) {
         // DRV_SNSOUT_PIN/PD11 changed
         pid.faults.snsoutFault = !digitalRead<DRV_SNSOUT_PIN>();
     }
-    if (pending & (1 << 14)) {
+    if (pending & GPIO_PIN_14) {
         // DRV8701_FAULT_PIN/PB14 changed
         auto fault = pid.faults.drv8701Fault;
         pid.faults.drv8701Fault = !digitalRead<DRV8701_FAULT_PIN>();

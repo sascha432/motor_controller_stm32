@@ -27,9 +27,15 @@ struct I2CHelper {
         // Remap I2C1 to PB8/PB9
         AFIO->MAPR |= AFIO_MAPR_I2C1_REMAP;
 
-        // PB8, PB9 = Alternate Function Open Drain, 50MHz
-        GPIOB->CRH &= ~((0xF << 0) | (0xF << 4));
-        GPIOB->CRH |=  ((0xF << 0) | (0xF << 4));
+        // Clear the MODE and CNF fields for PB8 and PB9 before configuring them.
+        GPIOB->CRH &= ~(GPIO_CRH_MODE8 | GPIO_CRH_CNF8 |
+                        GPIO_CRH_MODE9 | GPIO_CRH_CNF9);
+
+        // Configure PB8 and PB9 as 50 MHz alternate-function open-drain pins.
+        GPIOB->CRH |= GPIO_CRH_MODE8_1 | GPIO_CRH_MODE8_0
+                   | GPIO_CRH_CNF8_1  | GPIO_CRH_CNF8_0
+                   | GPIO_CRH_MODE9_1 | GPIO_CRH_MODE9_0
+                   | GPIO_CRH_CNF9_1  | GPIO_CRH_CNF9_0;
 
         initI2C1Common();
     }
@@ -47,9 +53,15 @@ struct I2CHelper {
         // Ensure I2C1 is NOT remapped (PB6/PB7)
         AFIO->MAPR &= ~AFIO_MAPR_I2C1_REMAP;
 
-        // PB6, PB7 = Alternate Function Open-Drain, 50 MHz
-        GPIOB->CRL &= ~((0xF << (6 * 4)) | (0xF << (7 * 4)));
-        GPIOB->CRL |=  ((0xF << (6 * 4)) | (0xF << (7 * 4)));
+        // Clear the MODE and CNF fields for PB6 and PB7 before configuring them.
+        GPIOB->CRL &= ~(GPIO_CRL_MODE6 | GPIO_CRL_CNF6 |
+                        GPIO_CRL_MODE7 | GPIO_CRL_CNF7);
+
+        // Configure PB6 and PB7 as 50 MHz alternate-function open-drain pins.
+        GPIOB->CRL  |= GPIO_CRL_MODE6_0 | GPIO_CRL_MODE6_1
+                    | GPIO_CRL_CNF6_0  | GPIO_CRL_CNF6_1
+                    | GPIO_CRL_MODE7_0 | GPIO_CRL_MODE7_1
+                    | GPIO_CRL_CNF7_0  | GPIO_CRL_CNF7_1;
 
         initI2C1Common();
     }
@@ -70,15 +82,17 @@ struct I2CHelper {
         // Remove remap
         AFIO->MAPR &= ~AFIO_MAPR_I2C1_REMAP;
 
-        // PB6, PB7 = Floating input (reset state)
-        GPIOB->CRL &= ~((0xF << (6 * 4)) | (0xF << (7 * 4)));
-        GPIOB->CRL |=  ((0x4 << (6 * 4)) | (0x4 << (7 * 4)));
+        // Clear the MODE and CNF fields for PB6 and PB7.
+        GPIOB->CRL &= ~(GPIO_CRL_MODE6 | GPIO_CRL_CNF6 | GPIO_CRL_MODE7 | GPIO_CRL_CNF7);
+        // Set CNF=01 and MODE=00: floating input, the GPIO reset state.
+        GPIOB->CRL |= GPIO_CRL_CNF6_0 | GPIO_CRL_CNF7_0;
 
-        // PB8, PB9 = Floating input (reset state)
-        GPIOB->CRH &= ~((0xF << (0 * 4)) | (0xF << (1 * 4)));
-        GPIOB->CRH |=  ((0x4 << (0 * 4)) | (0x4 << (1 * 4)));
+        // Clear the MODE and CNF fields for PB8 and PB9.
+        GPIOB->CRH &= ~(GPIO_CRH_MODE8 | GPIO_CRH_CNF8 | GPIO_CRH_MODE9 | GPIO_CRH_CNF9);
+        // Set CNF=01 and MODE=00: floating input, the GPIO reset state.
+        GPIOB->CRH |= GPIO_CRH_CNF8_0 | GPIO_CRH_CNF9_0;
 
-        // Optional: disable peripheral clock if no longer needed
+        // disable peripheral clock
         RCC->APB1ENR &= ~RCC_APB1ENR_I2C1EN;
 
         delay_us<10>();

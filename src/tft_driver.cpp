@@ -98,30 +98,30 @@ void tft_driver_gpio_tim_init(void)
  */
 void tft_driver_spi_init(void)
 {
-    /* Enable clocks */
+    // Enable clocks
     __HAL_RCC_SPI2_CLK_ENABLE();
     __HAL_RCC_GPIOB_CLK_ENABLE();
 
-    /* Configure PB13 (CLK) and PB15 (MOSI) as alternate function push-pull */
+    // Configure PB13 (CLK) and PB15 (MOSI) as alternate function push-pull
     GPIOB->CRH &= ~(GPIO_CRH_MODE13 | GPIO_CRH_CNF13 | GPIO_CRH_MODE15 | GPIO_CRH_CNF15);
-    GPIOB->CRH |= (GPIO_CRH_MODE13_0 | GPIO_CRH_MODE13_1)  /* PB13: 50MHz */
-               | (GPIO_CRH_CNF13_1)                        /* PB13: Alt func push-pull */
-               | (GPIO_CRH_MODE15_0 | GPIO_CRH_MODE15_1)  /* PB15: 50MHz */
-               | (GPIO_CRH_CNF15_1);                       /* PB15: Alt func push-pull */
+    GPIOB->CRH |= (GPIO_CRH_MODE13_0 | GPIO_CRH_MODE13_1)       // PB13: 50MHz
+               |  (GPIO_CRH_CNF13_1)                            // PB13: Alt func push-pull
+               |  (GPIO_CRH_MODE15_0 | GPIO_CRH_MODE15_1)       // PB15: 50MHz
+               |  (GPIO_CRH_CNF15_1);                           // PB15: Alt func push-pull
 
-    /* Disable SPI first */
+    // Disable SPI first
     SPI2->CR1 = 0;
 
-    /* Configure SPI2 - BR=0 gives ~18MHz on APB1=36MHz */
-    SPI2->CR1 = (0 << 3)          /* Baud rate: BR=0 (36MHz/2 = 18MHz) */
-            | SPI_CR1_MSTR      /* Master mode */
-            | SPI_CR1_SSM       /* Software slave management */
-            | SPI_CR1_SSI       /* Internal slave select */
-            | SPI_CR1_CPOL      /* Clock polarity = 1 */
-            | SPI_CR1_CPHA;     /* Clock phase = 1 */
-    SPI2->CR2 = 0;  /* DMA disabled by default, enabled per transfer */
+    // Configure SPI2 - BR=0 gives ~18MHz on APB1=36MHz
+    SPI2->CR1 = (0 << SPI_CR1_BR_Pos)   // Baud rate: BR=0 (36MHz/2 = 18MHz)
+            | SPI_CR1_MSTR              // Master mode
+            | SPI_CR1_SSM               // Software slave management
+            | SPI_CR1_SSI               // Internal slave select
+            | SPI_CR1_CPOL              // Clock polarity = 1
+            | SPI_CR1_CPHA;             // Clock phase = 1
+    SPI2->CR2 = 0;  // DMA disabled by default, enabled per transfer
 
-    /* Enable SPI2 */
+    // Enable SPI2
     SPI2->CR1 |= SPI_CR1_SPE;
 
     // initialize DMA1 Channel 5 for SPI2 TX

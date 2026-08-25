@@ -1,4 +1,3 @@
-#if 1
 /**
   Author: sascha_lammers@gmx.de
 */
@@ -44,5 +43,3 @@ uint32_t stm32_CRC(const uint32_t *data, size_t size)
         return CRC->DR;
     #endif
 }
-
-#endif
