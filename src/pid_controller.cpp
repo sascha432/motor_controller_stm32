@@ -405,8 +405,8 @@ void PidController::ocp_start()
     ocp.state = OcpStateType::TRIGGERED;
 
     // ramp motor current down to stay within input current limit
-    int32_t motorCurrent = DAC_GET_MOTOR_CURRENT();
-    motorCurrent -= static_cast<uint32_t>(motorCurrent) / kOcpCurrentRampDown;
+    uint32_t motorCurrent = DAC_GET_MOTOR_CURRENT();
+    motorCurrent -= motorCurrent / kOcpCurrentRampDown;
     if (motorCurrent < kOcpCurrentRampUp) {
         motorCurrent = kOcpCurrentRampUp; // keep at kOcpCurrentRampUp
     }
