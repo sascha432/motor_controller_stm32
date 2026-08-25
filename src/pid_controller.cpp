@@ -164,8 +164,8 @@ void PidController::reset()
     faults.vsenseMax = ADCConverter::Voltage::reverse(eeprom.getOvpProtection());
     lastRpmCounter = PID_READ_RPM_COUNTER();
     lastRpmCounterUpdated = HAL_GetTick();
-    applyPIDParams();
     ocp.reset();
+    applyPIDParams();
     resetFaults();
     adc.initInjection();
 

@@ -339,6 +339,7 @@ struct PidController
      */
     void setMotorCurrentLimit(uint16_t value)
     {
+        ocp.dacMotorCurrent = ADCConverter::Current::reverse(value);
         adc.setMotorCurrentLimit(value);
     }
 
@@ -598,25 +599,20 @@ public:
 
     struct OcpState
     {
-        OcpStateType state;                 // state of the over current protection
-        uint32_t counter;                   // event counter
+        volatile OcpStateType state;                    // state of the over current protection
+        volatile uint32_t counter;                      // event counter
         uint16_t dacMotorCurrent;
-        uint16_t dacInputCurrent;
 
         OcpState() :
             state(OcpStateType::NONE),
             counter(0),
-            dacMotorCurrent(0),
-            dacInputCurrent(0)
+            dacMotorCurrent(0)
         {
         }
 
         inline void reset()
         {
-            state = OcpStateType::NONE;
-            counter = 0;
-            dacMotorCurrent = DAC_GET_MOTOR_CURRENT();
-            dacInputCurrent = DAC_GET_INPUT_CURRENT();
+            *this = OcpState();
         }
     };
 

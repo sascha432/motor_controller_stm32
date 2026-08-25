@@ -966,13 +966,13 @@ int32_t Menu::updateRotaryValue(int32_t value)
                 case DashboardScreen::SelectedValueType::INPUT_CURRENT_LIMIT:
                     clampedValue = std::clamp<int32_t>(getValue(), UIConstants::kMinInputCurrent, UIConstants::kMaxInputCurrent);
                     eeprom.setInputCurrentLimit(clampedValue);
-                    pid.setInputCurrentLimit(clampedValue);
+                    pid.setInputCurrentLimit(eeprom.getInputCurrentLimit());
                     setValue(clampedValue);
                     break;
                 case DashboardScreen::SelectedValueType::MOTOR_CURRENT_LIMIT:
                     clampedValue = std::clamp<int32_t>(getValue(), UIConstants::kMinMotorCurrent, UIConstants::kMaxMotorCurrent);
                     eeprom.setMotorCurrentLimit(clampedValue);
-                    pid.setMotorCurrentLimit(clampedValue);
+                    pid.setMotorCurrentLimit(eeprom.getMotorCurrentLimit());
                     setValue(clampedValue);
                     break;
                 case DashboardScreen::SelectedValueType::MAX:
