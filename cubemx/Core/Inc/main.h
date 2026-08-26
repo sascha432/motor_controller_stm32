@@ -90,8 +90,8 @@ extern "C" {
 #define PID_WRITE_MOTOR_PWM_BRAKE(level)            (PID_MOTOR_PWM_TIMER->CCR1 = (level), PID_MOTOR_PWM_TIMER->CCR2 = (level))
 
 // DAC macros for DRV8701 and INA381 overcurrent protection
-#define DAC_SET_MOTOR_CURRENT(value)                (DAC->DHR12R1 = (value) & 0xfff)
-#define DAC_SET_INPUT_CURRENT(value)                (DAC->DHR12R2 = (value) & 0xfff)
+#define DAC_SET_MOTOR_CURRENT(value)                (DAC->DHR12R1 = (value) & 0x0fffU)
+#define DAC_SET_INPUT_CURRENT(value)                (DAC->DHR12R2 = (value) & 0x0fffU)
 #define DAC_GET_MOTOR_CURRENT()                     ((uint16_t)DAC->DHR12R1) // DRVOCP_VREF_DAC_PIN/PA4
 #define DAC_GET_INPUT_CURRENT()                     ((uint16_t)DAC->DHR12R2) // OCP_VREF_DAC_PIN/PA5
 

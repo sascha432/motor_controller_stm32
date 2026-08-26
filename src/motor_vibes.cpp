@@ -24,8 +24,8 @@ void MotorVibes::init()
     // store current limits and remove them
     motorCurrentLimit = DAC_GET_MOTOR_CURRENT();
     inputCurrentLimit = DAC_GET_INPUT_CURRENT();
-    DAC_SET_MOTOR_CURRENT(0xffff);
-    DAC_SET_INPUT_CURRENT(0xffff);
+    DAC_SET_MOTOR_CURRENT(~0U);
+    DAC_SET_INPUT_CURRENT(~0U);
 
     // change PWM frequency
     tim1.Init.Prescaler = 71; // 72 MHz / 72 = 1 MHz (1 us tick)
