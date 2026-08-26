@@ -889,7 +889,7 @@ void StartScreen::_refreshVisuals()
     start_screen_update_top_status_labels(voltageLabel, currentLabel, motorTempLabel, mosfetTempLabel, voltageLabelBuf, sizeof(voltageLabelBuf), currentLabelBuf, sizeof(currentLabelBuf), motorTempLabelBuf, sizeof(motorTempLabelBuf), mosfetTempLabelBuf, sizeof(mosfetTempLabelBuf));
 
     // blink any errors
-    if (((HAL_GetTick() / 1024) & 0x01) == 0 && pid.hasErrorCode()) {
+    if (pid.hasErrorCode() && ((HAL_GetTick() / 1024) & 0x01) == 0) {
         pid.errorPrintf(directionLabelBuf, sizeof(directionLabelBuf));
         lv_label_set_text_static(directionLabel, directionLabelBuf);
         lv_obj_set_style_text_color(directionLabel, STARTSCREEN_COLOR_ERROR, LV_PART_MAIN);

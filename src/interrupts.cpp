@@ -13,10 +13,6 @@ InterruptErrorType interruptErrorType;
 
 // === interrupt handlers ===
 
-// avoid overhead for fast timer interrupt and call timer6 handler directly
-// other events might interfere with code that is not handled by HAL, but TIM6 is dedicated for the PID controller timing
-#define CALL_TIM6_HANDLER_DIRECTLY 1
-
 /**
  * @brief Periodically call PID controller methods
  */
@@ -44,27 +40,9 @@ static inline void TIM6_Handler(void)
  */
 extern "C" void TIM6_IRQHandler(void)
 {
-    #if CALL_TIM6_HANDLER_DIRECTLY
-        TIM6->SR &= ~TIM_SR_UIF;
-        TIM6_Handler();
-    #else
-        extern TIM_HandleTypeDef tim6;
-        HAL_TIM_IRQHandler(&tim6);
-    #endif
+    TIM6->SR &= ~TIM_SR_UIF;
+    TIM6_Handler();
 }
-
-#if !CALL_TIM6_HANDLER_DIRECTLY
-/**
- * @brief Callback for TIM period elapsed
- *
- */
-extern "C" void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
-{
-    if (htim->Instance == TIM6) { // PidController::kOcpTickInterval
-        TIM6_Handler();
-    }
-}
-#endif
 
 /**
  * @brief Handle external interrupts for buttons
@@ -72,15 +50,15 @@ extern "C" void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
  */
 extern "C" void EXTI9_5_IRQHandler(void)
 {
-    uint32_t pending = EXTI->PR & (GPIO_PIN_8 | GPIO_PIN_9);
+    uint32_t pending = EXTI->PR & (BTN_1_Pin | BTN_2_Pin);
     EXTI->PR = pending; // clear flags
-    if (pending & GPIO_PIN_8) {
-        // KNOB_BUTTON_PIN/PD8 changed
-        knobButton.isr(GPIOD->IDR);
+    if (pending & BTN_1_Pin) {
+        // changed event (rising and falling)
+        knobButton.isr(BTN_1_GPIO_Port->IDR);
     }
-    if (pending & GPIO_PIN_9) {
-        // BACK_BUTTON_PIN/PD9 changed
-        backButton.isr(GPIOD->IDR);
+    if (pending & BTN_2_Pin) {
+        // changed event
+        backButton.isr(BTN_2_GPIO_Port->IDR);
     }
 }
 
@@ -90,20 +68,20 @@ extern "C" void EXTI9_5_IRQHandler(void)
  */
 extern "C" void EXTI15_10_IRQHandler(void)
 {
-    uint32_t pending = EXTI->PR & (GPIO_PIN_10 | GPIO_PIN_11 | GPIO_PIN_12 | GPIO_PIN_14);
+    uint32_t pending = EXTI->PR & (BTN_3_Pin | DRV_SNSOUT_Pin | GPIO_PIN_12 | DRV_FAULT_Pin);
     EXTI->PR = pending; // clear flags
-    if (pending & GPIO_PIN_10) {
-        // START_BUTTON_PIN/PD10 changed
-        startButton.isr(GPIOD->IDR);
+    if (pending & BTN_3_Pin) {
+        // changed event
+        startButton.isr(BTN_3_GPIO_Port->IDR);
     }
-    if (pending & GPIO_PIN_11) {
-        // DRV_SNSOUT_PIN/PD11 changed
-        pid.faults.snsoutFault = !digitalRead<DRV_SNSOUT_PIN>();
+    if (pending & DRV_SNSOUT_Pin) {
+        // changed event
+        pid.faults.resetSnsoutFault();
     }
-    if (pending & GPIO_PIN_14) {
-        // DRV8701_FAULT_PIN/PB14 changed
+    if (pending & DRV_FAULT_Pin) {
+        // changed event
         auto fault = pid.faults.drv8701Fault;
-        pid.faults.drv8701Fault = !digitalRead<DRV8701_FAULT_PIN>();
+        pid.faults.resetDrvFault();
         if (!fault && pid.faults.drv8701Fault) {
             LEDs::onLEDError(); // turn fault LED on, main loop resets it after the fault has cleared
         }

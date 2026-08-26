@@ -4,7 +4,6 @@
   Baremetal SPI driver for ST7789 - DMA TX based
 */
 
-#include <stm32f1xx.h>
 #include <algorithm>
 #include <memory>
 #include "tft_driver.h"

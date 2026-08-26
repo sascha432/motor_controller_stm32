@@ -6,6 +6,7 @@
 
 #include "i2c.h"
 #include "debug.h"
+#include "main.h"
 
 /**
  * @brief MT6701 magnetic encoder I2C configuration
@@ -118,13 +119,12 @@ private:
 /**
  * @brief MT6701 magnetic encoder driver
  *
- * @tparam GPIO_PIN GPIO pin number for I2C enable
- * @tparam GPIO_PORT_ADDR GPIO port address for I2C enable
- * @tparam ACTIVE_LOW_I2C true if I2C enable is active low, false if active high
  */
-template<uint8_t GPIO_PIN, bool ACTIVE_LOW_I2C>
-struct MT6701Encoder
+struct MotorEncoder
 {
+    // true if I2C enable is active low, false if active high
+    static constexpr bool kActiveLowI2CEnable = false;
+
     /**
      * @brief select encoder mode
      *
@@ -132,7 +132,12 @@ struct MT6701Encoder
      */
     void setI2CEnablePin(bool state)
     {
-        (ACTIVE_LOW_I2C ? !state : state) ? digitalWriteHigh<GPIO_PIN>() : digitalWriteLow<GPIO_PIN>();
+        if (kActiveLowI2CEnable ? !state : state) {
+            ENC1_I2C_EN_GPIO_Port->BSRR = ENC1_I2C_EN_Pin;
+        }
+        else {
+            ENC1_I2C_EN_GPIO_Port->BRR = ENC1_I2C_EN_Pin;
+        }
         // wait for the encoder to change state
         HAL_Delay(1);
     }
@@ -142,18 +147,18 @@ struct MT6701Encoder
      */
     void init()
     {
-        // Enable GPIOx clock
-        __HAL_RCC_GPIOx_CLK_ENABLE<GPIO_PIN>();
+        // Enable GPIO port clock
+        __HAL_RCC_GPIOD_CLK_ENABLE();
 
         GPIO_InitTypeDef GPIO_InitStruct = {};
-        GPIO_InitStruct.Pin = digitalPinToHAL<GPIO_PIN>();
+        GPIO_InitStruct.Pin = ENC1_I2C_EN_Pin;
         GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
         GPIO_InitStruct.Pull = GPIO_NOPULL;
         GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-        HAL_GPIO_Init(digitalPinToGPIO<GPIO_PIN>(), &GPIO_InitStruct);
+        HAL_GPIO_Init(ENC1_I2C_EN_GPIO_Port, &GPIO_InitStruct);
 
         // turn off
-        setI2CEnablePin(ACTIVE_LOW_I2C);
+        setI2CEnablePin(kActiveLowI2CEnable);
     }
 
     /**
@@ -167,7 +172,7 @@ struct MT6701Encoder
      */
     void programPPR(I2CHelper &i2c, uint16_t ppr, bool writeEEPROM = false)
     {
-        setI2CEnablePin(!ACTIVE_LOW_I2C);
+        setI2CEnablePin(!kActiveLowI2CEnable);
 
         // switch I2C1 pins for MT6701
         i2c.deinitI2C1();
@@ -186,13 +191,11 @@ struct MT6701Encoder
             DEBUG_PRINT(DebugType::ERROR, "MT6701 not detected at address 0x%02x", MT6701Config::MT6701_ADDR);
         }
 
-        setI2CEnablePin(ACTIVE_LOW_I2C);
+        setI2CEnablePin(kActiveLowI2CEnable);
         // remap I2C1 for EEPROM
         i2c.deinitI2C1();
         i2c.initI2C1Remapped();
     }
 };
-
-using MotorEncoder = MT6701Encoder<MT6701_I2C_ENABLE_PIN, false>;
 
 extern MotorEncoder motorEncoder;

@@ -3,7 +3,6 @@
 */
 
 #include "adc.h"
-#include "pins.h"
 #include "pid_controller.h"
 #include "leds.h"
 
@@ -21,11 +20,11 @@ void ADC::init()
     __HAL_RCC_GPIOC_CLK_ENABLE();
 
     GPIO_InitTypeDef GPIO_InitStruct = {};
-    GPIO_InitStruct.Pin = digitalPinToHAL<PA2>()|digitalPinToHAL<PA3>();
+    GPIO_InitStruct.Pin = ISENSE_Pin | VSENSE_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
-    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-    GPIO_InitStruct.Pin = digitalPinToHAL<PC4>()|digitalPinToHAL<PC5>();
-    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+    HAL_GPIO_Init(ISENSE_GPIO_Port, &GPIO_InitStruct);
+    GPIO_InitStruct.Pin = EXT_NTC_Pin | DRV_TEMP_Pin;
+    HAL_GPIO_Init(EXT_NTC_GPIO_Port, &GPIO_InitStruct);
 
     // Enable ADC1 clock
     __HAL_RCC_ADC1_CLK_ENABLE();
@@ -114,9 +113,9 @@ void ADC::initDAC()
     __HAL_RCC_GPIOA_CLK_ENABLE();
 
     GPIO_InitTypeDef GPIO_InitStruct = {};
-    GPIO_InitStruct.Pin = digitalPinToHAL<DRVOCP_VREF_DAC_PIN>()|digitalPinToHAL<OCP_VREF_DAC_PIN>();
+    GPIO_InitStruct.Pin = DRVOCP_VREF_Pin | OCP_VREF_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
-    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+    HAL_GPIO_Init(DRVOCP_VREF_GPIO_Port, &GPIO_InitStruct);
 
     // Enable DAC channel #1 (PA4/DRVOCP_VREF_DAC_PIN) and channel #2 (PA5/OCP_VREF_DAC_PIN)
     __HAL_RCC_DAC_CLK_ENABLE();

@@ -119,11 +119,9 @@ static inline void loop()
         // check if fault/errors have cleared
         if (
             // check for DRV fault
-            !pid.faults.drv8701Fault &&
-            (pid.getErrorCode() == PidController::ErrorCodeType::NONE) &&
+            !pid.faults.drv8701Fault && !pid.hasErrorCode() &&
             // check OCP condition
-            (pid.ocp.state == PidController::OcpStateType::NONE) &&
-            (pid.ocp.counter == 0)
+            !pid.ocp.isActive()
         ) {
             // turn LEDs off
             LEDs::off();
@@ -363,35 +361,35 @@ static inline void EXTI_Init()
 
     // Clear pending flags
     EXTI->PR =
-        GPIO_PIN_8  |   // PD8  BTN_1
-        GPIO_PIN_9  |   // PD9  BTN_2
-        GPIO_PIN_10 |   // PD10 BTN_3
-        GPIO_PIN_11 |   // PD11 DRV_SNSOUT
-        GPIO_PIN_14;    // PB14 DRV_FAULT
+        BTN_1_Pin       |   // PD8  BTN_1
+        BTN_2_Pin       |   // PD9  BTN_2
+        BTN_3_Pin       |   // PD10 BTN_3
+        DRV_SNSOUT_Pin  |   // PD11 DRV_SNSOUT
+        DRV_FAULT_Pin;      // PB14 DRV_FAULT
 
     // Enable interrupt lines
     EXTI->IMR |=
-        GPIO_PIN_8  |   // PD8  BTN_1
-        GPIO_PIN_9  |   // PD9  BTN_2
-        GPIO_PIN_10 |   // PD10 BTN_3
-        GPIO_PIN_11 |   // PD11 DRV_SNSOUT
-        GPIO_PIN_14;    // PB14 DRV_FAULT
+        BTN_1_Pin       |   // PD8  BTN_1
+        BTN_2_Pin       |   // PD9  BTN_2
+        BTN_3_Pin       |   // PD10 BTN_3
+        DRV_SNSOUT_Pin  |   // PD11 DRV_SNSOUT
+        DRV_FAULT_Pin;      // PB14 DRV_FAULT
 
     // Rising edge: button change interrupt
     EXTI->RTSR |=
-        GPIO_PIN_8  |   // PD8  BTN_1
-        GPIO_PIN_9  |   // PD9  BTN_2
-        GPIO_PIN_10 |   // PD10 BTN_3
-        GPIO_PIN_11 |   // PD11 DRV_SNSOUT
-        GPIO_PIN_14;    // PB14 DRV_FAULT
+        BTN_1_Pin       |   // PD8  BTN_1
+        BTN_2_Pin       |   // PD9  BTN_2
+        BTN_3_Pin       |   // PD10 BTN_3
+        DRV_SNSOUT_Pin  |   // PD11 DRV_SNSOUT
+        DRV_FAULT_Pin;      // PB14 DRV_FAULT
 
     // Falling edge: button change + fault inputs
     EXTI->FTSR |=
-        GPIO_PIN_8  |   // PD8  BTN_1
-        GPIO_PIN_9  |   // PD9  BTN_2
-        GPIO_PIN_10 |   // PD10 BTN_3
-        GPIO_PIN_11 |   // PD11 DRV_SNSOUT
-        GPIO_PIN_14;    // PB14 DRV_FAULT
+        BTN_1_Pin       |   // PD8  BTN_1
+        BTN_2_Pin       |   // PD9  BTN_2
+        BTN_3_Pin       |   // PD10 BTN_3
+        DRV_SNSOUT_Pin  |   // PD11 DRV_SNSOUT
+        DRV_FAULT_Pin;      // PB14 DRV_FAULT
 
     // Enable NVIC
     HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);

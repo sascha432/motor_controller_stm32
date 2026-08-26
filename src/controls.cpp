@@ -7,40 +7,40 @@
 
 RotaryEncoderKnob knob;
 KnobButton knobButton;
-StartButton startButton;
 BackButton backButton;
+StartButton startButton;
 TIM_HandleTypeDef tim3;
 
-template <uint8_t GPIO_PIN, bool ACTIVE_STATE, uint32_t kDebounceTimeMs>
-void Button<GPIO_PIN, ACTIVE_STATE, kDebounceTimeMs>::init(CallbackType releaseCallback, CallbackType isDownCallback)
+template <uint16_t GPIO_Pin, bool ACTIVE_STATE, uint32_t DEBOUNCE_TIME_MILLIS>
+void Button<GPIO_Pin, ACTIVE_STATE, DEBOUNCE_TIME_MILLIS>::init(CallbackType releaseCallback, CallbackType isDownCallback)
 {
     this->releaseCallback = releaseCallback;
     this->isDownCallback = isDownCallback;
 
     // Enable GPIO clock
-    __HAL_RCC_GPIOx_CLK_ENABLE<GPIO_PIN>();
+    __HAL_RCC_GPIOD_CLK_ENABLE();
 
     GPIO_InitTypeDef GPIO_InitStruct = {};
-    GPIO_InitStruct.Pin = digitalPinToHAL<GPIO_PIN>();
+    GPIO_InitStruct.Pin = GPIO_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_PULLUP;
-    HAL_GPIO_Init(digitalPinToGPIO<GPIO_PIN>(), &GPIO_InitStruct);
+    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
     reset();
 }
 
-template <uint8_t GPIO_PIN, bool ACTIVE_STATE, uint32_t kDebounceTimeMs>
-void Button<GPIO_PIN, ACTIVE_STATE, kDebounceTimeMs>::isDownIsr()
+template <uint16_t GPIO_Pin, bool ACTIVE_STATE, uint32_t DEBOUNCE_TIME_MILLIS>
+void Button<GPIO_Pin, ACTIVE_STATE, DEBOUNCE_TIME_MILLIS>::isDownIsr()
 {
     if (isDownCallback && pressed && !released) {
         isDownCallback(HAL_GetTick() - lastPressedTime);
     }
 }
 
-template <uint8_t GPIO_PIN, bool ACTIVE_STATE, uint32_t kDebounceTimeMs>
-void Button<GPIO_PIN, ACTIVE_STATE, kDebounceTimeMs>::isr(uint32_t idr)
+template <uint16_t GPIO_Pin, bool ACTIVE_STATE, uint32_t DEBOUNCE_TIME_MILLIS>
+void Button<GPIO_Pin, ACTIVE_STATE, DEBOUNCE_TIME_MILLIS>::isr(uint32_t idr)
 {
-    bool buttonState = idr & (1 << digitalPinToBit<GPIO_PIN>());
+    bool buttonState = (idr & GPIO_Pin);
     // check if the state has changed
     if (buttonState != state) {
         uint32_t now = HAL_GetTick();
@@ -67,23 +67,20 @@ void Button<GPIO_PIN, ACTIVE_STATE, kDebounceTimeMs>::isr(uint32_t idr)
     }
 }
 
-template <uint8_t GPIO_PIN_A, uint8_t GPIO_PIN_B>
-void RotaryEncoder<GPIO_PIN_A, GPIO_PIN_B>::init()
+void RotaryEncoder::init()
 {
-    static_assert(GPIO_PIN_A == PA6 && GPIO_PIN_B == PA7, "PA6 and PA7 are hardcoded");
-
     // GPIO clocks
     __HAL_RCC_GPIOA_CLK_ENABLE();
 
     // TIM3 clock
     __HAL_RCC_TIM3_CLK_ENABLE();
 
-    // PA6 / PA7 as TIM3_CH1 / TIM3_CH2
+    // ENC2_A / ENC2_B as TIM3_CH1 / TIM3_CH2
     GPIO_InitTypeDef GPIO_InitStruct = {};
-    GPIO_InitStruct.Pin = GPIO_PIN_6 | GPIO_PIN_7;
+    GPIO_InitStruct.Pin = ENC2_A_Pin | ENC2_B_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
-    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+    HAL_GPIO_Init(ENC2_A_GPIO_Port, &GPIO_InitStruct);
 
     // TIM3 encoder init
     tim3.Instance = TIM3;
@@ -109,8 +106,7 @@ void RotaryEncoder<GPIO_PIN_A, GPIO_PIN_B>::init()
     HAL_TIM_Encoder_Start(&tim3, TIM_CHANNEL_ALL);
 }
 
-template <uint8_t GPIO_PIN_A, uint8_t GPIO_PIN_B>
-void RotaryEncoder<GPIO_PIN_A, GPIO_PIN_B>::reset()
+void RotaryEncoder::reset()
 {
     __disable_irq();
     position = 0;
@@ -118,8 +114,7 @@ void RotaryEncoder<GPIO_PIN_A, GPIO_PIN_B>::reset()
     __enable_irq();
 }
 
-template <uint8_t GPIO_PIN_A, uint8_t GPIO_PIN_B>
-void RotaryEncoder<GPIO_PIN_A, GPIO_PIN_B>::isr()
+void RotaryEncoder::isr()
 {
     int16_t value = UI_READ_ROTARY_KNOB_COUNTER();
     if (!value) {
@@ -143,7 +138,6 @@ void RotaryEncoder<GPIO_PIN_A, GPIO_PIN_B>::isr()
     }
 }
 
-template struct RotaryEncoder<ROTARY_ENCODER_PIN_A, ROTARY_ENCODER_PIN_B>;
-template struct Button<KNOB_BUTTON_PIN, false>;
-template struct Button<START_BUTTON_PIN, false>;
-template struct Button<BACK_BUTTON_PIN, false>;
+template struct Button<BTN_1_Pin>;
+template struct Button<BTN_2_Pin>;
+template struct Button<BTN_3_Pin>;

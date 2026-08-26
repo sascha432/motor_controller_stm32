@@ -4,21 +4,24 @@
 
 #pragma once
 
+#include "main.h"
 #include "helpers.h"
-#include "pins.h"
 #include "debug.h"
 
 /**
- * @brief Button template for handling GPIO buttons with debounce and interrupt support
+ * @brief Button template for handling GPIO buttons with debounce and interrupt support (GPIOD only!)
  *
- * @tparam GPIO_PIN  GPIO pin number, e.g. PB10, PA0, etc.
- * @tparam GPIO_PORT_ADDR GPIO port address, e.g. GPIOA_BASE, GPIOB_BASE, etc.
+ * @tparam GPIO_PIN GPIO pin (MUST BE GPIOD)
  * @tparam ACTIVE_STATE false for active low, true for active high
+ * @tparam
  */
-template<uint8_t GPIO_PIN, bool ACTIVE_STATE, uint32_t kDebounceTimeMs = 50>
+template<uint16_t GPIO_Pin, bool ACTIVE_STATE = false, uint32_t DEBOUNCE_TIME_MILLIS = 50>
 struct Button
 {
     using CallbackType = void (*)(uint32_t duration);
+
+    static constexpr bool kActiveState = ACTIVE_STATE;
+    static constexpr uint32_t kDebounceTimeMs = DEBOUNCE_TIME_MILLIS;
 
     /**
      * @brief Initialize GPIO and states for the button
@@ -36,7 +39,7 @@ struct Button
         lastDebounceTime = 0;
         lastPressedTime = HAL_GetTick();
         state = readState();
-        pressed = (state == ACTIVE_STATE);
+        pressed = (state == kActiveState);
         released = !pressed;
         __enable_irq();
     }
@@ -70,7 +73,7 @@ struct Button
      */
     inline bool isDown() const
     {
-        return (state == ACTIVE_STATE);
+        return (state == kActiveState);
     }
 
     /**
@@ -103,7 +106,7 @@ struct Button
      */
     inline void isr()
     {
-        isr(digitalPinToGPIO<GPIO_PIN>()->IDR);
+        isr(GPIOD->IDR);
     }
 
     /**
@@ -114,7 +117,7 @@ struct Button
      */
     bool readGPIOState() const
     {
-        return (readState() == ACTIVE_STATE);
+        return (readState() == kActiveState);
     }
 
 protected:
@@ -126,7 +129,7 @@ protected:
      */
     inline bool readState() const
     {
-        return digitalRead<GPIO_PIN>();
+        return GPIOD->IDR & GPIO_Pin;
     }
 
 protected:
@@ -142,11 +145,7 @@ protected:
 /**
  * @brief Rotary encoder
  *
- * @tparam PIN_A bit for pin A in the GPIO IDR register
- * @tparam PIN_B bit for pin B in the GPIO IDR register
- * @tparam GPIO_PORT_ADDR address of the GPIO port, pin A and pin B must be on the same port
  */
-template<uint8_t GPIO_PIN_A, uint8_t GPIO_PIN_B>
 struct RotaryEncoder
 {
     /**
@@ -206,10 +205,10 @@ protected:
     int32_t acceleration;
 };
 
-using RotaryEncoderKnob = RotaryEncoder<ROTARY_ENCODER_PIN_A, ROTARY_ENCODER_PIN_B>;
-using StartButton = Button<START_BUTTON_PIN, false>;
-using KnobButton = Button<KNOB_BUTTON_PIN, false>;
-using BackButton = Button<BACK_BUTTON_PIN, false>;
+using RotaryEncoderKnob = RotaryEncoder;
+using KnobButton = Button<BTN_1_Pin>;
+using BackButton = Button<BTN_2_Pin>;
+using StartButton = Button<BTN_3_Pin>;
 
 extern RotaryEncoderKnob knob;
 extern KnobButton knobButton;

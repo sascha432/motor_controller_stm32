@@ -5,7 +5,7 @@
 #pragma once
 
 #include "helpers.h"
-#include "pins.h"
+#include "main.h"
 #include "eeprom.h"
 #include "stats.h"
 #include "leds.h"
@@ -297,16 +297,6 @@ struct PidController
     }
 
     /**
-     * @brief Update internal fault states
-     *
-     */
-    void resetFaults()
-    {
-        faults.drv8701Fault = !digitalRead<DRV8701_FAULT_PIN>();
-        faults.snsoutFault = !digitalRead<DRV_SNSOUT_PIN>();
-    }
-
-    /**
      * @brief Apply PID parameters from EEPROM to the controller
      *
      */
@@ -328,7 +318,7 @@ struct PidController
      */
     void setInputCurrentLimit(uint16_t value)
     {
-        faults.isenseMax = ADCConverter::Current::reverse(value);
+        faults.setIsenseMax(ADCConverter::Current::reverse(value));
         adc.setInputCurrentLimit(value);
     }
 
@@ -339,7 +329,7 @@ struct PidController
      */
     void setMotorCurrentLimit(uint16_t value)
     {
-        ocp.dacMotorCurrent = ADCConverter::Current::reverse(value);
+        ocp.setDacMotorCurrent(ADCConverter::Current::reverse(value));
         adc.setMotorCurrentLimit(value);
     }
 
@@ -537,10 +527,31 @@ public:
         {
         }
 
-        inline void reset()
+        inline void resetDrvFault()
         {
-            drv8701Fault = false;
-            snsoutFault = false;
+            drv8701Fault = (DRV_FAULT_GPIO_Port->IDR & DRV_FAULT_Pin) == 0;
+        }
+
+        inline void resetSnsoutFault()
+        {
+            snsoutFault = (DRV_SNSOUT_GPIO_Port->IDR & DRV_SNSOUT_Pin) == 0;
+        }
+
+        inline void setIsenseMax(uint16_t isenseMax)
+        {
+            this->isenseMax = isenseMax;
+        }
+
+        inline void setVsenseMax(uint16_t vsenseMax)
+        {
+            this->vsenseMax = vsenseMax;
+        }
+
+        inline void reset(uint16_t vsenseMax)
+        {
+            setVsenseMax(vsenseMax);
+            resetDrvFault();
+            resetSnsoutFault();
         }
     };
 
@@ -613,6 +624,21 @@ public:
         inline void reset()
         {
             *this = OcpState();
+        }
+
+        inline bool isTriggered() const
+        {
+            return state == OcpStateType::TRIGGERED;
+        }
+
+        inline bool isActive() const
+        {
+            return (state != OcpStateType::NONE) || (counter != 0);
+        }
+
+        inline void setDacMotorCurrent(uint16_t dacMotorCurrent)
+        {
+            this->dacMotorCurrent = dacMotorCurrent;
         }
     };
 
@@ -690,7 +716,7 @@ public:
 
     // buffer for PID loop data for SWO PID tuning
     // adjust size to the interval
-    static constexpr float kPidLoopBufferSeconds = 0.128f; // how much data to store in seconds
+    static constexpr float kPidLoopBufferSeconds = 0.15f; // how much data to store in seconds
     RingBuffer<PidLoopType, std::clamp<size_t>(((1000 * kPidLoopBufferSeconds) / kPIDInterval), 32, 80)> pidLoopBuffer;
     static constexpr size_t kPidLoopBufferCount = sizeof(pidLoopBuffer) / sizeof(PidLoopType);
     static constexpr size_t kPidLoopBufferSize = sizeof(pidLoopBuffer);

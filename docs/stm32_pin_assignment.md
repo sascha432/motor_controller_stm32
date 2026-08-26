@@ -95,7 +95,7 @@ th:nth-child(4), td:nth-child(4) { width: 56%; }
 | Signal | STM32 pin | Type | Notes |
 |---|---|---|---|
 | ENC1_I2C_EN | PD7 | DOUT | Enables MT6701 I2C mode |
-| OCP_LED | PD12 | DOUT | 220 Ohm series resistor |
+| MOTOR_LEDS | PD12 | DOUT | 220 Ohm series resistor, charlieplexed red and yellow |
 
 ### Digital input - fast interrupt
 

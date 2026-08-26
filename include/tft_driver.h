@@ -8,8 +8,8 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "main.h"
 #include "lvgl.h"
-#include "pins.h"
 
 // TFT driver selection
 #define TFT_DRIVER_ST7735           1

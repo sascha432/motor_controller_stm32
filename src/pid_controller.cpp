@@ -2,6 +2,7 @@
   Author: sascha_lammers@gmx.de
 */
 
+#include "main.h"
 #include "pid_controller.h"
 #include "mt6701_encoder.h"
 #include "leds.h"
@@ -17,7 +18,8 @@ TIM_HandleTypeDef tim1;
 
 void PidController::init()
 {
-    // // === PWM on TIM1 CH1 (PA8, PA9) ===
+    // === PWM on TIM1 CH1 (PA8, PA9) ===
+
     // Enable clocks
     __HAL_RCC_AFIO_CLK_ENABLE();
     __HAL_RCC_GPIOA_CLK_ENABLE();
@@ -94,15 +96,15 @@ void PidController::init()
     HAL_TIM_Encoder_Start(&tim4, TIM_CHANNEL_ALL);
 
     // TIM5 setup for RPM counter
-    __HAL_RCC_GPIOx_CLK_ENABLE<ENC1_ANALOG_PIN>();
+    __HAL_RCC_GPIOA_CLK_ENABLE();
     __HAL_RCC_TIM5_CLK_ENABLE();
 
     // PA1 (TIM5_CH2) input floating
     GPIO_InitStruct = {};
-    GPIO_InitStruct.Pin = digitalPinToHAL<ENC1_ANALOG_PIN>();
+    GPIO_InitStruct.Pin = ENC1_ANALOG_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
-    HAL_GPIO_Init(digitalPinToGPIO<ENC1_ANALOG_PIN>(), &GPIO_InitStruct);
+    HAL_GPIO_Init(ENC1_ANALOG_GPIO_Port, &GPIO_InitStruct);
 
     // Reset TIM5
     TIM5->CR1 = 0;
@@ -127,22 +129,18 @@ void PidController::init()
     TIM5->CNT = 0;
     TIM5->CR1 |= TIM_CR1_CEN;
 
-    // Fault interrupt pins DRV8701_FAULT_PIN, OCP_INT_PIN, DRV_SNSOUT_PIN
-    __HAL_RCC_GPIOx_CLK_ENABLE<DRV8701_FAULT_PIN>();
-    __HAL_RCC_GPIOx_CLK_ENABLE<OCP_INT_PIN>();
-    __HAL_RCC_GPIOx_CLK_ENABLE<DRV_SNSOUT_PIN>();
+    // Fault interrupt pins DRV_FAULT, OCP_INT, DRV_SNSOUT
+    __HAL_RCC_GPIOB_CLK_ENABLE();
+    __HAL_RCC_GPIOD_CLK_ENABLE();
 
     GPIO_InitStruct = {};
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_PULLUP;
-    GPIO_InitStruct.Pin = digitalPinToHAL<DRV8701_FAULT_PIN>();
-    HAL_GPIO_Init(digitalPinToGPIO<DRV8701_FAULT_PIN>(), &GPIO_InitStruct);
+    GPIO_InitStruct.Pin = DRV_FAULT_Pin | OCP_INT_Pin;
+    HAL_GPIO_Init(DRV_FAULT_GPIO_Port, &GPIO_InitStruct);
 
-    GPIO_InitStruct.Pin = digitalPinToHAL<OCP_INT_PIN>();
-    HAL_GPIO_Init(digitalPinToGPIO<OCP_INT_PIN>(), &GPIO_InitStruct);
-
-    GPIO_InitStruct.Pin = digitalPinToHAL<DRV_SNSOUT_PIN>();
-    HAL_GPIO_Init(digitalPinToGPIO<DRV_SNSOUT_PIN>(), &GPIO_InitStruct);
+    GPIO_InitStruct.Pin = DRV_SNSOUT_Pin;
+    HAL_GPIO_Init(DRV_SNSOUT_GPIO_Port, &GPIO_InitStruct);
 }
 
 void PidController::reset()
@@ -160,13 +158,11 @@ void PidController::reset()
     ::stats.reset();
     errorCode = ErrorCodeType::NONE;
     releaseBrakeCounter = 0;
-    faults.reset();
-    faults.vsenseMax = ADCConverter::Voltage::reverse(eeprom.getOvpProtection());
+    faults.reset(ADCConverter::Voltage::reverse(eeprom.getOvpProtection()));
     lastRpmCounter = PID_READ_RPM_COUNTER();
     lastRpmCounterUpdated = HAL_GetTick();
     ocp.reset();
     applyPIDParams();
-    resetFaults();
 
     #if PID_ISR_DEBUG_PRINT
         DEBUG_PRINT(DebugType::PID, "reset() Kp=%s Ki=%s Kd=%s RPM=%u windup=%s OCP=%u/%u OVP=%u",
@@ -366,7 +362,7 @@ void PidController::isr()
         item.pwmLevel = static_cast<uint8_t>((clampedPwmLevel * 100) / pwmLevel.getARR());
         item.running = running ? 1U : 0U;
         item.drv8701Fault = faults.drv8701Fault ? 1U : 0U;
-        item.ocpFault = (ocp.state == OcpStateType::TRIGGERED) ? 1U : 0U;
+        item.ocpFault = ocp.isTriggered() ? 1U : 0U;
         item.snsoutFault = faults.snsoutFault ? 1U : 0U;
         pidLoopBuffer.push(item);
 

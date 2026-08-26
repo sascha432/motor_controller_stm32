@@ -69,14 +69,14 @@ void MX_USB_DEVICE_Init(void)
   __HAL_RCC_GPIOE_CLK_ENABLE();
 
   GPIO_InitTypeDef GPIO_InitStruct = {};
-  GPIO_InitStruct.Pin = GPIO_PIN_1;
+  GPIO_InitStruct.Pin = USB_PU_EN_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
+  HAL_GPIO_Init(USB_PU_EN_GPIO_Port, &GPIO_InitStruct);
 
   // disable USB pull-up power source
-  GPIOE->BRR = GPIO_PIN_1;
+  USB_PU_EN_GPIO_Port->BRR = GPIO_PIN_1;
 
   #if 0
   #if DEBUG
@@ -116,7 +116,7 @@ void MX_USB_DEVICE_Init(void)
   /* USER CODE BEGIN USB_DEVICE_Init_PostTreatment */
 
   // enable USB D+ pull-up power source, the pull-up becomes active only if a USB cable is connected to the device
-  GPIOE->BSRR = GPIO_PIN_1;
+  USB_PU_EN_GPIO_Port->BSRR = GPIO_PIN_1;
 
   /* USER CODE END USB_DEVICE_Init_PostTreatment */
 }

@@ -4,9 +4,8 @@
 
 #pragma once
 
-#include <algorithm>
+#include "main.h"
 #include "adc_converters.h"
-#include "pins.h"
 
 extern ADC_HandleTypeDef hadc1;
 struct PidController;

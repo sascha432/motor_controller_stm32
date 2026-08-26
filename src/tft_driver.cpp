@@ -20,13 +20,13 @@ TIM_HandleTypeDef tim2;
  * @param spiClockHz SPI clock speed in Hz (default: 18 MHz)
  * @return constexpr uint32_t Calculated timeout in milliseconds
  */
-static constexpr uint32_t kCalculateDMATimeoutMs(uint16_t bytes, uint32_t spiClockHz = 18000000) {
+static constexpr uint32_t kCalculateDMATimeoutMs(uint16_t bytes, uint32_t spiClockHz = 18000000)
+{
     return (((bytes * 8000) + (spiClockHz - 1)) / spiClockHz);
 }
 
 static constexpr uint32_t kDMATransferTimeoutMillis = kCalculateDMATimeoutMs(sizeof(s_lvgl_buf_1));         // DMA transfer timeout in milliseconds
 static constexpr uint32_t kSPISyncTimeoutMillis = 3;                                                        // SPI synchronization timeout in milliseconds
-
 
 /**
  * @brief init GPIO pins and timers for the SPI display and backlight PWM
@@ -35,23 +35,23 @@ static constexpr uint32_t kSPISyncTimeoutMillis = 3;                            
 void tft_driver_gpio_tim_init(void)
 {
     // Enable GPIOC and GPIOD clocks
+    __HAL_RCC_GPIOB_CLK_ENABLE();
     __HAL_RCC_GPIOC_CLK_ENABLE();
     __HAL_RCC_GPIOD_CLK_ENABLE();
-    __HAL_RCC_GPIOB_CLK_ENABLE();
 
-    // TFT_PIN_RST/PC6, TFT_PIN_RS/PC7 (CRL)
+    // TFT_RST/PC6, TFT_DC/PC7 (CRL)
     GPIO_InitTypeDef GPIO_InitStruct = {};
-    GPIO_InitStruct.Pin = GPIO_PIN_6 | GPIO_PIN_7;
+    GPIO_InitStruct.Pin = TFT_RST_Pin | TFT_DC_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+    HAL_GPIO_Init(TFT_RST_GPIO_Port, &GPIO_InitStruct);
 
-    // TFT_PIN_CS/PD15 (CRH)
+    // TFT_CS/PD15 (CRH)
     GPIO_InitStruct = {};
-    GPIO_InitStruct.Pin = GPIO_PIN_15;
+    GPIO_InitStruct.Pin = TFT_CS_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+    HAL_GPIO_Init(TFT_CS_GPIO_Port, &GPIO_InitStruct);
 
     // set pins to default state
     TFT_PIN_CS_HIGH();
@@ -59,17 +59,16 @@ void tft_driver_gpio_tim_init(void)
 
     // backlight PWM on TFT_PIN_LED/PB11
     __HAL_RCC_AFIO_CLK_ENABLE();
-    // __HAL_RCC_GPIOB_CLK_ENABLE();
     __HAL_RCC_TIM2_CLK_ENABLE();
 
     __HAL_AFIO_REMAP_TIM2_PARTIAL_2();
 
-    // TFT_PIN_LED/PB11 = Alternate Function Push-Pull, 50 MHz (CRH)
+    // TFT_PWM/PB11 and LED_PWM/PB10 = Alternate Function Push-Pull, 50 MHz (CRH)
     GPIO_InitStruct = {};
-    GPIO_InitStruct.Pin = GPIO_PIN_11 | GPIO_PIN_10;
+    GPIO_InitStruct.Pin = TFT_PWM_Pin | LED_PWM_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+    HAL_GPIO_Init(TFT_PWM_GPIO_Port, &GPIO_InitStruct);
 
     // TIM2 setup
     tim2.Instance = TIM2;
@@ -102,12 +101,12 @@ void tft_driver_spi_init(void)
     __HAL_RCC_SPI2_CLK_ENABLE();
     __HAL_RCC_GPIOB_CLK_ENABLE();
 
-    // Configure PB13 (CLK) and PB15 (MOSI) as alternate function push-pull
-    GPIOB->CRH &= ~(GPIO_CRH_MODE13 | GPIO_CRH_CNF13 | GPIO_CRH_MODE15 | GPIO_CRH_CNF15);
-    GPIOB->CRH |= (GPIO_CRH_MODE13_0 | GPIO_CRH_MODE13_1)       // PB13: 50MHz
-               |  (GPIO_CRH_CNF13_1)                            // PB13: Alt func push-pull
-               |  (GPIO_CRH_MODE15_0 | GPIO_CRH_MODE15_1)       // PB15: 50MHz
-               |  (GPIO_CRH_CNF15_1);                           // PB15: Alt func push-pull
+    // Configure TFT_CLK/PB13 and TFT_MOSI/PB15 as alternate function push-pull
+    GPIO_InitTypeDef GPIO_InitStruct = {};
+    GPIO_InitStruct.Pin = TFT_CLK_Pin | TFT_MOSI_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+    HAL_GPIO_Init(TFT_CLK_GPIO_Port, &GPIO_InitStruct);
 
     // Disable SPI first
     SPI2->CR1 = 0;

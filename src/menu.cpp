@@ -10,6 +10,7 @@
 #include "eeprom.h"
 #include "leds.h"
 #include "pid_controller.h"
+#include "motor_vibes.h"
 
 ScreenFlow screenFlow;
 Menu menu;
@@ -240,70 +241,64 @@ void Menu::loadWelcomeScreen()
     screenFlow.refresh();
     tft_backlight_pwm_set(eeprom.getTFTBrightness());
 
-    if constexpr (UIConstants::kEnableIlluminationLEDFading) {
-
-        #if HAVE_MOTOR_VIBES
-            MotorVibes chime;
-            const bool play = eeprom.getMotorChime();
-            if (play) {
-                chime.init();
-            }
-
-            static const uint8_t chimeFrequency50msInterval[] = {
-                104, 104, 104,  // 520 Hz
-                0,
-                132, 132, 132,  // 660 Hz
-                0,
-                157, 157, 157, 157,  // 785 Hz
-                0,
-                132, 132, 132,  // 660 Hz
-                0,
-                157, 157, 157, 157,  // 785 Hz
-                0,
-                209, 209, 209, 209, 209, // 1045 Hz
-                0
-            };
-        #endif
-
-        // gradually increase LED brightness to target value
-        constexpr uint32_t kMultiplier = (1 << 23);
-        constexpr uint32_t kLoopDelay = 10;
-        const uint32_t start = HAL_GetTick();
-        uint32_t targetBrightness = eeprom.getLEDBrightness() * kMultiplier;
-        uint32_t currentBrightness = 0;
-        uint32_t step = targetBrightness / (UIConstants::kWelcomeScreenTimeout / kLoopDelay);
-        targetBrightness -= step;
-        for(uint32_t i = 0; ; i++) {
-            uint32_t elapsed = HAL_GetTick() - start;
-            if (elapsed >= UIConstants::kWelcomeScreenTimeout) {
-                break;
-            }
-            if (currentBrightness < targetBrightness) {
-                currentBrightness += step;
-            }
-            LEDs::illuminationLedSetPWM(currentBrightness / (kMultiplier / LEDs::kIlluminationResolution));
-            // blink motor LEDs
-            ((elapsed / 500) & 0x01) ? LEDs::onLEDError() : LEDs::onLEDWarning();
-            #if HAVE_MOTOR_VIBES
-                // play chime tone
-                if (play) {
-                    const uint32_t index = i / 5;
-                    chime.playTone((index >= sizeof(chimeFrequency50msInterval)) ? 0 : (chimeFrequency50msInterval[index] * 5));
-                }
-            #endif
-            WatchDog::delay(kLoopDelay);
+    #if HAVE_MOTOR_VIBES
+        MotorVibes chime;
+        const bool play = eeprom.getMotorChime();
+        if (play) {
+            chime.init();
         }
-        LEDs::off();
+
+        static const uint8_t chimeFrequency50msInterval[] = {
+            104, 104, 104,  // 520 Hz
+            0,
+            132, 132, 132,  // 660 Hz
+            0,
+            157, 157, 157, 157,  // 785 Hz
+            0,
+            132, 132, 132,  // 660 Hz
+            0,
+            157, 157, 157, 157,  // 785 Hz
+            0,
+            209, 209, 209, 209, 209, // 1045 Hz
+            0
+        };
+    #endif
+
+    // gradually increase LED brightness to target value
+    constexpr uint32_t kMultiplier = (1 << 23);
+    constexpr uint32_t kLoopDelay = 10;
+    const uint32_t start = HAL_GetTick();
+    uint32_t targetBrightness = eeprom.getLEDBrightness() * kMultiplier;
+    uint32_t currentBrightness = 0;
+    const uint32_t step = targetBrightness / (UIConstants::kWelcomeScreenTimeout / kLoopDelay);
+    targetBrightness -= step;
+    for(uint32_t i = 0; ; i++) {
+        uint32_t elapsed = HAL_GetTick() - start;
+        if (elapsed >= UIConstants::kWelcomeScreenTimeout) {
+            break;
+        }
+        if (currentBrightness < targetBrightness) {
+            currentBrightness += step;
+        }
+        LEDs::illuminationLedSetPWM(currentBrightness / (kMultiplier / LEDs::kIlluminationResolution));
+        // blink motor LEDs
+        ((elapsed / 500) & 0x01) ? LEDs::onLEDError() : LEDs::onLEDWarning();
         #if HAVE_MOTOR_VIBES
+            // play chime tone
             if (play) {
-                chime.stopTone();
-                chime.deinit();
+                const uint32_t index = i / 5;
+                chime.playTone((index >= sizeof(chimeFrequency50msInterval)) ? 0 : (chimeFrequency50msInterval[index] * 5));
             }
         #endif
+        WatchDog::delay(kLoopDelay);
     }
-    else {
-        WatchDog::delay(UIConstants::kWelcomeScreenTimeout);
-    }
+    LEDs::off();
+    #if HAVE_MOTOR_VIBES
+        if (play) {
+            chime.stopTone();
+            chime.deinit();
+        }
+    #endif
     clearUserInput();
 }
 

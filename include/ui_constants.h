@@ -9,19 +9,6 @@
 #define STR_HELPER(x)           #x
 #define STR(x)                  STR_HELPER(x)
 
-#define VERSION_MAJOR           1
-#define VERSION_MINOR           0
-#define VERSION_PATCH           2
-#define VERSION_FULL            ((VERSION_MAJOR << 16) | (VERSION_MINOR << 8) | (VERSION_PATCH))
-
-#ifndef PCB_REV_MAJOR
-#define PCB_REV_MAJOR           1
-#endif
-#ifndef PCB_REV_MINOR
-#define PCB_REV_MINOR           2
-#endif
-#define PCB_REV_FULL            (PCB_REV_MAJOR << 8) | (PCB_REV_MINOR)
-
 // === UI constants ===
 struct UIConstants
 {
@@ -96,6 +83,4 @@ struct UIConstants
     static constexpr uint32_t kWelcomeScreenTimeout = 2000;                 // WelcomeScreen timeout in milliseconds
     static constexpr uint32_t kInfoScreenTimeout = 1500;                    // Default InfoScreen timeout in milliseconds
     static constexpr uint32_t kLongPressDuration = 550;                     // Long press duration in milliseconds
-
-    static constexpr bool kEnableIlluminationLEDFading = true;              // Enable fading of the illumination LED while showing the welcome screen
 };
