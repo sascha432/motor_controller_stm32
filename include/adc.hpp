@@ -54,3 +54,30 @@ inline void ADC::isrInjected()
         pid.ocp_stop();
     }
 }
+
+inline void ADC::updateInjectedTriggerPoint(uint16_t pwmLevel)
+{
+    // the trigger point can be adjusted to get the best measurement
+    // this was tested on PCB rev 1.0 with a different RC filter for the INA381 and might require adjustments for 1.2
+    #if 0
+        // measure in the middle of the DC
+        PID_MOTOR_PWM_TIMER->CCR4 = pwmLevel / 2;
+    #elif 0
+        // DC falling edge - delay
+        uint32_t ccr = pwmLevel;
+        if (ccr > kInjectionStartDelayTicks) {
+            ccr -= kInjectionStartDelayTicks;
+        }
+    #elif 0
+        // DC falling edge + delay
+        uint32_t ccr = pwmLevel + kInjectionStartDelayTicks;
+        if (ccr > pid.getPWMLevelARR()) {
+            ccr -= pid.getPWMLevelARR(); // must be non zero
+        }
+        PID_MOTOR_PWM_TIMER->CCR4 = ccr;
+    #else
+        (void)pwmLevel;
+        // use fixed trigger point, DC raising edge + delay
+        PID_MOTOR_PWM_TIMER->CCR4 = kInjectionStartDelayTicks;
+    #endif
+}

@@ -53,11 +53,12 @@ void PidController::init()
     HAL_TIM_PWM_Start(&tim1, TIM_CHANNEL_1);
     HAL_TIM_PWM_Start(&tim1, TIM_CHANNEL_2);
 
-    // TIM1 CH4 compare event used as injected ADC trigger (PA2 current + PA3 voltage sample)
-    // starts disabled (Pulse = 0 keeps OC4REF flat -> no trigger); it is enabled/disabled via
-    // ADC::updateInjectedTriggerPoint() from motorOn()/motorOff() so the injected group only
-    // samples while the motor is running. The output is internal only, NOT routed to PA11.
-    sConfigOC.OCMode = TIM_OCMODE_PWM1;
+    // TIM1 CH4 OC4REF used as injected ADC trigger (PA2 current + PA3 voltage sample)
+    // PWM mode 2: OC4REF goes high when CNT reaches CCR4, so the rising edge (which the
+    // ADC triggers on) fires at exactly the CCR4 point in the cycle set by
+    // ADC::updateInjectedTriggerPoint(). Output is internal only, NOT routed to PA11.
+    // starts disabled (Pulse = 0 keeps OC4REF flat high -> no rising edge -> no trigger)
+    sConfigOC.OCMode = TIM_OCMODE_PWM2;
     sConfigOC.Pulse = 0;
     HAL_TIM_PWM_ConfigChannel(&tim1, &sConfigOC, TIM_CHANNEL_4);
     HAL_TIM_PWM_Start(&tim1, TIM_CHANNEL_4);

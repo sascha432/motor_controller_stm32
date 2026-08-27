@@ -42,7 +42,7 @@ struct ADC
         MAX
     };
     static constexpr uint32_t kNumConversions = DMABufferType::MAX;                 // number of channels
-    static constexpr uint32_t kSampleTimeCH2 = ADC_SAMPLETIME_239CYCLES_5;          // isense
+    static constexpr uint32_t kSampleTimeCH2 = ADC_SAMPLETIME_71CYCLES_5;           // isense
     static constexpr uint32_t kSampleTimeCH3 = ADC_SAMPLETIME_13CYCLES_5;           // vsense
     static constexpr uint32_t kSampleTimeCH14 = ADC_SAMPLETIME_71CYCLES_5;          // motor ntc
     static constexpr uint32_t kSampleTimeCH15 = ADC_SAMPLETIME_71CYCLES_5;          // mosfet ntc
@@ -51,7 +51,7 @@ struct ADC
     static constexpr float kISenseRollingAverageTime = 1.0f;                        // rolling average over 1000ms
     static constexpr uint16_t kISenseCountMax = ((1000.0 / PID_INTERVAL) * kISenseRollingAverageTime * (1.0f + (0.5f / kISenseCountDecayDivider))); // calculate number of samples
 
-    static constexpr uint32_t kInjectionStartDelayMicros = 4;                       // synchronize delayed start with PWM timer
+    static constexpr uint32_t kInjectionStartDelayTicks = 3 * 72;                   // synchronize delayed start with PWM timer
 
     /**
      * @brief Construct ADC object
@@ -207,13 +207,7 @@ protected:
      * @param pwmLevel unused
      *
      */
-    inline void updateInjectedTriggerPoint(uint16_t pwmLevel)
-    {
-        // the trigger point can be adjusted to get the best measurement
-        (void)pwmLevel;
-        // use fixed trigger point
-        PID_MOTOR_PWM_TIMER->CCR4 = kInjectionStartDelayMicros * 72;
-    }
+    inline void updateInjectedTriggerPoint(uint16_t pwmLevel);
 
     /**
      * @brief Disable the injected ADC trigger by flattening OC4REF (CCR4 = 0)

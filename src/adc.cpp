@@ -69,7 +69,6 @@ void ADC::init()
     NVIC_EnableIRQ(DMA1_Channel1_IRQn); // enable DMA1 channel 1 interrupt
 
     // Injected group: PA2 (IN2) current + PA3 (IN3) voltage, triggered by TIM1_CH4
-    // compare event (fires at the PWM falling edge / end of duty cycle)
     ADC1->CR2 |= ADC_CR2_JEXTTRIG | ADC_CR2_JEXTSEL_0;              // TIM1_CH4 trigger, rising edge
     ADC1->JSQR = (2U << ADC_JSQR_JSQ3_Pos) |                        // rank 1: IN2 (PA2) current
                  (3U << ADC_JSQR_JSQ4_Pos) |                        // rank 2: IN3 (PA3) voltage
