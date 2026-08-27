@@ -5,11 +5,7 @@
 */
 
 #include "ui.h"
-#include "adc.h"
 #include "pid_controller.h"
-#include "stats.h"
-#include "controls.h"
-#include "menu.h"
 #include "serial.h"
 
 // === Helpers ===

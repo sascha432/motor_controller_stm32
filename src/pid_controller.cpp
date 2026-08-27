@@ -4,9 +4,6 @@
 
 #include "pid_controller.h"
 #include "mt6701_encoder.h"
-#include "leds.h"
-#include "menu.h"
-#include "stats.h"
 
 #define PID_ISR_DEBUG_PRINT 0
 

@@ -4,7 +4,6 @@
 
 #include "debug.h"
 #include "serial.h"
-#include "helpers.h"
 
 static inline void debug_swd_init()
 {

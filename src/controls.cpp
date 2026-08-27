@@ -3,7 +3,6 @@
 */
 
 #include "controls.h"
-#include "debug.h"
 
 RotaryEncoderKnob knob;
 KnobButton knobButton;

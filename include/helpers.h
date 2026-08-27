@@ -64,7 +64,7 @@ static constexpr uint32_t kARRToPWMFrequency(uint16_t arr)
  * @tparam microseconds delay
  */
 template<uint32_t US>
-inline void delay_us()
+static inline void delay_us()
 {
     static_assert(US <= 0xFFFF, "delay_us() value too high for 16bit timer");
     const uint16_t start = TIM7->CNT;
@@ -222,7 +222,7 @@ struct WatchDog
     static void delay(uint32_t ms);
 
     /**
-     * @brief Watchdog tick handler, call this from TIM6 @ PID_INTERVAL
+     * @brief Watchdog tick handler, call this from SysTick_Handler()
      *
      */
     static void tickHandler();
@@ -241,7 +241,7 @@ inline void WatchDog::delay(uint32_t ms)
 inline void WatchDog::tickHandler()
 {
     WWDG->CR = 0x7F; // feed the watchdog
-    if (++ticks >= static_cast<uint32_t>(kTimeoutMs / PID_INTERVAL)) { // kTimeoutMs timeout
+    if (++ticks >= kTimeoutMs) { // kTimeoutMs timeout
         call_default_error_handler(InterruptErrorType::WATCHDOG_TICK_TIMEOUT);
     }
 }

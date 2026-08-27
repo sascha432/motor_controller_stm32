@@ -4,7 +4,6 @@
   Baremetal SPI DMA driver with interrupt support for LVGL
 */
 
-#include <stm32f1xx.h>
 #include "tft_driver.h"
 #include "tft_driver_screenshot.h"
 

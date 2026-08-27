@@ -3,8 +3,6 @@
 */
 
 #include "eeprom.h"
-#include "adc.h"
-#include "i2c.h"
 
 // === AT24C02CM5/TR prototypes etc... ===
 

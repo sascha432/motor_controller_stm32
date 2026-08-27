@@ -3,7 +3,6 @@
 */
 
 #include "stats.h"
-#include "adc_converters.h"
 
 // static range checks to void overflows in internal calculations, need to be updated if constants are changed
 static_assert(ADCConverter::Voltage::convert(100) == 966, "static check failed");

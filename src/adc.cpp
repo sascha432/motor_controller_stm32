@@ -3,8 +3,6 @@
 */
 
 #include "adc.h"
-#include "pid_controller.h"
-#include "leds.h"
 
 ADC adc;
 

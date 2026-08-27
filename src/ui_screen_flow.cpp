@@ -5,8 +5,6 @@
 */
 
 #include "ui.h"
-#include "controls.h"
-#include "menu.h"
 
 // === Screen Flow Manager ===
 
