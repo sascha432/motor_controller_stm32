@@ -1,7 +1,7 @@
 /**
   Author: sascha_lammers@gmx.de
 
-  Baremetal SPI DMA driver
+  Baremetal SPI DMA driver with interrupt support for LVGL
 */
 
 #include <stm32f1xx.h>
@@ -34,6 +34,8 @@ static constexpr uint32_t kCalculateDMATimeoutMs(uint16_t bytes, uint32_t spiClo
 }
 
 static constexpr uint32_t kDMATransferTimeoutMillis = kCalculateDMATimeoutMs(sizeof(s_lvgl_buf_1));     // DMA transfer timeout in milliseconds
+static constexpr uint32_t kDMATransferFlagsBlocking = (DMA_CCR_MINC | DMA_CCR_DIR | DMA_CCR_PL_1);
+static constexpr uint32_t kDMATransferFlagsInterrupt = (DMA_CCR_MINC | DMA_CCR_DIR | DMA_CCR_PL_1 | DMA_CCR_TCIE | DMA_CCR_TEIE);
 
 /**
  * @brief init GPIO pins and timers for the SPI display and backlight PWM
@@ -149,9 +151,6 @@ static void tft_driver_clear_spi_rx_fifo()
     // Read SR register to clear any pending status flags
     (void)SPI2->SR;
 }
-
-static constexpr uint32_t kDMATransferFlagsBlocking = (DMA_CCR_MINC | DMA_CCR_DIR | DMA_CCR_PL_1);
-static constexpr uint32_t kDMATransferFlagsInterrupt = (DMA_CCR_MINC | DMA_CCR_DIR | DMA_CCR_PL_1 | DMA_CCR_TCIE | DMA_CCR_TEIE);
 
 static void tft_driver_start_dma_transfer(const void *data, uint16_t len, uint32_t ccr)
 {
