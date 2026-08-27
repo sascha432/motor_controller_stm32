@@ -130,6 +130,7 @@ void MX_TIM7_Init(void);
 void SystemClock_Config();
 
 extern CRC_HandleTypeDef hcrc;
+extern WWDG_HandleTypeDef hwwdg;
 
 /* USER CODE END EFP */
 

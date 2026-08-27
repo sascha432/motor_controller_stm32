@@ -155,6 +155,9 @@ void HAL_DAC_MspInit(DAC_HandleTypeDef* hdac)
 
     /* USER CODE BEGIN DAC_MspInit 1 */
 
+    HAL_DAC_Start(hdac, DAC_CHANNEL_1);
+    HAL_DAC_Start(hdac, DAC_CHANNEL_2);
+
     /* USER CODE END DAC_MspInit 1 */
 
   }

@@ -250,7 +250,6 @@ struct WatchDog
     static void tickHandler();
 
     static volatile uint32_t ticks;
-    static WWDG_HandleTypeDef watchdog;
 };
 
 inline void WatchDog::delay(uint32_t ms)

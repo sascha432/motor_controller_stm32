@@ -9,7 +9,6 @@
 
 // === global variables ===
 
-WWDG_HandleTypeDef WatchDog::watchdog;
 InterruptErrorType interruptErrorType;
 
 // === interrupt handlers ===
@@ -182,15 +181,15 @@ extern "C" void UsageFault_Handler(void)
  */
 extern "C" void WWDG_IRQHandler(void)
 {
-    HAL_WWDG_IRQHandler(&WatchDog::watchdog);
+    HAL_WWDG_IRQHandler(&hwwdg);
 }
 
 /**
  * @brief Handle watchdog timeouts
  */
-extern "C" void HAL_WWDG_EarlyWakeupCallback(WWDG_HandleTypeDef *hwwdg)
+extern "C" void HAL_WWDG_EarlyWakeupCallback(WWDG_HandleTypeDef *hwwdgPtr)
 {
-    if (hwwdg != &WatchDog::watchdog) {
+    if (hwwdgPtr != &hwwdg) {
         return;
     }
     call_default_error_handler(InterruptErrorType::WATCHDOG_TIMEOUT);
