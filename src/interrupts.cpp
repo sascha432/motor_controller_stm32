@@ -102,17 +102,6 @@ extern "C" void DMA1_Channel1_IRQHandler()
 }
 
 /**
- * @brief DMA1_Channel5_IRQHandler is the interrupt handler for the TFT SPI TX DMA channel
- */
-extern "C" void DMA1_Channel5_IRQHandler(void)
-{
-    if (DMA1->ISR & (DMA_ISR_TCIF5 | DMA_ISR_TEIF5)) {
-        DMA1->IFCR = DMA_IFCR_CGIF5;
-        tft_driver_dma_transfer_finished_isr();
-    }
-}
-
-/**
  * @brief ADC1_2_IRQHandler is the interrupt handler for the injected ADC group. It is called
  *        when an injected conversion sequence (JEOC) completes, once per PWM period
  *
@@ -122,6 +111,17 @@ extern "C" void ADC1_2_IRQHandler()
     if (ADC1->SR & ADC_SR_JEOC) {
         ADC1->SR = ~ADC_SR_JEOC;    // clear injected end of sequence flag
         adc.isrInjected();
+    }
+}
+
+/**
+ * @brief DMA1_Channel5_IRQHandler is the interrupt handler for the TFT SPI TX DMA channel
+ */
+extern "C" void DMA1_Channel5_IRQHandler(void)
+{
+    if (DMA1->ISR & (DMA_ISR_TCIF5 | DMA_ISR_TEIF5)) {
+        DMA1->IFCR = DMA_IFCR_CGIF5;
+        tft_driver_dma_transfer_finished_isr();
     }
 }
 
@@ -234,7 +234,7 @@ static void delay_ms(uint32_t ms)
   * @brief  This function is executed in case of error occurrence.
   * @retval None
   */
-extern "C" void Error_Handler(void)
+extern "C" void My_Error_Handler(void)
 {
     // disable interrupts
     __disable_irq();
