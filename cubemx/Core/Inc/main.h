@@ -37,6 +37,17 @@ extern "C" {
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
 
+enum InterruptErrorType {
+    ERROR_HANDLER = 0,
+    WATCHDOG_TIMEOUT,
+    WATCHDOG_TICK_TIMEOUT,
+    HARD_FAULT_HANDLER,
+    MEM_MANAGE_HANDLER,
+    NMI_HANDLER,
+    BUS_FAULT_HANDLER,
+    USAGE_FAULT_HANDLER,
+};
+
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
@@ -131,6 +142,15 @@ void SystemClock_Config();
 
 extern CRC_HandleTypeDef hcrc;
 extern WWDG_HandleTypeDef hwwdg;
+extern enum InterruptErrorType interruptErrorType;
+
+extern void Error_Handler_Debug(void);
+
+inline void call_default_error_handler(enum InterruptErrorType type)
+{
+  interruptErrorType = type;
+  Error_Handler_Debug();
+}
 
 /* USER CODE END EFP */
 

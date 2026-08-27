@@ -521,7 +521,7 @@ void MX_WWDG_Init(void)
 
 /* USER CODE BEGIN 4 */
 
-extern void My_Error_Handler(void);
+enum InterruptErrorType interruptErrorType = ERROR_HANDLER;
 
 /* USER CODE END 4 */
 
@@ -532,7 +532,7 @@ extern void My_Error_Handler(void);
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-  My_Error_Handler();
+  Error_Handler_Debug();
   /* USER CODE END Error_Handler_Debug */
 }
 #ifdef USE_FULL_ASSERT

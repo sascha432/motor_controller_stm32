@@ -7,10 +7,6 @@
 #include "controls.h"
 #include "tft_driver.h"
 
-// === global variables ===
-
-InterruptErrorType interruptErrorType;
-
 // === interrupt handlers ===
 
 /**
@@ -233,7 +229,7 @@ static void delay_ms(uint32_t ms)
   * @brief  This function is executed in case of error occurrence.
   * @retval None
   */
-extern "C" void My_Error_Handler(void)
+extern "C" void Error_Handler_Debug(void)
 {
     // disable interrupts
     __disable_irq();

@@ -185,28 +185,6 @@ private:
     volatile size_t tail = 0;
 };
 
-// global error handling
-enum class InterruptErrorType : uint32_t {
-    ERROR_HANDLER = 0,
-    WATCHDOG_TIMEOUT,
-    WATCHDOG_TICK_TIMEOUT,
-    HARD_FAULT_HANDLER,
-    MEM_MANAGE_HANDLER,
-    NMI_HANDLER,
-    BUS_FAULT_HANDLER,
-    USAGE_FAULT_HANDLER,
-};
-
-extern InterruptErrorType interruptErrorType;
-
-extern "C" void Error_Handler(void);
-
-inline void call_default_error_handler(InterruptErrorType type)
-{
-    interruptErrorType = type;
-    Error_Handler();
-}
-
 /**
  * @brief Watchdog helper class
  *
