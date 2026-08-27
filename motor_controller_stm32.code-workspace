@@ -87,6 +87,7 @@
 			"GPIOE",
 			"hadc",
 			"hadc1",
+			"hdac",
 			"hdma",
 			"hpcd",
 			"htim",

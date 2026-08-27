@@ -200,9 +200,9 @@ protected:
 };
 
 using RotaryEncoderKnob = RotaryEncoder;
-using KnobButton = Button<BTN_1_Pin>;
-using BackButton = Button<BTN_2_Pin>;
-using StartButton = Button<BTN_3_Pin>;
+using KnobButton = Button<BTN_1_Pin>;           // GPIOD only
+using BackButton = Button<BTN_2_Pin>;           // GPIOD only
+using StartButton = Button<BTN_3_Pin>;          // GPIOD only
 
 extern RotaryEncoderKnob knob;
 extern KnobButton knobButton;

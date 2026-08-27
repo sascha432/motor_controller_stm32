@@ -47,7 +47,7 @@ void Button<GPIO_Pin, ACTIVE_STATE, DEBOUNCE_TIME_MILLIS>::isr(uint32_t idr)
         {
             lastDebounceTime = now;
             state = buttonState;
-            if (state == ACTIVE_STATE) {
+            if (state == kActiveState) {
                 if (!pressed) {
                     lastPressedTime = now;
                 }
