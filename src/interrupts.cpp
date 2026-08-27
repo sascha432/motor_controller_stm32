@@ -64,7 +64,7 @@ extern "C" void EXTI9_5_IRQHandler(void)
  */
 extern "C" void EXTI15_10_IRQHandler(void)
 {
-    uint32_t pending = EXTI->PR & (BTN_3_Pin | DRV_SNSOUT_Pin | GPIO_PIN_12 | DRV_FAULT_Pin);
+    uint32_t pending = EXTI->PR & (BTN_3_Pin | DRV_SNSOUT_Pin | DRV_FAULT_Pin);
     EXTI->PR = pending; // clear flags
     if (pending & BTN_3_Pin) {
         // changed event
