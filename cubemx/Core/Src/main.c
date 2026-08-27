@@ -196,6 +196,9 @@ void MX_DAC_Init(void)
   }
   /* USER CODE BEGIN DAC_Init 2 */
 
+  HAL_DAC_Start(&hdac, DAC_CHANNEL_1);
+  HAL_DAC_Start(&hdac, DAC_CHANNEL_2);
+
   /* USER CODE END DAC_Init 2 */
 
 }
