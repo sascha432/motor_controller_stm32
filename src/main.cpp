@@ -25,6 +25,73 @@ static void lvgl_log_cb(const char *buf)
 }
 #endif
 
+// === interrupt handlers initialization ===
+
+static inline void EXTI_Init()
+{
+    // Route EXTI8-EXTI11 to GPIO port D
+    AFIO->EXTICR[2] =
+        AFIO_EXTICR3_EXTI8_PD  |    // EXTI8  PD8
+        AFIO_EXTICR3_EXTI9_PD  |    // EXTI9  PD9
+        AFIO_EXTICR3_EXTI10_PD |    // EXTI10 PD10
+        AFIO_EXTICR3_EXTI11_PD;     // EXTI11 PD11
+
+    // Route EXTI14 to GPIO port B
+    AFIO->EXTICR[3] =
+        AFIO_EXTICR4_EXTI14_PB;     // EXTI14 PB14
+
+    // Clear pending flags
+    EXTI->PR =
+        BTN_1_Pin       |   // PD8  BTN_1
+        BTN_2_Pin       |   // PD9  BTN_2
+        BTN_3_Pin       |   // PD10 BTN_3
+        DRV_SNSOUT_Pin  |   // PD11 DRV_SNSOUT
+        DRV_FAULT_Pin;      // PB14 DRV_FAULT
+
+    // Enable interrupt lines
+    EXTI->IMR |=
+        BTN_1_Pin       |   // PD8  BTN_1
+        BTN_2_Pin       |   // PD9  BTN_2
+        BTN_3_Pin       |   // PD10 BTN_3
+        DRV_SNSOUT_Pin  |   // PD11 DRV_SNSOUT
+        DRV_FAULT_Pin;      // PB14 DRV_FAULT
+
+    // Rising edge: button change interrupt
+    EXTI->RTSR |=
+        BTN_1_Pin       |   // PD8  BTN_1
+        BTN_2_Pin       |   // PD9  BTN_2
+        BTN_3_Pin       |   // PD10 BTN_3
+        DRV_SNSOUT_Pin  |   // PD11 DRV_SNSOUT
+        DRV_FAULT_Pin;      // PB14 DRV_FAULT
+
+    // Falling edge: button change + fault inputs
+    EXTI->FTSR |=
+        BTN_1_Pin       |   // PD8  BTN_1
+        BTN_2_Pin       |   // PD9  BTN_2
+        BTN_3_Pin       |   // PD10 BTN_3
+        DRV_SNSOUT_Pin  |   // PD11 DRV_SNSOUT
+        DRV_FAULT_Pin;      // PB14 DRV_FAULT
+
+    // Enable NVIC
+    HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+    HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+
+    HAL_NVIC_SetPriority(TIM6_IRQn, 1, 0);
+    HAL_NVIC_EnableIRQ(TIM6_IRQn);
+}
+
+// === DWT cycle counter ===
+
+static inline void DWT_Init(void)
+{
+    // Enable trace
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+    // Reset cycle counter
+    DWT->CYCCNT = 0;
+    // Enable cycle counter
+    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+}
+
 // === core setup ===
 
 static inline void setup()
@@ -47,9 +114,6 @@ static inline void setup()
         }
     });
     startButton.init();
-
-    // rotary encoder knob
-    knob.init();
 
     // ADC with DMA
     adc.init();
@@ -217,7 +281,7 @@ static inline void loop()
         lastLvHandler = HAL_GetTick();
     }
 
-    #if 1
+    #if 0
         static uint32_t lastDebugPrint = 0;
         if ((HAL_GetTick() - lastDebugPrint) >= 100U) {
             DEBUG_PRINT(DebugType::INFO, "rpm=%u", (unsigned)PID_READ_RPM_COUNTER());
@@ -345,73 +409,6 @@ static inline void loop()
         }
     }
     #endif
-}
-
-// === interrupt handlers initialization ===
-
-static inline void EXTI_Init()
-{
-    // Route EXTI8-EXTI11 to GPIO port D
-    AFIO->EXTICR[2] =
-        AFIO_EXTICR3_EXTI8_PD  |    // EXTI8  PD8
-        AFIO_EXTICR3_EXTI9_PD  |    // EXTI9  PD9
-        AFIO_EXTICR3_EXTI10_PD |    // EXTI10 PD10
-        AFIO_EXTICR3_EXTI11_PD;     // EXTI11 PD11
-
-    // Route EXTI14 to GPIO port B
-    AFIO->EXTICR[3] =
-        AFIO_EXTICR4_EXTI14_PB;     // EXTI14 PB14
-
-    // Clear pending flags
-    EXTI->PR =
-        BTN_1_Pin       |   // PD8  BTN_1
-        BTN_2_Pin       |   // PD9  BTN_2
-        BTN_3_Pin       |   // PD10 BTN_3
-        DRV_SNSOUT_Pin  |   // PD11 DRV_SNSOUT
-        DRV_FAULT_Pin;      // PB14 DRV_FAULT
-
-    // Enable interrupt lines
-    EXTI->IMR |=
-        BTN_1_Pin       |   // PD8  BTN_1
-        BTN_2_Pin       |   // PD9  BTN_2
-        BTN_3_Pin       |   // PD10 BTN_3
-        DRV_SNSOUT_Pin  |   // PD11 DRV_SNSOUT
-        DRV_FAULT_Pin;      // PB14 DRV_FAULT
-
-    // Rising edge: button change interrupt
-    EXTI->RTSR |=
-        BTN_1_Pin       |   // PD8  BTN_1
-        BTN_2_Pin       |   // PD9  BTN_2
-        BTN_3_Pin       |   // PD10 BTN_3
-        DRV_SNSOUT_Pin  |   // PD11 DRV_SNSOUT
-        DRV_FAULT_Pin;      // PB14 DRV_FAULT
-
-    // Falling edge: button change + fault inputs
-    EXTI->FTSR |=
-        BTN_1_Pin       |   // PD8  BTN_1
-        BTN_2_Pin       |   // PD9  BTN_2
-        BTN_3_Pin       |   // PD10 BTN_3
-        DRV_SNSOUT_Pin  |   // PD11 DRV_SNSOUT
-        DRV_FAULT_Pin;      // PB14 DRV_FAULT
-
-    // Enable NVIC
-    HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
-    HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
-
-    HAL_NVIC_SetPriority(TIM6_IRQn, 1, 0);
-    HAL_NVIC_EnableIRQ(TIM6_IRQn);
-}
-
-// === DWT cycle counter ===
-
-static inline void DWT_Init(void)
-{
-    // Enable trace
-    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
-    // Reset cycle counter
-    DWT->CYCCNT = 0;
-    // Enable cycle counter
-    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
 }
 
 // === main ===
