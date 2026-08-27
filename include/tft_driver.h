@@ -51,9 +51,12 @@ static inline void tft_driver_global_unlock()
  */
 static inline void tft_driver_dma_transfer_finished_isr()
 {
-    // inlined code lv_disp_flush_ready(&s_lvgl_disp_drv);
+    #if LVGL_VERSION_MAJOR == 8
     s_lvgl_disp_drv.draw_buf->flushing = 0;
     s_lvgl_disp_drv.draw_buf->flushing_last = 0;
+    #else
+    lv_disp_flush_ready(&s_lvgl_disp_drv);
+    #endif
 
     // Post-Transfer Cleanup is done before the next DMA request indicated by CS pulled low
     tft_driver_global_unlock();

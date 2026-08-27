@@ -218,8 +218,8 @@ static void delay_ms(uint32_t ms)
         ms -= kMaxMillis;
         delay_ms(kMaxMillis);
     }
-    uint32_t start = DWT->CYCCNT;
-    uint32_t ticks = ms * kTicksPerMs;
+    const uint32_t start = DWT->CYCCNT;
+    const uint32_t ticks = ms * kTicksPerMs;
     while ((DWT->CYCCNT - start) < ticks) {
         __NOP();
     }
@@ -269,6 +269,7 @@ extern "C" void Error_Handler_Debug(void)
     #endif
 
     // infinite loop to signal error via LED flashes
+    LEDs::init();
     while (1) {
         LEDs::onLEDError();
         delay_ms(500);
