@@ -17,18 +17,53 @@ namespace Helpers {
             reset();
         }
 
-        void reset()
+        inline void reset()
         {
-            min = INT16_MAX;
-            max = INT16_MIN;
+            min = INT32_MAX;
+            max = INT32_MIN;
         }
 
-        void update(int16_t value)
+        inline void update(int32_t minVal, int32_t maxVal, int32_t value)
         {
             const uint32_t now = HAL_GetTick();
+            __reset(now);
+            if (minVal != INT32_MAX) {
+                __update(minVal, now);
+            }
+            if (maxVal != INT32_MIN) {
+                __update(maxVal, now);
+            }
+            __update(value, now);
+        }
+
+        inline void update(int32_t value)
+        {
+            const uint32_t now = HAL_GetTick();
+            __reset(now);
+            __update(value, now);
+        }
+
+        inline int32_t getMin() const
+        {
+            return min;
+        }
+
+        inline int32_t getMax() const
+        {
+            return max;
+        }
+
+    protected:
+
+        inline void __reset(const uint32_t now = HAL_GetTick())
+        {
             if ((now - lastUpdate) > UPDATE_RATE_TIME) {
                 reset();
             }
+        }
+
+        inline void __update(int32_t value, const uint32_t now)
+        {
             if (value < min) {
                 min = value;
                 lastUpdate = now;
@@ -39,20 +74,10 @@ namespace Helpers {
             }
         }
 
-        inline int16_t getMin() const
-        {
-            return min;
-        }
-
-        inline int16_t getMax() const
-        {
-            return max;
-        }
-
     private:
         uint32_t lastUpdate;
-        int16_t min;
-        int16_t max;
+        int32_t min;
+        int32_t max;
     };
 
     // DECAY_TIME should be a power of 2 so the compiler can optimize multiply/divide operations into bit shifts

@@ -64,6 +64,8 @@ struct ADC
         isenseMaxFiltered(0),
         motorTemperatureFiltered(0),
         mosfetTemperatureFiltered(0),
+        vsenseMax(INT32_MIN),
+        vsenseMin(INT32_MAX),
         dmaTransferComplete(false),
         isenseSmoothing(0)
     {
@@ -79,13 +81,13 @@ struct ADC
      * @brief Interrupt Service Routine for the ADC. This function is called when a DMA transfer is complete
      *
      */
-    void isr();
+    inline void isr();
 
     /**
      * @brief Interrupt Service Routine for the injected ADC group
      *
      */
-    void isrInjected();
+    inline void isrInjected();
 
 protected:
     friend PidController;
@@ -140,6 +142,30 @@ public:
     {
         const uint16_t value = isenseMaxFiltered;
         isenseMaxFiltered = 0;
+        return value;
+    }
+
+    /**
+     * @brief Get the and clear max. vsense value
+     *
+     * @return int32_t returns INT32_MIN for no max. value
+     */
+    inline int32_t getAndClearVSenseMaxValue()
+    {
+        const int32_t value = vsenseMax;
+        vsenseMax = INT32_MIN;
+        return value;
+    }
+
+    /**
+     * @brief Get the and clear min. vsense value
+     *
+     * @return int32_t returns INT32_MAX no min. value
+     */
+    inline int32_t getAndClearVSenseMinValue()
+    {
+        const int32_t value = vsenseMin;
+        vsenseMin = INT32_MAX;
         return value;
     }
 
@@ -275,6 +301,8 @@ protected:
     volatile uint16_t isenseMaxFiltered;
     volatile uint16_t motorTemperatureFiltered;
     volatile uint16_t mosfetTemperatureFiltered;
+    volatile int32_t vsenseMax;
+    volatile int32_t vsenseMin;
     volatile bool dmaTransferComplete;
     uint16_t isenseSmoothing;
 };

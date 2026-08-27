@@ -90,16 +90,9 @@ extern "C" void EXTI15_10_IRQHandler(void)
  */
 extern "C" void DMA1_Channel1_IRQHandler()
 {
-    TickProfiler::start(1);
     if (DMA1->ISR & DMA_ISR_TCIF1) {
         DMA1->IFCR = DMA_IFCR_CGIF1;
         adc.isr();
-    }
-    TickProfiler::stop();
-    static uint32_t c=0;
-    if(c>10000) {
-        DEBUG_PRINT(DebugType::INFO, "DMA1_Channel1_IRQHandler=%u", TickProfiler::getTicks());
-        c =0;
     }
 }
 
@@ -110,16 +103,9 @@ extern "C" void DMA1_Channel1_IRQHandler()
  */
 extern "C" void ADC1_2_IRQHandler()
 {
-    TickProfiler::start(1);
     if (ADC1->SR & ADC_SR_JEOC) {
         ADC1->SR = ~ADC_SR_JEOC;    // clear injected end of sequence flag
         adc.isrInjected();
-    }
-    TickProfiler::stop();
-    static uint32_t c=0;
-    if(c>10000) {
-        DEBUG_PRINT(DebugType::INFO, "ADC1_2_IRQHandler=%u", TickProfiler::getTicks());
-        c =0;
     }
 }
 

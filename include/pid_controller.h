@@ -412,20 +412,20 @@ struct PidController
      * @brief Handle OCP start event
      *
      */
-    void ocp_start();
+    inline void ocp_start();
 
     /**
      * @brief Handle OCP stop event
      *
      */
-    void ocp_stop();
+    inline void ocp_stop();
 
     /**
      * @brief Check if OVP condition is met and stop motor or braking with hard fault
      *
      * @param vSense
      */
-    void ovp_check(uint16_t vSense);
+    inline void ovp_check(uint16_t vSense);
 
     /**
      * @brief Turn motor on in the specified direction
@@ -726,3 +726,6 @@ public:
 };
 
 extern PidController pid;
+
+#include "pid_controller.hpp"
+#include "adc.hpp"

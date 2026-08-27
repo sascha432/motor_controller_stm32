@@ -20,13 +20,14 @@ Stats stats;
 void Stats::update()
 {
     // get adc values
-    uint16_t vSense = adc.getVSenseValue();
-    uint16_t iSenseAvg = adc.getISenseAverageValue();
-    uint16_t motorTempFiltered = adc.getMotorTemperatureFiltered();
-    uint16_t mosfetTempFiltered = adc.getMosfetTemperatureFiltered();
+    const uint16_t vSense = adc.getVSenseValue();
+    const uint16_t iSenseAvg = adc.getISenseAverageValue();
+    const uint16_t motorTempFiltered = adc.getMotorTemperatureFiltered();
+    const uint16_t mosfetTempFiltered = adc.getMosfetTemperatureFiltered();
 
     // update stats
-    minMax.vcc.update(vSense);
+    minMax.vcc.update(adc.getAndClearVSenseMinValue(), adc.getAndClearVSenseMaxValue(), vSense);
+
     minMax.motorTemp.update(motorTempFiltered);
     minMax.mosfetTemp.update(mosfetTempFiltered);
     minMax.current.update(iSenseAvg);
