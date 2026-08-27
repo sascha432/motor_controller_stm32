@@ -118,7 +118,7 @@ struct Screen
         PID_ANTI_WINDUP,
         OVP_PROTECTION,
         WELCOME_CHIME,
-        CURRENT_LIMIT_LEVEL,
+        CURRENT_LIMIT_STRENGTH,
     };
 
     // screen dimensions

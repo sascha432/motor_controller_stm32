@@ -50,9 +50,9 @@ NTC_BETA = 3950
 NTC_NOMINAL_TEMP_C = 25.0
 MAX_RPM = 55000
 MAX_INPUT_CURRENT_LIMIT = 40000  # mA, matches the EEPROM input current limit UI maximum
-# Current limit level selectable values, matches firmware kCurrentLimitLevelItems (menu.cpp)
-CURRENT_LIMIT_LEVEL_NAMES = ("Low", "Medium", "High", "Very High")
-MAX_CURRENT_LIMIT_LEVEL = len(CURRENT_LIMIT_LEVEL_NAMES) - 1  # 3
+# Current limit strength selectable values, matches firmware kCurrentLimitStrengthItems (menu.cpp)
+CURRENT_LIMIT_STRENGTH_NAMES = ("Low", "Medium", "High", "Very High")
+MAX_CURRENT_LIMIT_STRENGTH = len(CURRENT_LIMIT_STRENGTH_NAMES) - 1  # 3
 FIRMWARE_LOG_PATTERN = re.compile(r"^\[(\d{6,})\]\s+([^\s]+)\s+(.*)$")
 PYOCD_LINE_PATTERN = re.compile(r"^\s*\d{6,}\s+[A-Za-z]\s+(.*?)(?:\s+\[[^\]]+\])?\s*$")
 LOG_ENTRY_TYPE_PATTERN = re.compile(r"^\d{2}:\d{2}:\d{2}\.\d{4}\s+([A-Z0-9_]+):\s")
@@ -236,7 +236,7 @@ class SWOData:
     eeprom_commit: bool
     send_screenshot: bool
     input_current_limit: int
-    current_limit_level: int
+    current_limit_strength: int
 
 
 @dataclass
@@ -268,7 +268,7 @@ class EEPROMData:
     ovp_protection: int
     pwm_frequency: int
     motor_chime: bool
-    current_limit_level: int
+    current_limit_strength: int
 
 
 EEPROM_FIELD_SPECS = (
@@ -276,7 +276,7 @@ EEPROM_FIELD_SPECS = (
     ("LED Brightness", "led_brightness", "int", 0, 100, None),
     ("Input Current (mA)", "input_current_limit", "int", 500, 40000, None),
     ("Motor Current (mA)", "motor_current_limit", "int", 500, 40000, None),
-    ("Current Limit Level", "current_limit_level", "choice", None, None, (("Low", 0), ("Medium", 1), ("High", 2), ("Very High", 3))),
+    ("Current Limit Strength", "current_limit_strength", "choice", None, None, (("Low", 0), ("Medium", 1), ("High", 2), ("Very High", 3))),
     ("Min RPM", "min_rpm", "int", 10, MAX_RPM, None),
     ("Max RPM", "max_rpm", "int", 10, MAX_RPM, None),
     ("Motor Direction", "motor_direction", "choice", None, None, (("Forward", 0), ("Reverse", 1))),
@@ -343,17 +343,17 @@ def anti_windup_percent_to_raw(percent_value: float) -> int:
     return int(round(percent_value * PID_ANTI_WINDUP_FACTOR))
 
 
-def current_limit_level_to_name(value: int) -> str:
-    if 0 <= value < len(CURRENT_LIMIT_LEVEL_NAMES):
-        return CURRENT_LIMIT_LEVEL_NAMES[value]
+def current_limit_strength_to_name(value: int) -> str:
+    if 0 <= value < len(CURRENT_LIMIT_STRENGTH_NAMES):
+        return CURRENT_LIMIT_STRENGTH_NAMES[value]
     return str(value)
 
 
-def current_limit_level_name_to_int(name: str) -> int:
+def current_limit_strength_name_to_int(name: str) -> int:
     try:
-        return CURRENT_LIMIT_LEVEL_NAMES.index(str(name).strip())
+        return CURRENT_LIMIT_STRENGTH_NAMES.index(str(name).strip())
     except ValueError:
-        raise ValueError(f"Unknown current limit level: {name}")
+        raise ValueError(f"Unknown current limit strength: {name}")
 
 
 def _uint16_to_float(raw_value: int) -> float:
@@ -1649,7 +1649,7 @@ class PIDTuningApp:
         self.anti_windup_var = tk.StringVar(value="0.00")
         self.rpm_var = tk.StringVar(value="0")
         self.input_current_limit_var = tk.StringVar(value="0")
-        self.current_limit_level_var = tk.StringVar(value=CURRENT_LIMIT_LEVEL_NAMES[0])
+        self.current_limit_strength_var = tk.StringVar(value=CURRENT_LIMIT_STRENGTH_NAMES[0])
         self._pid_fields_updating = False
         self._pid_fields_dirty = False
         self._last_loaded_swo_data: Optional[SWOData] = None
@@ -1899,11 +1899,11 @@ class PIDTuningApp:
         ttk.Label(pid_group, text="Limit (mA):").grid(row=5, column=0, padx=6, pady=4, sticky="w")
         ttk.Entry(pid_group, textvariable=self.input_current_limit_var, width=14).grid(row=5, column=1, padx=6, pady=4, sticky="ew")
 
-        ttk.Label(pid_group, text="Limit Level:").grid(row=6, column=0, padx=6, pady=4, sticky="w")
+        ttk.Label(pid_group, text="Limit Strength:").grid(row=6, column=0, padx=6, pady=4, sticky="w")
         ttk.Combobox(
             pid_group,
-            textvariable=self.current_limit_level_var,
-            values=CURRENT_LIMIT_LEVEL_NAMES,
+            textvariable=self.current_limit_strength_var,
+            values=CURRENT_LIMIT_STRENGTH_NAMES,
             state="readonly",
             width=12,
         ).grid(row=6, column=1, padx=6, pady=4, sticky="ew")
@@ -1943,7 +1943,7 @@ class PIDTuningApp:
         # C++ layout (SWO::DataType): float Kp, float Ki, float Kd, uint16_t antiWindup,
         # uint16_t rpm, uint32_t enabled, bool changed, 3x padding, uint32_t address,
         # bool commit, 3x padding, bool sendScreenshot, 1x padding (uint16 alignment),
-        # uint16_t inputCurrentLimit, uint8_t currentLimitLevel, 3x trailing padding.
+        # uint16_t inputCurrentLimit, uint8_t currentLimitStrength, 3x trailing padding.
         return struct.pack(
             SWO_DATA_STRUCT,
             data.kp,
@@ -1957,7 +1957,7 @@ class PIDTuningApp:
             data.eeprom_commit,
             data.send_screenshot,
             data.input_current_limit,
-            data.current_limit_level,
+            data.current_limit_strength,
         )
 
     def _pack_eeprom_data(self, data: EEPROMData) -> bytes:
@@ -1990,7 +1990,7 @@ class PIDTuningApp:
             data.ovp_protection,
             data.pwm_frequency,
             data.motor_chime,
-            data.current_limit_level,
+            data.current_limit_strength,
         )
 
     def _unpack_eeprom_data(self, payload: bytes) -> EEPROMData:
@@ -2001,7 +2001,7 @@ class PIDTuningApp:
         if len(payload) < SWO_DATA_SIZE:
             raise RuntimeError(f"SWO::data read returned too few bytes ({len(payload)} < {SWO_DATA_SIZE})")
 
-        kp, ki, kd, anti_windup_raw, rpm, enabled_state, changed, eeprom_address, eeprom_commit, send_screenshot, input_current_limit, current_limit_level = struct.unpack(
+        kp, ki, kd, anti_windup_raw, rpm, enabled_state, changed, eeprom_address, eeprom_commit, send_screenshot, input_current_limit, current_limit_strength = struct.unpack(
             SWO_DATA_STRUCT,
             payload[:SWO_DATA_SIZE],
         )
@@ -2017,7 +2017,7 @@ class PIDTuningApp:
             eeprom_commit=eeprom_commit,
             send_screenshot=send_screenshot,
             input_current_limit=input_current_limit,
-            current_limit_level=current_limit_level,
+            current_limit_strength=current_limit_strength,
         )
 
         if enabled_state not in (SWO_ENABLE_DISABLED, SWO_ENABLE_SWO, SWO_ENABLE_USB):
@@ -2038,8 +2038,8 @@ class PIDTuningApp:
         if not (0 <= data.input_current_limit <= MAX_INPUT_CURRENT_LIMIT):
             raise RuntimeError(f"Invalid SWO::data input current limit: {data.input_current_limit}")
 
-        if not (0 <= data.current_limit_level <= MAX_CURRENT_LIMIT_LEVEL):
-            raise RuntimeError(f"Invalid SWO::data current limit level: {data.current_limit_level}")
+        if not (0 <= data.current_limit_strength <= MAX_CURRENT_LIMIT_STRENGTH):
+            raise RuntimeError(f"Invalid SWO::data current limit strength: {data.current_limit_strength}")
 
         if data.eeprom_address < 0x20000000:
             raise RuntimeError("Invalid SWO::data EEPROM address: %08x" % data.eeprom_address)
@@ -2047,7 +2047,7 @@ class PIDTuningApp:
         return data
 
     def _install_pid_field_traces(self) -> None:
-        for var in (self.kp_var, self.ki_var, self.kd_var, self.anti_windup_var, self.rpm_var, self.input_current_limit_var, self.current_limit_level_var):
+        for var in (self.kp_var, self.ki_var, self.kd_var, self.anti_windup_var, self.rpm_var, self.input_current_limit_var, self.current_limit_strength_var):
             var.trace_add("write", self._on_pid_field_edited)
 
     def _on_pid_field_edited(self, *_: object) -> None:
@@ -2064,7 +2064,7 @@ class PIDTuningApp:
             self.anti_windup_var.set(f"{anti_windup_raw_to_percent(data.anti_windup):.2f}")
             self.rpm_var.set(str(data.rpm))
             self.input_current_limit_var.set(str(data.input_current_limit))
-            self.current_limit_level_var.set(current_limit_level_to_name(data.current_limit_level))
+            self.current_limit_strength_var.set(current_limit_strength_to_name(data.current_limit_strength))
             self._last_loaded_swo_data = data
             self._pid_fields_dirty = False
         finally:
@@ -2076,14 +2076,14 @@ class PIDTuningApp:
             self._append_log(f"Invalid serial parameter packet size: {len(payload)}", "ERROR")
             return
 
-        kp, ki, kd, anti_windup, rpm, input_current_limit, current_limit_level = parameters
+        kp, ki, kd, anti_windup, rpm, input_current_limit, current_limit_strength = parameters
         if not all(math.isfinite(value) for value in (kp, ki, kd)):
             self._append_log("Invalid serial parameter packet: non-finite PID value", "ERROR")
             return
         if anti_windup > anti_windup_percent_to_raw(100.0) or rpm > MAX_RPM:
             self._append_log("Invalid serial parameter packet: value out of range", "ERROR")
             return
-        if not (0 <= input_current_limit <= MAX_INPUT_CURRENT_LIMIT) or not (0 <= current_limit_level <= MAX_CURRENT_LIMIT_LEVEL):
+        if not (0 <= input_current_limit <= MAX_INPUT_CURRENT_LIMIT) or not (0 <= current_limit_strength <= MAX_CURRENT_LIMIT_STRENGTH):
             self._append_log("Invalid serial parameter packet: current limit out of range", "ERROR")
             return
 
@@ -2095,7 +2095,7 @@ class PIDTuningApp:
             self.anti_windup_var.set(f"{anti_windup_raw_to_percent(anti_windup):.2f}")
             self.rpm_var.set(str(rpm))
             self.input_current_limit_var.set(str(input_current_limit))
-            self.current_limit_level_var.set(current_limit_level_to_name(current_limit_level))
+            self.current_limit_strength_var.set(current_limit_strength_to_name(current_limit_strength))
             self._pid_fields_dirty = False
         finally:
             self._pid_fields_updating = False
@@ -2103,7 +2103,7 @@ class PIDTuningApp:
         self._append_log(
             f"Received PID params: Kp={kp:.6f} Ki={ki:.6f} Kd={kd:.6f} "
             f"AWR={anti_windup_raw_to_percent(anti_windup):.2f}% RPM={rpm} "
-            f"Current={input_current_limit}mA Level={current_limit_level}",
+            f"Current={input_current_limit}mA Strength={current_limit_strength}",
             "INFO",
         )
 
@@ -3159,16 +3159,16 @@ class PIDTuningApp:
             try:
                 payload = self.gdb_mem.read_memory(self.data_address, SWO_DATA_SIZE)
                 data = self._validate_swo_payload(payload)
-                # The SWO::data current/level mirror can be stale from a previous session
+                # The SWO::data current/strength mirror can be stale from a previous session
                 # (the target keeps running under pyocd attach/persist). The EEPROM holds
                 # the values actually in effect, so show those instead for display reads.
                 try:
                     eeprom_payload = self.gdb_mem.read_memory(data.eeprom_address, EEPROM_DATA_SIZE)
                     eeprom_data = self._unpack_eeprom_data(eeprom_payload)
                     data.input_current_limit = eeprom_data.input_current_limit
-                    data.current_limit_level = eeprom_data.current_limit_level
+                    data.current_limit_strength = eeprom_data.current_limit_strength
                 except Exception as exc:
-                    self.event_queue.put(("log", f"EEPROM read for current/level failed: {exc}"))
+                    self.event_queue.put(("log", f"EEPROM read for current/strength failed: {exc}"))
                 self.event_queue.put(("swo-read", (data, reason)))
             except Exception as exc:
                 self.event_queue.put(("log", f"Read SWO::data failed: {exc}"))
@@ -3219,7 +3219,7 @@ class PIDTuningApp:
             input_current_limit = int(self.input_current_limit_var.get().strip())
             if input_current_limit < 0 or input_current_limit > MAX_INPUT_CURRENT_LIMIT:
                 raise ValueError("Current limit out of range (0..%u)" % MAX_INPUT_CURRENT_LIMIT)
-            current_limit_level = current_limit_level_name_to_int(self.current_limit_level_var.get())
+            current_limit_strength = current_limit_strength_name_to_int(self.current_limit_strength_var.get())
         except Exception as exc:
             self._append_log(f"Invalid PID input: {exc}", "ERROR")
             return
@@ -3237,7 +3237,7 @@ class PIDTuningApp:
                 anti_windup_percent_to_raw(anti_windup),
                 rpm,
                 input_current_limit,
-                current_limit_level,
+                current_limit_strength,
             )
             self.sync_in_progress = True
 
@@ -3266,7 +3266,7 @@ class PIDTuningApp:
             eeprom_commit=False,
             send_screenshot=False,
             input_current_limit=input_current_limit,
-            current_limit_level=current_limit_level,
+            current_limit_strength=current_limit_strength,
         )
 
         def worker() -> None:
@@ -3283,7 +3283,7 @@ class PIDTuningApp:
                 )
                 self.event_queue.put(
                     ("log", f"Synced PID params to SWO::data (changed=true) "
-                     f"Current={data.input_current_limit}mA Level={data.current_limit_level}")
+                     f"Current={data.input_current_limit}mA Strength={data.current_limit_strength}")
                 )
                 # Read back once after write for confirmation.
                 payload = self.gdb_mem.read_memory(self.data_address, SWO_DATA_SIZE)
@@ -3800,7 +3800,7 @@ class PIDTuningApp:
                     f"Loaded SWO::data ({reason}): "
                     f"Kp={data.kp:.6f} Ki={data.ki:.6f} Kd={data.kd:.6f} "
                     f"AWR={anti_windup_raw_to_percent(data.anti_windup):.2f}% RPM={data.rpm} "
-                    f"Current={data.input_current_limit}mA Level={data.current_limit_level} changed={int(data.changed)}",
+                    f"Current={data.input_current_limit}mA Strength={data.current_limit_strength} changed={int(data.changed)}",
                     "INFO",
                 )
                 self._set_sync_enabled(True)
@@ -3863,7 +3863,7 @@ class PIDTuningApp:
                         self.anti_windup_var.set(f"{anti_windup_raw_to_percent(committed_eeprom_data.anti_windup):.2f}")
                         self.rpm_var.set(str(committed_eeprom_data.motor_rpm))
                         self.input_current_limit_var.set(str(committed_eeprom_data.input_current_limit))
-                        self.current_limit_level_var.set(current_limit_level_to_name(committed_eeprom_data.current_limit_level))
+                        self.current_limit_strength_var.set(current_limit_strength_to_name(committed_eeprom_data.current_limit_strength))
                         self._pid_fields_dirty = False
                     finally:
                         self._pid_fields_updating = False
@@ -3881,7 +3881,7 @@ class PIDTuningApp:
                             eeprom_commit=self._last_loaded_swo_data.eeprom_commit,
                             send_screenshot=self._last_loaded_swo_data.send_screenshot,
                             input_current_limit=committed_eeprom_data.input_current_limit,
-                            current_limit_level=committed_eeprom_data.current_limit_level,
+                            current_limit_strength=committed_eeprom_data.current_limit_strength,
                         )
 
                     self._append_log(
@@ -3891,7 +3891,7 @@ class PIDTuningApp:
                         f"AWR={anti_windup_raw_to_percent(committed_eeprom_data.anti_windup):.2f}% "
                         f"RPM={committed_eeprom_data.motor_rpm} "
                         f"Current={committed_eeprom_data.input_current_limit}mA "
-                        f"Level={committed_eeprom_data.current_limit_level}",
+                        f"Level={committed_eeprom_data.current_limit_strength}",
                         "INFO",
                     )
                     self._set_sync_enabled(True)

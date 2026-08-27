@@ -49,7 +49,6 @@ enum class AdvancedMenuItemType {
     MOTOR_RPM_SETTINGS,
     MOTOR_DIRECTION,
     SENSOR_DIRECTION,
-    CURRENT_LIMIT_LEVEL,
     PWM_FREQUENCY,
     OVP_PROTECTION,
     WELCOME_CHIME,
@@ -68,7 +67,6 @@ static const char *kAdvancedMenuItems[] = {
     "Motor RPM Settings",
     "Motor Direction",
     "Sensor Direction",
-    "Current Limit Level",
     "PWM Frequency",
     "OVP Protection",
     "Welcome Chime",
@@ -110,12 +108,14 @@ static const char *kMotorRPMSettingsItems[] = {
 enum class CurrentLimitItemType {
     INPUT_CURRENT_LIMIT = 0,
     MOTOR_CURRENT_LIMIT,
+    CURRENT_LIMIT_STRENGTH,
     BACK
 };
 
 static const char *kCurrentLimitItems[] = {
     "Input Current Limit",
     "Motor Current Limit",
+    "Current Limit Strength",
     "Back"
 };
 
@@ -135,7 +135,7 @@ static const char *kDirectionItems[] = {
     "Reverse"
 };
 
-static const char *kCurrentLimitLevelItems[] = {
+static const char *kCurrentLimitStrengthItems[] = {
     "Low",
     "Medium",
     "High",
@@ -585,6 +585,14 @@ void Menu::handleButtonPress(uint32_t duration)
                     screenFlow.next(screen);
                     setValue(eeprom.getMotorCurrentLimit());
                     break;
+                case CurrentLimitItemType::CURRENT_LIMIT_STRENGTH:
+                    screenFlow.next(new MenuScreen(
+                        Screen::Type::CURRENT_LIMIT_STRENGTH,
+                        kCurrentLimitStrengthItems,
+                        sizeof_array(kCurrentLimitStrengthItems)
+                    ));
+                    setValue(static_cast<uint8_t>(eeprom.getCurrentLimitStrength()));
+                    break;
                 case CurrentLimitItemType::BACK:
                     restorePreviousMenu();
                     break;
@@ -646,14 +654,6 @@ void Menu::handleButtonPress(uint32_t duration)
                         sizeof_array(kDirectionItems)
                     ));
                     setValue(static_cast<uint8_t>(eeprom.getSensorDirection()));
-                    break;
-                case AdvancedMenuItemType::CURRENT_LIMIT_LEVEL:
-                    screenFlow.next(new MenuScreen(
-                        Screen::Type::CURRENT_LIMIT_LEVEL,
-                        kCurrentLimitLevelItems,
-                        sizeof_array(kCurrentLimitLevelItems)
-                    ));
-                    setValue(static_cast<uint8_t>(eeprom.getCurrentLimitLevel()));
                     break;
                 case AdvancedMenuItemType::PID_PARAMETERS:
                     screenFlow.next(new MenuScreen(
@@ -864,7 +864,7 @@ void Menu::handleButtonPress(uint32_t duration)
         // === mixed menus ===
         case Screen::Type::MOTOR_DIRECTION:
         case Screen::Type::SENSOR_DIRECTION:
-        case Screen::Type::CURRENT_LIMIT_LEVEL:
+        case Screen::Type::CURRENT_LIMIT_STRENGTH:
         case Screen::Type::MIN_RPM:
         case Screen::Type::MAX_RPM:
         case Screen::Type::TFT_BRIGHTNESS:
@@ -1017,8 +1017,8 @@ int32_t Menu::updateRotaryValue(int32_t value)
         case Screen::Type::SENSOR_DIRECTION:
             eeprom.setSensorDirection(static_cast<EEPROM::SensorDirection>(getValue()));
             break;
-        case Screen::Type::CURRENT_LIMIT_LEVEL:
-            eeprom.setCurrentLimitLevel(getValue());
+        case Screen::Type::CURRENT_LIMIT_STRENGTH:
+            eeprom.setCurrentLimitStrength(getValue());
             break;
         case Screen::Type::MOTOR_BRAKE:
             eeprom.setMotorBrake(getValue());

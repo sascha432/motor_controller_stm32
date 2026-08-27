@@ -4,7 +4,7 @@
 
 inline uint32_t PidController::ocp_get_ramp() const
 {
-    switch(eeprom.getCurrentLimitLevel()) {
+    switch(eeprom.getCurrentLimitStrength()) {
         case 0:
             return 128;
         case 1:

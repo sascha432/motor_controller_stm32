@@ -47,7 +47,7 @@ struct SWO
         } EEPROM;
         volatile bool sendScreenshot;
         volatile uint16_t inputCurrentLimit;
-        volatile uint8_t currentLimitLevel;
+        volatile uint8_t currentLimitStrength;
         DataType() :
             Kp(0),
             Ki(0),
@@ -59,7 +59,7 @@ struct SWO
             EEPROM{0, false},
             sendScreenshot(false),
             inputCurrentLimit(0),
-            currentLimitLevel(0)
+            currentLimitStrength(0)
         {}
     };
     static constexpr size_t kDataTypeSize = sizeof(DataType);

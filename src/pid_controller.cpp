@@ -108,7 +108,7 @@ void PidController::reset()
             debugFloatToString(antiWindup / static_cast<float>(UIConstants::kAntiWindupFactor), 2, true),
             eeprom.getInputCurrentLimit(),
             eeprom.getMotorCurrentLimit(),
-            eeprom.getCurrentLimitLevel(),
+            eeprom.getCurrentLimitStrength(),
             eeprom.getOvpProtection()
         );
     #endif
@@ -310,7 +310,7 @@ void PidController::isr()
             eeprom.setMotorRPM(SWO::data.rpm);
             eeprom.setAntiWindup(SWO::data.antiWindup);
             eeprom.setInputCurrentLimit(SWO::data.inputCurrentLimit);
-            eeprom.setCurrentLimitLevel(SWO::data.currentLimitLevel);
+            eeprom.setCurrentLimitStrength(SWO::data.currentLimitStrength);
             SWO::data.changed = false;
 
             // apply to PID controller
@@ -329,7 +329,7 @@ void PidController::isr()
                     SWO::data.rpm,
                     debugFloatToString(SWO::data.antiWindup / static_cast<float>(UIConstants::kAntiWindupFactor), 2, true),
                     SWO::data.inputCurrentLimit,
-                    SWO::data.currentLimitLevel
+                    SWO::data.currentLimitStrength
                 );
             #endif
         }

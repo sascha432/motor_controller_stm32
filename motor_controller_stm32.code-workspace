@@ -118,6 +118,7 @@
 			"pcgcctl",
 			"Periph",
 			"PLLMUL",
+			"PYOCD",
 			"QDEC",
 			"RCC",
 			"RTSR",

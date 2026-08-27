@@ -78,7 +78,7 @@ struct UIConstants
     static constexpr uint16_t kDefaultOvpProtection = 36500;                // Default OVP protection in millivolts
     static constexpr uint16_t kDefaultPWMFrequency = 16500;                 // Default PWM frequency in Hz
     static constexpr bool kDefaultMotorChime = true;                        // Default welcome chime enabled
-    static constexpr uint8_t kDefaultCurrentLimitLevel = 1;                 // Default current limit level
+    static constexpr uint8_t kDefaultCurrentLimitStrength = 1;              // Default current limit strength
 
     // ui menu timeouts
     static constexpr uint32_t kWelcomeScreenTimeout = 2000;                 // WelcomeScreen timeout in milliseconds

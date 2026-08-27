@@ -481,7 +481,7 @@ struct PidController
         uint16_t antiWindup;
         uint16_t rpm;
         uint16_t inputCurrentLimit;
-        uint8_t currentLimitLevel;
+        uint8_t currentLimitStrength;
     };
 
     /**
@@ -491,7 +491,7 @@ struct PidController
      */
     PidParameters getPidParameters() const
     {
-        return {Kp, Ki, Kd, static_cast<uint16_t>(antiWindup), static_cast<uint16_t>(rpm), eeprom.getInputCurrentLimit(), eeprom.getCurrentLimitLevel()};
+        return {Kp, Ki, Kd, static_cast<uint16_t>(antiWindup), static_cast<uint16_t>(rpm), eeprom.getInputCurrentLimit(), eeprom.getCurrentLimitStrength()};
     }
 
     /**
@@ -508,7 +508,7 @@ struct PidController
         eeprom.setAntiWindup(params.antiWindup);
         eeprom.setMotorRPM(params.rpm);
         eeprom.setInputCurrentLimit(params.inputCurrentLimit);
-        eeprom.setCurrentLimitLevel(params.currentLimitLevel);
+        eeprom.setCurrentLimitStrength(params.currentLimitStrength);
         // apply to pid controller
         applyPIDParams();
 
