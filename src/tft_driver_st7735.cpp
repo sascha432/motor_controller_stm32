@@ -4,7 +4,8 @@
   Baremetal SPI driver for ST7735 - DMA TX based
 */
 
-#include <stm32f1xx.h>
+#include <algorithm>
+#include <memory>
 #include "tft_driver.h"
 
 #if TFT_DRIVER == TFT_DRIVER_ST7735
@@ -75,24 +76,7 @@ static inline void write_pixel_buffer_rgb565(const uint16_t *pixels, uint32_t pi
     TFT_PIN_CS_LOW();
     tft_driver_delay();
 
-    if constexpr (sizeof(s_lvgl_buf_1) > UINT16_MAX) {
-        constexpr size_t kMaxDMATransferSize = UINT16_MAX / sizeof(uint16_t); // max transfer in half words
-        while(pixel_count > 0) {
-            uint32_t transfer = pixel_count;
-            if (pixel_count > kMaxDMATransferSize) {
-                transfer = kMaxDMATransferSize;
-            }
-            tft_driver_spi_send_buffer_dma_raw(pixels, transfer * sizeof(uint16_t));
-            pixels += transfer;
-            pixel_count -= transfer;
-        }
-    }
-    else {
-        tft_driver_spi_send_buffer_dma_raw(pixels, pixel_count * sizeof(uint16_t));
-    }
-
-    tft_driver_delay();
-    TFT_PIN_CS_HIGH();
+    tft_driver_spi_send_buffer_dma_interrupt(pixels, pixel_count * sizeof(uint16_t));
 }
 
 /**
@@ -185,11 +169,23 @@ static inline void st7735_init(void)
  */
 void tft_write_window_pixels(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, const uint16_t *pixels, uint32_t pixel_count)
 {
+    tft_driver_prepare_dma();
     set_column(x0, x1);
     set_row(y0, y1);
     tft_driver_send_command(ST7735_RAMWR);
-
     write_pixel_buffer_rgb565(pixels, pixel_count);
+}
+
+/**
+ * Clear display
+ */
+void tft_clear_display(uint16_t color)
+{
+    tft_driver_prepare_dma();
+    set_column(0, LV_HOR_RES_MAX - 1);
+    set_row(0, LV_VER_RES_MAX - 1);
+    tft_driver_send_command(ST7735_RAMWR);
+    write_color_pixels(color, LV_HOR_RES_MAX * LV_VER_RES_MAX);
 }
 
 /**
@@ -199,18 +195,6 @@ void tft_driver_init(void)
 {
     // === Display setup ===
     st7735_init();
-}
-
-/**
- * Clear display
- */
-void tft_clear_display(uint16_t color)
-{
-    set_column(0, LV_HOR_RES_MAX - 1);
-    set_row(0, LV_VER_RES_MAX - 1);
-    tft_driver_send_command(ST7735_RAMWR);
-
-    write_color_pixels(color, (uint32_t)LV_HOR_RES_MAX * LV_VER_RES_MAX);
 }
 
 #endif // TFT_DRIVER == TFT_DRIVER_ST7735

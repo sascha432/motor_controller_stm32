@@ -716,7 +716,7 @@ public:
 
     // buffer for PID loop data for SWO PID tuning
     // adjust size to the interval
-    static constexpr float kPidLoopBufferSeconds = 0.15f; // how much data to store in seconds
+    static constexpr float kPidLoopBufferSeconds = 0.1f; // how much data to store in seconds
     RingBuffer<PidLoopType, std::clamp<size_t>(((1000 * kPidLoopBufferSeconds) / kPIDInterval), 32, 80)> pidLoopBuffer;
     static constexpr size_t kPidLoopBufferCount = sizeof(pidLoopBuffer) / sizeof(PidLoopType);
     static constexpr size_t kPidLoopBufferSize = sizeof(pidLoopBuffer);

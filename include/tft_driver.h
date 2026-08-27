@@ -19,15 +19,13 @@
 #endif
 
 // get dimensions from lvgl conf
-#define LV_BUFFER_SIZE              (LV_HOR_RES_MAX * LV_BUFFER_LINES)
+static constexpr uint32_t kLvTotalBufferSize = (LV_HOR_RES_MAX * LV_BUFFER_LINES);
+
+// we use double buffering
+static constexpr uint32_t kLvDisplayBufferSize = kLvTotalBufferSize / 2;
+static_assert(kLvDisplayBufferSize <= UINT16_MAX, "DMA transfers are limited to 64kb");
 
 #define TFT_DMA_CH                  DMA1_Channel5
-// #define TFT_DMA_TX_CHUNK_PIXELS     64
-
-// Function prototypes
-extern lv_disp_draw_buf_t s_lvgl_draw_buf;
-extern lv_color_t s_lvgl_buf_1[LV_BUFFER_SIZE];
-extern lv_disp_drv_t s_lvgl_disp_drv;
 
 inline void tft_driver_delay()
 {
@@ -61,10 +59,13 @@ inline void tft_backlight_pwm_set(uint8_t value)
 void tft_driver_gpio_tim_init(void);
 void tft_driver_spi_init(void);
 void tft_driver_spi_send_buffer_dma_raw(const void *data, uint16_t len);
+void tft_driver_spi_send_buffer_dma_interrupt(const void *data, uint16_t len);
 void tft_driver_spi_send_byte(uint8_t byte);
 void tft_driver_spi_send_buffer(const void *data, uint16_t len) ;
 void tft_driver_send_command(uint8_t cmd);
 void tft_driver_send_data(const void *data, uint16_t len);
+void tft_driver_dma_transfer_finished_isr();
+void tft_driver_prepare_dma();
 
 // Custom functions for each TFT driver
 void tft_driver_init(void);

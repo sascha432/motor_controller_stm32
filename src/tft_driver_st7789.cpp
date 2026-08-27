@@ -80,44 +80,7 @@ static inline void write_pixel_buffer_rgb565(const uint16_t *pixels, uint32_t pi
     TFT_PIN_CS_LOW();
     tft_driver_delay();
 
-    if constexpr (sizeof(s_lvgl_buf_1) > UINT16_MAX) {
-        constexpr size_t kMaxDMATransferSize = UINT16_MAX / sizeof(uint16_t); // max transfer in half words
-        while(pixel_count > 0) {
-            uint32_t transfer = pixel_count;
-            if (pixel_count > kMaxDMATransferSize) {
-                transfer = kMaxDMATransferSize;
-            }
-            tft_driver_spi_send_buffer_dma_raw(pixels, transfer * sizeof(uint16_t));
-            pixels += transfer;
-            pixel_count -= transfer;
-        }
-    }
-    else {
-        tft_driver_spi_send_buffer_dma_raw(pixels, pixel_count * sizeof(uint16_t));
-    }
-
-    #if 0
-    // use chunked transfer and convert to big endian
-    static uint32_t dma_transfer_buffer[TFT_DMA_TX_CHUNK_PIXELS / sizeof(uint16_t)];
-    uint32_t offset = 0;
-    while (offset < pixel_count) {
-        const uint32_t pixels_left = pixel_count - offset;
-        const uint32_t chunk_pixels = (pixels_left > TFT_DMA_TX_CHUNK_PIXELS) ? TFT_DMA_TX_CHUNK_PIXELS : pixels_left;
-        const uint32_t copy_words = (chunk_pixels + 1) / sizeof(uint16_t); // always copy 32bit words, out of bounds is safe because we only copy to the dma_transfer_buffer which is large enough
-
-        // 32bit transfer
-        uint32_t *dma_buffer = reinterpret_cast<uint32_t *>(dma_transfer_buffer);
-        const uint32_t *pixel_buffer = reinterpret_cast<const uint32_t *>(pixels + offset);
-        for (uint32_t i = 0; i < copy_words; i++) {
-            *dma_buffer++ = __REV16(*pixel_buffer++);
-        }
-        tft_driver_spi_send_buffer_dma_raw(dma_transfer_buffer, chunk_pixels * 2U);
-        offset += chunk_pixels;
-    }
-    #endif
-
-    tft_driver_delay();
-    TFT_PIN_CS_HIGH();
+    tft_driver_spi_send_buffer_dma_interrupt(pixels, pixel_count * sizeof(uint16_t));
 }
 
 /**
@@ -210,6 +173,7 @@ static inline void ST7789_init(void)
  */
 void tft_write_window_pixels(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, const uint16_t *pixels, uint32_t pixel_count)
 {
+    tft_driver_prepare_dma();
     set_column(x0, x1);
     set_row(y0, y1);
     tft_driver_send_command(ST7789_RAMWR);
@@ -221,10 +185,10 @@ void tft_write_window_pixels(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1,
  */
 void tft_clear_display(uint16_t color)
 {
+    tft_driver_prepare_dma();
     set_column(0, LV_HOR_RES_MAX - 1);
     set_row(0, LV_VER_RES_MAX - 1);
     tft_driver_send_command(ST7789_RAMWR);
-
     write_color_pixels(color, LV_HOR_RES_MAX * LV_VER_RES_MAX);
 }
 

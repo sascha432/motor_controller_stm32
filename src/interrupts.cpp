@@ -5,6 +5,7 @@
 #include "helpers.h"
 #include "pid_controller.h"
 #include "controls.h"
+#include "tft_driver.h"
 
 // === global variables ===
 
@@ -97,6 +98,17 @@ extern "C" void DMA1_Channel1_IRQHandler()
     if (DMA1->ISR & DMA_ISR_TCIF1) {
         DMA1->IFCR = DMA_IFCR_CGIF1;
         adc.isr();
+    }
+}
+
+/**
+ * @brief DMA1_Channel5_IRQHandler is the interrupt handler for the TFT SPI TX DMA channel
+ */
+extern "C" void DMA1_Channel5_IRQHandler(void)
+{
+    if (DMA1->ISR & (DMA_ISR_TCIF5 | DMA_ISR_TEIF5)) {
+        DMA1->IFCR = DMA_IFCR_CGIF5;
+        tft_driver_dma_transfer_finished_isr();
     }
 }
 

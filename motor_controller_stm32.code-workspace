@@ -22,6 +22,7 @@
 			"\\bGPIO[A-E]\\b",
 			"\\bGPIO[A-E]_BASE\\b",
 			"\\bST7789_\\w*",
+			"\\bST7735_\\w*",
 			"\\bGPIO_CRH_\\w*",
 			"\\bRCC_\\w*",
 			"\\bSPI_\\w*",
