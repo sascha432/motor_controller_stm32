@@ -3,15 +3,9 @@
 */
 
 #include <memory.h>
-#include <stm32f1xx.h>
-#include "helpers.h"
-#include "debug.h"
+#include "main.h"
 
 // === CRC helper function ===
-
-#if USE_HAL_CRC_FUNCTIONS
-extern CRC_HandleTypeDef hcrc;
-#endif
 
 uint32_t stm32_CRC(const uint32_t *data, size_t size)
 {

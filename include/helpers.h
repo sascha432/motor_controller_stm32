@@ -6,7 +6,7 @@
 
 #include <stdint.h>
 #include <type_traits>
-#include <stm32f1xx.h>
+#include "main.h"
 
 /**
  * @brief Float printf converters
@@ -219,7 +219,10 @@ struct WatchDog
      * @brief Initialize the watchdog
      *
      */
-    static void init();
+    static void init()
+    {
+        feed();
+    }
 
     /**
      * @brief Disable the watchdog

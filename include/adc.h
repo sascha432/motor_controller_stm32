@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include "main.h"
 #include "adc_converters.h"
 
 extern ADC_HandleTypeDef hadc1;
@@ -76,12 +75,6 @@ struct ADC
      *
      */
     void init();
-
-    /**
-     * @brief Initialize the DAC and GPIO pins for reference voltages
-     *
-     */
-    void initDAC();
 
     /**
      * @brief Interrupt Service Routine for the ADC. This function is called when a DMA transfer is complete

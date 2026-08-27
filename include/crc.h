@@ -6,7 +6,6 @@
 
 #include <stdint.h>
 #include <memory.h>
-#include <stm32f1xx.h>
 
 #define USE_HAL_CRC_FUNCTIONS 0
 

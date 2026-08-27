@@ -17,8 +17,6 @@ struct LEDs {
 
     static void init()
     {
-        // PWM for illuminationLedSetPWM() is initalized in tft_driver_gpio_tim_init() / shared with TFT backlight LED
-
         // Enable GPIO port clocks
         __HAL_RCC_GPIOB_CLK_ENABLE();
 

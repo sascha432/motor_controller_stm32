@@ -6,7 +6,6 @@
 
 #include "i2c.h"
 #include "debug.h"
-#include "main.h"
 
 /**
  * @brief MT6701 magnetic encoder I2C configuration

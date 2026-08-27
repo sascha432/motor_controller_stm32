@@ -56,7 +56,7 @@ inline void tft_backlight_pwm_set(uint8_t value)
 }
 
 // Common functions for all TFT drivers
-void tft_driver_gpio_tim_init(void);
+void tft_driver_gpio_init(void);
 void tft_driver_spi_init(void);
 void tft_driver_spi_send_buffer_dma_raw(const void *data, uint16_t len);
 void tft_driver_spi_send_buffer_dma_interrupt(const void *data, uint16_t len);
