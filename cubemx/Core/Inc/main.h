@@ -111,10 +111,25 @@ extern "C" {
 
 /* USER CODE END EM */
 
+void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
+
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
+void MX_DAC_Init(void);
+void MX_CRC_Init(void);
+void MX_WWDG_Init(void);
+void MX_TIM2_Init(void);
+void MX_TIM3_Init(void);
+void MX_TIM4_Init(void);
+void MX_TIM5_Init(void);
+void MX_TIM6_Init(void);
+void MX_TIM7_Init(void);
 
 /* USER CODE BEGIN EFP */
+
+void SystemClock_Config();
+
+extern CRC_HandleTypeDef hcrc;
 
 /* USER CODE END EFP */
 

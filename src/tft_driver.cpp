@@ -19,7 +19,6 @@ lv_disp_draw_buf_t s_lvgl_draw_buf;
 lv_color_t s_lvgl_buf_1[kLvDisplayBufferSize];
 lv_color_t s_lvgl_buf_2[kLvDisplayBufferSize];
 lv_disp_drv_t s_lvgl_disp_drv;
-TIM_HandleTypeDef tim2;
 
 /**
  * @brief Calculate the DMA transfer timeout based on the max. number of bytes to transfer and the SPI clock speed
@@ -38,13 +37,12 @@ static constexpr uint32_t kDMATransferFlagsBlocking = (DMA_CCR_MINC | DMA_CCR_DI
 static constexpr uint32_t kDMATransferFlagsInterrupt = (DMA_CCR_MINC | DMA_CCR_DIR | DMA_CCR_PL_1 | DMA_CCR_TCIE | DMA_CCR_TEIE);
 
 /**
- * @brief init GPIO pins and timers for the SPI display and backlight PWM
+ * @brief init GPIO pins for the SPI display
  *
  */
-void tft_driver_gpio_tim_init(void)
+void tft_driver_gpio_init(void)
 {
     // Enable GPIOC and GPIOD clocks
-    __HAL_RCC_GPIOB_CLK_ENABLE();
     __HAL_RCC_GPIOC_CLK_ENABLE();
     __HAL_RCC_GPIOD_CLK_ENABLE();
 
@@ -65,40 +63,6 @@ void tft_driver_gpio_tim_init(void)
     // set pins to default state
     TFT_PIN_CS_HIGH();
     TFT_PIN_RS_HIGH();
-
-    // backlight PWM on TFT_PIN_LED/PB11
-    __HAL_RCC_AFIO_CLK_ENABLE();
-    __HAL_RCC_TIM2_CLK_ENABLE();
-
-    __HAL_AFIO_REMAP_TIM2_PARTIAL_2();
-
-    // TFT_PWM/PB11 and LED_PWM/PB10 = Alternate Function Push-Pull, 50 MHz (CRH)
-    GPIO_InitStruct = {};
-    GPIO_InitStruct.Pin = TFT_PWM_Pin | LED_PWM_Pin;
-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-    HAL_GPIO_Init(TFT_PWM_GPIO_Port, &GPIO_InitStruct);
-
-    // TIM2 setup
-    tim2.Instance = TIM2;
-    tim2.Init.Prescaler = 71;          // 72MHz / (71+1) = 1MHz timer clock
-    tim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-    tim2.Init.Period = 999;            // 1MHz / (999+1) = 1kHz PWM
-    tim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-    HAL_TIM_PWM_Init(&tim2);
-
-    // PWM mode 1 CH3 + CH4
-    TIM_OC_InitTypeDef sConfigOC = {};
-    sConfigOC.OCMode = TIM_OCMODE_PWM1;
-    sConfigOC.Pulse = 0;
-    sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-    sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-    HAL_TIM_PWM_ConfigChannel(&tim2, &sConfigOC, TIM_CHANNEL_3);
-    HAL_TIM_PWM_ConfigChannel(&tim2, &sConfigOC, TIM_CHANNEL_4);
-
-    // Start PWM outputs
-    HAL_TIM_PWM_Start(&tim2, TIM_CHANNEL_3);
-    HAL_TIM_PWM_Start(&tim2, TIM_CHANNEL_4);
 }
 
 /**

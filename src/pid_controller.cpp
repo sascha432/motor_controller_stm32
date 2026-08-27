@@ -2,7 +2,6 @@
   Author: sascha_lammers@gmx.de
 */
 
-#include "main.h"
 #include "pid_controller.h"
 #include "mt6701_encoder.h"
 #include "leds.h"
@@ -66,68 +65,6 @@ void PidController::init()
     sConfigOC.Pulse = 0;
     HAL_TIM_PWM_ConfigChannel(&tim1, &sConfigOC, TIM_CHANNEL_4);
     HAL_TIM_PWM_Start(&tim1, TIM_CHANNEL_4);
-
-    // TIM4 setup MT6701 encoder on PB6 PB7
-    __HAL_RCC_AFIO_CLK_ENABLE();
-    __HAL_RCC_TIM4_CLK_ENABLE();
-
-    tim4.Instance = TIM4;
-    tim4.Init.Prescaler = 0;
-    tim4.Init.CounterMode = TIM_COUNTERMODE_UP;
-    tim4.Init.Period = 0xFFFF;
-    tim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-
-    TIM_Encoder_InitTypeDef sEncoderConfig = {};
-    // 4x mode, count on both edges of both channels
-    sEncoderConfig.EncoderMode = TIM_ENCODERMODE_TI12;
-    // channel 1
-    sEncoderConfig.IC1Polarity = TIM_ICPOLARITY_RISING;
-    sEncoderConfig.IC1Selection = TIM_ICSELECTION_DIRECTTI;
-    sEncoderConfig.IC1Prescaler = TIM_ICPSC_DIV1;
-    sEncoderConfig.IC1Filter = 0;
-    // channel 2
-    sEncoderConfig.IC2Polarity = TIM_ICPOLARITY_RISING;
-    sEncoderConfig.IC2Selection = TIM_ICSELECTION_DIRECTTI;
-    sEncoderConfig.IC2Prescaler = TIM_ICPSC_DIV1;
-    sEncoderConfig.IC2Filter = 0;
-
-    HAL_TIM_Encoder_Init(&tim4, &sEncoderConfig);
-    __HAL_TIM_SET_COUNTER(&tim4, 0);
-    HAL_TIM_Encoder_Start(&tim4, TIM_CHANNEL_ALL);
-
-    // TIM5 setup for RPM counter
-    __HAL_RCC_GPIOA_CLK_ENABLE();
-    __HAL_RCC_TIM5_CLK_ENABLE();
-
-    // PA1 (TIM5_CH2) input floating
-    GPIO_InitStruct = {};
-    GPIO_InitStruct.Pin = ENC1_ANALOG_Pin;
-    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    HAL_GPIO_Init(ENC1_ANALOG_GPIO_Port, &GPIO_InitStruct);
-
-    // Reset TIM5
-    TIM5->CR1 = 0;
-    TIM5->CR2 = 0;
-    TIM5->SMCR = 0;
-    TIM5->DIER = 0;
-    TIM5->CCMR1 = 0;
-    TIM5->CCER = 0;
-    // CH2 as input, mapped to TI2
-    TIM5->CCMR1 |= TIM_CCMR1_CC2S_0;
-    // Falling edge detection
-    TIM5->CCER |= TIM_CCER_CC2P;
-    // Select TI2FP2 as trigger input
-    // TS = 110
-    TIM5->SMCR |= (6 << TIM_SMCR_TS_Pos);
-    // External clock mode 1
-    // SMS = 111
-    TIM5->SMCR |= (7 << TIM_SMCR_SMS_Pos);
-    // 32-bit counter
-    TIM5->ARR = 0xFFFFFFFF;
-    // Start
-    TIM5->CNT = 0;
-    TIM5->CR1 |= TIM_CR1_CEN;
 
     // Fault interrupt pins DRV_FAULT, OCP_INT, DRV_SNSOUT
     __HAL_RCC_GPIOB_CLK_ENABLE();

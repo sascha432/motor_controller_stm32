@@ -53,16 +53,17 @@ static inline void setup()
 
     // ADC with DMA
     adc.init();
-    // DAC
-    adc.initDAC();
     // PID controller
     pid.init();
     // apply parameters
     pid.applyPIDParams();
 
     // Initialize display GPIO, PWM timer and SPI
-    tft_driver_gpio_tim_init();
+    tft_driver_gpio_init();
     tft_driver_spi_init();
+
+    // configure external interrupts last to avoid HAL resetting anything
+    EXTI_Init();
 }
 
 // === user setup runs after core setup ===
@@ -82,6 +83,7 @@ static inline void user_setup()
 
     // start the watchdog after startup is complete
     WatchDog::init();
+    MX_WWDG_Init();
 
     // Show welcome screen and load main menu
     menu.loadWelcomeScreen();
@@ -215,10 +217,11 @@ static inline void loop()
         lastLvHandler = HAL_GetTick();
     }
 
-    #if 0
+    #if 1
         static uint32_t lastDebugPrint = 0;
         if ((HAL_GetTick() - lastDebugPrint) >= 100U) {
-            DEBUG_PRINT(DebugType::INFO, "I=%u", ADCConverter::Current::convert(adc.getISenseAverageValue()));
+            DEBUG_PRINT(DebugType::INFO, "rpm=%u", (unsigned)PID_READ_RPM_COUNTER());
+            // DEBUG_PRINT(DebugType::INFO, "I=%u", ADCConverter::Current::convert(adc.getISenseAverageValue()));
             // DEBUG_PRINT(DebugType::INFO, "c=%u I=%u F=%u", (unsigned)pid.ocp.counter, (unsigned)adc.getAndClearISenseMaxValue(), (unsigned)adc.getISenseFilteredValue());
             lastDebugPrint = HAL_GetTick();
         }
@@ -394,48 +397,9 @@ static inline void EXTI_Init()
     // Enable NVIC
     HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
     HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
-}
 
-TIM_HandleTypeDef tim6;
-TIM_HandleTypeDef tim7;
-
-static inline void TIM7_TIM6_Init()
-{
-    // TIM7 for microsecond delay
-    tim7.Instance = TIM7;
-    tim7.Init.Prescaler = 71; // 72 MHz / 72 = 1 MHz (1 us tick)
-    tim7.Init.CounterMode = TIM_COUNTERMODE_UP;
-    tim7.Init.Period = 0xFFFF;
-    tim7.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-    __HAL_RCC_TIM7_CLK_ENABLE();
-    HAL_TIM_Base_Init(&tim7);
-    HAL_TIM_Base_Start(&tim7);
-
-    // TIM6 for periodic interrupts
-    tim6.Instance = TIM6;
-    tim6.Init.Prescaler = 71; // 72 MHz / 72 = 1 MHz (1 us tick)
-    tim6.Init.CounterMode = TIM_COUNTERMODE_UP;
-    tim6.Init.Period = static_cast<uint32_t>(PidController::kPIDInterval * 1000 - 1);
-
-    tim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-    __HAL_RCC_TIM6_CLK_ENABLE();
-    HAL_TIM_Base_Init(&tim6);
     HAL_NVIC_SetPriority(TIM6_IRQn, 1, 0);
     HAL_NVIC_EnableIRQ(TIM6_IRQn);
-    HAL_TIM_Base_Start_IT(&tim6);
-}
-
-CRC_HandleTypeDef hcrc;
-
-static inline void MX_CRC_Init(void)
-{
-    __HAL_RCC_CRC_CLK_ENABLE();
-
-    hcrc.Instance = CRC;
-
-    if (HAL_CRC_Init(&hcrc) != HAL_OK) {
-        Error_Handler();
-    }
 }
 
 // === DWT cycle counter ===
@@ -450,56 +414,6 @@ static inline void DWT_Init(void)
     DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
 }
 
-// === core clock configuration ===
-
-/**
-  * @brief System Clock Configuration
-  */
-static inline void SystemClock_Config()
-{
-    RCC_OscInitTypeDef RCC_OscInitStruct = {};
-    RCC_ClkInitTypeDef RCC_ClkInitStruct = {};
-    RCC_PeriphCLKInitTypeDef PeriphClkInit = {};
-
-    /** Initializes the RCC Oscillators according to the specified parameters
-     * in the RCC_OscInitTypeDef structure.
-     */
-    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
-    RCC_OscInitStruct.HSEState = RCC_HSE_ON;
-    RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
-    RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-    RCC_OscInitStruct.Prediv1Source = RCC_PREDIV1_SOURCE_HSE;
-    RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-    RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-    RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
-    RCC_OscInitStruct.PLL2.PLL2State = RCC_PLL_NONE;
-    if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
-        Error_Handler();
-    }
-
-    /** Initializes the CPU, AHB and APB buses clocks
-     */
-    RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK|RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-    RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-    RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-    RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
-    RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
-    if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK) {
-        Error_Handler();
-    }
-
-    PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_ADC|RCC_PERIPHCLK_USB;
-    PeriphClkInit.AdcClockSelection = RCC_ADCPCLK2_DIV6;
-    PeriphClkInit.UsbClockSelection = RCC_USBCLKSOURCE_PLL_DIV3;
-    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK) {
-        Error_Handler();
-    }
-
-    /** Configure the Systick interrupt time
-     */
-    __HAL_RCC_PLLI2S_ENABLE();
-}
-
 // === main ===
 
 int main(void)
@@ -511,12 +425,17 @@ int main(void)
     SystemClock_Config();
     SWO::init();
     MX_CRC_Init();
-    TIM7_TIM6_Init();
+    MX_TIM2_Init(); // PWM for TFT backlight and LED
+    MX_TIM3_Init(); // rotary encoder
+    MX_TIM4_Init(); // mt6701 encoder
+    MX_TIM5_Init(); // analog rpm counter
+    MX_TIM6_Init(); // PID timer
+    MX_TIM7_Init(); // microseconds tick timer
+    MX_DAC_Init();
     #if HAVE_USB_DEVICE
         MX_USB_DEVICE_Init();
     #endif
     setup();
-    EXTI_Init();
     // user init
     user_setup();
 

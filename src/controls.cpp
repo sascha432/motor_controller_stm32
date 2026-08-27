@@ -69,41 +69,41 @@ void Button<GPIO_Pin, ACTIVE_STATE, DEBOUNCE_TIME_MILLIS>::isr(uint32_t idr)
 
 void RotaryEncoder::init()
 {
-    // GPIO clocks
-    __HAL_RCC_GPIOA_CLK_ENABLE();
+    // // GPIO clocks
+    // __HAL_RCC_GPIOA_CLK_ENABLE();
 
-    // TIM3 clock
-    __HAL_RCC_TIM3_CLK_ENABLE();
+    // // TIM3 clock
+    // __HAL_RCC_TIM3_CLK_ENABLE();
 
-    // ENC2_A / ENC2_B as TIM3_CH1 / TIM3_CH2
-    GPIO_InitTypeDef GPIO_InitStruct = {};
-    GPIO_InitStruct.Pin = ENC2_A_Pin | ENC2_B_Pin;
-    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    HAL_GPIO_Init(ENC2_A_GPIO_Port, &GPIO_InitStruct);
+    // // ENC2_A / ENC2_B as TIM3_CH1 / TIM3_CH2
+    // GPIO_InitTypeDef GPIO_InitStruct = {};
+    // GPIO_InitStruct.Pin = ENC2_A_Pin | ENC2_B_Pin;
+    // GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    // GPIO_InitStruct.Pull = GPIO_NOPULL;
+    // HAL_GPIO_Init(ENC2_A_GPIO_Port, &GPIO_InitStruct);
 
-    // TIM3 encoder init
-    tim3.Instance = TIM3;
-    tim3.Init.Prescaler = 0;
-    tim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-    tim3.Init.Period = 0xFFFF;
-    tim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+    // // TIM3 encoder init
+    // tim3.Instance = TIM3;
+    // tim3.Init.Prescaler = 0;
+    // tim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+    // tim3.Init.Period = 0xFFFF;
+    // tim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
 
-    TIM_Encoder_InitTypeDef sEncoderConfig = {};
-    sEncoderConfig.EncoderMode = TIM_ENCODERMODE_TI1;
-    // channel 1
-    sEncoderConfig.IC1Polarity = TIM_ICPOLARITY_RISING;
-    sEncoderConfig.IC1Selection = TIM_ICSELECTION_DIRECTTI;
-    sEncoderConfig.IC1Prescaler = TIM_ICPSC_DIV1;
-    sEncoderConfig.IC1Filter = 0;
-    // channel 2
-    sEncoderConfig.IC2Polarity = TIM_ICPOLARITY_RISING;
-    sEncoderConfig.IC2Selection = TIM_ICSELECTION_DIRECTTI;
-    sEncoderConfig.IC2Prescaler = TIM_ICPSC_DIV1;
-    sEncoderConfig.IC2Filter = 0;
+    // TIM_Encoder_InitTypeDef sEncoderConfig = {};
+    // sEncoderConfig.EncoderMode = TIM_ENCODERMODE_TI1;
+    // // channel 1
+    // sEncoderConfig.IC1Polarity = TIM_ICPOLARITY_RISING;
+    // sEncoderConfig.IC1Selection = TIM_ICSELECTION_DIRECTTI;
+    // sEncoderConfig.IC1Prescaler = TIM_ICPSC_DIV1;
+    // sEncoderConfig.IC1Filter = 0;
+    // // channel 2
+    // sEncoderConfig.IC2Polarity = TIM_ICPOLARITY_RISING;
+    // sEncoderConfig.IC2Selection = TIM_ICSELECTION_DIRECTTI;
+    // sEncoderConfig.IC2Prescaler = TIM_ICPSC_DIV1;
+    // sEncoderConfig.IC2Filter = 0;
 
-    HAL_TIM_Encoder_Init(&tim3, &sEncoderConfig);
-    HAL_TIM_Encoder_Start(&tim3, TIM_CHANNEL_ALL);
+    // HAL_TIM_Encoder_Init(&tim3, &sEncoderConfig);
+    // HAL_TIM_Encoder_Start(&tim3, TIM_CHANNEL_ALL);
 }
 
 void RotaryEncoder::reset()

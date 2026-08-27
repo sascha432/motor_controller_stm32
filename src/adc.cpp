@@ -107,21 +107,6 @@ void ADC::init()
     startDMA();
 }
 
-void ADC::initDAC()
-{
-    // Initialize GPIOA for DAC output pins
-    __HAL_RCC_GPIOA_CLK_ENABLE();
-
-    GPIO_InitTypeDef GPIO_InitStruct = {};
-    GPIO_InitStruct.Pin = DRVOCP_VREF_Pin | OCP_VREF_Pin;
-    GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
-    HAL_GPIO_Init(DRVOCP_VREF_GPIO_Port, &GPIO_InitStruct);
-
-    // Enable DAC channel #1 (PA4/DRVOCP_VREF_DAC_PIN) and channel #2 (PA5/OCP_VREF_DAC_PIN)
-    __HAL_RCC_DAC_CLK_ENABLE();
-    DAC->CR |= DAC_CR_EN1 | DAC_CR_EN2;
-}
-
 void ADC::isr()
 {
     // check ovp condition
