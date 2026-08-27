@@ -12,7 +12,6 @@
 
 PidController pid;
 MotorEncoder motorEncoder;
-TIM_HandleTypeDef tim4;
 TIM_HandleTypeDef tim1;
 
 void PidController::init()

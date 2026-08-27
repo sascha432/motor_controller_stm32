@@ -158,12 +158,6 @@ struct RotaryEncoder
     {}
 
     /**
-     * @brief Initialize GPIO and TIM3 for rotary encoder
-     *
-     */
-    void init();
-
-    /**
      * @brief Reset rotary encoder value
      *
      */
