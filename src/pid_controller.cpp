@@ -98,8 +98,9 @@ void PidController::reset()
     ocp.reset();
     applyPIDParams();
 
+
     #if PID_ISR_DEBUG_PRINT
-        DEBUG_PRINT(DebugType::PID, "reset() Kp=%s Ki=%s Kd=%s RPM=%u windup=%s OCP=%u/%u OVP=%u",
+        DEBUG_PRINT(DebugType::PID, "reset() Kp=%s Ki=%s Kd=%s RPM=%u windup=%s OCP=%u/%u/%u OVP=%u",
             debugFloatToString(Kp, 6, true),
             debugFloatToString(Ki, 6, true),
             debugFloatToString(Kd, 6, true),
@@ -107,6 +108,7 @@ void PidController::reset()
             debugFloatToString(antiWindup / static_cast<float>(UIConstants::kAntiWindupFactor), 2, true),
             eeprom.getInputCurrentLimit(),
             eeprom.getMotorCurrentLimit(),
+            eeprom.getCurrentLimitLevel(),
             eeprom.getOvpProtection()
         );
     #endif
@@ -307,6 +309,8 @@ void PidController::isr()
             eeprom.setKi(SWO::data.Ki);
             eeprom.setMotorRPM(SWO::data.rpm);
             eeprom.setAntiWindup(SWO::data.antiWindup);
+            eeprom.setInputCurrentLimit(SWO::data.inputCurrentLimit);
+            eeprom.setCurrentLimitLevel(SWO::data.currentLimitLevel);
             SWO::data.changed = false;
 
             // apply to PID controller
@@ -315,14 +319,17 @@ void PidController::isr()
             pid.setKi(eeprom.getKi());
             pid.setRPM(eeprom.getMotorRPM());
             pid.setAntiWindup(eeprom.getAntiWindup());
+            pid.setInputCurrentLimit(eeprom.getInputCurrentLimit());
 
             #if PID_ISR_DEBUG_PRINT
-                DEBUG_PRINT(DebugType::PID, "SWO PID tuning: Kp=%s Ki=%s Kd=%s RPM=%u windup=%s",
+                DEBUG_PRINT(DebugType::PID, "SWO PID tuning: Kp=%s Ki=%s Kd=%s RPM=%u windup=%s OCP=%u/%u",
                     debugFloatToString(SWO::data.Kp, 6, true),
                     debugFloatToString(SWO::data.Ki, 6, true),
                     debugFloatToString(SWO::data.Kd, 6, true),
                     SWO::data.rpm,
-                    debugFloatToString(SWO::data.antiWindup / static_cast<float>(UIConstants::kAntiWindupFactor), 2, true)
+                    debugFloatToString(SWO::data.antiWindup / static_cast<float>(UIConstants::kAntiWindupFactor), 2, true),
+                    SWO::data.inputCurrentLimit,
+                    SWO::data.currentLimitLevel
                 );
             #endif
         }

@@ -49,6 +49,7 @@ enum class AdvancedMenuItemType {
     MOTOR_RPM_SETTINGS,
     MOTOR_DIRECTION,
     SENSOR_DIRECTION,
+    CURRENT_LIMIT_LEVEL,
     PWM_FREQUENCY,
     OVP_PROTECTION,
     WELCOME_CHIME,
@@ -67,6 +68,7 @@ static const char *kAdvancedMenuItems[] = {
     "Motor RPM Settings",
     "Motor Direction",
     "Sensor Direction",
+    "Current Limit Level",
     "PWM Frequency",
     "OVP Protection",
     "Welcome Chime",
@@ -131,6 +133,13 @@ static const char *kControlModeItems[] = {
 static const char *kDirectionItems[] = {
     "Forward",
     "Reverse"
+};
+
+static const char *kCurrentLimitLevelItems[] = {
+    "Low",
+    "Medium",
+    "High",
+    "Very High"
 };
 
 enum class RestoreDefaultsItemType {
@@ -638,6 +647,14 @@ void Menu::handleButtonPress(uint32_t duration)
                     ));
                     setValue(static_cast<uint8_t>(eeprom.getSensorDirection()));
                     break;
+                case AdvancedMenuItemType::CURRENT_LIMIT_LEVEL:
+                    screenFlow.next(new MenuScreen(
+                        Screen::Type::CURRENT_LIMIT_LEVEL,
+                        kCurrentLimitLevelItems,
+                        sizeof_array(kCurrentLimitLevelItems)
+                    ));
+                    setValue(static_cast<uint8_t>(eeprom.getCurrentLimitLevel()));
+                    break;
                 case AdvancedMenuItemType::PID_PARAMETERS:
                     screenFlow.next(new MenuScreen(
                         Screen::Type::PID_PARAMETERS,
@@ -847,6 +864,7 @@ void Menu::handleButtonPress(uint32_t duration)
         // === mixed menus ===
         case Screen::Type::MOTOR_DIRECTION:
         case Screen::Type::SENSOR_DIRECTION:
+        case Screen::Type::CURRENT_LIMIT_LEVEL:
         case Screen::Type::MIN_RPM:
         case Screen::Type::MAX_RPM:
         case Screen::Type::TFT_BRIGHTNESS:
@@ -998,6 +1016,9 @@ int32_t Menu::updateRotaryValue(int32_t value)
             break;
         case Screen::Type::SENSOR_DIRECTION:
             eeprom.setSensorDirection(static_cast<EEPROM::SensorDirection>(getValue()));
+            break;
+        case Screen::Type::CURRENT_LIMIT_LEVEL:
+            eeprom.setCurrentLimitLevel(getValue());
             break;
         case Screen::Type::MOTOR_BRAKE:
             eeprom.setMotorBrake(getValue());

@@ -409,6 +409,13 @@ struct PidController
     void isr();
 
     /**
+     * @brief Get OCP ramp value
+     *
+     * @return uint32_t
+     */
+    inline uint32_t ocp_get_ramp() const;
+
+    /**
      * @brief Handle OCP start event
      *
      */
@@ -473,6 +480,8 @@ struct PidController
         float Kd;
         uint16_t antiWindup;
         uint16_t rpm;
+        uint16_t inputCurrentLimit;
+        uint8_t currentLimitLevel;
     };
 
     /**
@@ -482,7 +491,7 @@ struct PidController
      */
     PidParameters getPidParameters() const
     {
-        return {Kp, Ki, Kd, static_cast<uint16_t>(antiWindup), static_cast<uint16_t>(rpm)};
+        return {Kp, Ki, Kd, static_cast<uint16_t>(antiWindup), static_cast<uint16_t>(rpm), eeprom.getInputCurrentLimit(), eeprom.getCurrentLimitLevel()};
     }
 
     /**
@@ -498,6 +507,8 @@ struct PidController
         eeprom.setKd(params.Kd);
         eeprom.setAntiWindup(params.antiWindup);
         eeprom.setMotorRPM(params.rpm);
+        eeprom.setInputCurrentLimit(params.inputCurrentLimit);
+        eeprom.setCurrentLimitLevel(params.currentLimitLevel);
         // apply to pid controller
         applyPIDParams();
 
@@ -599,9 +610,6 @@ public:
     static_assert(kPidLoopTypeSize % 4 == 0, "PidLoopType must be 4-byte aligned");
 
     // === OCP state machine and constants ===
-
-    static constexpr uint32_t kOcpCurrentRampUp = 32;
-    static constexpr uint32_t kOcpCurrentRampDown = 32;
 
     enum class OcpStateType : uint32_t {
         NONE = 0,           // no OCP condition

@@ -82,6 +82,7 @@ struct EEPROM
         uint16_t ovp_protection;
         uint16_t pwm_frequency;
         bool motor_chime;
+        uint8_t current_limit_level;
 
         /**
          * @brief Construct a new Data object with default settings
@@ -114,7 +115,8 @@ struct EEPROM
             anti_windup(UIConstants::kDefaultAntiWindup),
             ovp_protection(UIConstants::kDefaultOvpProtection),
             pwm_frequency(UIConstants::kDefaultPWMFrequency),
-            motor_chime(UIConstants::kDefaultMotorChime)
+            motor_chime(UIConstants::kDefaultMotorChime),
+            current_limit_level(UIConstants::kDefaultCurrentLimitLevel)
         {}
 
         /**
@@ -507,6 +509,16 @@ struct EEPROM
     void setMotorChime(bool value)
     {
         data.motor_chime = value;
+    }
+
+    uint8_t getCurrentLimitLevel() const
+    {
+        return data.current_limit_level;
+    }
+
+    void setCurrentLimitLevel(uint8_t value)
+    {
+        data.current_limit_level = value;
     }
 
 protected:

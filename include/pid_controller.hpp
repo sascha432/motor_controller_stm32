@@ -2,6 +2,21 @@
   Author: sascha_lammers@gmx.de
 */
 
+inline uint32_t PidController::ocp_get_ramp() const
+{
+    switch(eeprom.getCurrentLimitLevel()) {
+        case 0:
+            return 128;
+        case 1:
+            return 64;
+        case 2:
+            return 16;
+        case 3:
+            return 1;
+    }
+    return 64;
+}
+
 inline void PidController::ovp_check(uint16_t vSense)
 {
     if (vSense > faults.vsenseMax) {
@@ -18,10 +33,7 @@ inline void PidController::ocp_start()
 
     // ramp motor current limit down to stay within input current limit
     uint32_t motorCurrent = DAC_GET_MOTOR_CURRENT();
-    motorCurrent -= motorCurrent / kOcpCurrentRampDown;
-    if (motorCurrent < kOcpCurrentRampUp) {
-        motorCurrent = kOcpCurrentRampUp; // keep at kOcpCurrentRampUp to get a non zero increment for the ramp up
-    }
+    motorCurrent -= motorCurrent / ocp_get_ramp();
     DAC_SET_MOTOR_CURRENT(motorCurrent);
 
     // counter handles the warning LED and keeps it on the longer the OCP condition lasts
@@ -41,7 +53,7 @@ inline void PidController::ocp_stop()
         // ramp motor current limit up
         uint32_t motorCurrent = DAC_GET_MOTOR_CURRENT();
         if (motorCurrent < ocp.dacMotorCurrent) {
-            motorCurrent += motorCurrent / kOcpCurrentRampUp;
+            motorCurrent += std::max<uint32_t>(1, motorCurrent / ocp_get_ramp());
             if (motorCurrent >= ocp.dacMotorCurrent) {
                 // previous level reached, disabled OCP condition
                 motorCurrent = ocp.dacMotorCurrent;

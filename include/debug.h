@@ -46,7 +46,21 @@ struct SWO
             volatile bool commit;
         } EEPROM;
         volatile bool sendScreenshot;
-        DataType() : Kp(0), Ki(0), Kd(0), antiWindup(0), rpm(0), enabled(EnableState::DISABLED), changed(false), EEPROM{0, false}, sendScreenshot(false) {}
+        volatile uint16_t inputCurrentLimit;
+        volatile uint8_t currentLimitLevel;
+        DataType() :
+            Kp(0),
+            Ki(0),
+            Kd(0),
+            antiWindup(0),
+            rpm(0),
+            enabled(EnableState::DISABLED),
+            changed(false),
+            EEPROM{0, false},
+            sendScreenshot(false),
+            inputCurrentLimit(0),
+            currentLimitLevel(0)
+        {}
     };
     static constexpr size_t kDataTypeSize = sizeof(DataType);
     static_assert(sizeof(DataType) % 4 == 0, "DataType size must be a multiple of 4");
