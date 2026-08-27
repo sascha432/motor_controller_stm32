@@ -37,6 +37,7 @@ static inline void TIM6_Handler(void)
 extern "C" void TIM6_IRQHandler(void)
 {
     TIM6->SR &= ~TIM_SR_UIF;
+    WatchDog::tickHandler();
     TIM6_Handler();
 }
 
@@ -122,13 +123,16 @@ extern "C" void DMA1_Channel5_IRQHandler(void)
 
 // === interrupt handlers ===
 
+extern __IO uint32_t uwTick;
+extern HAL_TickFreqTypeDef uwTickFreq;
+
 /**
   * @brief This function handles System tick timer.
   */
 extern "C" void SysTick_Handler(void)
 {
-    HAL_IncTick();
-    WatchDog::tickHandler();
+    // HAL_IncTick();
+    uwTick += uwTickFreq;
 }
 
 /**

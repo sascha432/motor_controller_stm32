@@ -222,7 +222,7 @@ struct WatchDog
     static void delay(uint32_t ms);
 
     /**
-     * @brief Watchdog tick handler, call this from SysTick_Handler()
+     * @brief Watchdog tick handler, call this from TIM6 @ PID_INTERVAL
      *
      */
     static void tickHandler();
@@ -241,7 +241,7 @@ inline void WatchDog::delay(uint32_t ms)
 inline void WatchDog::tickHandler()
 {
     WWDG->CR = 0x7F; // feed the watchdog
-    if (++ticks >= kTimeoutMs) { // 1000ms timeout
+    if (++ticks >= static_cast<uint32_t>(kTimeoutMs / PID_INTERVAL)) { // kTimeoutMs timeout
         call_default_error_handler(InterruptErrorType::WATCHDOG_TICK_TIMEOUT);
     }
 }
