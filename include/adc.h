@@ -6,7 +6,6 @@
 
 #include "adc_converters.h"
 
-extern ADC_HandleTypeDef hadc1;
 struct PidController;
 
 static constexpr uint32_t kADCCFGRClockDiv = RCC_CFGR_ADCPRE_DIV6;

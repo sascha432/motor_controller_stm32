@@ -7,7 +7,6 @@
 #include "leds.h"
 
 ADC adc;
-ADC_HandleTypeDef hadc1;
 
 #ifndef ADC_CALIBRATION_TIMEOUT
     #define ADC_CALIBRATION_TIMEOUT 10

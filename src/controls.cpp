@@ -9,7 +9,6 @@ RotaryEncoderKnob knob;
 KnobButton knobButton;
 BackButton backButton;
 StartButton startButton;
-TIM_HandleTypeDef tim3;
 
 template <uint16_t GPIO_Pin, bool ACTIVE_STATE, uint32_t DEBOUNCE_TIME_MILLIS>
 void Button<GPIO_Pin, ACTIVE_STATE, DEBOUNCE_TIME_MILLIS>::init(CallbackType releaseCallback, CallbackType isDownCallback)
