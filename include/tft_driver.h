@@ -26,8 +26,44 @@ static constexpr uint32_t kLvDisplayBufferSize = kLvTotalBufferSize / 2;
 static_assert(kLvDisplayBufferSize <= UINT16_MAX, "DMA transfers are limited to 64kb");
 
 #define TFT_DMA_CH                  DMA1_Channel5
+#define TFT_DMA                     DMA1
 
-inline void tft_driver_delay()
+// in draw_buf_flush() lvgl is blocking if s_lvgl_disp_drv.draw_buf->flushing is set
+// as long as only lvgl is drawing to the display in the main loop, this does not require a separate locking mechanism
+#define HAVE_LVGL_BUFFER_LOCK       0
+
+#if HAVE_LVGL_BUFFER_LOCK
+extern volatile bool s_lvgl_buf_busy;
+#endif
+extern lv_disp_drv_t s_lvgl_disp_drv;
+
+static inline void tft_driver_global_unlock()
+{
+    #if HAVE_LVGL_BUFFER_LOCK
+    // DMA done, remove busy flag
+    s_lvgl_buf_busy = false;
+    #endif
+}
+
+/**
+ * @brief Unlock DMA transfer
+ *
+ */
+static inline void tft_driver_dma_transfer_finished_isr()
+{
+    // inlined code lv_disp_flush_ready(&s_lvgl_disp_drv);
+    s_lvgl_disp_drv.draw_buf->flushing = 0;
+    s_lvgl_disp_drv.draw_buf->flushing_last = 0;
+
+    // Post-Transfer Cleanup is done before the next DMA request indicated by CS pulled low
+    tft_driver_global_unlock();
+}
+
+/**
+ * @brief Internal delay function
+ *
+ */
+static inline void tft_driver_delay()
 {
     __NOP();
 }

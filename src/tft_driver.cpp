@@ -8,10 +8,6 @@
 #include "tft_driver.h"
 #include "tft_driver_screenshot.h"
 
-// in draw_buf_flush() lvgl is blocking if s_lvgl_disp_drv.draw_buf->flushing is set
-// as long as only lvgl is drawing to the display in the main loop, this does not require a separate locking mechanism
-#define HAVE_LVGL_BUFFER_LOCK 0
-
 #if HAVE_LVGL_BUFFER_LOCK
 volatile bool s_lvgl_buf_busy;
 #endif
@@ -66,7 +62,8 @@ void tft_driver_gpio_init(void)
 }
 
 /**
- * Initialize SPI2 for display communication
+ * @brief Initialize SPI2 for display communication
+ *
  */
 void tft_driver_spi_init(void)
 {
@@ -106,7 +103,24 @@ void tft_driver_spi_init(void)
     NVIC_EnableIRQ(DMA1_Channel5_IRQn);
 }
 
-static void tft_driver_clear_spi_rx_fifo()
+static inline void tft_driver_global_lock()
+{
+    #if HAVE_LVGL_BUFFER_LOCK
+    // set DMA busy flag to block any DMA transfer
+    s_lvgl_buf_busy = true;
+    #endif
+}
+
+static inline void tft_driver_global_lock_wait_ready()
+{
+    #if HAVE_LVGL_BUFFER_LOCK
+    // wait until the DMA transfer is ready
+    while(s_lvgl_buf_busy) {
+    }
+    #endif
+}
+
+static inline void tft_driver_clear_spi_rx_fifo()
 {
     // Clear any data in RX FIFO (SPI receives during full-duplex transmission)
     while (SPI2->SR & SPI_SR_RXNE) {
@@ -116,12 +130,20 @@ static void tft_driver_clear_spi_rx_fifo()
     (void)SPI2->SR;
 }
 
+static inline void tft_driver_wait_spi_sync()
+{
+    // SPI sync, wait for TX FIFO to empty (TXE flag set) and SPI to finish transmitting (BSY flag clear)
+    uint32_t timeout = 500;
+    while (((SPI2->SR & (SPI_SR_TXE | SPI_SR_BSY)) != SPI_SR_TXE) && --timeout) {
+    }
+}
+
 static void tft_driver_start_dma_transfer(const void *data, uint16_t len, uint32_t ccr)
 {
     // // Disable DMA channel
     TFT_DMA_CH->CCR &= ~DMA_CCR_EN;
     // // Clear all DMA flags
-    DMA1->IFCR = DMA_IFCR_CGIF5 | DMA_IFCR_CTCIF5 | DMA_IFCR_CHTIF5 | DMA_IFCR_CTEIF5;
+    TFT_DMA->IFCR = DMA_IFCR_CGIF5 | DMA_IFCR_CTCIF5 | DMA_IFCR_CHTIF5 | DMA_IFCR_CTEIF5;
 
     // Configure DMA transfer source and parameters
     TFT_DMA_CH->CMAR = reinterpret_cast<const uint32_t>(data);  // Source address (data buffer)
@@ -141,94 +163,77 @@ static void tft_driver_clear_dma_transfer()
     // Disable SPI TX DMA requests
     SPI2->CR2 &= ~SPI_CR2_TXDMAEN;
     // Clear all DMA flags again
-    DMA1->IFCR = DMA_IFCR_CGIF5 | DMA_IFCR_CTCIF5 | DMA_IFCR_CHTIF5 | DMA_IFCR_CTEIF5;
+    TFT_DMA->IFCR = DMA_IFCR_CGIF5 | DMA_IFCR_CTCIF5 | DMA_IFCR_CHTIF5 | DMA_IFCR_CTEIF5;
 }
 
 /**
- * Send data buffer via SPI2 TX DMA with CS already asserted.
+ * @brief Start DMA transfer in blocking mode
  */
 void tft_driver_spi_send_buffer_dma_raw(const void *data, uint16_t len)
 {
     // start DMA transfer
     tft_driver_start_dma_transfer(data, len, kDMATransferFlagsBlocking);
 
-    // Wait for DMA transfer to complete with timeout protection
+    // Wait for DMA transfer to complete with timeout
     uint32_t start = HAL_GetTick();
-    while (!(DMA1->ISR & DMA_ISR_TCIF5) && (HAL_GetTick() - start <= kDMATransferTimeoutMillis)) {
+    while (!(TFT_DMA->ISR & DMA_ISR_TCIF5) && (HAL_GetTick() - start <= kDMATransferTimeoutMillis)) {
     }
 
     // Post-Transfer Cleanup
     tft_driver_clear_dma_transfer();
-
-    // SPI sync, wait for TX FIFO to empty (TXE flag set) and SPI to finish transmitting (BSY flag clear)
-    start = 1000;
-    while (((SPI2->SR & (SPI_SR_TXE | SPI_SR_BSY)) != SPI_SR_TXE) && --start) {
-    }
-
-    tft_driver_clear_spi_rx_fifo();
-}
-
-void tft_driver_spi_send_buffer_dma_interrupt(const void *data, uint16_t len)
-{
-    #if HAVE_LVGL_BUFFER_LOCK
-    // set DMA busy flag to block any DMA transfer
-    s_lvgl_buf_busy = true;
-    #endif
-
-    // start DMA transfer with interrupts
-    tft_driver_start_dma_transfer(data, len, kDMATransferFlagsInterrupt);
-}
-
-void tft_driver_dma_transfer_finished_isr()
-{
-    // Complete cleanup now that the DMA interrupt has signaled the transfer
-    tft_driver_clear_dma_transfer();
-
-    // SPI sync, wait for TX FIFO to empty (TXE flag set) and SPI to finish transmitting (BSY flag clear)
-    uint32_t timeout = 1000; // 1000 cycles = ~13.9us
-    while (((SPI2->SR & (SPI_SR_TXE | SPI_SR_BSY)) != SPI_SR_TXE) && --timeout) {
-    }
-
-    TFT_PIN_CS_HIGH();
-
-    // tell LVGL its ready with the last DMA transfer
-    lv_disp_flush_ready(&s_lvgl_disp_drv);
-    #if HAVE_LVGL_BUFFER_LOCK
-    // DMA done, remove busy flag
-    s_lvgl_buf_busy = false;
-    #endif
-}
-
-void tft_driver_prepare_dma()
-{
-    #if HAVE_LVGL_BUFFER_LOCK
-    // wait until the DMA transfer is ready
-    while(s_lvgl_buf_busy) {
-    }
-    #endif
-
-    // the ISR does not clear the rx fifo
+    tft_driver_wait_spi_sync();
     tft_driver_clear_spi_rx_fifo();
 }
 
 /**
- * Send single SPI byte (DMA)
+ * @brief Start DMA transfer in non-blocking mode
+ *
+ * @param data
+ * @param len
+ */
+void tft_driver_spi_send_buffer_dma_interrupt(const void *data, uint16_t len)
+{
+    tft_driver_global_lock();
+    // start DMA transfer with interrupts
+    tft_driver_start_dma_transfer(data, len, kDMATransferFlagsInterrupt);
+}
+
+/**
+ * @brief Wait for the DMA to be ready and prepare it for new transfer
+ *
+ */
+void tft_driver_prepare_dma()
+{
+    tft_driver_global_lock_wait_ready();
+
+    // check if the last DMA transfer left CS in low state
+    if (TFT_PIN_IS_CS_LOW()) {
+        // Post-Transfer Cleanup
+        tft_driver_clear_dma_transfer();
+        tft_driver_wait_spi_sync();
+        TFT_PIN_CS_HIGH();
+    }
+    tft_driver_clear_spi_rx_fifo();
+}
+
+/**
+ * @brief Send single SPI byte (DMA)
+ *
  */
 void tft_driver_spi_send_byte(uint8_t byte)
 {
     /* Pull CS low before transfer */
     TFT_PIN_CS_LOW();
     tft_driver_delay();
-
     tft_driver_spi_send_buffer_dma_raw(&byte, 1);
-
     /* Pull CS high after transfer */
     tft_driver_delay();
     TFT_PIN_CS_HIGH();
 }
 
 /**
- * Send data buffer via SPI (DMA)
+ * @brief Send data buffer via SPI (DMA)
+ *
  */
 void tft_driver_spi_send_buffer(const void *data, uint16_t len)
 {
@@ -240,7 +245,8 @@ void tft_driver_spi_send_buffer(const void *data, uint16_t len)
 }
 
 /**
- * Send SPI command byte (with RS=0)
+ * @brief Send SPI command byte (with RS=0)
+ *
  */
 void tft_driver_send_command(uint8_t cmd)
 {
@@ -252,7 +258,8 @@ void tft_driver_send_command(uint8_t cmd)
 }
 
 /**
- * Send SPI data bytes (with RS=1)
+ * @brief Send SPI data bytes (with RS=1)
+ *
  */
 void tft_driver_send_data(const void *data, uint16_t len)
 {
@@ -261,7 +268,8 @@ void tft_driver_send_data(const void *data, uint16_t len)
 }
 
 /**
- * Flush callback for LVGL
+ * @brief Flush callback for LVGL
+ *
  */
 void tft_driver_lvgl_flush_cb(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p)
 {
@@ -281,7 +289,8 @@ void tft_driver_lvgl_flush_cb(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv
 }
 
 /**
- * Initialize LVGL display driver and register callback
+ * @brief Initialize LVGL display driver and register callback
+ *
  */
 void tft_driver_lvgl_init(void)
 {

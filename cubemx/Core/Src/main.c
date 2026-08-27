@@ -354,8 +354,8 @@ void MX_TIM4_Init(void)
   }
   /* USER CODE BEGIN TIM4_Init 2 */
 
-  __HAL_TIM_SET_COUNTER(&htim4, 0);
   HAL_TIM_Encoder_Start(&htim4, TIM_CHANNEL_ALL);
+  __HAL_TIM_SET_COUNTER(&htim4, 0);
 
   /* USER CODE END TIM4_Init 2 */
 

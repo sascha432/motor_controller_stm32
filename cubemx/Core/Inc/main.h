@@ -84,6 +84,7 @@ enum InterruptErrorType {
 #define TFT_PIN_RS_HIGH()                           (TFT_DC_GPIO_Port->BSRR = TFT_DC_Pin)
 #define TFT_PIN_RS_LOW()                            (TFT_DC_GPIO_Port->BRR = TFT_DC_Pin)
 #define TFT_PIN_CS_HIGH()                           (TFT_CS_GPIO_Port->BSRR = TFT_CS_Pin)
+#define TFT_PIN_IS_CS_LOW()                         ((TFT_CS_GPIO_Port->IDR & TFT_CS_Pin) == 0)
 #define TFT_PIN_CS_LOW()                            (TFT_CS_GPIO_Port->BRR = TFT_CS_Pin)
 #define TFT_PIN_RST_HIGH()                          (TFT_RST_GPIO_Port->BSRR = TFT_RST_Pin)
 #define TFT_PIN_RST_LOW()                           (TFT_RST_GPIO_Port->BRR = TFT_RST_Pin)
