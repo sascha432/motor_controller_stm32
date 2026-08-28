@@ -68,7 +68,7 @@ static inline void delay_us()
 {
     static_assert(US <= 0xFFFF, "delay_us() value too high for 16bit timer");
     const uint16_t start = TIM7->CNT;
-    while ((uint16_t)(TIM7->CNT - start) < (uint16_t)US) {
+    while (static_cast<uint16_t>(TIM7->CNT - start) < static_cast<uint16_t>(US)) {
     }
 }
 
@@ -116,8 +116,12 @@ inline void FloatToString::convertTrimmed(char *buffer, size_t size, float value
     float_to_string_convert(buffer, size, value, precision, true);
 }
 
+#if DEBUG
+
 // uses static buffer to return pointer(s) to string(s) for debugging
 const char *debugFloatToString(float value, uint8_t precision = 6, bool trimTrailingZeros = false);
+
+#endif
 
 /**
  * @brief Simple non-blocking Ring buffer implementation
@@ -197,10 +201,7 @@ struct WatchDog
      * @brief Initialize the watchdog
      *
      */
-    static void init()
-    {
-        feed();
-    }
+    static void init();
 
     /**
      * @brief Disable the watchdog
@@ -227,12 +228,18 @@ struct WatchDog
      */
     static void tickHandler();
 
+protected:
     static volatile uint32_t ticks;
 };
 
+inline void WatchDog::init()
+{
+    feed();
+}
+
 inline void WatchDog::delay(uint32_t ms)
 {
-    uint32_t start = HAL_GetTick();
+    const uint32_t start = HAL_GetTick();
     while ((HAL_GetTick() - start) < ms) {
         feed();
     }
@@ -278,25 +285,6 @@ inline T filterValue(T filteredValue, T value)
     }
     else {
         return (filteredValue * static_cast<FILTER_TYPE>(FILTER - 1) + value) / FILTER;
-    }
-}
-
-/**
- * @brief Check if a value is divisible by a divisor
- *
- * @param value The value to check
- * @param divisor The divisor to check against
- * @return true if value is divisible by divisor
- * @return false otherwise
- */
-template<uint32_t DIVISOR>
-inline bool kIsDivisible(uint32_t value)
-{
-    if constexpr ((DIVISOR & (DIVISOR - 1)) == 0) {
-        return (value & (DIVISOR - 1)) == 0;
-    }
-    else {
-        return (value % DIVISOR) == 0;
     }
 }
 

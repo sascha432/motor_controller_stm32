@@ -135,7 +135,7 @@ static const char *kDirectionItems[] = {
     "Reverse"
 };
 
-static const char *kCurrentLimitStrengthItems[] = {
+const char *kCurrentLimitStrengthItems[] = {
     "Low",
     "Medium",
     "High",
@@ -856,6 +856,11 @@ void Menu::handleButtonPress(uint32_t duration)
                         screenFlow->setSteps(UIConstants::kStepMotorCurrent);
                         setValue(eeprom.getMotorCurrentLimit());
                         break;
+                    case DashboardScreen::SelectedValueType::CURRENT_LIMIT_STRENGTH:
+                        dashboard.setMaxAcceleration(1);
+                        screenFlow->setSteps(1);
+                        setValue(eeprom.getCurrentLimitStrength());
+                        break;
                     case DashboardScreen::SelectedValueType::MAX:
                         break;
                 }
@@ -986,6 +991,11 @@ int32_t Menu::updateRotaryValue(int32_t value)
                     clampedValue = std::clamp<int32_t>(getValue(), UIConstants::kMinMotorCurrent, UIConstants::kMaxMotorCurrent);
                     eeprom.setMotorCurrentLimit(clampedValue);
                     pid.setMotorCurrentLimit(eeprom.getMotorCurrentLimit());
+                    setValue(clampedValue);
+                    break;
+                case DashboardScreen::SelectedValueType::CURRENT_LIMIT_STRENGTH:
+                    clampedValue = std::clamp<int32_t>(getValue(), UIConstants::kMinCurrentLimitStrength, UIConstants::kMaxCurrentLimitStrength);
+                    eeprom.setCurrentLimitStrength(clampedValue);
                     setValue(clampedValue);
                     break;
                 case DashboardScreen::SelectedValueType::MAX:

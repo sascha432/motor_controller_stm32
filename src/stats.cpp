@@ -26,10 +26,9 @@ void Stats::update()
 
     // update stats
     minMax.vcc.update(adc.getAndClearVSenseMinValue(), adc.getAndClearVSenseMaxValue(), vSense);
-
+    minMax.current.update(iSenseAvg);
     minMax.motorTemp.update(motorTempFiltered);
     minMax.mosfetTemp.update(mosfetTempFiltered);
-    minMax.current.update(iSenseAvg);
 
     // store converted values for display purposes
     vcc = ADCConverter::Voltage::convert(vSense);

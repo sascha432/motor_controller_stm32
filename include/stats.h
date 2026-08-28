@@ -204,7 +204,7 @@ namespace Helpers {
             return output / kFactor;
         }
 
-    // private:
+    private:
         OUTPUT_TYPE output;
     };
 
@@ -309,7 +309,7 @@ struct Stats
     volatile size_t graphWriteIndex;
     volatile bool graphDirty;
 
-// protected:
+protected:
     // stats
     struct {
         Helpers::MinMax<10000> vcc;

@@ -14,7 +14,7 @@ void delay_us(uint32_t us)
         us %= 1000;
     }
     const uint16_t start = TIM7->CNT;
-    while ((uint16_t)(TIM7->CNT - start) < us) {
+    while (static_cast<uint16_t>(TIM7->CNT - start) < static_cast<uint16_t>(us)) {
     }
 }
 
