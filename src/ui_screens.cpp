@@ -8,6 +8,8 @@
 #include "pid_controller.h"
 #include "serial.h"
 
+extern const char *kCurrentLimitStrengthItems[];
+
 // === Helpers ===
 
 inline constexpr lv_coord_t diagnostic_screen_get_ypos_for_row(int32_t row)
@@ -310,7 +312,6 @@ void SliderScreen::load()
     lv_obj_set_width(titleObj, kSliderScreenContainerWidth);
     lv_obj_set_style_text_align(titleObj, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
     lv_obj_set_style_anim_speed(titleObj, kSliderScreenTitleAnimSpeed, LV_PART_MAIN);
-    lv_label_set_long_mode(titleObj, LV_LABEL_LONG_CLIP);
     lv_label_set_long_mode(titleObj, LV_LABEL_LONG_SCROLL_CIRCULAR);
 
     const lv_coord_t sliderVisualHeight = std::max<lv_coord_t>(kSliderScreenSliderHeight, kSliderScreenKnobSize + 4);
@@ -629,8 +630,9 @@ void DashboardScreen::load()
 
     valueLabel = lv_label_create(container);
     lv_obj_set_style_text_color(valueLabel, DASHBOARDSCREEN_COLOR_PWM_LABEL, LV_PART_MAIN);
-    lv_obj_set_width(valueLabel, kDashboardScreenContainerWidth);
+    lv_obj_set_width(valueLabel, kDashboardScreenContainerWidth - kDashboardScreenValueTuningOffsetX);
     lv_obj_set_style_text_align(valueLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+    lv_obj_set_style_anim_speed(valueLabel, 10, LV_PART_MAIN);
 
     for (size_t i = 0; i < kDashboardScreenGraphLegendCount; ++i) {
         graphLegendLabels[i] = lv_label_create(container);
@@ -676,8 +678,9 @@ void DashboardScreen::_refreshVisuals()
                 lv_obj_clear_flag(rpmLabel, LV_OBJ_FLAG_HIDDEN);
 
                 lv_obj_set_style_text_font(valueLabel, kDashboardScreenValueFixedFont, LV_PART_MAIN);
-                lv_obj_set_pos(valueLabel, 0, kDashboardScreenValueBottomOffsetY);
+                lv_obj_set_pos(valueLabel, kDashboardScreenValueTuningOffsetX, kDashboardScreenValueBottomOffsetY);
                 lv_obj_set_style_text_align(valueLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+                lv_label_set_long_mode(valueLabel, LV_LABEL_LONG_CLIP);
 
                 lv_obj_add_flag(graphContainer, LV_OBJ_FLAG_HIDDEN);
                 for (auto *label : graphLegendLabels) {
@@ -691,13 +694,14 @@ void DashboardScreen::_refreshVisuals()
 
                 if (selectedValue == SelectedValueType::SPEED2) {
                     lv_obj_set_style_text_font(valueLabel, kDashboardScreenValueFixedFont, LV_PART_MAIN);
-                    lv_obj_set_pos(valueLabel, 0, kDashboardScreenValueTuningOffsetY);
+                    lv_obj_set_pos(valueLabel, kDashboardScreenValueTuningOffsetX, kDashboardScreenValueTuningOffsetY);
                 }
                 else {
                     lv_obj_set_style_text_font(valueLabel, kDashboardScreenValueFont, LV_PART_MAIN);
-                    lv_obj_set_pos(valueLabel, 0, kDashboardScreenValueTuningOffsetY - 3);
+                    lv_obj_set_pos(valueLabel, kDashboardScreenValueTuningOffsetX, kDashboardScreenValueTuningOffsetY - 3);
                 }
                 lv_obj_set_style_text_align(valueLabel, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
+                lv_label_set_long_mode(valueLabel, LV_LABEL_LONG_SCROLL_CIRCULAR);
 
                 lv_obj_clear_flag(graphContainer, LV_OBJ_FLAG_HIDDEN);
                 for (auto *label : graphLegendLabels) {
@@ -749,7 +753,7 @@ void DashboardScreen::_refreshVisuals()
             break;
         case SelectedValueType::ANTI_WINDUP: {
             if (eeprom.getAntiWindup() == 0) {
-                lv_label_set_text_static(valueLabel, "AWU OFF");
+                lv_label_set_text_static(valueLabel, "Anti-Windup OFF");
             }
             else {
                 const uint32_t antiWindup = (eeprom.getAntiWindup() * 1000) / UIConstants::kAntiWindupFactor;
@@ -764,6 +768,10 @@ void DashboardScreen::_refreshVisuals()
             break;
         case SelectedValueType::MOTOR_CURRENT_LIMIT:
             snprintf(valueLabelBuf, sizeof(valueLabelBuf), "Motor " SPRINTF_FP1_FMT "A", CONVERT_TO_FP1(eeprom.getMotorCurrentLimit()));
+            lv_label_set_text_static(valueLabel, valueLabelBuf);
+            break;
+        case SelectedValueType::CURRENT_LIMIT_STRENGTH:
+            snprintf(valueLabelBuf, sizeof(valueLabelBuf), "Strength %s", kCurrentLimitStrengthItems[eeprom.getCurrentLimitStrength() % (UIConstants::kMaxCurrentLimitStrength + 1)]);
             lv_label_set_text_static(valueLabel, valueLabelBuf);
             break;
         case SelectedValueType::MAX:

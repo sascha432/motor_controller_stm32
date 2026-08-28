@@ -198,6 +198,7 @@ struct Screen
     static constexpr lv_coord_t kDashboardScreenRpmOffsetY = (kScreenHeight / 2) - 12;
     static constexpr lv_coord_t kDashboardScreenValueBottomOffsetY = kDashboardScreenContainerHeight - 24;
     static constexpr lv_coord_t kDashboardScreenValueTuningOffsetY = 40;
+    static constexpr lv_coord_t kDashboardScreenValueTuningOffsetX = kDashboardScreenContainerWidth / 2;
     static constexpr lv_coord_t kDashboardScreenValueLabelHeight = 14;
     static constexpr lv_coord_t kDashboardScreenGraphTopGap = 4;
     static constexpr lv_coord_t kDashboardScreenGraphLegendWidth = 28;
@@ -521,6 +522,7 @@ struct DashboardScreen : public Screen
         ANTI_WINDUP,
         INPUT_CURRENT_LIMIT,
         MOTOR_CURRENT_LIMIT,
+        CURRENT_LIMIT_STRENGTH,
         MAX
     };
 

@@ -19,6 +19,8 @@ struct UIConstants
     static constexpr uint32_t kStepMotorCurrent = 100;                      // motor current step in mA
     static constexpr uint32_t kMinMotorCurrent = kStepMotorCurrent * 20;    // min. peak motor current in mA
     static constexpr uint32_t kMaxMotorCurrent = 40000;                     // max. peak motor current in mA
+    static constexpr uint32_t kMinCurrentLimitStrength = 0;                 // min. value
+    static constexpr uint32_t kMaxCurrentLimitStrength = 3;                 // max. value
     static constexpr uint16_t kMinRPM = 10;                                 // Min. Motor RPM
     static constexpr uint16_t kMaxRPM = 55000;                              // Max. Motor RPM
     static constexpr uint8_t kMinTFTBrightness = 5;                         // Min. TFT Brightness
