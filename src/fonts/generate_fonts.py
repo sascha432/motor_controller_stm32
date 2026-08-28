@@ -14,6 +14,8 @@ from pathlib import Path
 FONT_SPECS = (
     # Edit these symbol strings directly when the UI starts using new characters.
     # Keep each entry readable instead of converting them into hex ranges.
+    # Sizes below are .rodata (flash) bytes measured with arm-none-eabi-size.
+    # 10px: 551 B (digits/space/., custom font, no built-in equivalent used)
     ("Montserrat-Regular.ttf", 10, "lv_font_montserrat_10_digits.c", (
         " ",
         "0123456789",
@@ -22,6 +24,47 @@ FONT_SPECS = (
         ".,",                                           # !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~
         "",
     )),
+    # Replaces the LVGL built-in LV_FONT_MONTSERRAT_12/14/18/24 (full ASCII+Latin-1).
+    # Source: Montserrat-Medium.ttf (same weight the LVGL built-ins are generated from).
+    # Shared glyph set for all sizes; names need the _ui suffix because the generated
+    # .c guard (LV_FONT_MONTSERRAT_<SIZE>_UI) must not collide with lv_conf.h switches.
+    # 12px: built-in LV_FONT_MONTSERRAT_12 (full ASCII+Latin-1) 11,590 B -> lv_font_montserrat_12_ui 5,011 B
+    ("Montserrat-Medium.ttf", 12, "lv_font_montserrat_12_ui.c", (
+        " ",
+        "0123456789",
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ",                   # ABCDEFGHIJKLMNOPQRSTUVWXYZ
+        "abcdefghijklmnopqrstuvwxyz",                   # "abcdefghijklmnopqrstuvwxyz"
+        "()#%&-./:",                                    # !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~
+        "°",
+    )),
+    # 14px: built-in LV_FONT_MONTSERRAT_14 (full ASCII+Latin-1) 13,751 B -> lv_font_montserrat_14_ui 5,411 B
+    ("Montserrat-Medium.ttf", 14, "lv_font_montserrat_14_ui.c", (
+        " ",
+        "0123456789",
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ",                   # ABCDEFGHIJKLMNOPQRSTUVWXYZ
+        "abcdefghijklmnopqrstuvwxyz",                   # "abcdefghijklmnopqrstuvwxyz"
+        "()#%&-./:",                                    # !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~
+        "°",
+    )),
+    # 18px: built-in LV_FONT_MONTSERRAT_18 (full ASCII+Latin-1) 19,132 B -> lv_font_montserrat_18_ui 6,533 B
+    ("Montserrat-Medium.ttf", 18, "lv_font_montserrat_18_ui.c", (
+        " ",
+        "0123456789",
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ",                   # ABCDEFGHIJKLMNOPQRSTUVWXYZ
+        "abcdefghijklmnopqrstuvwxyz",                   # "abcdefghijklmnopqrstuvwxyz"
+        "()#%&-./:",                                    # !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~
+        "°",
+    )),
+    # 24px: built-in LV_FONT_MONTSERRAT_24 (full ASCII+Latin-1) 28,803 B -> lv_font_montserrat_24_ui 8,378 B
+    ("Montserrat-Medium.ttf", 24, "lv_font_montserrat_24_ui.c", (
+        " ",
+        "0123456789",
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ",                   # ABCDEFGHIJKLMNOPQRSTUVWXYZ
+        "abcdefghijklmnopqrstuvwxyz",                   # "abcdefghijklmnopqrstuvwxyz"
+        "()#%&-./:",                                    # !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~
+        "°",
+    )),
+    # 14px mono: 1,032 B
     ("DejaVuSansMono.ttf", 14, "lv_font_dejavu_sans_mono_14.c", (
         " ",
         "0123456789",
@@ -30,6 +73,7 @@ FONT_SPECS = (
         "().%",                                         # !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~
         "°",
     )),
+    # 24px mono: 2,007 B
     ("DejaVuSansMono.ttf", 24, "lv_font_dejavu_sans_mono_24.c", (
         " ",
         "0123456789",

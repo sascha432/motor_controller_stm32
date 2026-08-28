@@ -126,16 +126,16 @@ struct Screen
     static constexpr const lv_coord_t kScreenHeight = LV_VER_RES_MAX;
 
     // welcome screen style constants
-    static constexpr const lv_font_t *kWelcomeScreenLabelFont = &lv_font_montserrat_24;
+    static constexpr const lv_font_t *kWelcomeScreenLabelFont = &lv_font_montserrat_24_ui;
 
     // info screen style constants
-    static constexpr const lv_font_t *kInfoScreenLabelFont = &lv_font_montserrat_24;
+    static constexpr const lv_font_t *kInfoScreenLabelFont = &lv_font_montserrat_24_ui;
     static constexpr lv_coord_t kInfoScreenLabelBorderRadius = 16;
     static constexpr lv_coord_t kInfoScreenLabelPadding = 8;
     static constexpr lv_coord_t kInfoScreenLabelBorderWidth = 2;
 
     // menu screen style constants
-    static constexpr const lv_font_t *kMenuScreenLabelFont = &lv_font_montserrat_18;
+    static constexpr const lv_font_t *kMenuScreenLabelFont = &lv_font_montserrat_18_ui;
     static constexpr lv_coord_t kMenuScreenVisibleItems = 5;
     static constexpr lv_coord_t kMenuScreenItemHeight = 26;
     static constexpr lv_coord_t kMenuScreenStartX = 10;
@@ -147,9 +147,9 @@ struct Screen
     static constexpr lv_coord_t kMenuScreenCornerRadius = 4;
 
     // slider screen style constants
-    static constexpr const lv_font_t *kSliderScreenLabelFont = &lv_font_montserrat_14;
-    static constexpr const lv_font_t *kSliderScreenLabelFontBig = &lv_font_montserrat_18;
-    static constexpr const lv_font_t *kSliderScreenValueFont = &lv_font_montserrat_18;
+    static constexpr const lv_font_t *kSliderScreenLabelFont = &lv_font_montserrat_14_ui;
+    static constexpr const lv_font_t *kSliderScreenLabelFontBig = &lv_font_montserrat_18_ui;
+    static constexpr const lv_font_t *kSliderScreenValueFont = &lv_font_montserrat_18_ui;
     static constexpr lv_coord_t kSliderScreenContainerX = 16;
     static constexpr lv_coord_t kSliderScreenContainerY = 20;
     static constexpr lv_coord_t kSliderScreenContainerWidth = kScreenWidth - 24;
@@ -163,7 +163,7 @@ struct Screen
     static constexpr lv_coord_t kSliderScreenKnobBorderWidth = 2;
 
     // diagnostics screen style constants
-    static constexpr const lv_font_t *kDiagnosticsScreenLabelFont = &lv_font_montserrat_14;
+    static constexpr const lv_font_t *kDiagnosticsScreenLabelFont = &lv_font_montserrat_14_ui;
     static constexpr lv_coord_t kDiagnosticScreenViewportX = 10;
     static constexpr lv_coord_t kDiagnosticScreenViewportY = 10;
     static constexpr lv_coord_t kDiagnosticScreenMargin = 20;
@@ -184,7 +184,7 @@ struct Screen
     static constexpr const lv_font_t *kDashboardScreenMetricsFont = &lv_font_dejavu_sans_mono_14;
     static constexpr const lv_font_t *kDashboardScreenSpeedFont = &lv_font_dejavu_sans_mono_24;
     static constexpr const lv_font_t *kDashboardScreenValueFixedFont = &lv_font_dejavu_sans_mono_14;
-    static constexpr const lv_font_t *kDashboardScreenValueFont = &lv_font_montserrat_14;
+    static constexpr const lv_font_t *kDashboardScreenValueFont = &lv_font_montserrat_14_ui;
     static constexpr const lv_font_t *kDashboardScreenGraphLegendFont = &lv_font_montserrat_10_digits;
     static constexpr lv_coord_t kDashboardScreenContainerX = 8;
     static constexpr lv_coord_t kDashboardScreenContainerY = 6;
@@ -200,17 +200,17 @@ struct Screen
     static constexpr lv_coord_t kDashboardScreenValueTuningOffsetY = 40;
     static constexpr lv_coord_t kDashboardScreenValueLabelHeight = 14;
     static constexpr lv_coord_t kDashboardScreenGraphTopGap = 4;
-    static constexpr lv_coord_t kDashboardScreenGraphLegendWidth = 24;
+    static constexpr lv_coord_t kDashboardScreenGraphLegendWidth = 28;
     static constexpr lv_coord_t kDashboardScreenGraphX = kDashboardScreenGraphLegendWidth;
     static constexpr lv_coord_t kDashboardScreenGraphY = kDashboardScreenValueTuningOffsetY + kDashboardScreenValueLabelHeight + kDashboardScreenGraphTopGap;
     static constexpr lv_coord_t kDashboardScreenGraphWidth = kDashboardScreenContainerWidth - kDashboardScreenGraphLegendWidth;
     static constexpr lv_coord_t kDashboardScreenGraphHeight = kDashboardScreenContainerHeight - kDashboardScreenGraphY - 1;
-    static constexpr int32_t kDashboardScreenGraphMinRpmSpan = 100;
+    static constexpr int32_t kDashboardScreenGraphMinRpmSpan = 50;
     static constexpr size_t kDashboardScreenGraphLegendCount = 4;
     static constexpr size_t kDashboardScreenGraphPointCount = sizeof_array(stats.graphSamples);
 
     // start screen style constants
-    static constexpr const lv_font_t *kStartScreenDirectionFont = &lv_font_montserrat_24;
+    static constexpr const lv_font_t *kStartScreenDirectionFont = &lv_font_montserrat_24_ui;
     static constexpr const lv_font_t *kStartScreenMetricsFont = &lv_font_dejavu_sans_mono_14;
     static constexpr const lv_font_t *kStartScreenSpeedFont = &lv_font_dejavu_sans_mono_24;
     static constexpr lv_coord_t kStartScreenContainerX = 8;
