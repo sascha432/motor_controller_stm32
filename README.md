@@ -41,7 +41,9 @@ At approximately 38V and above, the OVP is disabled, causing all of the energy t
 
 ### Overcurrent Protection
 
-The controller has two configurable current-protection mechanisms.
+The controller has three configurable current-protection mechanisms.
+
+**NOTE:** the PID parameters must be well tuned for the current limit to work correctly. This applies to closed-loop (RPM-based) mode only.
 
 #### Motor Current Limit
 
@@ -54,6 +56,10 @@ This protection operates silently and does not generate a user-facing error.
 When the maximum input current is reached, the motor current limit is gradually reduced until the condition clears. It is then gradually increased again to prevent immediate retriggering. If the motor current limit is set too low, the input current limit may not function correctly.
 
 The yellow LED indicates that the input current limit has been reached and turns off after recovery.
+
+#### Current Limit Strength
+
+The current limit strength determines how fast the motor current is reduced once the input current limit is reached, and how quickly it is restored again after the condition clears. A higher strength reacts more aggressively, whereas a lower strength smooths the reduction and recovery to avoid abrupt current changes.
 
 ## Error Codes
 
