@@ -21,9 +21,6 @@
     "svd_path": "STM32F107xx.svd"
   },
   "frameworks": [
-    "arduino",
-    "cmsis",
-    "libopencm3",
     "stm32cube"
   ],
   "name": "STM32F107VC (64k RAM. 256k Flash)",
