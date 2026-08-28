@@ -196,10 +196,16 @@ struct Screen
     static constexpr lv_coord_t kDashboardScreenMotorTempOffsetY = kDashboardScreenVoltageOffsetY;
     static constexpr lv_coord_t kDashboardScreenMosfetTempOffsetY = kDashboardScreenCurrentOffsetY;
     static constexpr lv_coord_t kDashboardScreenRpmOffsetY = (kScreenHeight / 2) - 12;
+    static constexpr lv_coord_t kDashboardScreenRpmOffsetX = 0;
+    static constexpr lv_coord_t kDashboardScreenValueTuningRpmWidth = kDashboardScreenContainerWidth / 2 + 8;
     static constexpr lv_coord_t kDashboardScreenValueBottomOffsetY = kDashboardScreenContainerHeight - 24;
+    static constexpr lv_coord_t kDashboardScreenValueBottomOffsetX = 0;
     static constexpr lv_coord_t kDashboardScreenValueTuningOffsetY = 40;
-    static constexpr lv_coord_t kDashboardScreenValueTuningOffsetX = kDashboardScreenContainerWidth / 2;
+    static constexpr lv_coord_t kDashboardScreenValueTuningOffsetX = 0;
+    static constexpr lv_coord_t kDashboardScreenValueTuningColumn = kDashboardScreenContainerWidth / 2 + 12;
+    static constexpr lv_coord_t kDashboardScreenValueTuningWidth = kDashboardScreenContainerWidth - kDashboardScreenValueTuningColumn;
     static constexpr lv_coord_t kDashboardScreenValueLabelHeight = 14;
+    static constexpr lv_coord_t kDashboardScreenValueAnimSpeed = 10;
     static constexpr lv_coord_t kDashboardScreenGraphTopGap = 4;
     static constexpr lv_coord_t kDashboardScreenGraphLegendWidth = 28;
     static constexpr lv_coord_t kDashboardScreenGraphX = kDashboardScreenGraphLegendWidth;

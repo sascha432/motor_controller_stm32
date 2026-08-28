@@ -624,15 +624,12 @@ void DashboardScreen::load()
     rpmLabel = lv_label_create(container);
     lv_obj_set_style_text_color(rpmLabel, DASHBOARDSCREEN_COLOR_SPEED, LV_PART_MAIN);
     lv_obj_set_style_text_font(rpmLabel, kDashboardScreenSpeedFont, LV_PART_MAIN);
-    lv_obj_set_width(rpmLabel, kDashboardScreenContainerWidth);
-    lv_obj_set_style_text_align(rpmLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    lv_obj_set_pos(rpmLabel, 0, kDashboardScreenRpmOffsetY);
 
     valueLabel = lv_label_create(container);
     lv_obj_set_style_text_color(valueLabel, DASHBOARDSCREEN_COLOR_PWM_LABEL, LV_PART_MAIN);
-    lv_obj_set_width(valueLabel, kDashboardScreenContainerWidth - kDashboardScreenValueTuningOffsetX);
+    lv_obj_set_width(valueLabel, kDashboardScreenValueTuningWidth);
     lv_obj_set_style_text_align(valueLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    lv_obj_set_style_anim_speed(valueLabel, 10, LV_PART_MAIN);
+    lv_obj_set_style_anim_speed(valueLabel, kDashboardScreenValueAnimSpeed, LV_PART_MAIN);
 
     for (size_t i = 0; i < kDashboardScreenGraphLegendCount; ++i) {
         graphLegendLabels[i] = lv_label_create(container);
@@ -673,13 +670,15 @@ void DashboardScreen::_refreshVisuals()
         switch(selectedValue) {
             case SelectedValueType::SPEED:
                 lv_obj_set_style_text_font(rpmLabel, kDashboardScreenSpeedFont, LV_PART_MAIN);
-                lv_obj_set_pos(rpmLabel, 0, kDashboardScreenRpmOffsetY);
+                lv_obj_set_pos(rpmLabel, kDashboardScreenRpmOffsetX, kDashboardScreenRpmOffsetY);
                 lv_obj_set_style_text_align(rpmLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+                lv_obj_set_width(rpmLabel, kDashboardScreenContainerWidth);
                 lv_obj_clear_flag(rpmLabel, LV_OBJ_FLAG_HIDDEN);
 
                 lv_obj_set_style_text_font(valueLabel, kDashboardScreenValueFixedFont, LV_PART_MAIN);
-                lv_obj_set_pos(valueLabel, kDashboardScreenValueTuningOffsetX, kDashboardScreenValueBottomOffsetY);
+                lv_obj_set_pos(valueLabel, kDashboardScreenValueBottomOffsetX, kDashboardScreenValueBottomOffsetY);
                 lv_obj_set_style_text_align(valueLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+                lv_obj_set_width(valueLabel, kDashboardScreenContainerWidth);
                 lv_label_set_long_mode(valueLabel, LV_LABEL_LONG_CLIP);
 
                 lv_obj_add_flag(graphContainer, LV_OBJ_FLAG_HIDDEN);
@@ -690,17 +689,19 @@ void DashboardScreen::_refreshVisuals()
             default:
                 lv_obj_set_style_text_font(rpmLabel, kDashboardScreenValueFixedFont, LV_PART_MAIN);
                 lv_obj_set_style_text_align(rpmLabel, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
-                lv_obj_set_pos(rpmLabel, 0, kDashboardScreenValueTuningOffsetY);
+                lv_obj_set_width(rpmLabel, kDashboardScreenValueTuningRpmWidth);
+                lv_obj_set_pos(rpmLabel, kDashboardScreenValueTuningOffsetX, kDashboardScreenValueTuningOffsetY);
 
                 if (selectedValue == SelectedValueType::SPEED2) {
                     lv_obj_set_style_text_font(valueLabel, kDashboardScreenValueFixedFont, LV_PART_MAIN);
-                    lv_obj_set_pos(valueLabel, kDashboardScreenValueTuningOffsetX, kDashboardScreenValueTuningOffsetY);
+                    lv_obj_set_pos(valueLabel, kDashboardScreenValueTuningColumn, kDashboardScreenValueTuningOffsetY);
                 }
                 else {
                     lv_obj_set_style_text_font(valueLabel, kDashboardScreenValueFont, LV_PART_MAIN);
-                    lv_obj_set_pos(valueLabel, kDashboardScreenValueTuningOffsetX, kDashboardScreenValueTuningOffsetY - 3);
+                    lv_obj_set_pos(valueLabel, kDashboardScreenValueTuningColumn, kDashboardScreenValueTuningOffsetY - 3);
                 }
                 lv_obj_set_style_text_align(valueLabel, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
+                lv_obj_set_width(valueLabel, kDashboardScreenValueTuningWidth);
                 lv_label_set_long_mode(valueLabel, LV_LABEL_LONG_SCROLL_CIRCULAR);
 
                 lv_obj_clear_flag(graphContainer, LV_OBJ_FLAG_HIDDEN);
