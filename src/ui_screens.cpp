@@ -315,8 +315,6 @@ void SliderScreen::load()
     lv_label_set_long_mode(titleObj, LV_LABEL_LONG_SCROLL_CIRCULAR);
 
     const lv_coord_t sliderVisualHeight = std::max<lv_coord_t>(kSliderScreenSliderHeight, kSliderScreenKnobSize + 4);
-    const lv_coord_t sliderFillHeight = std::max<lv_coord_t>(6, kSliderScreenSliderHeight - 8);
-
     lv_obj_t *slider = lv_obj_create(container);
     lv_obj_set_pos(slider, 0, lv_obj_get_height(titleRow) + kSliderScreenTitleBottomGap);
     lv_obj_set_size(slider, kSliderScreenContainerWidth, sliderVisualHeight);
@@ -327,23 +325,17 @@ void SliderScreen::load()
     lv_obj_set_style_border_color(slider, SLIDERSCREEN_COLOR_SLIDER_BORDER, LV_PART_MAIN);
 
     sliderFill = lv_obj_create(slider);
-    lv_obj_set_pos(sliderFill, 0, (sliderVisualHeight - sliderFillHeight) / 2);
-    lv_obj_set_size(sliderFill, 0, sliderFillHeight);
     lv_obj_set_style_bg_color(sliderFill, SLIDERSCREEN_COLOR_SLIDER_FILL_ACTIVE, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(sliderFill, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_radius(sliderFill, kSliderScreenSliderRadius, LV_PART_MAIN);
     lv_obj_set_style_border_width(sliderFill, 0, LV_PART_MAIN);
 
     sliderFillAfterActive = lv_obj_create(slider);
-    lv_obj_set_pos(sliderFillAfterActive, 0, (sliderVisualHeight - sliderFillHeight) / 2);
-    lv_obj_set_size(sliderFillAfterActive, 0, sliderFillHeight);
     lv_obj_set_style_bg_color(sliderFillAfterActive, SLIDERSCREEN_COLOR_SLIDER_FILL_ACTIVE, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(sliderFillAfterActive, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_radius(sliderFillAfterActive, kSliderScreenSliderRadius, LV_PART_MAIN);
 
     sliderFillAfter = lv_obj_create(slider);
-    lv_obj_set_pos(sliderFillAfter, 0, (sliderVisualHeight - sliderFillHeight) / 2);
-    lv_obj_set_size(sliderFillAfter, 0, sliderFillHeight);
     lv_obj_set_style_bg_color(sliderFillAfter, SLIDERSCREEN_COLOR_SLIDER_FILL, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(sliderFillAfter, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_radius(sliderFillAfter, kSliderScreenSliderRadius, LV_PART_MAIN);
@@ -355,7 +347,7 @@ void SliderScreen::load()
     lv_obj_set_style_radius(sliderKnob, LV_RADIUS_CIRCLE, LV_PART_MAIN);
     lv_obj_set_style_border_width(sliderKnob, kSliderScreenKnobBorderWidth, LV_PART_MAIN);
     lv_obj_set_style_border_color(sliderKnob, SLIDERSCREEN_COLOR_SLIDER_KNOB_BORDER, LV_PART_MAIN);
-    lv_obj_set_pos(sliderKnob, 0, (sliderVisualHeight - kSliderScreenKnobSize) / 2);
+    lv_obj_set_y(sliderKnob, (sliderVisualHeight - kSliderScreenKnobSize) / 2);
 
     valueLabel = lv_label_create(container);
     lv_obj_set_style_text_color(valueLabel, SLIDERSCREEN_COLOR_VALUE, LV_PART_MAIN);
@@ -504,8 +496,7 @@ void DiagnosticsScreen::update()
         diagnostic_screen_set_label_row(usbConnectionLabel, 7, scrollOffset);
     #endif
 
-    const int32_t trackHeightRaw = lv_obj_get_height(scrollbarTrack);
-    const int32_t trackHeight = std::max<int32_t>(trackHeightRaw, 10);
+    const int32_t trackHeight = std::max<int32_t>(lv_obj_get_height(scrollbarTrack), 10);
 
     // Line-based scrollbar: thumb size and movement are based on scroll steps.
     const int32_t stepCount = scrollMax + 1;
@@ -638,7 +629,6 @@ void DashboardScreen::load()
         lv_obj_set_width(graphLegendLabels[i], kDashboardScreenGraphLegendWidth - 2);
         lv_obj_set_style_text_align(graphLegendLabels[i], LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
         lv_label_set_long_mode(graphLegendLabels[i], LV_LABEL_LONG_CLIP);
-        lv_obj_set_pos(graphLegendLabels[i], 0, kDashboardScreenGraphY);
     }
 
     graphContainer = lv_obj_create(container);
