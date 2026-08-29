@@ -23,7 +23,7 @@ void EEPROM::init()
     i2c.initI2C1Remapped();
     bool result = i2c.sendBytes(kAddress, nullptr, 0);
     (void)result;
-    DEBUG_PRINT(DebugType::INFO, "EEPROM detected=%u", (int)result);
+    DEBUG_PRINT(DebugType::INFO, "EEPROM detected=%u", static_cast<int>(result));
 }
 
 void EEPROM::read()
@@ -31,12 +31,12 @@ void EEPROM::read()
     Data tmp;
     tmp.invalidate();
     bool result = eepromReadBytes(kDefaultOffset, &tmp, sizeof(tmp));
-    DEBUG_PRINT(DEBUG_LEVEL_RESULT(result), "read=%u magic=%08x version=%d sequence=%d ofs=%u", (int)result, tmp.magic, tmp.version, tmp.sequence, kDefaultOffset);
+    DEBUG_PRINT(DEBUG_LEVEL_RESULT(result), "read=%u magic=%08x version=%d sequence=%d ofs=%u", static_cast<int>(result), tmp.magic, tmp.version, tmp.sequence, kDefaultOffset);
     if (!result || tmp.magic != kMagic || tmp.version != kVersion || tmp.validateCRC() == kInvalidCRC) {
         if constexpr (kBackupOffset) {
             tmp.invalidate();
             result = eepromReadBytes(kBackupOffset, &tmp, sizeof(tmp));
-            DEBUG_PRINT(DEBUG_LEVEL_RESULT(result), "read=%u magic=%08x version=%d sequence=%d ofs=%u (BACKUP)", (int)result, tmp.magic, tmp.version, tmp.sequence, kBackupOffset);
+            DEBUG_PRINT(DEBUG_LEVEL_RESULT(result), "read=%u magic=%08x version=%d sequence=%d ofs=%u (BACKUP)", static_cast<int>(result), tmp.magic, tmp.version, tmp.sequence, kBackupOffset);
             if (!result || tmp.magic != kMagic || tmp.version != kVersion || tmp.validateCRC() == kInvalidCRC) {
                 DEBUG_PRINT(DebugType::ERROR, "EEPROM data invalid, resetting to defaults");
                 resetDefaults();
@@ -77,22 +77,22 @@ bool EEPROM::write()
     if (!result) {
         data.sequence--;
     }
-    DEBUG_PRINT(DEBUG_LEVEL_RESULT(result), "write=%u magic=%08x version=%d sequence=%d ofs=%u", (unsigned)result, data.magic, data.version, data.sequence, kDefaultOffset);
+    DEBUG_PRINT(DEBUG_LEVEL_RESULT(result), "write=%u magic=%08x version=%d sequence=%d ofs=%u", static_cast<unsigned>(result), data.magic, data.version, data.sequence, kDefaultOffset);
 
     if constexpr (kBackupOffset) {
         result = eepromWriteBytes(kBackupOffset, &data, sizeof(data));
-        DEBUG_PRINT(DEBUG_LEVEL_RESULT(result), "write=%u magic=%08x version=%d sequence=%d ofs=%u (BACKUP)", (unsigned)result, data.magic, data.version, data.sequence, kBackupOffset);
+        DEBUG_PRINT(DEBUG_LEVEL_RESULT(result), "write=%u magic=%08x version=%d sequence=%d ofs=%u (BACKUP)", static_cast<unsigned>(result), data.magic, data.version, data.sequence, kBackupOffset);
     }
 
     if constexpr (kValidateWrite) {
         tmp.invalidate();
         result = eepromReadBytes(kDefaultOffset, &tmp, sizeof(tmp));
-        DEBUG_PRINT(DebugType::INFO, "verify=%u magic=%08x version=%d sequence=%d crc=%08x ofs=%u", (unsigned)result, tmp.magic, tmp.version, tmp.sequence, tmp.crc, kDefaultOffset);
+        DEBUG_PRINT(DebugType::INFO, "verify=%u magic=%08x version=%d sequence=%d crc=%08x ofs=%u", static_cast<unsigned>(result), tmp.magic, tmp.version, tmp.sequence, tmp.crc, kDefaultOffset);
         if constexpr (kBackupOffset) {
             tmp.invalidate();
             result = eepromReadBytes(kBackupOffset, &tmp, sizeof(tmp));
             tmp.validateCRC();
-            DEBUG_PRINT(DebugType::INFO, "verify=%u magic=%08x version=%d sequence=%d crc=%08x ofs=%u (BACKUP)", (unsigned)result, tmp.magic, tmp.version, tmp.sequence, tmp.crc, kBackupOffset);
+            DEBUG_PRINT(DebugType::INFO, "verify=%u magic=%08x version=%d sequence=%d crc=%08x ofs=%u (BACKUP)", static_cast<unsigned>(result), tmp.magic, tmp.version, tmp.sequence, tmp.crc, kBackupOffset);
         }
     }
     return result;
@@ -137,7 +137,7 @@ bool eepromWaitReady(void)
             return true;
         }
     }
-    DEBUG_PRINT(DebugType::ERROR, "timeout=%u", (unsigned)(HAL_GetTick() - start));
+    DEBUG_PRINT(DebugType::ERROR, "timeout=%u", static_cast<unsigned>(HAL_GetTick() - start));
     return false;
 }
 

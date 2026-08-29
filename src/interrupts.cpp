@@ -18,7 +18,7 @@ static inline void TIM6_Handler(void)
     pid.isr();
 
     // call knob and button ISRs
-    constexpr uint32_t kTicksPerKnobIsr = (uint32_t)(25.0f / PidController::kPIDInterval);
+    constexpr uint32_t kTicksPerKnobIsr = static_cast<uint32_t>(25.0f / PidController::kPIDInterval);
     constexpr float kKnobTimingMillis = kTicksPerKnobIsr * PidController::kPIDInterval;
     (void)kKnobTimingMillis;
 
@@ -274,7 +274,7 @@ extern "C" void Error_Handler_Debug(void)
         LEDs::onLEDError();
         delay_ms(500);
         // signal error type via LED flashes
-        for(int i = 0; i <= (int)interruptErrorType; i++) {
+        for(int i = 0; i <= static_cast<int>(interruptErrorType); i++) {
             LEDs::off();
             delay_ms(250);
             LEDs::onLEDWarning();

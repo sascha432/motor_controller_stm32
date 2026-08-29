@@ -391,7 +391,7 @@ void Menu::abortableDelay(uint32_t ms)
 {
     clearUserInput();
     uint32_t start = HAL_GetTick();
-    while (HAL_GetTick() - start < ms) {
+    while ((HAL_GetTick() - start) < ms) {
         WatchDog::feed();
         if (hasAnyButtonBeenPressed()) {
             while (isAnyButtonDown()) {

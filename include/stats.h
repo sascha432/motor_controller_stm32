@@ -115,7 +115,7 @@ namespace Helpers {
             // apply decay
             integral = (integral * decay) / kFactor;
             // add integration term: value * dt / 1000
-            integral += ((int32_t)value * dt * kFactor) / 1000;
+            integral += (static_cast<int32_t>(value) * dt * kFactor) / 1000;
         }
 
         int32_t get() const

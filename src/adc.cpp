@@ -56,8 +56,8 @@ void ADC::init()
     // Configure DMA
     DMA1_Channel1->CCR &= ~DMA_CCR_EN;
 
-    DMA1_Channel1->CPAR  = (uint32_t)&ADC1->DR;
-    DMA1_Channel1->CMAR  = (uint32_t)adc_buffer;
+    DMA1_Channel1->CPAR  = reinterpret_cast<uint32_t>(&ADC1->DR);
+    DMA1_Channel1->CMAR  = reinterpret_cast<uint32_t>(adc_buffer);
     DMA1_Channel1->CNDTR = kNumConversions;
 
     DMA1_Channel1->CCR =

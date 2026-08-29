@@ -103,7 +103,7 @@ static void debug_swd_write(const char *msg)
         if (!SWO::waitReadyPort(SWO::kITMPort)) {
             break;
         }
-        ITM->PORT[SWO::kITMPort].u8 = (uint8_t)*msg++;
+        ITM->PORT[SWO::kITMPort].u8 = static_cast<uint8_t>(*msg++);
     }
 }
 

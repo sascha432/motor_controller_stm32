@@ -152,7 +152,7 @@ struct PidController
         #if PID_USE_FLOATING_POINT_MATH
             return (error * KpPreCalc + integral * KiPreCalc + derivative * KdPreCalc);
         #else
-            return (error * (int64_t)KpPreCalc + integral * (int64_t)KiPreCalc + derivative * (int64_t)KdPreCalc) / kFPFactor; // use int64_t to avoid overflow
+            return (error * static_cast<int64_t>(KpPreCalc) + integral * static_cast<int64_t>(KiPreCalc) + derivative * static_cast<int64_t>(KdPreCalc)) / kFPFactor; // use int64_t to avoid overflow
         #endif
     }
 
@@ -251,7 +251,7 @@ struct PidController
      */
     inline int32_t getCountsDelta(uint32_t counter)
     {
-        int16_t delta = (int16_t)counter - (int16_t)lastEncoderCounter;
+        int16_t delta = static_cast<int16_t>(counter) - static_cast<int16_t>(lastEncoderCounter);
         lastEncoderCounter = counter;
         return delta;
     }
@@ -569,8 +569,8 @@ public:
     // === Statistics data structure ===
     struct StatsType
     {
-        Helpers::FixedLowPass<(uint32_t)kPIDInterval, (uint32_t)(kPIDInterval * 32), 512, volatile int32_t> rpm;     // filtered RPM for displaying
-        Helpers::FixedLowPass<(uint32_t)kPIDInterval, (uint32_t)(kPIDInterval * 2), 256, volatile int32_t> pwm;     // filtered PWM for displaying
+        Helpers::FixedLowPass<static_cast<uint32_t>(kPIDInterval), static_cast<uint32_t>(kPIDInterval * 32), 512, volatile int32_t> rpm;     // filtered RPM for displaying
+        Helpers::FixedLowPass<static_cast<uint32_t>(kPIDInterval), static_cast<uint32_t>(kPIDInterval * 2), 256, volatile int32_t> pwm;     // filtered PWM for displaying
 
         struct {
             volatile uint32_t loop;                  // number of times the PID loop has been called

@@ -47,7 +47,7 @@ struct MT6701Config {
     {
         uint8_t high = readRegister(REG_ABZ_RES_HIGH);
         uint8_t low  = readRegister(REG_ABZ_RES_LOW);
-        return (((uint16_t)high << 8) | (low)) + 1;
+        return ((static_cast<uint16_t>(high) << 8) | (low)) + 1;
     }
 
     /**

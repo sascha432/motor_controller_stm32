@@ -51,7 +51,7 @@ struct TickProfiler {
 
     static void snprintf(char *buf, size_t size, uint32_t slot = 0)
     {
-        ::snprintf(buf, size, "%u\n", (unsigned)getTicks(slot));
+        ::snprintf(buf, size, "%u\n", static_cast<unsigned>(getTicks(slot)));
     }
 
     static AverageSumType slots[16];

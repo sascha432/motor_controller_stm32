@@ -15,9 +15,9 @@
  * printf("123.45=" SPRINTF_FP2_FMT "\n", CONVERT_TO_FP2(123.56))
  *
  */
-#define CONVERT_TO_FP1(value)               (int)(value / 1000), ((unsigned)(value / 100) % 10)
-#define CONVERT_TO_FP2(value)               (int)(value / 1000), ((unsigned)(value / 10) % 100)
-#define CONVERT_TO_FP6(value)               (int)(value / 1000000), ((unsigned)(value / 100000) % 1000000)
+#define CONVERT_TO_FP1(value)               static_cast<int>(value / 1000), (static_cast<unsigned>(value / 100) % 10)
+#define CONVERT_TO_FP2(value)               static_cast<int>(value / 1000), (static_cast<unsigned>(value / 10) % 100)
+#define CONVERT_TO_FP6(value)               static_cast<int>(value / 1000000), (static_cast<unsigned>(value / 100000) % 1000000)
 
 #define DEGREE_UTF8                         "\xC2\xB0"
 
@@ -296,7 +296,7 @@ static constexpr float kFloatToUint16Multiplier = 65535.0f;
 // Enable GPIO port clock
 #define __HAL_RCC_GPIO_X_CLK_ENABLE(GPIO_Port)   do { \
                                         __IO uint32_t tmpreg; \
-                                        const uint32_t mask = RCC_APB2ENR_IOPAEN << (((uint32_t)GPIO_Port - GPIOA_BASE) >> 10); \
+                                        const uint32_t mask = RCC_APB2ENR_IOPAEN << ((reinterpret_cast<uint32_t>(GPIO_Port) - GPIOA_BASE) >> 10); \
                                         SET_BIT(RCC->APB2ENR, mask); \
                                         /* Delay after an RCC peripheral clock enabling */\
                                         tmpreg = READ_BIT(RCC->APB2ENR, mask) ;\

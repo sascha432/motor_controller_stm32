@@ -257,7 +257,7 @@ enum class DebugType : uint32_t
 // debug level to output
 // #define DEBUG_LEVEL             static_cast<DebugType>((uint32_t)DebugType::ERROR|(uint32_t)DebugType::WARNING|(uint32_t)DebugType::NOTICE)
 // #define DEBUG_LEVEL             static_cast<DebugType>((uint32_t)DebugType::ALL&~(uint32_t)DebugType::UI)
-#define DEBUG_LEVEL             static_cast<DebugType>((uint32_t)DebugType::ALL)
+#define DEBUG_LEVEL             static_cast<DebugType>(static_cast<uint32_t>(DebugType::ALL))
 
 inline const char *debugLevelToString(DebugType level)
 {
@@ -325,21 +325,21 @@ constexpr const char *debug_source_filename(const char *file)
 
     #define DEBUG_PRINT_MSG(level, msg, ...) \
         do { \
-            if ((uint32_t)(DEBUG_LEVEL) & (uint32_t)(level)) { \
+            if (static_cast<uint32_t>(DEBUG_LEVEL) & static_cast<uint32_t>(level)) { \
                 DEBUG_PRINTF_FUNC(msg, ##__VA_ARGS__); \
             } \
         } while(0)
 
     #define DEBUG_PRINT(level, msg, ...) \
         do { \
-            if ((uint32_t)(DEBUG_LEVEL) & (uint32_t)(level)) { \
+            if (static_cast<uint32_t>(DEBUG_LEVEL) & static_cast<uint32_t>(level)) { \
                 DEBUG_PRINTF_FUNC("[%06lu] %s " msg "\n", HAL_GetTick(), debugLevelToString(level), ##__VA_ARGS__); \
             } \
         } while(0)
 
     #define DEBUG_PRINT_SRC(level, msg, ...) \
         do { \
-            if ((uint32_t)(DEBUG_LEVEL) & (uint32_t)(level)) { \
+            if (static_cast<uint32_t>(DEBUG_LEVEL) & static_cast<uint32_t>(level)) { \
                 DEBUG_PRINTF_FUNC("[%06lu] %s %s:%u " msg "\n", HAL_GetTick(), debugLevelToString(level), DEBUG_SOURCE_FILENAME, __LINE__, ##__VA_ARGS__); \
             } \
         } while(0)
