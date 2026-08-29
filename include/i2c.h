@@ -1,3 +1,4 @@
+#include "debug.h"
 /**
   Author: sascha_lammers@gmx.de
 */
@@ -7,12 +8,32 @@
 #include "helpers.h"
 
 /**
+ * @brief Helper macro with timeout
+ *
+ */
+#define I2C_WAIT_TIMEOUT(condition, timeout, af_check) \
+    do { \
+        const uint16_t start = TIM7->CNT; \
+        while((condition)) { \
+            if constexpr (af_check) { \
+                if (I2C1->SR1 & I2C_SR1_AF) { \
+                    return I2CError(); \
+                } \
+            } \
+            if (static_cast<uint16_t>(TIM7->CNT - start) >= timeout) { \
+                return I2CError(); \
+            } \
+        } \
+    } while(0);
+
+/**
  * @brief initialization of the I2C bus and simple blocking functions to communicate
  *
  */
-struct I2CHelper {
-
-    static const uint32_t kTimeoutCount = 10000U;
+struct I2CHelper
+{
+    // wait timeout
+    static const uint16_t kTimeoutMicros = 500;
 
     /**
      * @brief initialize I2C1 on PB8/PB9 (remapped)
@@ -110,28 +131,13 @@ struct I2CHelper {
      */
     bool sendBytes(uint8_t address, const uint8_t *data, uint16_t length, bool stop = true)
     {
-        // START
+        // Start
         I2C1->CR1 |= I2C_CR1_START;
+        I2C_WAIT_TIMEOUT(!(I2C1->SR1 & I2C_SR1_SB), kTimeoutMicros, false);
 
-        uint32_t timeout = kTimeoutCount;
-        while (!(I2C1->SR1 & I2C_SR1_SB)) {
-            if (isTimeout(timeout)) {
-                return I2CError();
-            }
-        }
-
-        // Address
+        // Send address
         I2C1->DR = address << 1;
-
-        timeout = kTimeoutCount;
-        while (!(I2C1->SR1 & I2C_SR1_ADDR)) {
-            if (I2C1->SR1 & I2C_SR1_AF) {
-                return I2CError();
-            }
-            if (isTimeout(timeout)) {
-                return I2CError();
-            }
-        }
+        I2C_WAIT_TIMEOUT(!(I2C1->SR1 & I2C_SR1_ADDR), kTimeoutMicros, true);
 
         // Clear ADDR
         (void)I2C1->SR1;
@@ -139,24 +145,10 @@ struct I2CHelper {
 
         if (length) {
             while (length--) {
-                timeout = kTimeoutCount;
-                while (!(I2C1->SR1 & I2C_SR1_TXE)) {
-                    if (I2C1->SR1 & I2C_SR1_AF) {
-                        return I2CError();
-                    }
-                    if (isTimeout(timeout)) {
-                        return I2CError();
-                    }
-                }
+                I2C_WAIT_TIMEOUT(!(I2C1->SR1 & I2C_SR1_TXE), kTimeoutMicros, true);
                 I2C1->DR = *data++;
             }
-
-            timeout = kTimeoutCount;
-            while (!(I2C1->SR1 & I2C_SR1_BTF)) {
-                if (isTimeout(timeout)) {
-                    return I2CError();
-                }
-            }
+            I2C_WAIT_TIMEOUT(!(I2C1->SR1 & I2C_SR1_BTF), kTimeoutMicros, false);
         }
 
         if (stop) {
@@ -185,28 +177,13 @@ struct I2CHelper {
         I2C1->CR1 |= I2C_CR1_ACK;
         I2C1->CR1 &= ~I2C_CR1_POS;
 
-        // START
+        // Start
         I2C1->CR1 |= I2C_CR1_START;
+        I2C_WAIT_TIMEOUT(!(I2C1->SR1 & I2C_SR1_SB), kTimeoutMicros, false);
 
-        uint32_t timeout = kTimeoutCount;
-        while (!(I2C1->SR1 & I2C_SR1_SB)) {
-            if (isTimeout(timeout)) {
-                return I2CError();
-            }
-        }
-
-        // Address + read
+        // Send address + read
         I2C1->DR = (address << 1) | 1;
-
-        timeout = kTimeoutCount;
-        while (!(I2C1->SR1 & I2C_SR1_ADDR)) {
-            if (I2C1->SR1 & I2C_SR1_AF) {
-                return I2CError();
-            }
-            if (isTimeout(timeout)) {
-                return I2CError();
-            }
-        }
+        I2C_WAIT_TIMEOUT(!(I2C1->SR1 & I2C_SR1_ADDR), kTimeoutMicros, true);
 
         if (length == 1) {
             I2C1->CR1 &= ~I2C_CR1_ACK;
@@ -215,12 +192,7 @@ struct I2CHelper {
             (void)I2C1->SR2;
             I2C1->CR1 |= I2C_CR1_STOP;
 
-            timeout = kTimeoutCount;
-            while (!(I2C1->SR1 & I2C_SR1_RXNE)) {
-                if (isTimeout(timeout)) {
-                    return I2CError();
-                }
-            }
+            I2C_WAIT_TIMEOUT(!(I2C1->SR1 & I2C_SR1_RXNE), kTimeoutMicros, false);
             *data = I2C1->DR;
         } else {
             // Clear ADDR, then read all bytes while scheduling NACK+STOP
@@ -229,18 +201,11 @@ struct I2CHelper {
             (void)I2C1->SR2;
 
             while (length > 0) {
-                timeout = kTimeoutCount;
-                while (!(I2C1->SR1 & I2C_SR1_RXNE)) {
-                    if (isTimeout(timeout)) {
-                        return I2CError();
-                    }
-                }
-
+                I2C_WAIT_TIMEOUT(!(I2C1->SR1 & I2C_SR1_RXNE), kTimeoutMicros, false);
                 if (length == 2) {
                     I2C1->CR1 &= ~I2C_CR1_ACK;
                     I2C1->CR1 |= I2C_CR1_STOP;
                 }
-
                 *data++ = I2C1->DR;
                 --length;
             }
@@ -306,11 +271,5 @@ private:
         I2C1->CR1 |= I2C_CR1_STOP;
         I2C1->SR1 &= ~I2C_SR1_AF;
         return false;
-    }
-
-    inline bool isTimeout(uint32_t &counter)
-    {
-        __NOP();
-        return --counter == 0;
     }
 };
