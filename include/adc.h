@@ -291,7 +291,7 @@ protected:
     volatile uint16_t adc_buffer[kNumConversions];
     volatile uint32_t isenseSum;
     volatile uint16_t isenseCount;
-    volatile uint16_t isenseFiltered;
+    uint16_t isenseFiltered;
     volatile uint16_t isenseMaxFiltered;
     volatile uint16_t motorTemperatureFiltered;
     volatile uint16_t mosfetTemperatureFiltered;
