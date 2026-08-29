@@ -771,7 +771,7 @@ void DashboardScreen::_refreshVisuals()
             lv_label_set_text_static(valueLabel, valueLabelBuf);
             break;
         case SelectedValueType::CURRENT_LIMIT_STRENGTH:
-            snprintf(valueLabelBuf, sizeof(valueLabelBuf), "Strength %s", kCurrentLimitStrengthItems[eeprom.getCurrentLimitStrength() % (UIConstants::kMaxCurrentLimitStrength + 1)]);
+            snprintf(valueLabelBuf, sizeof(valueLabelBuf), "Strength %s", kCurrentLimitStrengthItems[static_cast<uint8_t>(eeprom.getCurrentLimitStrength()) % static_cast<uint8_t>(EEPROM::CurrentLimitStrength::MAX)]);
             lv_label_set_text_static(valueLabel, valueLabelBuf);
             break;
         case SelectedValueType::MAX:

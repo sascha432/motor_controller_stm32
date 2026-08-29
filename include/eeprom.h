@@ -49,6 +49,15 @@ struct EEPROM
         Reverse = static_cast<uint8_t>(MotorDirection::Reverse)
     };
 
+    enum class CurrentLimitStrength : uint8_t {
+        MIN = 0,
+        LOW = 0,
+        MEDIUM,
+        HIGH,
+        VERY_HIGH,
+        MAX
+    };
+
     /**
      * @brief EEPROM data structure
      *
@@ -82,7 +91,7 @@ struct EEPROM
         uint16_t ovp_protection;
         uint16_t pwm_frequency;
         bool motor_chime;
-        uint8_t current_limit_strength;
+        CurrentLimitStrength current_limit_strength;
 
         /**
          * @brief Construct a new Data object with default settings
@@ -116,7 +125,7 @@ struct EEPROM
             ovp_protection(UIConstants::kDefaultOvpProtection),
             pwm_frequency(UIConstants::kDefaultPWMFrequency),
             motor_chime(UIConstants::kDefaultMotorChime),
-            current_limit_strength(UIConstants::kDefaultCurrentLimitStrength)
+            current_limit_strength(static_cast<CurrentLimitStrength>(UIConstants::kDefaultCurrentLimitStrength))
         {}
 
         /**
@@ -511,12 +520,12 @@ struct EEPROM
         data.motor_chime = value;
     }
 
-    uint8_t getCurrentLimitStrength() const
+    CurrentLimitStrength getCurrentLimitStrength() const
     {
         return data.current_limit_strength;
     }
 
-    void setCurrentLimitStrength(uint8_t value)
+    void setCurrentLimitStrength(CurrentLimitStrength value)
     {
         data.current_limit_strength = value;
     }

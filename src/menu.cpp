@@ -819,7 +819,7 @@ void Menu::handleButtonPress(uint32_t duration)
             {
                 DashboardScreen &dashboard = *reinterpret_cast<DashboardScreen *>(screenFlow.getScreen());
                 // short press advances to the next editable value, long press moves backward through the same selection cycle
-                switch(duration < UIConstants::kLongPressDuration ? dashboard.incrSelectedValue(eeprom.isPIDMode()) : dashboard.decrSelectedValue(eeprom.isPIDMode())) {
+                switch((duration < UIConstants::kLongPressDuration) ? dashboard.incrSelectedValue(eeprom.isPIDMode()) : dashboard.decrSelectedValue(eeprom.isPIDMode())) {
                     case DashboardScreen::SelectedValueType::SPEED:
                     case DashboardScreen::SelectedValueType::SPEED2:
                         dashboard.setMaxAcceleration(eeprom.isPIDMode() ? UIConstants::kStepsRPM : UIConstants::kStepsPWM);
@@ -859,7 +859,7 @@ void Menu::handleButtonPress(uint32_t duration)
                     case DashboardScreen::SelectedValueType::CURRENT_LIMIT_STRENGTH:
                         dashboard.setMaxAcceleration(1);
                         screenFlow->setSteps(1);
-                        setValue(eeprom.getCurrentLimitStrength());
+                        setValue(static_cast<uint8_t>(eeprom.getCurrentLimitStrength()));
                         break;
                     case DashboardScreen::SelectedValueType::MAX:
                         break;
@@ -994,8 +994,8 @@ int32_t Menu::updateRotaryValue(int32_t value)
                     setValue(clampedValue);
                     break;
                 case DashboardScreen::SelectedValueType::CURRENT_LIMIT_STRENGTH:
-                    clampedValue = std::clamp<int32_t>(getValue(), UIConstants::kMinCurrentLimitStrength, UIConstants::kMaxCurrentLimitStrength);
-                    eeprom.setCurrentLimitStrength(clampedValue);
+                    clampedValue = clamp_enum<EEPROM::CurrentLimitStrength>(getValue());
+                    eeprom.setCurrentLimitStrength(static_cast<EEPROM::CurrentLimitStrength>(clampedValue));
                     setValue(clampedValue);
                     break;
                 case DashboardScreen::SelectedValueType::MAX:
@@ -1028,7 +1028,7 @@ int32_t Menu::updateRotaryValue(int32_t value)
             eeprom.setSensorDirection(static_cast<EEPROM::SensorDirection>(getValue()));
             break;
         case Screen::Type::CURRENT_LIMIT_STRENGTH:
-            eeprom.setCurrentLimitStrength(getValue());
+            eeprom.setCurrentLimitStrength(static_cast<EEPROM::CurrentLimitStrength>(getValue()));
             break;
         case Screen::Type::MOTOR_BRAKE:
             eeprom.setMotorBrake(getValue());

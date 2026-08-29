@@ -5,16 +5,16 @@
 inline uint32_t PidController::ocp_get_ramp() const
 {
     switch(eeprom.getCurrentLimitStrength()) {
-        case 0:
+        case EEPROM::CurrentLimitStrength::LOW:
             return 128;
-        case 1:
-            return 64;
-        case 2:
+        case EEPROM::CurrentLimitStrength::HIGH:
             return 16;
-        case 3:
+        case EEPROM::CurrentLimitStrength::VERY_HIGH:
             return 1;
+        case EEPROM::CurrentLimitStrength::MEDIUM:
+        default:
+            return 64;
     }
-    return 64;
 }
 
 inline void PidController::ovp_check(uint16_t vSense)

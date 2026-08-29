@@ -481,7 +481,7 @@ struct PidController
         uint16_t antiWindup;
         uint16_t rpm;
         uint16_t inputCurrentLimit;
-        uint8_t currentLimitStrength;
+        EEPROM::CurrentLimitStrength currentLimitStrength;
     };
 
     /**

@@ -310,7 +310,7 @@ void PidController::isr()
             eeprom.setMotorRPM(SWO::data.rpm);
             eeprom.setAntiWindup(SWO::data.antiWindup);
             eeprom.setInputCurrentLimit(SWO::data.inputCurrentLimit);
-            eeprom.setCurrentLimitStrength(SWO::data.currentLimitStrength);
+            eeprom.setCurrentLimitStrength(static_cast<EEPROM::CurrentLimitStrength>(SWO::data.currentLimitStrength));
             SWO::data.changed = false;
 
             // apply to PID controller

@@ -302,3 +302,19 @@ static constexpr float kFloatToUint16Multiplier = 65535.0f;
                                         tmpreg = READ_BIT(RCC->APB2ENR, mask) ;\
                                         UNUSED(tmpreg); \
                                       } while(0U)
+
+
+/**
+ * @brief Clamp value to ENUM::MIN ENUM::MAX
+ *
+ * @tparam ENUM_TYPE
+ * @tparam T
+ * @param value
+ * @return constexpr T
+ */
+template <typename ENUM_TYPE, typename T>
+constexpr T clamp_enum(T value)
+{
+    using U = std::underlying_type_t<ENUM_TYPE>;
+    return static_cast<T>(std::clamp(static_cast<U>(value), static_cast<U>(ENUM_TYPE::MIN), static_cast<U>(ENUM_TYPE::MAX) - 1));
+}
