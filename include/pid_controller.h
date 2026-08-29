@@ -569,7 +569,7 @@ public:
     // === Statistics data structure ===
     struct StatsType
     {
-        Helpers::FixedLowPass<(uint32_t)kPIDInterval, (uint32_t)(kPIDInterval * 8), 512, volatile int32_t> rpm;     // filtered RPM for displaying
+        Helpers::FixedLowPass<(uint32_t)kPIDInterval, (uint32_t)(kPIDInterval * 32), 512, volatile int32_t> rpm;     // filtered RPM for displaying
         Helpers::FixedLowPass<(uint32_t)kPIDInterval, (uint32_t)(kPIDInterval * 2), 256, volatile int32_t> pwm;     // filtered PWM for displaying
 
         struct {
