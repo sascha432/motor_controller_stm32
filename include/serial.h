@@ -71,8 +71,8 @@ struct Serial : public SerialProtocol
 
     inline static bool canWrite()
     {
-        uint32_t start = HAL_GetTick();
-        while(HAL_GetTick() - start < kTimeoutMs) {
+        const uint32_t start = HAL_GetTick();
+        while((HAL_GetTick() - start) < kTimeoutMs) {
             if (reinterpret_cast<USBD_CDC_HandleTypeDef *>(hUsbDeviceFS.pClassData)->TxState == 0) {
                 return true;
             }

@@ -512,12 +512,14 @@ struct PidController
         // apply to pid controller
         applyPIDParams();
 
-        DEBUG_PRINT(DebugType::PID, "Kp=%s Ki=%s Kd=%s RPM=%u windup=%s",
+        DEBUG_PRINT(DebugType::PID, "Kp=%s Ki=%s Kd=%s RPM=%u windup=%s OCP=%u/%u",
             debugFloatToString(Kp, 6, true),
             debugFloatToString(Ki, 6, true),
             debugFloatToString(Kd, 6, true),
             rpm,
-            debugFloatToString(antiWindup / static_cast<float>(UIConstants::kAntiWindupFactor), 2, true)
+            debugFloatToString(antiWindup / static_cast<float>(UIConstants::kAntiWindupFactor), 2, true),
+            static_cast<unsigned>(params.inputCurrentLimit),
+            static_cast<unsigned>(params.currentLimitStrength)
         );
     }
 
@@ -613,7 +615,7 @@ public:
 
     enum class OcpStateType : uint32_t {
         NONE = 0,           // no OCP condition
-        TRIGGERED = 1,      // OCP detected
+        TRIGGERED = 1,      // OC detected
     };
 
     struct OcpState
