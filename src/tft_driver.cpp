@@ -7,9 +7,6 @@
 #include "tft_driver.h"
 #include "tft_driver_screenshot.h"
 
-#if HAVE_LVGL_BUFFER_LOCK
-volatile bool s_lvgl_buf_busy;
-#endif
 lv_disp_draw_buf_t s_lvgl_draw_buf;
 lv_color_t s_lvgl_buf_1[kLvDisplayBufferSize];
 lv_color_t s_lvgl_buf_2[kLvDisplayBufferSize];
@@ -30,6 +27,7 @@ static constexpr uint32_t kCalculateDMATimeoutMs(uint16_t bytes, uint32_t spiClo
 static constexpr uint32_t kDMATransferTimeoutMillis = kCalculateDMATimeoutMs(sizeof(s_lvgl_buf_1));     // DMA transfer timeout in milliseconds
 static constexpr uint32_t kDMATransferFlagsBlocking = (DMA_CCR_MINC | DMA_CCR_DIR | DMA_CCR_PL_1);
 static constexpr uint32_t kDMATransferFlagsInterrupt = (DMA_CCR_MINC | DMA_CCR_DIR | DMA_CCR_PL_1 | DMA_CCR_TCIE | DMA_CCR_TEIE);
+static constexpr uint16_t kSPIWaitTimeoutMicros = 100;                                                  // SPI wait timeout in microseconds
 
 /**
  * @brief init GPIO pins for the SPI display
@@ -102,23 +100,6 @@ void tft_driver_spi_init(void)
     NVIC_EnableIRQ(DMA1_Channel5_IRQn);
 }
 
-static inline void tft_driver_global_lock()
-{
-    #if HAVE_LVGL_BUFFER_LOCK
-    // set DMA busy flag to block any DMA transfer
-    s_lvgl_buf_busy = true;
-    #endif
-}
-
-static inline void tft_driver_global_lock_wait_ready()
-{
-    #if HAVE_LVGL_BUFFER_LOCK
-    // wait until the DMA transfer is ready
-    while(s_lvgl_buf_busy) {
-    }
-    #endif
-}
-
 static inline void tft_driver_clear_spi_rx_fifo()
 {
     // Clear any data in RX FIFO (SPI receives during full-duplex transmission)
@@ -132,8 +113,8 @@ static inline void tft_driver_clear_spi_rx_fifo()
 static inline void tft_driver_wait_spi_sync()
 {
     // SPI sync, wait for TX FIFO to empty (TXE flag set) and SPI to finish transmitting (BSY flag clear)
-    uint32_t timeout = 500;
-    while (((SPI2->SR & (SPI_SR_TXE | SPI_SR_BSY)) != SPI_SR_TXE) && --timeout) {
+    const uint16_t start = TIM7->CNT;
+    while (((SPI2->SR & (SPI_SR_TXE | SPI_SR_BSY)) != SPI_SR_TXE) && (static_cast<uint16_t>(TIM7->CNT - start) < kSPIWaitTimeoutMicros)) {
     }
 }
 
@@ -192,7 +173,6 @@ void tft_driver_spi_send_buffer_dma_raw(const void *data, uint16_t len)
  */
 void tft_driver_spi_send_buffer_dma_interrupt(const void *data, uint16_t len)
 {
-    tft_driver_global_lock();
     // start DMA transfer with interrupts
     tft_driver_start_dma_transfer(data, len, kDMATransferFlagsInterrupt);
 }
@@ -203,8 +183,6 @@ void tft_driver_spi_send_buffer_dma_interrupt(const void *data, uint16_t len)
  */
 void tft_driver_prepare_dma()
 {
-    tft_driver_global_lock_wait_ready();
-
     // check if the last DMA transfer left CS in low state
     if (TFT_PIN_IS_CS_LOW()) {
         // Post-Transfer Cleanup
