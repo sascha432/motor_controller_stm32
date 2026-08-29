@@ -61,12 +61,12 @@ struct Serial : public SerialProtocol
 {
     inline static bool isConfigured()
     {
-        return hUsbDeviceFS.pClassData != nullptr && hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED;
+        return (hUsbDeviceFS.pClassData != nullptr) && (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED);
     }
 
     inline static bool isConnected()
     {
-        return usbTerminalConnected != 0 && isConfigured();
+        return (usbTerminalConnected != 0) && isConfigured();
     }
 
     inline static bool canWrite()

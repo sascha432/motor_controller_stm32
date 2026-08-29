@@ -11,8 +11,8 @@
  * @brief Charlieplexed LEDs
  *
  */
-struct LEDs {
-
+struct LEDs
+{
     static constexpr uint32_t kIlluminationResolution = 1024;
 
     static void init()

@@ -93,6 +93,7 @@
 			"hpcd",
 			"htim",
 			"hwwdg",
+			"I2C_SR1_RXNE",
 			"ICPOLARITY",
 			"ICPSC",
 			"ICSELECTION",

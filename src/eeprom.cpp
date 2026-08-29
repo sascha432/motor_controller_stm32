@@ -32,12 +32,12 @@ void EEPROM::read()
     tmp.invalidate();
     bool result = eepromReadBytes(kDefaultOffset, &tmp, sizeof(tmp));
     DEBUG_PRINT(DEBUG_LEVEL_RESULT(result), "read=%u magic=%08x version=%d sequence=%d ofs=%u", static_cast<int>(result), tmp.magic, tmp.version, tmp.sequence, kDefaultOffset);
-    if (!result || tmp.magic != kMagic || tmp.version != kVersion || tmp.validateCRC() == kInvalidCRC) {
+    if (!result || (tmp.magic != kMagic) || (tmp.version != kVersion) || (tmp.validateCRC() == kInvalidCRC)) {
         if constexpr (kBackupOffset) {
             tmp.invalidate();
             result = eepromReadBytes(kBackupOffset, &tmp, sizeof(tmp));
             DEBUG_PRINT(DEBUG_LEVEL_RESULT(result), "read=%u magic=%08x version=%d sequence=%d ofs=%u (BACKUP)", static_cast<int>(result), tmp.magic, tmp.version, tmp.sequence, kBackupOffset);
-            if (!result || tmp.magic != kMagic || tmp.version != kVersion || tmp.validateCRC() == kInvalidCRC) {
+            if (!result || (tmp.magic != kMagic) || (tmp.version != kVersion) || (tmp.validateCRC() == kInvalidCRC)) {
                 DEBUG_PRINT(DebugType::ERROR, "EEPROM data invalid, resetting to defaults");
                 resetDefaults();
                 return;
@@ -131,8 +131,8 @@ void EEPROM::updateTemperatureLimits()
 //------------------------------------------------------------------
 bool eepromWaitReady(void)
 {
-    uint32_t start = HAL_GetTick();
-    while(HAL_GetTick() - start <= EEPROM::kWriteCycleWaitTimeoutMs) {
+    const uint32_t start = HAL_GetTick();
+    while((HAL_GetTick() - start) <= EEPROM::kWriteCycleWaitTimeoutMs) {
         if (i2c.sendByte(EEPROM::kAddress, 0x00, true)) {
             return true;
         }

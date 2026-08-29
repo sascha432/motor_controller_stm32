@@ -45,8 +45,8 @@ struct MT6701Config {
      */
     uint16_t getPPR() const
     {
-        uint8_t high = readRegister(REG_ABZ_RES_HIGH);
-        uint8_t low  = readRegister(REG_ABZ_RES_LOW);
+        const uint8_t high = readRegister(REG_ABZ_RES_HIGH);
+        const uint8_t low  = readRegister(REG_ABZ_RES_LOW);
         return ((static_cast<uint16_t>(high) << 8) | (low)) + 1;
     }
 
@@ -59,9 +59,9 @@ struct MT6701Config {
      */
     bool setPPR(uint16_t ppr) const
     {
-        uint16_t res_value = ppr - 1;
-        uint8_t high = (res_value >> 8);
-        uint8_t low  = (res_value) & 0xff;
+        const uint16_t res_value = ppr - 1;
+        const uint8_t high = (res_value >> 8);
+        const uint8_t low  = (res_value) & 0xff;
 
         if (!writeRegister(REG_ABZ_RES_HIGH, high)) {
             return false;
@@ -147,7 +147,7 @@ struct MotorEncoder
     void init()
     {
         // Enable GPIO port clock
-        __HAL_RCC_GPIOD_CLK_ENABLE();
+        __HAL_RCC_GPIO_X_CLK_ENABLE(ENC1_I2C_EN_GPIO_Port);
 
         GPIO_InitTypeDef GPIO_InitStruct = {};
         GPIO_InitStruct.Pin = ENC1_I2C_EN_Pin;

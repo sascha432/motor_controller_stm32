@@ -66,10 +66,7 @@ struct ScreenFlow {
      * @brief Refresh current screen
      *
      */
-    static inline void refresh()
-    {
-        lv_timer_handler();
-    }
+    static inline void refresh();
 
 protected:
     Screen *screen;
@@ -87,4 +84,9 @@ inline Screen *ScreenFlow::operator->() const
 inline Screen *ScreenFlow::getScreen() const
 {
     return screen;
+}
+
+inline void ScreenFlow::refresh()
+{
+    lv_timer_handler();
 }

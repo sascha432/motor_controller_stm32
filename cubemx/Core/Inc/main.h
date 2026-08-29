@@ -80,6 +80,9 @@ enum InterruptErrorType {
 #define F_CPU                                       72000000UL
 #endif
 
+// program MT6701 during boot via I2C
+#define MT6701_PROGRAM_PPR                          false
+
 // PIN macros for the TFT driver
 #define TFT_PIN_RS_HIGH()                           (TFT_DC_GPIO_Port->BSRR = TFT_DC_Pin)
 #define TFT_PIN_RS_LOW()                            (TFT_DC_GPIO_Port->BRR = TFT_DC_Pin)
@@ -88,6 +91,9 @@ enum InterruptErrorType {
 #define TFT_PIN_CS_LOW()                            (TFT_CS_GPIO_Port->BRR = TFT_CS_Pin)
 #define TFT_PIN_RST_HIGH()                          (TFT_RST_GPIO_Port->BSRR = TFT_RST_Pin)
 #define TFT_PIN_RST_LOW()                           (TFT_RST_GPIO_Port->BRR = TFT_RST_Pin)
+
+#define TFT_DMA_CH                                  DMA1_Channel5
+#define TFT_DMA                                     DMA1
 
 // motor driver pins are connected to channels 1 and 2 of TIM1 (PA8 and PA9)
 #define PID_MOTOR_PWM_TIMER                         TIM1

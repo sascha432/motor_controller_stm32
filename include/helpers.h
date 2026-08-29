@@ -65,7 +65,7 @@ static constexpr uint32_t kARRToPWMFrequency(uint16_t arr)
  * @tparam microseconds delay
  */
 template<uint32_t US>
-static inline void delay_us()
+inline void delay_us()
 {
     static_assert(US <= 0xFFFF, "delay_us() value too high for 16bit timer");
     const uint16_t start = TIM7->CNT;

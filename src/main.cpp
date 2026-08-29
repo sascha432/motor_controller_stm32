@@ -125,9 +125,6 @@ static inline void setup()
     // Initialize display GPIO, PWM timer and SPI
     tft_driver_gpio_init();
     tft_driver_spi_init();
-
-    // configure external interrupts last to avoid HAL resetting anything
-    EXTI_Init();
 }
 
 // === user setup runs after core setup ===
@@ -138,16 +135,16 @@ static inline void user_setup()
     tft_driver_init();
     tft_clear_display();
 
+    // start the watchdog after startup is complete
+    WatchDog::init();
+    MX_WWDG_Init();
+
     // Initialize LVGL and register flush callback
     lv_init();
     #if LV_USE_LOG
         lv_log_register_print_cb(lvgl_log_cb);
     #endif
     tft_driver_lvgl_init();
-
-    // start the watchdog after startup is complete
-    WatchDog::init();
-    MX_WWDG_Init();
 
     // Show welcome screen and load main menu
     menu.loadWelcomeScreen();
@@ -430,6 +427,7 @@ int main(void)
     #if HAVE_USB_DEVICE
         MX_USB_DEVICE_Init();
     #endif
+    EXTI_Init();
     setup();
     // user init
     user_setup();
