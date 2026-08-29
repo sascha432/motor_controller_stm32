@@ -5,6 +5,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <algorithm>
 #include <type_traits>
 #include "main.h"
 
@@ -316,5 +317,5 @@ template <typename ENUM_TYPE, typename T>
 constexpr T clamp_enum(T value)
 {
     using U = std::underlying_type_t<ENUM_TYPE>;
-    return static_cast<T>(std::clamp(static_cast<U>(value), static_cast<U>(ENUM_TYPE::MIN), static_cast<U>(ENUM_TYPE::MAX) - 1));
+    return std::clamp<T>(static_cast<U>(value), static_cast<U>(ENUM_TYPE::MIN), static_cast<U>(ENUM_TYPE::MAX) - 1);
 }
