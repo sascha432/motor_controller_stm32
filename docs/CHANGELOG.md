@@ -2,7 +2,7 @@
 
 ## [Unreleased 1.0.2]
 
-- Added input current limit strength (Low to Very High)
+- Added current limit strength (Low - Very High)
 - Added LVGL double buffering with DMA interrupts to improve display performance
 - Terminal connected detection to avoid USB timeouts and lag
 - Using ADC injection group and interrupt to handle over current and voltage

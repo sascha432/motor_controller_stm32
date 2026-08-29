@@ -357,7 +357,7 @@ def current_limit_strength_name_to_int(name: str) -> int:
 
 
 def _uint16_to_float(raw_value: int) -> float:
-    return float(raw_value) * 65535.0
+    return float(raw_value) / 65535.0
 
 
 def decode_pid_item(payload: bytes) -> Optional[Sample]:

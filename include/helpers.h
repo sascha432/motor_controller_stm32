@@ -288,8 +288,12 @@ inline T filterValue(T filteredValue, T value)
     }
 }
 
+// fast conversion [0.0 - 1.0f] to 16bit without rounding
+// static_cast<uint16_t>(floatValue * kFloatToUint16Multiplier)
+// static_cast<float>(intValue / kFloatToUint16Multiplier)
 static constexpr float kFloatToUint16Multiplier = 65535.0f;
 
+// Enable GPIO port clock
 #define __HAL_RCC_GPIO_X_CLK_ENABLE(GPIO_Port)   do { \
                                         __IO uint32_t tmpreg; \
                                         const uint32_t mask = RCC_APB2ENR_IOPAEN << (((uint32_t)GPIO_Port - GPIOA_BASE) >> 10); \
