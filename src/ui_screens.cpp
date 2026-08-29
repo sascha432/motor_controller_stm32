@@ -271,7 +271,7 @@ void MenuScreen::setValue(uint32_t index)
 {
     #if 0
         // allows negative values to wrap around the menu items
-        selected = (((int32_t)index % count) + count) % count;
+        selected = (((static_cast<int32_t>(index) % count) + count) % count;
     #else
         // no wrapping
         selected = std::clamp<int32_t>(index, 0, count - 1);
@@ -457,7 +457,7 @@ void DiagnosticsScreen::load()
         "Build " __DATE__ " " __TIME__ "\n"
         "EEPROM cycle #%u\n"
         "PID Interval " SPRINTF_FP2_FMT "ms",
-            (unsigned)eeprom.getData().sequence,
+            static_cast<unsigned>(eeprom.getData().sequence),
             CONVERT_TO_FP2(static_cast<uint32_t>(PidController::kPIDInterval * 1000))
     );
 
@@ -551,8 +551,8 @@ void DiagnosticsScreen::_refreshVisuals()
     lv_label_set_text_static(mosfetTempLabel, mosfetTempLabelBuf);
 
     snprintf(rpmLabelBuf, sizeof(rpmLabelBuf), "RPM %d/%u",
-        (signed)pid.stats.rpm.get(),
-        (unsigned)pid.getRPM()
+        static_cast<signed>(pid.stats.rpm.get()),
+        static_cast<unsigned>(pid.getRPM())
     );
     lv_label_set_text_static(rpmPwmLabel, rpmLabelBuf);
 
@@ -705,6 +705,12 @@ void DashboardScreen::_refreshVisuals()
                 lv_label_set_long_mode(valueLabel, LV_LABEL_LONG_SCROLL_CIRCULAR);
 
                 lv_obj_clear_flag(graphContainer, LV_OBJ_FLAG_HIDDEN);
+                if (eeprom.isPIDMode()) {
+                    lv_obj_clear_flag(graphSetRpmLine, LV_OBJ_FLAG_HIDDEN);
+                }
+                else {
+                    lv_obj_add_flag(graphSetRpmLine, LV_OBJ_FLAG_HIDDEN);
+                }
                 for (auto *label : graphLegendLabels) {
                     lv_obj_clear_flag(label, LV_OBJ_FLAG_HIDDEN);
                 }
@@ -718,11 +724,14 @@ void DashboardScreen::_refreshVisuals()
         _rebuildGraphPoints();
     }
 
+    int32_t pwmLevel;
     if (eeprom.isPIDMode()) {
-        snprintf(rpmLabelBuf, sizeof(rpmLabelBuf), "%u RPM (%u)", (unsigned)pid.clampRPM(pid.stats.rpm.get()), (unsigned)pid.getRPM());
+        pwmLevel = (pid.stats.pwm.get() * 100U) / pid.getPWMLevelARR();
+        snprintf(rpmLabelBuf, sizeof(rpmLabelBuf), "%u RPM (%u)", static_cast<unsigned>(pid.clampRPM(pid.stats.rpm.get())), static_cast<unsigned>(pid.getRPM()));
     }
     else {
-        snprintf(rpmLabelBuf, sizeof(rpmLabelBuf), "%u RPM", (unsigned)pid.clampRPM(pid.stats.rpm.get()));
+        pwmLevel = eeprom.getMotorPWM();
+        snprintf(rpmLabelBuf, sizeof(rpmLabelBuf), "%u RPM", static_cast<unsigned>(pid.clampRPM(pid.stats.rpm.get())));
     }
     lv_label_set_text_static(rpmLabel, rpmLabelBuf);
 
@@ -730,11 +739,11 @@ void DashboardScreen::_refreshVisuals()
 
     switch(selectedValue) {
         case SelectedValueType::SPEED:
-            snprintf(valueLabelBuf, sizeof(valueLabelBuf), "PWM %d%% %u.%uW", (int)((pid.stats.pwm.get() * 100) / pid.getPWMLevelARR()), CONVERT_TO_FP1(stats.vcc * stats.current / 1000U));
+            snprintf(valueLabelBuf, sizeof(valueLabelBuf), "PWM %d%% %u.%uW", static_cast<int>(pwmLevel), CONVERT_TO_FP1(stats.vcc * stats.current / 1000U));
             lv_label_set_text_static(valueLabel, valueLabelBuf);
             break;
         case SelectedValueType::SPEED2:
-            snprintf(valueLabelBuf, sizeof(valueLabelBuf), "PWM %d%%", (int)((pid.stats.pwm.get() * 100) / pid.getPWMLevelARR()));
+            snprintf(valueLabelBuf, sizeof(valueLabelBuf), "PWM %d%%", static_cast<int>(pwmLevel));
             lv_label_set_text_static(valueLabel, valueLabelBuf);
             break;
         case SelectedValueType::KP:
@@ -908,7 +917,7 @@ void StartScreen::_refreshVisuals()
         lv_obj_set_style_bg_color(directionLabel, STARTSCREEN_COLOR_START_BG, LV_PART_MAIN);
     }
 
-    snprintf(speedLabelBuf, sizeof(speedLabelBuf), eeprom.isPIDMode() ? "%u RPM" : "%u%% PWM", (unsigned)eeprom.getSpeed());
+    snprintf(speedLabelBuf, sizeof(speedLabelBuf), eeprom.isPIDMode() ? "%u RPM" : "%u%% PWM", static_cast<unsigned>(eeprom.getSpeed()));
     lv_label_set_text_static(speedLabel, speedLabelBuf);
 }
 

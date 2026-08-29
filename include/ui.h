@@ -579,9 +579,14 @@ struct DashboardScreen : public Screen
      *
      * @return SelectedValueType New selected value
      */
-    SelectedValueType incrSelectedValue()
+    SelectedValueType incrSelectedValue(bool isPidMode)
     {
         selectedValue = static_cast<SelectedValueType>((static_cast<uint32_t>(selectedValue) + 1) % static_cast<uint32_t>(SelectedValueType::MAX));
+        if (!isPidMode) {
+            if (selectedValue == SelectedValueType::KP) { // skip PID parameters
+                selectedValue = SelectedValueType::INPUT_CURRENT_LIMIT;
+            }
+        }
         return selectedValue;
     }
 
@@ -590,9 +595,14 @@ struct DashboardScreen : public Screen
      *
      * @return SelectedValueType New selected value
      */
-    SelectedValueType decrSelectedValue()
+    SelectedValueType decrSelectedValue(bool isPidMode)
     {
         selectedValue = static_cast<SelectedValueType>((static_cast<uint32_t>(selectedValue) + static_cast<uint32_t>(SelectedValueType::MAX) - 1) % static_cast<uint32_t>(SelectedValueType::MAX));
+        if (!isPidMode) {
+            if (selectedValue == SelectedValueType::ANTI_WINDUP) {
+                selectedValue = SelectedValueType::SPEED2;
+            }
+        }
         return selectedValue;
     }
 

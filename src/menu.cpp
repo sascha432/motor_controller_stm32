@@ -816,10 +816,10 @@ void Menu::handleButtonPress(uint32_t duration)
             }
             else
             #endif
-            if (eeprom.isPIDMode()) {
+            {
                 DashboardScreen &dashboard = *reinterpret_cast<DashboardScreen *>(screenFlow.getScreen());
                 // short press advances to the next editable value, long press moves backward through the same selection cycle
-                switch(duration < UIConstants::kLongPressDuration ? dashboard.incrSelectedValue() : dashboard.decrSelectedValue()) {
+                switch(duration < UIConstants::kLongPressDuration ? dashboard.incrSelectedValue(eeprom.isPIDMode()) : dashboard.decrSelectedValue(eeprom.isPIDMode())) {
                     case DashboardScreen::SelectedValueType::SPEED:
                     case DashboardScreen::SelectedValueType::SPEED2:
                         dashboard.setMaxAcceleration(eeprom.isPIDMode() ? UIConstants::kStepsRPM : UIConstants::kStepsPWM);

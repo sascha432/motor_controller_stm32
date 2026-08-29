@@ -2,6 +2,7 @@
 
 ## [Unreleased 1.0.2]
 
+- Settings Tuning enabled for Open Loop Mode
 - Added current limit strength (Low - Very High)
 - Added LVGL double buffering with DMA interrupts to improve display performance
 - Terminal connected detection to avoid USB timeouts and lag
