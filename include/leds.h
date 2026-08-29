@@ -18,9 +18,9 @@ struct LEDs {
     static void init()
     {
         // Enable GPIO port clock
-        __HAL_RCC_GPIOD_CLK_ENABLE();
+        __HAL_RCC_GPIO_X_CLK_ENABLE(MOTOR_LEDS_GPIO_Port);
 
-        // LED 1 & 2
+        // LED 1 & 2 off
         off();
     }
 
