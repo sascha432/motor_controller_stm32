@@ -8,7 +8,6 @@
 #include <stdlib.h>
 #include "ui_constants.h"
 #include "lvgl.h"
-#include "lv_custom_fonts.h"
 #include "tft_driver.h"
 #include "controls.h"
 #include "eeprom.h"
