@@ -289,3 +289,12 @@ inline T filterValue(T filteredValue, T value)
 }
 
 static constexpr float kFloatToUint16Multiplier = 65535.0f;
+
+#define __HAL_RCC_GPIO_X_CLK_ENABLE(GPIO_Port)   do { \
+                                        __IO uint32_t tmpreg; \
+                                        const uint32_t mask = RCC_APB2ENR_IOPAEN << (((uint32_t)GPIO_Port - GPIOA_BASE) >> 10); \
+                                        SET_BIT(RCC->APB2ENR, mask); \
+                                        /* Delay after an RCC peripheral clock enabling */\
+                                        tmpreg = READ_BIT(RCC->APB2ENR, mask) ;\
+                                        UNUSED(tmpreg); \
+                                      } while(0U)

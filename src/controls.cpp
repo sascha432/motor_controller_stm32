@@ -5,9 +5,16 @@
 #include "controls.h"
 
 RotaryEncoderKnob knob;
-KnobButton knobButton;
-BackButton backButton;
-StartButton startButton;
+KnobButton knobButton(BTN_1_GPIO_Port);
+BackButton backButton(BTN_2_GPIO_Port);
+StartButton startButton(BTN_3_GPIO_Port);
+
+// === Button ===
+template <uint16_t GPIO_Pin, bool ACTIVE_STATE, uint32_t DEBOUNCE_TIME_MILLIS>
+Button<GPIO_Pin, ACTIVE_STATE, DEBOUNCE_TIME_MILLIS>::Button(GPIO_TypeDef *gpio) :
+    GPIO_Port(gpio)
+{
+}
 
 template <uint16_t GPIO_Pin, bool ACTIVE_STATE, uint32_t DEBOUNCE_TIME_MILLIS>
 void Button<GPIO_Pin, ACTIVE_STATE, DEBOUNCE_TIME_MILLIS>::init(CallbackType releaseCallback, CallbackType isDownCallback)
@@ -15,24 +22,15 @@ void Button<GPIO_Pin, ACTIVE_STATE, DEBOUNCE_TIME_MILLIS>::init(CallbackType rel
     this->releaseCallback = releaseCallback;
     this->isDownCallback = isDownCallback;
 
-    // Enable GPIO clock
-    __HAL_RCC_GPIOD_CLK_ENABLE();
+    __HAL_RCC_GPIO_X_CLK_ENABLE(GPIO_Port);
 
     GPIO_InitTypeDef GPIO_InitStruct = {};
     GPIO_InitStruct.Pin = GPIO_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_PULLUP;
-    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+    HAL_GPIO_Init(GPIO_Port, &GPIO_InitStruct);
 
     reset();
-}
-
-template <uint16_t GPIO_Pin, bool ACTIVE_STATE, uint32_t DEBOUNCE_TIME_MILLIS>
-void Button<GPIO_Pin, ACTIVE_STATE, DEBOUNCE_TIME_MILLIS>::isDownIsr()
-{
-    if (isDownCallback && pressed && !released) {
-        isDownCallback(HAL_GetTick() - lastPressedTime);
-    }
 }
 
 template <uint16_t GPIO_Pin, bool ACTIVE_STATE, uint32_t DEBOUNCE_TIME_MILLIS>
@@ -65,13 +63,7 @@ void Button<GPIO_Pin, ACTIVE_STATE, DEBOUNCE_TIME_MILLIS>::isr(uint32_t idr)
     }
 }
 
-void RotaryEncoder::reset()
-{
-    __disable_irq();
-    position = 0;
-    acceleration = 0;
-    __enable_irq();
-}
+// === RotaryEncoder ===
 
 void RotaryEncoder::isr()
 {
