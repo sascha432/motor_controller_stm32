@@ -44,7 +44,6 @@ struct MotorVibes
 
 private:
     uint16_t prescaler;
-    uint16_t period;
     uint16_t arr;
     uint16_t motorCurrentLimit;
     uint16_t inputCurrentLimit;

@@ -11,13 +11,12 @@
 
 void MotorVibes::init()
 {
-    // store values and deinit timer
+    // stop PWM outputs
     PID_MOTOR_PWM_TIMER->CCR1 = 0;
     PID_MOTOR_PWM_TIMER->CCR2 = 0;
-    prescaler = htim1.Init.Prescaler;
-    period = htim1.Init.Period;
+    // store current prescaler and auto-reload value
+    prescaler = PID_MOTOR_PWM_TIMER->PSC;
     arr = PID_MOTOR_PWM_TIMER->ARR;
-    HAL_TIM_PWM_DeInit(&htim1);
 
     // store current limits and remove them
     motorCurrentLimit = DAC_GET_MOTOR_CURRENT();
@@ -25,32 +24,26 @@ void MotorVibes::init()
     DAC_SET_MOTOR_CURRENT(~0U);
     DAC_SET_INPUT_CURRENT(~0U);
 
-    // change PWM frequency
-    htim1.Init.Prescaler = 71; // 72 MHz / 72 = 1 MHz (1 us tick)
-    htim1.Init.Period = kTonePeriod;
-    HAL_TIM_PWM_Init(&htim1);
-    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
+    // change prescaler and period on the fly without reinitializing the timer
+    PID_MOTOR_PWM_TIMER->PSC = 71; // 72 MHz / 72 = 1 MHz (1 us tick)
+    PID_MOTOR_PWM_TIMER->ARR = kTonePeriod;
+    PID_MOTOR_PWM_TIMER->EGR = TIM_EGR_UG; // force update event to load PSC/ARR and reset the counter
 }
 
 void MotorVibes::deinit()
 {
-    // deinit and restore previous values
+    // stop PWM outputs
     PID_MOTOR_PWM_TIMER->CCR1 = 0;
     PID_MOTOR_PWM_TIMER->CCR2 = 0;
-    HAL_TIM_PWM_DeInit(&htim1);
 
     // restore current limits
     DAC_SET_MOTOR_CURRENT(motorCurrentLimit);
     DAC_SET_INPUT_CURRENT(inputCurrentLimit);
 
-    // re-initialize timer with previous values
-    htim1.Init.Prescaler = prescaler;
-    htim1.Init.Period = period;
-    HAL_TIM_PWM_Init(&htim1);
-    __HAL_TIM_SET_AUTORELOAD(&htim1, arr);
-    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
+    // restore prescaler and period on the fly
+    PID_MOTOR_PWM_TIMER->PSC = prescaler;
+    PID_MOTOR_PWM_TIMER->ARR = arr;
+    PID_MOTOR_PWM_TIMER->EGR = TIM_EGR_UG; // force update event to load PSC/ARR and reset the counter
 }
 
 void MotorVibes::playTone(uint32_t frequency)
