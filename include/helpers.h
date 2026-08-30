@@ -74,13 +74,6 @@ inline void delay_us()
 }
 
 /**
- * @brief Delay function
- *
- * @param us microseconds
- */
-void delay_us(uint32_t us);
-
-/**
  * @brief Convert float to string helper
  */
 struct FloatToString
@@ -136,30 +129,27 @@ public:
     bool push(const T& item)
     {
         size_t next = (head + 1) % SIZE;
-
-        if (next == tail)
+        if (next == tail) {
             return false; // full
-
+        }
         buffer[head] = item;
         head = next;
-
         return true;
     }
 
     bool pop(T& item)
     {
-        if (head == tail)
+        if (head == tail) {
             return false; // empty
-
+        }
         item = buffer[tail];
         tail = (tail + 1) % SIZE;
-
         return true;
     }
 
     bool empty() const
     {
-        return head == tail;
+        return (head == tail);
     }
 
     void clear()
@@ -177,9 +167,9 @@ public:
 
     size_t available() const
     {
-        if (head >= tail)
+        if (head >= tail) {
             return head - tail;
-
+        }
         return SIZE - tail + head;
     }
 

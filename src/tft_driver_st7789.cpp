@@ -53,7 +53,7 @@ static inline void write_color_pixels(uint16_t color, uint32_t pixels)
     constexpr size_t kChunkPixelBufferSize = 128 / sizeof(uint16_t); // chunk buffer in half words
     uint32_t dma_transfer_buffer[kChunkPixelBufferSize / sizeof(uint16_t)];
 
-    // const uint32_t pixel_pattern = __REV16(static_cast<uint32_t>(color) << 16U) | color; // big endian
+    // const uint32_t pixel_pattern = __REV16((static_cast<uint32_t>(color) << 16U) | color); // big endian
     const uint32_t pixel_pattern = (static_cast<uint32_t>(color) << 16U) | color;
     std::fill(std::begin(dma_transfer_buffer), std::end(dma_transfer_buffer), pixel_pattern);
 

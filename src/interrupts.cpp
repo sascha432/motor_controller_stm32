@@ -206,7 +206,7 @@ extern "C" void OTG_FS_IRQHandler(void)
 #endif
 
 /**
- * @brief Delay with interrupt disabled
+ * @brief Delay with interrupts disabled
  *
  * @param ms Time in milliseconds
  */
@@ -274,7 +274,7 @@ extern "C" void Error_Handler_Debug(void)
         LEDs::onLEDError();
         delay_ms(500);
         // signal error type via LED flashes
-        for(int i = 0; i <= static_cast<int>(interruptErrorType); i++) {
+        for(uint32_t i = 0; i <= interruptErrorType; i++) {
             LEDs::off();
             delay_ms(250);
             LEDs::onLEDWarning();

@@ -5,19 +5,6 @@
 #include <string.h>
 #include "helpers.h"
 
-// == delay function ===
-
-void delay_us(uint32_t us)
-{
-    if (us > 1000) {
-        HAL_Delay(us / 1000);
-        us %= 1000;
-    }
-    const uint16_t start = TIM7->CNT;
-    while (static_cast<uint16_t>(TIM7->CNT - start) < static_cast<uint16_t>(us)) {
-    }
-}
-
 // === float to string conversion ===
 
 #if DEBUG

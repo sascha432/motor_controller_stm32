@@ -78,7 +78,7 @@ void ADC::init()
 
     // Enable ADC for calibration
     ADC1->CR2 |= ADC_CR2_ADON;
-    delay_us(ADC_CALIBRATION_TIMEOUT);
+    delay_us<ADC_CALIBRATION_TIMEOUT>();
 
     // Reset calibration
     ADC1->CR2 |= ADC_CR2_RSTCAL;
@@ -92,7 +92,7 @@ void ADC::init()
 
     // Enable ADC again after calibration
     ADC1->CR2 |= ADC_CR2_ADON;
-    delay_us(ADC_CALIBRATION_TIMEOUT);
+    delay_us<ADC_CALIBRATION_TIMEOUT>();
 
     ADC1->CR2 &= ~(ADC_CR2_CONT|ADC_CR2_EXTSEL);        // disable continuous conversion and external trigger
     ADC1->CR2 |= ADC_CR2_EXTSEL | ADC_CR2_EXTTRIG;      // enable external trigger (software start)
