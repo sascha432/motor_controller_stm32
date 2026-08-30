@@ -35,7 +35,8 @@ static constexpr uint16_t kSPIWaitTimeoutMicros = 100;                          
  */
 void tft_driver_gpio_init(void)
 {
-    // Enable GPIOC and GPIOD clocks
+    // Enable clocks
+    __HAL_RCC_GPIOB_CLK_ENABLE();
     __HAL_RCC_GPIOC_CLK_ENABLE();
     __HAL_RCC_GPIOD_CLK_ENABLE();
 
@@ -53,6 +54,13 @@ void tft_driver_gpio_init(void)
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
     HAL_GPIO_Init(TFT_CS_GPIO_Port, &GPIO_InitStruct);
 
+    // Configure TFT_CLK/PB13 and TFT_MOSI/PB15 as alternate function push-pull
+    GPIO_InitStruct = {};
+    GPIO_InitStruct.Pin = TFT_CLK_Pin | TFT_MOSI_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+    HAL_GPIO_Init(TFT_CLK_GPIO_Port, &GPIO_InitStruct);
+
     // set pins to default state
     TFT_PIN_CS_HIGH();
     TFT_PIN_RS_HIGH();
@@ -66,14 +74,6 @@ void tft_driver_spi_init(void)
 {
     // Enable clocks
     __HAL_RCC_SPI2_CLK_ENABLE();
-    __HAL_RCC_GPIOB_CLK_ENABLE();
-
-    // Configure TFT_CLK/PB13 and TFT_MOSI/PB15 as alternate function push-pull
-    GPIO_InitTypeDef GPIO_InitStruct = {};
-    GPIO_InitStruct.Pin = TFT_CLK_Pin | TFT_MOSI_Pin;
-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-    HAL_GPIO_Init(TFT_CLK_GPIO_Port, &GPIO_InitStruct);
 
     // Disable SPI first
     SPI2->CR1 = 0;

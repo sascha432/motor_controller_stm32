@@ -122,7 +122,7 @@ static inline void setup()
     // apply parameters
     pid.applyPIDParams();
 
-    // Initialize display GPIO, PWM timer and SPI
+    // Initialize display GPIO and SPI
     tft_driver_gpio_init();
     tft_driver_spi_init();
 }
