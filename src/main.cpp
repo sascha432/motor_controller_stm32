@@ -181,8 +181,10 @@ static inline void loop()
     if (LEDs::isAnyLEDOn()) {
         // check if fault/errors have cleared
         if (
+            // check for errors set
+            !pid.hasErrorCode() &&
             // check for DRV fault
-            !pid.faults.drv8701Fault && !pid.hasErrorCode() &&
+            !pid.faults.drv8701Fault &&
             // check OCP condition
             !pid.ocp.isActive()
         ) {
@@ -417,6 +419,7 @@ int main(void)
     SystemClock_Config();
     SWO::init();
     MX_CRC_Init();
+    MX_TIM1_Init(); // PWM for motor and RPM counter
     MX_TIM2_Init(); // PWM for TFT backlight and LED
     MX_TIM3_Init(); // rotary encoder
     MX_TIM4_Init(); // mt6701 encoder

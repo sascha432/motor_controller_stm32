@@ -9,65 +9,17 @@
 
 PidController pid;
 MotorEncoder motorEncoder;
-TIM_HandleTypeDef tim1;
 
 void PidController::init()
 {
-    // === PWM on TIM1 CH1 (PA8, PA9) ===
-
-    // Enable clocks
-    __HAL_RCC_AFIO_CLK_ENABLE();
-    __HAL_RCC_GPIOA_CLK_ENABLE();
-    __HAL_RCC_TIM1_CLK_ENABLE();
-
-    // PA8 / PA9 AF push-pull
-    GPIO_InitTypeDef GPIO_InitStruct = {};
-    GPIO_InitStruct.Pin = GPIO_PIN_8 | GPIO_PIN_9;
-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-    // TIM1 PWM setup
-    tim1.Instance = TIM1;
-    tim1.Init.Prescaler = 0;
-    tim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-    tim1.Init.Period = pwmLevel.getMax() - 1;
-    tim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-    HAL_TIM_PWM_Init(&tim1);
-
-    // PWM mode 1 CH1 + CH2
-    TIM_OC_InitTypeDef sConfigOC = {};
-    sConfigOC.OCMode = TIM_OCMODE_PWM1;
-    sConfigOC.Pulse = 0;
-    sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-    sConfigOC.OCNPolarity = 0;
-    sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-    HAL_TIM_PWM_ConfigChannel(&tim1, &sConfigOC, TIM_CHANNEL_1);
-    HAL_TIM_PWM_ConfigChannel(&tim1, &sConfigOC, TIM_CHANNEL_2);
-
-    // TIM1 BDTR MOE
-    __HAL_TIM_MOE_ENABLE(&tim1);
-
-    // Start PWM
-    HAL_TIM_PWM_Start(&tim1, TIM_CHANNEL_1);
-    HAL_TIM_PWM_Start(&tim1, TIM_CHANNEL_2);
-
-    // TIM1 CH4 OC4REF used as injected ADC trigger (PA2 current + PA3 voltage sample)
-    // PWM mode 2: OC4REF goes high when CNT reaches CCR4, so the rising edge (which the
-    // ADC triggers on) fires at exactly the CCR4 point in the cycle set by
-    // ADC::updateInjectedTriggerPoint(). Output is internal only, NOT routed to PA11.
-    // starts disabled (Pulse = 0 keeps OC4REF flat high -> no rising edge -> no trigger)
-    sConfigOC.OCMode = TIM_OCMODE_PWM2;
-    sConfigOC.Pulse = 0;
-    HAL_TIM_PWM_ConfigChannel(&tim1, &sConfigOC, TIM_CHANNEL_4);
-    HAL_TIM_PWM_Start(&tim1, TIM_CHANNEL_4);
+    // get PWM frequency from initialized timer
+    pwmLevel.setMax(htim1.Init.Period + 1);
 
     // Fault interrupt pins DRV_FAULT, OCP_INT, DRV_SNSOUT
     __HAL_RCC_GPIOB_CLK_ENABLE();
     __HAL_RCC_GPIOD_CLK_ENABLE();
 
-    GPIO_InitStruct = {};
+    GPIO_InitTypeDef GPIO_InitStruct = {};
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_PULLUP;
     GPIO_InitStruct.Pin = DRV_FAULT_Pin | OCP_INT_Pin;
@@ -381,8 +333,8 @@ void PidController::setPWMFrequency(uint32_t frequency)
     const uint32_t arr = pwmLevel.getMax() - 1;
 
     // stop timer and update pwm frequency
-    __HAL_TIM_DISABLE(&tim1);
-    __HAL_TIM_SET_AUTORELOAD(&tim1, arr);
+    __HAL_TIM_DISABLE(&htim1);
+    __HAL_TIM_SET_AUTORELOAD(&htim1, arr);
 
     // update pre-calculated PID parameters
     setKp(Kp);
@@ -393,6 +345,6 @@ void PidController::setPWMFrequency(uint32_t frequency)
     adc.initInjection(frequency);
 
     // start timer
-    __HAL_TIM_SET_COUNTER(&tim1, 0);
-    __HAL_TIM_ENABLE(&tim1);
+    __HAL_TIM_SET_COUNTER(&htim1, 0);
+    __HAL_TIM_ENABLE(&htim1);
 }

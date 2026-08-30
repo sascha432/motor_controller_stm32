@@ -136,6 +136,7 @@ void Error_Handler(void);
 void MX_DAC_Init(void);
 void MX_CRC_Init(void);
 void MX_WWDG_Init(void);
+void MX_TIM1_Init(void);
 void MX_TIM2_Init(void);
 void MX_TIM3_Init(void);
 void MX_TIM4_Init(void);
@@ -148,6 +149,7 @@ void MX_TIM7_Init(void);
 void SystemClock_Config();
 
 extern CRC_HandleTypeDef hcrc;
+extern TIM_HandleTypeDef htim1;
 extern WWDG_HandleTypeDef hwwdg;
 extern enum InterruptErrorType interruptErrorType;
 
