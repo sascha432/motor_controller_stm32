@@ -18,16 +18,16 @@ void MotorVibes::init()
     prescaler = PID_MOTOR_PWM_TIMER->PSC;
     arr = PID_MOTOR_PWM_TIMER->ARR;
 
+    // change prescaler and period on the fly without reinitializing the timer
+    PID_MOTOR_PWM_TIMER->PSC = 71; // 72 MHz / 72 = 1 MHz (1 us tick)
+    PID_MOTOR_PWM_TIMER->ARR = kTonePeriod;
+    PID_MOTOR_PWM_TIMER->EGR = TIM_EGR_UG; // force update event to load PSC/ARR and reset the counter
+
     // store current limits and remove them
     motorCurrentLimit = DAC_GET_MOTOR_CURRENT();
     inputCurrentLimit = DAC_GET_INPUT_CURRENT();
     DAC_SET_MOTOR_CURRENT(~0U);
     DAC_SET_INPUT_CURRENT(~0U);
-
-    // change prescaler and period on the fly without reinitializing the timer
-    PID_MOTOR_PWM_TIMER->PSC = 71; // 72 MHz / 72 = 1 MHz (1 us tick)
-    PID_MOTOR_PWM_TIMER->ARR = kTonePeriod;
-    PID_MOTOR_PWM_TIMER->EGR = TIM_EGR_UG; // force update event to load PSC/ARR and reset the counter
 }
 
 void MotorVibes::deinit()
