@@ -176,9 +176,9 @@ struct MotorEncoder
             auto result = config.setPPR(ppr);
             if (result && writeEEPROM) {
                 result = config.writeEEPROM();
-                DEBUG_PRINT(DebugType::NOTICE, "write EEPROM=%u", result);
+                DEBUG_PRINT(DebugType::NOTICE, "MT6701 write EEPROM=%u", result);
             }
-            DEBUG_PRINT(DebugType::INFO, "PPR=%u", config.getPPR());
+            DEBUG_PRINT(DebugType::INFO, "MT6701 PPR=%u", config.getPPR());
         }
         else {
             DEBUG_PRINT(DebugType::ERROR, "MT6701 not detected at address 0x%02x", MT6701Config::MT6701_ADDR);
