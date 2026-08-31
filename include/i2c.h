@@ -1,4 +1,3 @@
-#include "debug.h"
 /**
   Author: sascha_lammers@gmx.de
 */
@@ -7,24 +6,28 @@
 
 #include "helpers.h"
 
+// microseconds timer required
+#define I2C_TIMEOUT_TIM TIM7
+
 /**
  * @brief Helper macro with timeout
  *
  */
 #define I2C_WAIT_TIMEOUT(condition, timeout, af_check) \
     do { \
-        const uint16_t start = TIM7->CNT; \
+        const uint16_t start = I2C_TIMEOUT_TIM->CNT; \
         while((condition)) { \
             if constexpr (af_check) { \
-                if (I2C1->SR1 & I2C_SR1_AF) { \
+                if (getI2C()->SR1 & I2C_SR1_AF) { \
                     return I2CError(); \
                 } \
             } \
-            if (static_cast<uint16_t>(TIM7->CNT - start) >= timeout) { \
+            if (static_cast<uint16_t>(I2C_TIMEOUT_TIM->CNT - start) >= timeout) { \
                 return I2CError(); \
             } \
         } \
     } while(0);
+
 
 /**
  * @brief initialization of the I2C bus and simple blocking functions to communicate
@@ -34,6 +37,16 @@ struct I2CHelper
 {
     // wait timeout
     static const uint16_t kTimeoutMicros = 500;
+
+    /**
+     * @brief Get I2C1 interface
+     *
+     * @return constexpr I2C_TypeDef*
+     */
+    static inline constexpr I2C_TypeDef *getI2C()
+    {
+        return I2C1;
+    }
 
     /**
      * @brief initialize I2C1 on PB8/PB9 (remapped)
@@ -54,9 +67,9 @@ struct I2CHelper
 
         // Configure PB8 and PB9 as 50 MHz alternate-function open-drain pins.
         GPIOB->CRH |= GPIO_CRH_MODE8_1 | GPIO_CRH_MODE8_0
-                   | GPIO_CRH_CNF8_1  | GPIO_CRH_CNF8_0
-                   | GPIO_CRH_MODE9_1 | GPIO_CRH_MODE9_0
-                   | GPIO_CRH_CNF9_1  | GPIO_CRH_CNF9_0;
+                   |  GPIO_CRH_CNF8_1  | GPIO_CRH_CNF8_0
+                   |  GPIO_CRH_MODE9_1 | GPIO_CRH_MODE9_0
+                   |  GPIO_CRH_CNF9_1  | GPIO_CRH_CNF9_0;
 
         initI2C1Common();
     }
@@ -80,9 +93,9 @@ struct I2CHelper
 
         // Configure PB6 and PB7 as 50 MHz alternate-function open-drain pins.
         GPIOB->CRL  |= GPIO_CRL_MODE6_0 | GPIO_CRL_MODE6_1
-                    | GPIO_CRL_CNF6_0  | GPIO_CRL_CNF6_1
-                    | GPIO_CRL_MODE7_0 | GPIO_CRL_MODE7_1
-                    | GPIO_CRL_CNF7_0  | GPIO_CRL_CNF7_1;
+                    |  GPIO_CRL_CNF6_0  | GPIO_CRL_CNF6_1
+                    |  GPIO_CRL_MODE7_0 | GPIO_CRL_MODE7_1
+                    |  GPIO_CRL_CNF7_0  | GPIO_CRL_CNF7_1;
 
         initI2C1Common();
     }
@@ -94,10 +107,10 @@ struct I2CHelper
     void deinitI2C1()
     {
         // Disable I2C peripheral
-        I2C1->CR1 &= ~I2C_CR1_PE;
+        getI2C()->CR1 &= ~I2C_CR1_PE;
 
         // Optional: reset I2C registers
-        RCC->APB1RSTR |=  RCC_APB1RSTR_I2C1RST;
+        RCC->APB1RSTR |= RCC_APB1RSTR_I2C1RST;
         RCC->APB1RSTR &= ~RCC_APB1RSTR_I2C1RST;
 
         // Remove remap
@@ -132,27 +145,27 @@ struct I2CHelper
     bool sendBytes(uint8_t address, const uint8_t *data, uint16_t length, bool stop = true)
     {
         // Start
-        I2C1->CR1 |= I2C_CR1_START;
-        I2C_WAIT_TIMEOUT(!(I2C1->SR1 & I2C_SR1_SB), kTimeoutMicros, false);
+        getI2C()->CR1 |= I2C_CR1_START;
+        I2C_WAIT_TIMEOUT(!(getI2C()->SR1 & I2C_SR1_SB), kTimeoutMicros, false);
 
         // Send address
-        I2C1->DR = address << 1;
-        I2C_WAIT_TIMEOUT(!(I2C1->SR1 & I2C_SR1_ADDR), kTimeoutMicros, true);
+        getI2C()->DR = address << 1;
+        I2C_WAIT_TIMEOUT(!(getI2C()->SR1 & I2C_SR1_ADDR), kTimeoutMicros, true);
 
         // Clear ADDR
-        (void)I2C1->SR1;
-        (void)I2C1->SR2;
+        (void)getI2C()->SR1;
+        (void)getI2C()->SR2;
 
         if (length) {
             while (length--) {
-                I2C_WAIT_TIMEOUT(!(I2C1->SR1 & I2C_SR1_TXE), kTimeoutMicros, true);
-                I2C1->DR = *data++;
+                I2C_WAIT_TIMEOUT(!(getI2C()->SR1 & I2C_SR1_TXE), kTimeoutMicros, true);
+                getI2C()->DR = *data++;
             }
-            I2C_WAIT_TIMEOUT(!(I2C1->SR1 & I2C_SR1_BTF), kTimeoutMicros, false);
+            I2C_WAIT_TIMEOUT(!(getI2C()->SR1 & I2C_SR1_BTF), kTimeoutMicros, false);
         }
 
         if (stop) {
-            I2C1->CR1 |= I2C_CR1_STOP;
+            getI2C()->CR1 |= I2C_CR1_STOP;
         }
         return true;
     }
@@ -174,44 +187,44 @@ struct I2CHelper
         }
 
         // Keep receiver state in a known default configuration.
-        I2C1->CR1 |= I2C_CR1_ACK;
-        I2C1->CR1 &= ~I2C_CR1_POS;
+        getI2C()->CR1 |= I2C_CR1_ACK;
+        getI2C()->CR1 &= ~I2C_CR1_POS;
 
         // Start
-        I2C1->CR1 |= I2C_CR1_START;
-        I2C_WAIT_TIMEOUT(!(I2C1->SR1 & I2C_SR1_SB), kTimeoutMicros, false);
+        getI2C()->CR1 |= I2C_CR1_START;
+        I2C_WAIT_TIMEOUT(!(getI2C()->SR1 & I2C_SR1_SB), kTimeoutMicros, false);
 
         // Send address + read
-        I2C1->DR = (address << 1) | 1;
-        I2C_WAIT_TIMEOUT(!(I2C1->SR1 & I2C_SR1_ADDR), kTimeoutMicros, true);
+        getI2C()->DR = (address << 1) | 1;
+        I2C_WAIT_TIMEOUT(!(getI2C()->SR1 & I2C_SR1_ADDR), kTimeoutMicros, true);
 
         if (length == 1) {
-            I2C1->CR1 &= ~I2C_CR1_ACK;
+            getI2C()->CR1 &= ~I2C_CR1_ACK;
             // Clear ADDR before STOP for 1-byte read on STM32F1.
-            (void)I2C1->SR1;
-            (void)I2C1->SR2;
-            I2C1->CR1 |= I2C_CR1_STOP;
+            (void)getI2C()->SR1;
+            (void)getI2C()->SR2;
+            getI2C()->CR1 |= I2C_CR1_STOP;
 
-            I2C_WAIT_TIMEOUT(!(I2C1->SR1 & I2C_SR1_RXNE), kTimeoutMicros, false);
-            *data = I2C1->DR;
+            I2C_WAIT_TIMEOUT(!(getI2C()->SR1 & I2C_SR1_RXNE), kTimeoutMicros, false);
+            *data = getI2C()->DR;
         } else {
             // Clear ADDR, then read all bytes while scheduling NACK+STOP
             // before receiving the final byte.
-            (void)I2C1->SR1;
-            (void)I2C1->SR2;
+            (void)getI2C()->SR1;
+            (void)getI2C()->SR2;
 
             while (length > 0) {
-                I2C_WAIT_TIMEOUT(!(I2C1->SR1 & I2C_SR1_RXNE), kTimeoutMicros, false);
+                I2C_WAIT_TIMEOUT(!(getI2C()->SR1 & I2C_SR1_RXNE), kTimeoutMicros, false);
                 if (length == 2) {
-                    I2C1->CR1 &= ~I2C_CR1_ACK;
-                    I2C1->CR1 |= I2C_CR1_STOP;
+                    getI2C()->CR1 &= ~I2C_CR1_ACK;
+                    getI2C()->CR1 |= I2C_CR1_STOP;
                 }
-                *data++ = I2C1->DR;
+                *data++ = getI2C()->DR;
                 --length;
             }
         }
 
-        I2C1->CR1 |= I2C_CR1_ACK;
+        getI2C()->CR1 |= I2C_CR1_ACK;
         return true;
     }
 
@@ -245,31 +258,31 @@ struct I2CHelper
     }
 
 private:
-    void initI2C1Common()
+    inline void initI2C1Common()
     {
         // Reset I2C
-        I2C1->CR1 = I2C_CR1_SWRST;
-        I2C1->CR1 = 0;
+        getI2C()->CR1 = I2C_CR1_SWRST;
+        getI2C()->CR1 = 0;
 
         // APB1 = 36 MHz
-        I2C1->CR2 = 36;
+        getI2C()->CR2 = 36;
 
         // 100 kHz Standard Mode
-        I2C1->CCR = 180;
+        getI2C()->CCR = 180;
 
         // Maximum rise time
-        I2C1->TRISE = 37;
+        getI2C()->TRISE = 37;
 
         // Enable I2C
-        I2C1->CR1 = I2C_CR1_PE;
+        getI2C()->CR1 = I2C_CR1_PE;
 
         delay_us<10>();
     }
 
     inline bool I2CError()
     {
-        I2C1->CR1 |= I2C_CR1_STOP;
-        I2C1->SR1 &= ~I2C_SR1_AF;
+        getI2C()->CR1 |= I2C_CR1_STOP;
+        getI2C()->SR1 &= ~I2C_SR1_AF;
         return false;
     }
 };
