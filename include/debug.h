@@ -12,7 +12,7 @@
 
 // === data for SWD PID tuning ===
 
-#define SWO_DATA_FIXED_RAM_ADDRESS 0x2000F000UL
+#define SWO_DATA_FIXED_RAM_ADDRESS 0x2000FFC0UL
 
 /**
  * @brief SWO class for sending debug output and PID tuning data via SWO

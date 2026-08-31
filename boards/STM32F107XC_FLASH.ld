@@ -11,7 +11,8 @@
 
 ENTRY(Reset_Handler)
 
-_estack = 0x2000FFFF;
+/* stack top; the top 64 bytes of RAM are reserved for the .ram_fixed region */
+_estack = 0x2000FFC0;
 
 _Min_Heap_Size = 0x200;
 _Min_Stack_Size = 0x400;
@@ -110,16 +111,7 @@ SECTIONS
     __bss_end__ = _ebss;
   } >RAM
 
-  .ram_fixed (NOLOAD) :
-  {
-    . = ORIGIN(RAM) + LENGTH(RAM) - 0x1000;
-    . = ALIGN(4);
-    __ram_fixed_start__ = .;
-    KEEP(*(.ram_fixed))
-    . = ALIGN(4);
-    __ram_fixed_end__ = .;
-  } >RAM
-
+  /* Heap base right after .bss so malloc can use the full low region again */
   ._user_heap_stack :
   {
     . = ALIGN(8);
@@ -128,6 +120,17 @@ SECTIONS
     . = . + _Min_Heap_Size;
     . = . + _Min_Stack_Size;
     . = ALIGN(8);
+  } >RAM
+
+  /* 64-byte fixed region at the very top of RAM, above the stack (unreachable by heap/stack) */
+  .ram_fixed (NOLOAD) :
+  {
+    . = ORIGIN(RAM) + LENGTH(RAM) - 0x40;
+    . = ALIGN(4);
+    __ram_fixed_start__ = .;
+    KEEP(*(.ram_fixed))
+    . = ALIGN(4);
+    __ram_fixed_end__ = .;
   } >RAM
 
   /DISCARD/ :

@@ -208,8 +208,8 @@ SCREENSHOT_FRAME_HEADER_STRUCT = "<HHB3x"
 SCREENSHOT_FRAME_HEADER_SIZE = struct.calcsize(SCREENSHOT_FRAME_HEADER_STRUCT)
 SCREENSHOT_PORT = 2
 
-# SWO::DataType layout in firmware with fixed RAM address
-SWO_DATA_FIXED_RAM_ADDRESS = 0x2000F000
+# SWO::DataType layout in firmware with fixed RAM address (top 64 bytes of RAM, above the stack)
+SWO_DATA_FIXED_RAM_ADDRESS = 0x2000FFC0
 SWO_ENABLE_DISABLED = 0
 SWO_ENABLE_SWO = 1
 SWO_ENABLE_USB = 2
