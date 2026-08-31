@@ -11,6 +11,8 @@
 #include "adc_converters.h"
 #include "crc.h"
 
+#define VALIDATE_EEPROM_WRITES !!DEBUG
+
 struct EEPROM
 {
     static constexpr uint8_t kAddress = 0x50;                           // 7-bit device address
@@ -19,7 +21,7 @@ struct EEPROM
     static constexpr uint32_t kWriteCycleWaitTimeoutMs = 7;             // wait for write cycle to complete (~5ms)
     static constexpr size_t kDefaultOffset = 0;                         // default offset for EEPROM data
     static constexpr size_t kBackupOffset = kSize / 2;                  // offset for backup EEPROM data (0 = DISABLE)
-    static constexpr bool kValidateWrite = false;                       // validate write by reading back data and comparing with original
+    static constexpr bool kValidateWrite = VALIDATE_EEPROM_WRITES;      // validate write by reading back data and comparing with original
 
     static constexpr uint32_t kMagic = 0xDEADBEEF;
     static constexpr uint32_t kInvalidCRC = 0xffffffff;
@@ -126,7 +128,8 @@ struct EEPROM
             pwm_frequency(UIConstants::kDefaultPWMFrequency),
             motor_chime(UIConstants::kDefaultMotorChime),
             current_limit_strength(static_cast<CurrentLimitStrength>(UIConstants::kDefaultCurrentLimitStrength))
-        {}
+        {
+        }
 
         /**
          * @brief Get the data pointer without header
@@ -150,15 +153,15 @@ struct EEPROM
         }
 
         /**
-         * @brief Compare if EEPROM data is equal without comparing the magic, version and sequence number
+         * @brief Compare if EEPROM data is equal without comparing the magic, version, sequence number or crc
          *
          * @param other EEPROM data to compare with
          * @return true
          * @return false
          */
-        bool operator==(const Data &other) const
+        inline bool operator==(const Data &other) const
         {
-            if (crc == kInvalidCRC || other.crc == kInvalidCRC) {
+            if ((crc == kInvalidCRC) || (other.crc == kInvalidCRC)) {
                 // invalid data
                 return false;
             }
@@ -181,15 +184,26 @@ struct EEPROM
          *
          * @return uint32_t CRC value, or kInvalidCRC if invalid
          */
-        uint32_t validateCRC()
+        inline uint32_t validateCRC()
         {
-            uint32_t newCrc = calculateCRC();
+            const uint32_t newCrc = calculateCRC();
             if (crc != newCrc) {
-                DEBUG_PRINT(DebugType::ERROR, "EEPROM CRC mismatch: expected=%08x calculated=%08x", crc, newCrc);
+                DEBUG_PRINT(DebugType::ERROR, "EEPROM CRC expected=%08x calculated=%08x", crc, newCrc);
                 // mark as invalid
                 crc = kInvalidCRC;
             }
             return crc;
+        }
+
+        /**
+         * @brief Validate eeprom magic, version and crc (data)
+         *
+         * @return true
+         * @return false
+         */
+        inline bool isValid()
+        {
+            return (magic == kMagic) && (version == kVersion) && (validateCRC() != kInvalidCRC);
         }
 
         /**
@@ -204,6 +218,15 @@ struct EEPROM
             crc = kInvalidCRC;
         }
     };
+
+    /**
+     * @brief Construct EEPROM object
+     *
+     */
+    EEPROM()
+    {
+        SWO::data.EEPROM.address = reinterpret_cast<uint32_t>(&this->data);
+    }
 
     /**
      * @brief Initialize GPIO and I2C for EEPROM access
@@ -532,6 +555,26 @@ struct EEPROM
 
 protected:
     void updateTemperatureLimits();
+
+    /**
+     * @brief Read data from EEPROM and validate the contents
+     *
+     * @param data
+     * @param offset
+     * @return true
+     * @return false
+     */
+    bool readData(Data &data, uint8_t offset);
+
+    /**
+     * @brief Write data to EEPROM
+     *
+     * @param data
+     * @param offset
+     * @return true
+     * @return false
+     */
+    bool writeData(const Data &data, uint8_t offset);
 
 protected:
     Data data;

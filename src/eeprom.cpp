@@ -19,9 +19,8 @@ bool eepromWaitReady(void);
 
 void EEPROM::init()
 {
-    SWO::data.EEPROM.address = reinterpret_cast<uint32_t>(&this->data);
     i2c.initI2C1Remapped();
-    bool result = i2c.sendBytes(kAddress, nullptr, 0);
+    const bool result = i2c.sendBytes(kAddress, nullptr, 0);
     (void)result;
     DEBUG_PRINT(DebugType::INFO, "EEPROM detected=%u", static_cast<int>(result));
 }
@@ -29,23 +28,29 @@ void EEPROM::init()
 void EEPROM::read()
 {
     Data tmp;
-    tmp.invalidate();
-    bool result = eepromReadBytes(kDefaultOffset, &tmp, sizeof(tmp));
-    DEBUG_PRINT(DEBUG_LEVEL_RESULT(result), "read=%u magic=%08x version=%d sequence=%d ofs=%u", static_cast<int>(result), tmp.magic, tmp.version, tmp.sequence, kDefaultOffset);
-    if (!result || (tmp.magic != kMagic) || (tmp.version != kVersion) || (tmp.validateCRC() == kInvalidCRC)) {
-        if constexpr (kBackupOffset) {
-            tmp.invalidate();
-            result = eepromReadBytes(kBackupOffset, &tmp, sizeof(tmp));
-            DEBUG_PRINT(DEBUG_LEVEL_RESULT(result), "read=%u magic=%08x version=%d sequence=%d ofs=%u (BACKUP)", static_cast<int>(result), tmp.magic, tmp.version, tmp.sequence, kBackupOffset);
-            if (!result || (tmp.magic != kMagic) || (tmp.version != kVersion) || (tmp.validateCRC() == kInvalidCRC)) {
-                DEBUG_PRINT(DebugType::ERROR, "EEPROM data invalid, resetting to defaults");
-                resetDefaults();
-                return;
+    bool result = readData(tmp, kDefaultOffset);
+    if (!result || !tmp.isValid()) {
+        for(;;) {
+            if constexpr (kBackupOffset) {
+                // invalid eeprom data, read backup
+                result = readData(tmp, kBackupOffset);
+                if (result && tmp.isValid()) {
+                    break;
+                }
             }
-        }
-        else {
             DEBUG_PRINT(DebugType::ERROR, "EEPROM data invalid, resetting to defaults");
             resetDefaults();
+            return;
+        }
+    }
+    else if constexpr (kBackupOffset) {
+        Data tmp2;
+        result = readData(tmp2, kBackupOffset);
+        DEBUG_PRINT(DEBUG_LEVEL_RESULT(result), "EEPROM sequence=%d backup_sequence=%u", tmp.sequence, tmp2.sequence);
+        if (result && tmp2.isValid() && (tmp2.sequence > tmp.sequence)) {
+            // the backup sequence number is more recent, use the backup instead
+            data = tmp2;
+            updateTemperatureLimits();
             return;
         }
     }
@@ -55,45 +60,40 @@ void EEPROM::read()
 
 bool EEPROM::write()
 {
-    // read EEPROM and compare with current data to avoid unnecessary writes
-    Data tmp;
-    tmp.invalidate();
-    bool result = eepromReadBytes(kDefaultOffset, &tmp, sizeof(tmp));
-    if (result) {
-        tmp.validateCRC();
-        if (tmp == data) {
-            DEBUG_PRINT(DebugType::INFO, "EEPROM write skipped, no changes");
-            return false;
+    bool result;
+    {
+        // read EEPROM and compare with current data to avoid unnecessary writes
+        Data tmp;
+        result = readData(tmp, kDefaultOffset);
+        for(;;) {
+            if constexpr (kBackupOffset) {
+                Data tmp2;
+                const bool result2 = readData(tmp2, kBackupOffset);
+                if (!(result2 && tmp2 == data)) {
+                    // read error or backup does not match, force write
+                    break;
+                }
+            }
+            if (result && tmp == data) {
+                DEBUG_PRINT(DebugType::INFO, "EEPROM write skipped, no changes");
+                return false;
+            }
+            break;
         }
     }
-    else if (!result) {
-        DEBUG_PRINT(DebugType::ERROR, "EEPROM read failed");
-    }
 
-    // write data to EEPROM
+    // update sequence and crc
     data.sequence++;
     data.crc = data.calculateCRC();
-    result = eepromWriteBytes(kDefaultOffset, &data, sizeof(data));
-    if (!result) {
-        data.sequence--;
-    }
-    DEBUG_PRINT(DEBUG_LEVEL_RESULT(result), "write=%u magic=%08x version=%d sequence=%d ofs=%u", static_cast<unsigned>(result), data.magic, data.version, data.sequence, kDefaultOffset);
-
+    // write data to EEPROM
+    result = writeData(data, kDefaultOffset);
     if constexpr (kBackupOffset) {
-        result = eepromWriteBytes(kBackupOffset, &data, sizeof(data));
-        DEBUG_PRINT(DEBUG_LEVEL_RESULT(result), "write=%u magic=%08x version=%d sequence=%d ofs=%u (BACKUP)", static_cast<unsigned>(result), data.magic, data.version, data.sequence, kBackupOffset);
+        result = writeData(data, kBackupOffset);
     }
-
-    if constexpr (kValidateWrite) {
-        tmp.invalidate();
-        result = eepromReadBytes(kDefaultOffset, &tmp, sizeof(tmp));
-        DEBUG_PRINT(DebugType::INFO, "verify=%u magic=%08x version=%d sequence=%d crc=%08x ofs=%u", static_cast<unsigned>(result), tmp.magic, tmp.version, tmp.sequence, tmp.crc, kDefaultOffset);
-        if constexpr (kBackupOffset) {
-            tmp.invalidate();
-            result = eepromReadBytes(kBackupOffset, &tmp, sizeof(tmp));
-            tmp.validateCRC();
-            DEBUG_PRINT(DebugType::INFO, "verify=%u magic=%08x version=%d sequence=%d crc=%08x ofs=%u (BACKUP)", static_cast<unsigned>(result), tmp.magic, tmp.version, tmp.sequence, tmp.crc, kBackupOffset);
-        }
+    if (!result) {
+        // restore sequence and update crc
+        data.sequence--;
+        data.crc = data.calculateCRC();
     }
     return result;
 }
@@ -123,6 +123,36 @@ void EEPROM::updateTemperatureLimits()
     motor_temperature_limit_adc = ADCConverter::NTC::reverse(data.motor_temperature_limit);
 }
 
+bool EEPROM::readData(Data &data, uint8_t offset)
+{
+    data.invalidate();
+    const bool result = eepromReadBytes(offset, &data, sizeof(data));
+    if (result) {
+        data.validateCRC();
+    }
+    DEBUG_PRINT(DEBUG_LEVEL_RESULT(result), "EEPROM read=%u magic=%08x version=%d sequence=%d ofs=%u", static_cast<int>(result), data.magic, data.version, data.sequence, offset);
+    if (!result) {
+        data.invalidate();
+    }
+    return result;
+}
+
+bool EEPROM::writeData(const Data &data, uint8_t offset)
+{
+    bool result = eepromWriteBytes(offset, &data, sizeof(data));
+    DEBUG_PRINT(DEBUG_LEVEL_RESULT(result), "EEPROM write=%u magic=%08x version=%d sequence=%d ofs=%u", static_cast<unsigned>(result), data.magic, data.version, data.sequence, offset);
+
+    #if DEBUG
+        if constexpr (kValidateWrite) {
+            Data tmp;
+            const bool result2 = readData(tmp, offset);
+            (void)result2;
+            DEBUG_PRINT(DebugType::INFO, "EEPROM verify=%u magic=%08x version=%d sequence=%d crc=%08x ofs=%u", static_cast<unsigned>(result2), tmp.magic, tmp.version, tmp.sequence, tmp.crc, offset);
+        }
+    #endif
+    return result;
+}
+
 // === AT24C02C I2C implementation ===
 
 //------------------------------------------------------------------
@@ -132,12 +162,12 @@ void EEPROM::updateTemperatureLimits()
 bool eepromWaitReady(void)
 {
     const uint32_t start = HAL_GetTick();
-    while((HAL_GetTick() - start) <= EEPROM::kWriteCycleWaitTimeoutMs) {
+    while((HAL_GetTick() - start) < EEPROM::kWriteCycleWaitTimeoutMs) {
         if (i2c.sendByte(EEPROM::kAddress, 0x00, true)) {
             return true;
         }
     }
-    DEBUG_PRINT(DebugType::ERROR, "timeout=%u", static_cast<unsigned>(HAL_GetTick() - start));
+    DEBUG_PRINT(DebugType::ERROR, "EEPROM timeout=%u", static_cast<unsigned>(HAL_GetTick() - start));
     return false;
 }
 
