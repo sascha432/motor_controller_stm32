@@ -88,10 +88,12 @@ bool EEPROM::write()
     // write data to EEPROM
     result = writeData(data, kDefaultOffset);
     if constexpr (kBackupOffset) {
-        result = writeData(data, kBackupOffset);
+        if (writeData(data, kBackupOffset)) {
+            result = true;
+        }
     }
     if (!result) {
-        // restore sequence and update crc
+        // restore sequence and update crc if both writes fail
         data.sequence--;
         data.crc = data.calculateCRC();
     }
