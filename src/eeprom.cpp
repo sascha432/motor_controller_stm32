@@ -60,28 +60,12 @@ void EEPROM::read()
 
 bool EEPROM::write()
 {
-    bool result;
-    {
-        // read EEPROM and compare with current data to avoid unnecessary writes
-        Data tmp;
-        result = readData(tmp, kDefaultOffset);
-        for(;;) {
-            if constexpr (kBackupOffset) {
-                Data tmp2;
-                const bool result2 = readData(tmp2, kBackupOffset);
-                if (!(result2 && tmp2 == data)) {
-                    // read error or backup does not match, force write
-                    break;
-                }
-            }
-            if (result && tmp == data) {
-                DEBUG_PRINT(DebugType::INFO, "EEPROM write skipped, no changes");
-                return false;
-            }
-            break;
-        }
+    // read EEPROM and compare with current data to avoid unnecessary writes
+    bool result = hasChanged();
+    if (!result) {
+        DEBUG_PRINT(DebugType::INFO, "EEPROM write skipped, no changes");
+        return false;
     }
-
     // update sequence and crc
     data.sequence++;
     data.crc = data.calculateCRC();
@@ -125,7 +109,26 @@ void EEPROM::updateTemperatureLimits()
     motor_temperature_limit_adc = ADCConverter::NTC::reverse(data.motor_temperature_limit);
 }
 
-bool EEPROM::readData(Data &data, uint8_t offset)
+bool EEPROM::hasChanged() const
+{
+    Data tmp;
+    const bool result = readData(tmp, kDefaultOffset);
+    const bool resultValid = result && (tmp == data);
+    if constexpr (kBackupOffset) {
+        const bool result2 = readData(tmp, kBackupOffset);
+        if (!(result2 && tmp == data)) {
+            // backup read error or backup data does not match
+            return true;
+        }
+    }
+    if (resultValid) {
+        return false;
+    }
+    // read error or data does not match
+    return true;
+}
+
+bool EEPROM::readData(Data &data, size_t offset) const
 {
     data.invalidate();
     const bool result = eepromReadBytes(offset, &data, sizeof(data));
@@ -139,7 +142,7 @@ bool EEPROM::readData(Data &data, uint8_t offset)
     return result;
 }
 
-bool EEPROM::writeData(const Data &data, uint8_t offset)
+bool EEPROM::writeData(const Data &data, size_t offset) const
 {
     bool result = eepromWriteBytes(offset, &data, sizeof(data));
     DEBUG_PRINT(DEBUG_LEVEL_RESULT(result), "EEPROM write=%u magic=%08x version=%d sequence=%d ofs=%u", static_cast<unsigned>(result), data.magic, data.version, data.sequence, offset);

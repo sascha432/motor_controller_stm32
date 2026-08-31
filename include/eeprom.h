@@ -557,6 +557,14 @@ protected:
     void updateTemperatureLimits();
 
     /**
+     * @brief Compare if data in memory matches the EEPROM data and backup copy
+     *
+     * @return true
+     * @return false
+     */
+    bool hasChanged() const;
+
+    /**
      * @brief Read data from EEPROM and validate the contents
      *
      * @param data
@@ -564,7 +572,7 @@ protected:
      * @return true
      * @return false
      */
-    bool readData(Data &data, uint8_t offset);
+    bool readData(Data &data, size_t offset) const;
 
     /**
      * @brief Write data to EEPROM
@@ -574,7 +582,7 @@ protected:
      * @return true
      * @return false
      */
-    bool writeData(const Data &data, uint8_t offset);
+    bool writeData(const Data &data, size_t offset) const;
 
 protected:
     Data data;
