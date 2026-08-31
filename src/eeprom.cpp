@@ -6,7 +6,6 @@
 
 // === AT24C02CM5/TR prototypes etc... ===
 
-I2CHelper i2c;
 EEPROM eeprom;
 
 bool eepromDetect(uint8_t address);
@@ -20,7 +19,7 @@ bool eepromWaitReady(void);
 
 void EEPROM::init()
 {
-    i2c.initI2C1Remapped();
+    I2CHelper::initI2C1Remapped();
     const bool result = eepromDetect(kAddress);
     (void)result;
     DEBUG_PRINT(DebugType::INFO, "EEPROM detected=%u", static_cast<int>(result));
@@ -166,7 +165,7 @@ bool EEPROM::writeData(const Data &data, size_t offset) const
 //------------------------------------------------------------------
 bool eepromDetect(uint8_t address)
 {
-    return i2c.sendBytes(address, nullptr, 0);
+    return I2CHelper::sendBytes(address, nullptr, 0);
 }
 
 //------------------------------------------------------------------
@@ -177,7 +176,7 @@ bool eepromWaitReady(void)
 {
     const uint32_t start = HAL_GetTick();
     while((HAL_GetTick() - start) < EEPROM::kWriteCycleWaitTimeoutMs) {
-        if (i2c.sendByte(EEPROM::kAddress, 0x00, true)) {
+        if (I2CHelper::sendByte(EEPROM::kAddress, 0x00, true)) {
             return true;
         }
     }
@@ -191,7 +190,7 @@ bool eepromWaitReady(void)
 bool eepromWriteByte(uint8_t memAddress, uint8_t data)
 {
     const uint8_t buf[2] = { memAddress, data };
-    if (!i2c.sendBytes(EEPROM::kAddress, buf, sizeof(buf), true)) {
+    if (!I2CHelper::sendBytes(EEPROM::kAddress, buf, sizeof(buf), true)) {
         return false;
     }
     return eepromWaitReady();
@@ -202,10 +201,10 @@ bool eepromWriteByte(uint8_t memAddress, uint8_t data)
 //------------------------------------------------------------------
 int eepromReadByte(uint8_t memAddress)
 {
-    if (!i2c.sendBytes(EEPROM::kAddress, &memAddress, 1, false)) {
+    if (!I2CHelper::sendBytes(EEPROM::kAddress, &memAddress, 1, false)) {
         return -1;
     }
-    return i2c.readByte(EEPROM::kAddress);
+    return I2CHelper::readByte(EEPROM::kAddress);
 }
 
 //------------------------------------------------------------------
@@ -227,7 +226,7 @@ bool eepromWriteBytes(uint8_t memAddress, const void *data, uint32_t length)
         buf[0] = memAddress;
         memcpy(&buf[1], src, chunk);
 
-        if (!i2c.sendBytes(EEPROM::kAddress, buf, chunk + 1, true)) {
+        if (!I2CHelper::sendBytes(EEPROM::kAddress, buf, chunk + 1, true)) {
             return false;
         }
         if (!eepromWaitReady()) {
@@ -249,8 +248,8 @@ bool eepromReadBytes(uint8_t memAddress, void *data, uint32_t length)
     if (memAddress + length > EEPROM::kSize) {
         return false; // out of range
     }
-    if (!i2c.sendBytes(EEPROM::kAddress, &memAddress, 1, false)) {
+    if (!I2CHelper::sendBytes(EEPROM::kAddress, &memAddress, 1, false)) {
         return false;
     }
-    return i2c.readBytes(EEPROM::kAddress, reinterpret_cast<uint8_t *>(data), length);
+    return I2CHelper::readBytes(EEPROM::kAddress, reinterpret_cast<uint8_t *>(data), length);
 }

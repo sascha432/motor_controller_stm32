@@ -153,7 +153,7 @@ static inline void user_setup()
 
     // program MT6701 PPR via I2C
     if (PidController::kProgramPPR) {
-        motorEncoder.programPPR(i2c, PidController::kPPR);
+        motorEncoder.programPPR(PidController::kPPR);
     }
 
     menu.loadStartScreen();

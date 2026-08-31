@@ -23,10 +23,6 @@ struct MT6701Config {
 
     static constexpr uint8_t MT6701_ADDR = 0x06;
 
-    MT6701Config(I2CHelper &i2c) : i2c(i2c)
-    {
-    }
-
     /**
      * @brief check if the encoder is detected on the I2C bus
      *
@@ -35,7 +31,7 @@ struct MT6701Config {
      */
     bool init()
     {
-        return i2c.sendBytes(MT6701_ADDR, nullptr, 0);
+        return I2CHelper::sendBytes(MT6701_ADDR, nullptr, 0);
     }
 
     /**
@@ -100,19 +96,17 @@ struct MT6701Config {
 private:
     uint8_t readRegister(uint8_t reg) const
     {
-        if (!i2c.sendByte(MT6701_ADDR, reg, false)) {
+        if (!I2CHelper::sendByte(MT6701_ADDR, reg, false)) {
             return 0xff;
         }
-        return i2c.readByte(MT6701_ADDR);
+        return I2CHelper::readByte(MT6701_ADDR);
     }
 
     bool writeRegister(uint8_t reg, uint8_t value) const
     {
         uint8_t buf[2] = { reg, value };
-        return i2c.sendBytes(MT6701_ADDR, buf, sizeof(buf), true);
+        return I2CHelper::sendBytes(MT6701_ADDR, buf, sizeof(buf), true);
     }
-
-    I2CHelper &i2c;
 };
 
 /**
@@ -169,15 +163,15 @@ struct MotorEncoder
      * @param ppr set pulses per revolution
      * @param writeEEPROM whether to write the settings to EEPROM
      */
-    void programPPR(I2CHelper &i2c, uint16_t ppr, bool writeEEPROM = false)
+    void programPPR(uint16_t ppr, bool writeEEPROM = false)
     {
         setI2CEnablePin(!kActiveLowI2CEnable);
 
         // switch I2C1 pins for MT6701
-        i2c.deinitI2C1();
-        i2c.initI2C1();
+        I2CHelper::deinitI2C1();
+        I2CHelper::initI2C1();
 
-        MT6701Config config(i2c);
+        MT6701Config config;
         if (config.init()) {
             auto result = config.setPPR(ppr);
             if (result && writeEEPROM) {
@@ -192,8 +186,8 @@ struct MotorEncoder
 
         setI2CEnablePin(kActiveLowI2CEnable);
         // remap I2C1 for EEPROM
-        i2c.deinitI2C1();
-        i2c.initI2C1Remapped();
+        I2CHelper::deinitI2C1();
+        I2CHelper::initI2C1Remapped();
     }
 };
 

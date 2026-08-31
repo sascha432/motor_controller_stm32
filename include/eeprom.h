@@ -599,5 +599,4 @@ protected:
     uint16_t motor_temperature_limit_adc;
 };
 
-extern I2CHelper i2c;
 extern EEPROM eeprom;

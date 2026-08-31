@@ -52,7 +52,7 @@ struct I2CHelper
      * @brief initialize I2C1 on PB8/PB9 (remapped)
      *
      */
-    void initI2C1Remapped(void)
+    static void initI2C1Remapped(void)
     {
         // Enable clocks
         RCC->APB2ENR |= RCC_APB2ENR_IOPBEN | RCC_APB2ENR_AFIOEN;
@@ -78,7 +78,7 @@ struct I2CHelper
      * @brief initialize I2C1 on PB6/PB7 (default)
      *
      */
-    void initI2C1()
+    static void initI2C1()
     {
         // Enable clocks
         RCC->APB2ENR |= RCC_APB2ENR_IOPBEN | RCC_APB2ENR_AFIOEN;
@@ -104,7 +104,7 @@ struct I2CHelper
      * @brief disable I2C1 and reset PB6, PB7, PB8, PB9 to floating input
      *
      */
-    void deinitI2C1()
+    static void deinitI2C1()
     {
         // Disable I2C peripheral
         getI2C()->CR1 &= ~I2C_CR1_PE;
@@ -142,7 +142,7 @@ struct I2CHelper
      * @return true if the transmission was successful
      * @return false if an error occurred
      */
-    bool sendBytes(uint8_t address, const uint8_t *data, uint16_t length, bool stop = true)
+    static bool sendBytes(uint8_t address, const uint8_t *data, uint16_t length, bool stop = true)
     {
         // Start
         getI2C()->CR1 |= I2C_CR1_START;
@@ -180,7 +180,7 @@ struct I2CHelper
      * @return false if an error occurred
      */
 
-    bool readBytes(uint8_t address, uint8_t *data, uint16_t length)
+    static bool readBytes(uint8_t address, uint8_t *data, uint16_t length)
     {
         if (length == 0) {
             return false;
@@ -237,7 +237,7 @@ struct I2CHelper
      * @return true if the transmission was successful
      * @return false if an error occurred
      */
-    inline bool sendByte(uint8_t address, uint8_t data, bool stop = true)
+    static inline bool sendByte(uint8_t address, uint8_t data, bool stop = true)
     {
         return sendBytes(address, &data, sizeof(data), stop);
     }
@@ -248,7 +248,7 @@ struct I2CHelper
      * @param address I2C address of the device
      * @return int16_t The read byte, or -1 if an error occurred
      */
-    int16_t readByte(uint8_t address)
+    static int16_t readByte(uint8_t address)
     {
         uint8_t data;
         if (readBytes(address, &data, sizeof(data))) {
@@ -258,7 +258,7 @@ struct I2CHelper
     }
 
 private:
-    inline void initI2C1Common()
+    static inline void initI2C1Common()
     {
         // Reset I2C
         getI2C()->CR1 = I2C_CR1_SWRST;
@@ -279,7 +279,7 @@ private:
         delay_us<10>();
     }
 
-    inline bool I2CError()
+    static inline bool I2CError()
     {
         getI2C()->CR1 |= I2C_CR1_STOP;
         getI2C()->SR1 &= ~I2C_SR1_AF;
