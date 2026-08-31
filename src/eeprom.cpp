@@ -9,6 +9,7 @@
 I2CHelper i2c;
 EEPROM eeprom;
 
+bool eepromDetect(uint8_t address);
 bool eepromWriteByte(uint8_t memAddress, uint8_t data);
 int eepromReadByte(uint8_t memAddress);
 bool eepromWriteBytes(uint8_t memAddress, const void *data, uint32_t length);
@@ -20,7 +21,7 @@ bool eepromWaitReady(void);
 void EEPROM::init()
 {
     i2c.initI2C1Remapped();
-    const bool result = i2c.sendBytes(kAddress, nullptr, 0);
+    const bool result = eepromDetect(kAddress);
     (void)result;
     DEBUG_PRINT(DebugType::INFO, "EEPROM detected=%u", static_cast<int>(result));
 }
@@ -159,6 +160,14 @@ bool EEPROM::writeData(const Data &data, size_t offset) const
 }
 
 // === AT24C02C I2C implementation ===
+
+//------------------------------------------------------------------
+// Check if any device responds on that address
+//------------------------------------------------------------------
+bool eepromDetect(uint8_t address)
+{
+    return i2c.sendBytes(address, nullptr, 0);
+}
 
 //------------------------------------------------------------------
 // Poll the EEPROM with a dummy control-byte write until it ACKs,
