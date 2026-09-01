@@ -182,9 +182,9 @@ static inline void user_setup()
  * @brief Handle incoming serial data
  *
  */
-static inline void handle_serial_data(const size_t result, const Serial::BinaryType type, const char *buf)
+static inline void handle_serial_data(Serial::BinaryResult result, const char *buf)
 {
-    switch(type) {
+    switch(result.type) {
         case Serial::BinaryType::REQUEST_SCREENSHOT: {
                 DEBUG_PRINT(DebugType::INFO, "Serial: screenshot requested");
                 SWO::data.sendScreenshot = true;
@@ -231,7 +231,7 @@ static inline void handle_serial_data(const size_t result, const Serial::BinaryT
             }
             break;
         default:
-            DEBUG_PRINT(DebugType::ERROR, "Serial: binary type=%u size=%u", static_cast<unsigned>(type), static_cast<unsigned>(result));
+            DEBUG_PRINT(DebugType::ERROR, "Serial: binary type=%u size=%u", static_cast<unsigned>(result.type), static_cast<unsigned>(result.size));
             break;
     }
 }
@@ -393,19 +393,17 @@ static inline void loop()
         // handle USB CDC data
         if (Serial::isConnected()) {
             char buf[128]; // EEPROM::Data is 60 byte, the header is 12 byte + a lot extra space
-            Serial::BinaryType type;
-            uint32_t crc, newCrc;
-
-            const size_t result = Serial::readBinary(buf, sizeof(buf), type, crc);
-            if (result) {
-                if (result % sizeof(uint32_t) != 0) {
-                    DEBUG_PRINT(DebugType::ERROR, "Serial: invalid binary type=%u size=%u", static_cast<unsigned>(type), static_cast<unsigned>(result));
+            Serial::BinaryResult result = Serial::readBinary(buf, sizeof(buf));
+            if (result.size) {
+                uint32_t newCrc;
+                if ((result.size % sizeof(uint32_t)) != 0) {
+                    DEBUG_PRINT(DebugType::ERROR, "Serial: invalid binary type=%u size=%u", static_cast<unsigned>(result.type), static_cast<unsigned>(result.size));
                 }
-                else if ((newCrc = stm32_CRC(reinterpret_cast<uint32_t *>(buf), result)) != crc) {
-                    DEBUG_PRINT(DebugType::ERROR, "Serial: CRC expected=0x%08X got=0x%08X type=%u size=%u", crc, newCrc, static_cast<unsigned>(type), static_cast<unsigned>(result));
+                else if ((newCrc = stm32_CRC(reinterpret_cast<uint32_t *>(buf), result.size)) != result.crc) {
+                    DEBUG_PRINT(DebugType::ERROR, "Serial: CRC expected=0x%08X got=0x%08X type=%u size=%u", result.crc, newCrc, static_cast<unsigned>(result.type), static_cast<unsigned>(result.size));
                 }
                 else {
-                    handle_serial_data(result, type, buf);
+                    handle_serial_data(result, buf);
                 }
             }
         }

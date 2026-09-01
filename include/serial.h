@@ -59,6 +59,22 @@ struct SerialProtocol
 
 struct Serial : public SerialProtocol
 {
+    struct BinaryResult
+    {
+        size_t size;
+        BinaryType type;
+        uint32_t crc;
+
+        BinaryResult() : size(0), crc(0xffffffff)
+        {
+        }
+
+        uint16_t *getTypePtr()
+        {
+            return reinterpret_cast<uint16_t *>(&type);
+        }
+    };
+
     inline static bool isConfigured()
     {
         return (hUsbDeviceFS.pClassData != nullptr) && (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED);
@@ -80,12 +96,14 @@ struct Serial : public SerialProtocol
         return false;
     }
 
-    static size_t readBinary(void *data, size_t size, BinaryType &type, uint32_t &crc)
+    static BinaryResult readBinary(void *data, size_t size)
     {
+        BinaryResult result;
         if (size == 0 || !isConnected()) {
-            return 0;
+            return result;
         }
-        return CDC_ReadBinary_FS(reinterpret_cast<uint8_t *>(data), size, reinterpret_cast<uint16_t *>(&type), &crc);
+        result.size = CDC_ReadBinary_FS(reinterpret_cast<uint8_t *>(data), size, result.getTypePtr(), &result.crc);
+        return result;
     }
 
     static size_t write(const void *data, size_t size)
