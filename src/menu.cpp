@@ -135,12 +135,18 @@ static const char *kDirectionItems[] = {
     "Reverse"
 };
 
-const char *kCurrentLimitStrengthItems[] = {
+static const char *kCurrentLimitStrengthItems[] = {
     "Low",
     "Medium",
     "High",
     "Very High"
 };
+
+const char *getCurrentLimitStrengthItem(EEPROM::CurrentLimitStrength strength)
+{
+    static_assert(static_cast<uint8_t>(EEPROM::CurrentLimitStrength::MAX) == sizeof_array(kCurrentLimitStrengthItems), "number of items mismatch");
+    return kCurrentLimitStrengthItems[static_cast<uint8_t>(strength) % sizeof_array(kCurrentLimitStrengthItems)];
+}
 
 enum class RestoreDefaultsItemType {
     RESTORE = 0,
@@ -819,7 +825,7 @@ void Menu::handleButtonPress(uint32_t duration)
             {
                 DashboardScreen &dashboard = *reinterpret_cast<DashboardScreen *>(screenFlow.getScreen());
                 // short press advances to the next editable value, long press moves backward through the same selection cycle
-                switch((duration < UIConstants::kLongPressDuration) ? dashboard.incrSelectedValue(eeprom.isPIDMode()) : dashboard.decrSelectedValue(eeprom.isPIDMode())) {
+                switch(dashboard.changeSelectedValue(eeprom.isPIDMode(), (duration < UIConstants::kLongPressDuration))) {
                     case DashboardScreen::SelectedValueType::SPEED:
                     case DashboardScreen::SelectedValueType::SPEED2:
                         dashboard.setMaxAcceleration(eeprom.isPIDMode() ? UIConstants::kStepsRPM : UIConstants::kStepsPWM);

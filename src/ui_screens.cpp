@@ -8,7 +8,7 @@
 #include "pid_controller.h"
 #include "serial.h"
 
-extern const char *kCurrentLimitStrengthItems[];
+const char *getCurrentLimitStrengthItem(EEPROM::CurrentLimitStrength strength);
 
 // === Helpers ===
 
@@ -67,10 +67,10 @@ inline int32_t dashboard_screen_graph_compute_range()
 
 void start_screen_update_top_status_labels(lv_obj_t *voltageLabel, lv_obj_t *currentLabel, lv_obj_t *motorTempLabel, lv_obj_t *mosfetTempLabel, char *voltageLabelBuf, size_t voltageLabelBufSize, char *currentLabelBuf, size_t currentLabelBufSize, char *motorTempLabelBuf, size_t motorTempLabelBufSize, char *mosfetTempLabelBuf, size_t mosfetTempLabelBufSize)
 {
-    snprintf(voltageLabelBuf, voltageLabelBufSize, "%u.%uV (%u.%uV)", CONVERT_TO_FP1(stats.vcc), CONVERT_TO_FP1(stats.max.vcc));
+    snprintf(voltageLabelBuf, voltageLabelBufSize, SPRINTF_FP1_FMT "V (" SPRINTF_FP1_FMT "V)", CONVERT_TO_FP1(stats.vcc), CONVERT_TO_FP1(stats.max.vcc));
     lv_label_set_text_static(voltageLabel, voltageLabelBuf);
 
-    snprintf(currentLabelBuf, currentLabelBufSize, "%u.%uA (%u.%uA)", CONVERT_TO_FP1(stats.current), CONVERT_TO_FP1(stats.max.current));
+    snprintf(currentLabelBuf, currentLabelBufSize, SPRINTF_FP1_FMT "A (" SPRINTF_FP1_FMT "A)", CONVERT_TO_FP1(stats.current), CONVERT_TO_FP1(stats.max.current));
     lv_label_set_text_static(currentLabel, currentLabelBuf);
 
     snprintf(motorTempLabelBuf, motorTempLabelBufSize, "%d" DEGREE_UTF8 "C", stats.motorTemp);
@@ -513,14 +513,14 @@ void DiagnosticsScreen::update()
 
 void DiagnosticsScreen::_refreshVisuals()
 {
-    snprintf(vccLabelBuf, sizeof(vccLabelBuf), "VCC %u.%uV (%u.%uV/%u.%uV)",
+    snprintf(vccLabelBuf, sizeof(vccLabelBuf), "VCC " SPRINTF_FP1_FMT "V (" SPRINTF_FP1_FMT "V/" SPRINTF_FP1_FMT "V)",
         CONVERT_TO_FP1(stats.vcc),
         CONVERT_TO_FP1(stats.min.vcc),
         CONVERT_TO_FP1(stats.max.vcc)
     );
     lv_label_set_text_static(vccLabel, vccLabelBuf);
 
-    snprintf(currentLabelBuf, sizeof(currentLabelBuf), "Current %u.%02uA (%u.%02uA/%u.%02uA)",
+    snprintf(currentLabelBuf, sizeof(currentLabelBuf), "Current " SPRINTF_FP2_FMT "A (" SPRINTF_FP2_FMT "A/" SPRINTF_FP2_FMT "A)",
         CONVERT_TO_FP2(stats.current),
         CONVERT_TO_FP2(stats.min.current),
         CONVERT_TO_FP2(stats.max.current)
@@ -729,7 +729,7 @@ void DashboardScreen::_refreshVisuals()
 
     switch(selectedValue) {
         case SelectedValueType::SPEED:
-            snprintf(valueLabelBuf, sizeof(valueLabelBuf), "PWM %d%% %u.%uW", static_cast<int>(pwmLevel), CONVERT_TO_FP1(stats.vcc * stats.current / 1000U));
+            snprintf(valueLabelBuf, sizeof(valueLabelBuf), "PWM %d%% " SPRINTF_FP1_FMT "W", static_cast<int>(pwmLevel), CONVERT_TO_FP1(stats.vcc * stats.current / 1000U));
             lv_label_set_text_static(valueLabel, valueLabelBuf);
             break;
         case SelectedValueType::SPEED2:
@@ -771,7 +771,7 @@ void DashboardScreen::_refreshVisuals()
             lv_label_set_text_static(valueLabel, valueLabelBuf);
             break;
         case SelectedValueType::CURRENT_LIMIT_STRENGTH:
-            snprintf(valueLabelBuf, sizeof(valueLabelBuf), "Strength %s", kCurrentLimitStrengthItems[static_cast<uint8_t>(eeprom.getCurrentLimitStrength()) % static_cast<uint8_t>(EEPROM::CurrentLimitStrength::MAX)]);
+            snprintf(valueLabelBuf, sizeof(valueLabelBuf), "Strength %s", getCurrentLimitStrengthItem(eeprom.getCurrentLimitStrength()));
             lv_label_set_text_static(valueLabel, valueLabelBuf);
             break;
         case SelectedValueType::MAX:

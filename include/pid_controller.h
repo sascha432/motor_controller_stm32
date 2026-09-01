@@ -66,9 +66,6 @@ struct PidController
         SENSOR_REVERSE,
         MOTOR_OVER_TEMPERATURE,
         MOSFET_OVER_TEMPERATURE,
-        FAULT,
-        OCP,
-        SNSOUT,
         OVP
     };
 

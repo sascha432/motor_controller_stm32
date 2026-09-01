@@ -53,7 +53,7 @@ struct UIConstants
     static constexpr uint32_t kStepOvpProtection = 100;                     // OVP protection step in millivolts
     static constexpr uint32_t kStepsRPM = 50;                               // RPM steps
     static constexpr uint32_t kStepsPWM = 1;                                // PWM steps
-    static constexpr uint16_t kMinPWMFrequency = 5000;                      // Min. PWM frequency in Hz
+    static constexpr uint16_t kMinPWMFrequency = 1500;                      // Min. PWM frequency in Hz
     static constexpr uint16_t kMaxPWMFrequency = 40000;                     // Max. PWM frequency in Hz
     static constexpr uint16_t kStepPWMFrequency = 500;                      // PWM frequency step in Hz
 
@@ -76,7 +76,7 @@ struct UIConstants
     static constexpr float kDefaultKd = 0.0f;                               // Default PID Kd value
     static constexpr uint16_t kDefaultAntiWindup = 90 * kAntiWindupFactor;  // Default PID anti-windup in percentage (0-100) * kAntiWindupFactor
     static constexpr uint16_t kDefaultOvpProtection = 36500;                // Default OVP protection in millivolts
-    static constexpr uint16_t kDefaultPWMFrequency = 16500;                 // Default PWM frequency in Hz
+    static constexpr uint16_t kDefaultPWMFrequency = 20000;                 // Default PWM frequency in Hz
     static constexpr bool kDefaultMotorChime = true;                        // Default welcome chime enabled
     static constexpr uint8_t kDefaultCurrentLimitStrength = 1;              // Default current limit strength
 

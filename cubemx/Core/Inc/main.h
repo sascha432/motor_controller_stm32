@@ -104,7 +104,7 @@ enum InterruptErrorType {
 #define PID_WRITE_MOTOR_PWM_FORWARD(level)          (PID_MOTOR_PWM_TIMER->CCR1 = (level), PID_MOTOR_PWM_TIMER->CCR2 = 0)
 #define PID_WRITE_MOTOR_PWM_REVERSE(level)          (PID_MOTOR_PWM_TIMER->CCR1 = 0, PID_MOTOR_PWM_TIMER->CCR2 = (level))
 #define PID_WRITE_MOTOR_PWM_ON(level, dir)          ((dir == EEPROM::MotorDirection::Reverse) ? PID_WRITE_MOTOR_PWM_REVERSE(level) : PID_WRITE_MOTOR_PWM_FORWARD(level))
-#define PID_WRITE_MOTOR_PWM_OFF()                   (PID_MOTOR_PWM_TIMER->CCR1 = 0, PID_MOTOR_PWM_TIMER->CCR2 = 0)
+#define PID_WRITE_MOTOR_PWM_OFF()                   (PID_MOTOR_PWM_TIMER->CCR1 = 0, PID_MOTOR_PWM_TIMER->CCR2 = 0, PID_MOTOR_PWM_TIMER->EGR = TIM_EGR_UG)
 #define PID_WRITE_MOTOR_PWM_BRAKE(level)            (PID_MOTOR_PWM_TIMER->CCR1 = (level), PID_MOTOR_PWM_TIMER->CCR2 = (level))
 
 // DAC macros for DRV8701 and INA381 overcurrent protection

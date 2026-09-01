@@ -152,7 +152,7 @@ static inline void user_setup()
     menu.applyEEPROMSettings();
 
     // program MT6701 PPR via I2C
-    if (PidController::kProgramPPR) {
+    if constexpr (PidController::kProgramPPR) {
         motorEncoder.programPPR(PidController::kPPR);
     }
 
@@ -206,7 +206,7 @@ static inline void loop()
     if (SWO::data.EEPROM.commit) {
         // check if the PID tuning requests to save the EEPROM settings
         SWO::data.EEPROM.commit = false;
-        bool result = eeprom.write();
+        const bool result = eeprom.write();
         (void)result;
         DEBUG_PRINT(DebugType::INFO, "SWO EEPROM write=%u", result);
         menu.applyEEPROMSettings();

@@ -303,12 +303,6 @@ size_t PidController::errorPrintf(char *buf, size_t bufSize) const
             return snprintf(buf, bufSize, "MOSFET %d" DEGREE_UTF8 "C", ::stats.mosfetTemp);
         case ErrorCodeType::OVP:
             return snprintf(buf, bufSize, "OVP %u.%uV", CONVERT_TO_FP1(eeprom.getOvpProtection()));
-        case ErrorCodeType::OCP:
-            return snprintf(buf, bufSize, "OCP");
-        case ErrorCodeType::FAULT:
-            return snprintf(buf, bufSize, "DRV8701 FAULT");
-        case ErrorCodeType::SNSOUT:
-            return snprintf(buf, bufSize, "DRV8701 SNSOUT");
         case ErrorCodeType::NONE:
             return snprintf(buf, bufSize, "NONE");
     }
@@ -322,9 +316,12 @@ size_t PidController::errorPrintf(char *buf, size_t bufSize) const
 
 void PidController::setPWMFrequency(uint32_t frequency)
 {
-    // clamp frequency to min/max values
     constexpr uint32_t kMinPWMFrequency = kARRToPWMFrequency(0xffff);       // 16bit timer limit
     constexpr uint32_t kMaxPWMFrequency = kARRToPWMFrequency(1 << 10);      // at least 10bit pwm resolution
+    static_assert(kMinPWMFrequency < UIConstants::kMinPWMFrequency, "UIConstants::kMinPWMFrequency is too low");
+    static_assert(kMaxPWMFrequency > UIConstants::kMaxPWMFrequency, "UIConstants::kMaxPWMFrequency is too high");
+
+    // clamp frequency to min/max values
     frequency = std::clamp<uint32_t>(frequency, kMinPWMFrequency, kMaxPWMFrequency);
 
     // set pwm level

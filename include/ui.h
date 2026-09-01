@@ -574,8 +574,23 @@ struct DashboardScreen : public Screen
     }
 
     /**
+     * @brief Increment or decrement selected value
+     *
+     * @param isPidMode
+     * @param direction true to increment, false to decrement
+     * @return SelectedValueType New selected value
+     */
+    SelectedValueType changeSelectedValue(bool isPidMode, bool direction)
+    {
+        return direction ?
+            incrSelectedValue(isPidMode) :
+            decrSelectedValue(isPidMode);
+    }
+
+    /**
      * @brief Increment the value that is selected for adjustment (speed, PID parameters, etc...) and wrap around to the first value if the last value is reached
      *
+     * @param isPidMode
      * @return SelectedValueType New selected value
      */
     SelectedValueType incrSelectedValue(bool isPidMode)
@@ -592,6 +607,7 @@ struct DashboardScreen : public Screen
     /**
      * @brief Decrement the value that is selected for adjustment (speed, PID parameters, etc...) and wrap around to the last value if the first value is reached
      *
+     * @param isPidMode
      * @return SelectedValueType New selected value
      */
     SelectedValueType decrSelectedValue(bool isPidMode)
