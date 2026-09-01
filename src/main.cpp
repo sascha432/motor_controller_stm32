@@ -176,6 +176,68 @@ static inline void user_setup()
     menu.loadStartScreen();
 }
 
+#if HAVE_USB_DEVICE
+
+/**
+ * @brief Handle incoming serial data
+ *
+ */
+static inline void handle_serial_data(const size_t result, const Serial::BinaryType type, const char *buf)
+{
+    switch(type) {
+        case Serial::BinaryType::REQUEST_SCREENSHOT: {
+                DEBUG_PRINT(DebugType::INFO, "Serial: screenshot requested");
+                SWO::data.sendScreenshot = true;
+            }
+            break;
+        case Serial::BinaryType::TOGGLE_PID: {
+                const uint32_t value = *reinterpret_cast<const uint32_t *>(buf);
+                SWO::data.enabled = value ? SWO::EnableState::SERIAL : SWO::EnableState::DISABLED;
+                DEBUG_PRINT(DebugType::INFO, "Serial: PID tuning %s", value ? "enabled" : "disabled");
+                if (value) {
+                    const auto params = pid.getPidParameters();
+                    Serial::writeBinary(Serial::BinaryType::PARAMETERS, &params, sizeof(params));
+                }
+            }
+            break;
+        case Serial::BinaryType::REQUEST_PARAMETERS: {
+                DEBUG_PRINT(DebugType::INFO, "Serial: PID parameters requested");
+                const auto params = pid.getPidParameters();
+                Serial::writeBinary(Serial::BinaryType::PARAMETERS, &params, sizeof(params));
+            }
+            break;
+        case Serial::BinaryType::PARAMETERS: {
+                DEBUG_PRINT(DebugType::INFO, "Serial: PID parameters received");
+                pid.setPidParameters(*reinterpret_cast<const PidController::PidParameters *>(buf));
+            }
+            break;
+        case Serial::BinaryType::REQUEST_EEPROM: {
+                DEBUG_PRINT(DebugType::INFO, "Serial: EEPROM requested");
+                const EEPROM::Data &data = eeprom.getData();
+                Serial::writeBinary(Serial::BinaryType::EEPROM, &data, sizeof(data));
+            }
+            break;
+        case Serial::BinaryType::EEPROM: {
+                eeprom.getData() = *reinterpret_cast<const EEPROM::Data *>(buf);
+                const bool result = eeprom.write();
+                (void)result;
+                DEBUG_PRINT(DebugType::INFO, "Serial: EEPROM write=%u", static_cast<unsigned>(result));
+                menu.applyEEPROMSettings();
+            }
+            break;
+        case Serial::BinaryType::SYSTEM_RESET: {
+                DEBUG_PRINT(DebugType::INFO, "Serial: system reset requested");
+                invoke_system_reset();
+            }
+            break;
+        default:
+            DEBUG_PRINT(DebugType::ERROR, "Serial: binary type=%u size=%u", static_cast<unsigned>(type), static_cast<unsigned>(result));
+            break;
+    }
+}
+
+#endif
+
 /**
  * @brief Main loop function
  *
@@ -332,70 +394,18 @@ static inline void loop()
         if (Serial::isConnected()) {
             char buf[128]; // EEPROM::Data is 60 byte, the header is 12 byte + a lot extra space
             Serial::BinaryType type;
-            uint32_t crc;
+            uint32_t crc, newCrc;
 
-            size_t result = Serial::readBinary(buf, sizeof(buf), type, crc);
+            const size_t result = Serial::readBinary(buf, sizeof(buf), type, crc);
             if (result) {
                 if (result % sizeof(uint32_t) != 0) {
-                    DEBUG_PRINT(DebugType::ERROR, "Serial: invalid binary size=%u type=%u", result, static_cast<uint32_t>(type));
+                    DEBUG_PRINT(DebugType::ERROR, "Serial: invalid binary type=%u size=%u", static_cast<unsigned>(type), static_cast<unsigned>(result));
+                }
+                else if ((newCrc = stm32_CRC(reinterpret_cast<uint32_t *>(buf), result)) != crc) {
+                    DEBUG_PRINT(DebugType::ERROR, "Serial: CRC expected=0x%08X got=0x%08X type=%u size=%u", crc, newCrc, static_cast<unsigned>(type), static_cast<unsigned>(result));
                 }
                 else {
-                    uint32_t newCrc = stm32_CRC(reinterpret_cast<uint32_t *>(buf), result);
-                    if (newCrc != crc) {
-                        DEBUG_PRINT(DebugType::ERROR, "Serial: CRC mismatch type=%u size=%u got=0x%08X expected=0x%08X", static_cast<uint32_t>(type), result, crc, newCrc);
-                    }
-                    else {
-                        switch(type) {
-                            case Serial::BinaryType::REQUEST_SCREENSHOT: {
-                                    DEBUG_PRINT(DebugType::INFO, "Serial: screenshot requested");
-                                    SWO::data.sendScreenshot = true;
-                                }
-                                break;
-                            case Serial::BinaryType::TOGGLE_PID: {
-                                    uint32_t value = *reinterpret_cast<uint32_t *>(buf);
-                                    SWO::data.enabled = value ? SWO::EnableState::SERIAL : SWO::EnableState::DISABLED;
-                                    DEBUG_PRINT(DebugType::INFO, "Serial: PID tuning %s", value ? "enabled" : "disabled");
-                                    if (value) {
-                                        auto params = pid.getPidParameters();
-                                        Serial::writeBinary(Serial::BinaryType::PARAMETERS, &params, sizeof(params));
-                                    }
-                                }
-                                break;
-                            case Serial::BinaryType::REQUEST_PARAMETERS: {
-                                    DEBUG_PRINT(DebugType::INFO, "Serial: PID parameters requested");
-                                    auto params = pid.getPidParameters();
-                                    Serial::writeBinary(Serial::BinaryType::PARAMETERS, &params, sizeof(params));
-                                }
-                                break;
-                            case Serial::BinaryType::PARAMETERS: {
-                                    DEBUG_PRINT(DebugType::INFO, "Serial: PID parameters received");
-                                    pid.setPidParameters(*reinterpret_cast<PidController::PidParameters *>(buf));
-                                }
-                                break;
-                            case Serial::BinaryType::REQUEST_EEPROM: {
-                                    DEBUG_PRINT(DebugType::INFO, "Serial: EEPROM requested");
-                                    EEPROM::Data &data = eeprom.getData();
-                                    Serial::writeBinary(Serial::BinaryType::EEPROM, &data, sizeof(data));
-                                }
-                                break;
-                            case Serial::BinaryType::EEPROM: {
-                                    eeprom.getData() = *reinterpret_cast<EEPROM::Data *>(buf);
-                                    bool result = eeprom.write();
-                                    (void)result;
-                                    DEBUG_PRINT(DebugType::INFO, "Serial: EEPROM write=%u", result);
-                                    menu.applyEEPROMSettings();
-                                }
-                                break;
-                            case Serial::BinaryType::SYSTEM_RESET: {
-                                    DEBUG_PRINT(DebugType::INFO, "Serial: system reset requested");
-                                    invoke_system_reset();
-                                }
-                                break;
-                            default:
-                                DEBUG_PRINT(DebugType::ERROR, "Serial: binary type=%u size=%u", static_cast<uint32_t>(type), result);
-                                break;
-                        }
-                    }
+                    handle_serial_data(result, type, buf);
                 }
             }
         }
