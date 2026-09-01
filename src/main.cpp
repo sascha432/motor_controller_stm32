@@ -25,8 +25,10 @@ static void lvgl_log_cb(const char *buf)
 }
 #endif
 
-// === interrupt handlers initialization ===
-
+/**
+ * @brief Initialize interrupt handlers
+ *
+ */
 static inline void EXTI_Init()
 {
     // Route EXTI8-EXTI11 to GPIO port D
@@ -80,8 +82,10 @@ static inline void EXTI_Init()
     HAL_NVIC_EnableIRQ(TIM6_IRQn);
 }
 
-// === DWT cycle counter ===
-
+/**
+ * @brief Initialize DWT cycle counter
+ *
+ */
 static inline void DWT_Init(void)
 {
     // Enable trace
@@ -92,8 +96,21 @@ static inline void DWT_Init(void)
     DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
 }
 
-// === core setup ===
+/**
+ * @brief Disable PID, PWM and invoke system reset
+ *
+ */
+static inline void invoke_system_reset()
+{
+    pid.running = false;
+    PID_WRITE_MOTOR_PWM_OFF();
+    HAL_NVIC_SystemReset();
+}
 
+/**
+ * @brief Core setup
+ *
+ */
 static inline void setup()
 {
     // Initialize and read EEPROM on I2C1 on PB8/PB9
@@ -108,9 +125,7 @@ static inline void setup()
     backButton.init(nullptr, [](uint32_t duration) {
         // do hard reset after holding the back button for 5 seconds
         if (duration >= 5000) {
-            pid.running = false;
-            PID_WRITE_MOTOR_PWM_OFF();
-            HAL_NVIC_SystemReset();
+            invoke_system_reset();
         }
     });
     startButton.init();
@@ -127,8 +142,10 @@ static inline void setup()
     tft_driver_spi_init();
 }
 
-// === user setup runs after core setup ===
-
+/**
+ * @brief User setup
+ *
+ */
 static inline void user_setup()
 {
     // Initialize display driver
@@ -159,8 +176,10 @@ static inline void user_setup()
     menu.loadStartScreen();
 }
 
-// === main loop ===
-
+/**
+ * @brief Main loop function
+ *
+ */
 static inline void loop()
 {
     // feed the dog
@@ -283,7 +302,7 @@ static inline void loop()
     #if 0
         static uint32_t lastDebugPrint = 0;
         if ((HAL_GetTick() - lastDebugPrint) >= 100U) {
-            DEBUG_PRINT(DebugType::INFO, "rpm=%u", static_cast<unsigned>(PID_READ_RPM_COUNTER()));
+            DEBUG_PRINT(DebugType::INFO, "abc=%u", 123);
             lastDebugPrint = HAL_GetTick();
         }
     #endif
@@ -369,7 +388,7 @@ static inline void loop()
                                 break;
                             case Serial::BinaryType::SYSTEM_RESET: {
                                     DEBUG_PRINT(DebugType::INFO, "Serial: system reset requested");
-                                    HAL_NVIC_SystemReset();
+                                    invoke_system_reset();
                                 }
                                 break;
                             default:
@@ -408,8 +427,10 @@ static inline void loop()
     #endif
 }
 
-// === main ===
-
+/**
+ * @brief Main function
+ *
+ */
 int main(void)
 {
     // system init
@@ -419,12 +440,12 @@ int main(void)
     SystemClock_Config();
     SWO::init();
     MX_CRC_Init();
-    MX_TIM1_Init(); // PWM for motor and RPM counter
+    MX_TIM1_Init(); // PWM for motor and ADC injection group trigger
     MX_TIM2_Init(); // PWM for TFT backlight and LED
     MX_TIM3_Init(); // rotary encoder
     MX_TIM4_Init(); // mt6701 encoder
     MX_TIM5_Init(); // analog rpm counter
-    MX_TIM6_Init(); // PID timer
+    MX_TIM6_Init(); // PID timer callback
     MX_TIM7_Init(); // microseconds tick timer
     MX_DAC_Init();
     #if HAVE_USB_DEVICE
