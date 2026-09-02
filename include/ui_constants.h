@@ -84,4 +84,5 @@ struct UIConstants
     static constexpr uint32_t kWelcomeScreenTimeout = 2000;                 // WelcomeScreen timeout in milliseconds
     static constexpr uint32_t kInfoScreenTimeout = 1500;                    // Default InfoScreen timeout in milliseconds
     static constexpr uint32_t kLongPressDuration = 425;                     // Long press duration in milliseconds
+    static constexpr uint32_t kResetFirmwareLongPressTimeout = 5000;        // Long press duration in milliseconds before resetting firmware
 };

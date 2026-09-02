@@ -396,7 +396,7 @@ ScreenFlow &Menu::getScreenFlow()
 void Menu::abortableDelay(uint32_t ms)
 {
     clearUserInput();
-    uint32_t start = HAL_GetTick();
+    const uint32_t start = HAL_GetTick();
     while ((HAL_GetTick() - start) < ms) {
         WatchDog::feed();
         if (hasAnyButtonBeenPressed()) {
@@ -430,7 +430,7 @@ void Menu::clearUserInput()
 
 void Menu::saveEEPROMChanges()
 {
-    bool success = eeprom.write();
+    const bool success = eeprom.write();
     DEBUG_PRINT(DebugType::UI, "saveEEPROMChanges() write=%d", success);
     if (success) {
         screenFlow.setScreen(new InfoScreen(Screen::Type::EEPROM_SAVED, "Saved", InfoScreen::InfoScreenThemeType::INFO));
@@ -441,7 +441,7 @@ void Menu::saveEEPROMChanges()
 
 void Menu::writePendingEEPROMChanges()
 {
-    bool success = eeprom.write();
+    const bool success = eeprom.write();
     (void)success;
     DEBUG_PRINT(DebugType::UI, "writePendingEEPROMChanges() write=%d", success);
 }

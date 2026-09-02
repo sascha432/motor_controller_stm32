@@ -74,6 +74,27 @@ inline void delay_us()
 }
 
 /**
+ * @brief Initialize DWT cycle counter
+ *
+ */
+static inline void DWT_Init(void)
+{
+    // Enable trace
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+    // Reset cycle counter
+    DWT->CYCCNT = 0;
+    // Enable cycle counter
+    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+}
+
+/**
+ * @brief Delay with interrupts disabled
+ *
+ * @param ms Time in milliseconds
+ */
+void DWT_delay_ms(uint32_t ms);
+
+/**
  * @brief Convert float to string helper
  */
 struct FloatToString
@@ -306,6 +327,7 @@ static constexpr float kFloatToUint16Multiplier = 65535.0f;
 template <typename ENUM_TYPE, typename T>
 constexpr T clamp_enum(T value)
 {
-    using U = std::underlying_type_t<ENUM_TYPE>;
+    using UT = std::underlying_type_t<ENUM_TYPE>;
+    using U = std::conditional_t<(sizeof(UT) > sizeof(T)), UT, T>;
     return std::clamp<T>(static_cast<U>(value), static_cast<U>(ENUM_TYPE::MIN), static_cast<U>(ENUM_TYPE::MAX) - 1);
 }

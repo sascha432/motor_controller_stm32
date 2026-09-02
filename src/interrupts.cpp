@@ -206,26 +206,6 @@ extern "C" void OTG_FS_IRQHandler(void)
 #endif
 
 /**
- * @brief Delay with interrupts disabled
- *
- * @param ms Time in milliseconds
- */
-static void delay_ms(uint32_t ms)
-{
-    constexpr uint32_t kTicksPerMs = F_CPU / 1000;
-    constexpr uint32_t kMaxMillis = UINT32_MAX / kTicksPerMs;
-    while(ms > kMaxMillis) {
-        ms -= kMaxMillis;
-        delay_ms(kMaxMillis);
-    }
-    const uint32_t start = DWT->CYCCNT;
-    const uint32_t ticks = ms * kTicksPerMs;
-    while ((DWT->CYCCNT - start) < ticks) {
-        __NOP();
-    }
-}
-
-/**
   * @brief  This function is executed in case of error occurrence.
   * @retval None
   */
@@ -272,16 +252,16 @@ extern "C" void Error_Handler_Debug(void)
     LEDs::init();
     while (1) {
         LEDs::onLEDError();
-        delay_ms(500);
+        DWT_delay_ms(500);
         // signal error type via LED flashes
         for(uint32_t i = 0; i <= interruptErrorType; i++) {
             LEDs::off();
-            delay_ms(250);
+            DWT_delay_ms(250);
             LEDs::onLEDWarning();
-            delay_ms(250);
+            DWT_delay_ms(250);
         }
         LEDs::off();
-        delay_ms(500);
+        DWT_delay_ms(500);
         // check if the back button is pressed and reset MCU
         if (backButton.readGPIOState()) {
             HAL_NVIC_SystemReset();

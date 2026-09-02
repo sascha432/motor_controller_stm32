@@ -83,20 +83,6 @@ static inline void EXTI_Init()
 }
 
 /**
- * @brief Initialize DWT cycle counter
- *
- */
-static inline void DWT_Init(void)
-{
-    // Enable trace
-    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
-    // Reset cycle counter
-    DWT->CYCCNT = 0;
-    // Enable cycle counter
-    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
-}
-
-/**
  * @brief Disable PID, PWM and invoke system reset
  *
  */
@@ -123,8 +109,8 @@ static inline void setup()
     // buttons
     knobButton.init();
     backButton.init(nullptr, [](uint32_t duration) {
-        // do hard reset after holding the back button for 5 seconds
-        if (duration >= 5000) {
+        // do hard reset after holding the back button
+        if (duration >= UIConstants::kResetFirmwareLongPressTimeout) {
             invoke_system_reset();
         }
     });

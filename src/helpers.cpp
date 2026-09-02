@@ -5,6 +5,21 @@
 #include <string.h>
 #include "helpers.h"
 
+void DWT_delay_ms(uint32_t ms)
+{
+    constexpr uint32_t kTicksPerMs = F_CPU / 1000;
+    constexpr uint32_t kMaxMillis = UINT32_MAX / kTicksPerMs;
+    while(ms > kMaxMillis) {
+        ms -= kMaxMillis;
+        DWT_delay_ms(kMaxMillis);
+    }
+    const uint32_t start = DWT->CYCCNT;
+    const uint32_t ticks = ms * kTicksPerMs;
+    while ((DWT->CYCCNT - start) < ticks) {
+        __NOP();
+    }
+}
+
 // === float to string conversion ===
 
 #if DEBUG
