@@ -1,6 +1,10 @@
 # Changelog
 
-## [Unreleased 1.0.2]
+## [Unreleased 1.0.3]
+
+- New version
+
+## 1.0.2
 
 - Settings Tuning enabled for Open Loop Mode
 - Added current limit strength (Low - Very High)

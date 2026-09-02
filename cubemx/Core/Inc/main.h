@@ -65,7 +65,7 @@ enum InterruptErrorType {
 
 #define VERSION_MAJOR                               1
 #define VERSION_MINOR                               0
-#define VERSION_PATCH                               2
+#define VERSION_PATCH                               3
 #define VERSION_FULL                                ((VERSION_MAJOR << 16) | (VERSION_MINOR << 8) | (VERSION_PATCH))
 
 #ifndef PCB_REV_MAJOR
