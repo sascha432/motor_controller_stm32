@@ -93,7 +93,7 @@ void PidController::motorOff()
         }
         else {
             // enable brake
-            const uint32_t level = clampPWMLevel(eeprom.getMotorBrake() * pwmLevel.getMax() / 100);
+            const uint32_t level = clampPWMLevel(eeprom.getMotorBrake() * pwmLevel.getARR() / 100);
             PID_WRITE_MOTOR_PWM_BRAKE(level);
         }
         __enable_irq();

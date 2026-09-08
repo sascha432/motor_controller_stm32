@@ -215,6 +215,10 @@ struct SWO
     #define DEBUG_OUTPUT        DEBUG_OUTPUT_NONE
 #endif
 
+#ifndef GIT_REVISION
+    #define GIT_REVISION        ""
+#endif
+
 #if defined(DEBUG) && DEBUG
     #if DEBUG_OUTPUT == DEBUG_OUTPUT_SWO
         #define __DEBUG__BUILD__ "DEBUG SWO"
